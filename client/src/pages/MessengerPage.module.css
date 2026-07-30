@@ -1,0 +1,40 @@
+.page {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background: var(--chat-bg);
+  padding: var(--space-5);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+  text-align: center;
+  max-width: 420px;
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  margin: 0 0 var(--space-5);
+  color: var(--text-secondary);
+}
+
+.logout {
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}

@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
@@ -5,7 +6,9 @@ import { pinoHttp } from 'pino-http';
 
 import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
+import { authRouter } from './http/routes/auth.js';
 import { healthRouter } from './http/routes/health.js';
+import { usersRouter } from './http/routes/users.js';
 import { logger } from './lib/logger.js';
 
 /**
@@ -27,9 +30,12 @@ export function createApp(): Express {
     }),
   );
   app.use(express.json({ limit: '1mb' }));
+  app.use(cookieParser());
 
   // Роуты объявляются здесь и только здесь — не после server.listen(), как раньше.
   app.use('/api', healthRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/users', usersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

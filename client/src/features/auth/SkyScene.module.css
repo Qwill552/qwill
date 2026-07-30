@@ -1,0 +1,321 @@
+/* Атмосферная сцена день/ночь для экрана входа (секция 5). Единственное место
+   в приложении, где применяется liquid glass — сама карточка стилизуется в AuthPage. */
+
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #7bd3f7;
+  transition: background 1s ease;
+}
+
+:root[data-theme='dark'] .scene {
+  background: linear-gradient(180deg, #091024 0%, #15224a 65%, #1e3368 100%);
+}
+
+.stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 15% 25%, #fff 100%, transparent),
+    radial-gradient(3px 3px at 75% 15%, #fff 100%, transparent),
+    radial-gradient(2px 2px at 85% 45%, #fff 80%, transparent),
+    radial-gradient(1px 1px at 30% 60%, #fff 100%, transparent),
+    radial-gradient(2px 2px at 50% 10%, #fff 90%, transparent),
+    radial-gradient(1px 1px at 10% 80%, #fff 100%, transparent),
+    radial-gradient(2.5px 2.5px at 90% 80%, #fff 100%, transparent),
+    radial-gradient(1.5px 1.5px at 60% 70%, #fff 100%, transparent),
+    radial-gradient(1.5px 1.5px at 20% 45%, #fff 90%, transparent),
+    radial-gradient(2px 2px at 45% 85%, #fff 80%, transparent),
+    radial-gradient(1px 1px at 80% 25%, #fff 100%, transparent),
+    radial-gradient(2.5px 2.5px at 35% 15%, #fff 85%, transparent);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  z-index: 0;
+}
+
+:root[data-theme='dark'] .stars {
+  opacity: 1;
+}
+
+.celestial {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -370px);
+  width: 120px;
+  height: 120px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.sunWrapper {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  top: 10px;
+  left: 10px;
+  transition:
+    transform 1s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.8s ease;
+}
+
+:root[data-theme='dark'] .sunWrapper {
+  transform: translate(300px, 150px);
+  opacity: 0;
+}
+
+.sunDisc {
+  position: absolute;
+  inset: 0;
+  background: #ffdf73;
+  border-radius: 50%;
+  z-index: 2;
+  box-shadow: 0 0 50px 15px rgb(255 223 115 / 70%);
+}
+
+.sunRays {
+  position: absolute;
+  inset: -30px;
+  z-index: 1;
+  animation: spin-ccw 20s linear infinite;
+}
+
+.rayLine {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180px;
+  height: 6px;
+  background: linear-gradient(
+    90deg,
+    #ffdf73 0%,
+    #ffdf73 18%,
+    transparent 18%,
+    transparent 82%,
+    #ffdf73 82%,
+    #ffdf73 100%
+  );
+  transform: translate(-50%, -50%);
+  border-radius: 6px;
+  filter: drop-shadow(0 0 8px rgb(255 223 115 / 80%));
+}
+
+.rayLine:nth-child(2) {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.rayLine:nth-child(3) {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.rayLine:nth-child(4) {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+@keyframes spin-ccw {
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+.moon {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  top: 15px;
+  left: 15px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: -18px 12px 0 0 #fff;
+  transform: translate(-300px, 150px) rotate(-45deg);
+  opacity: 0;
+  transition:
+    transform 1s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.8s ease;
+}
+
+:root[data-theme='dark'] .moon {
+  transform: translate(12px, -8px) rotate(0deg);
+  opacity: 1;
+}
+
+.cloud {
+  position: absolute;
+  background: #fff;
+  border-radius: 50px;
+  transition:
+    background 1s ease,
+    opacity 1s ease,
+    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+}
+
+.cloud::before,
+.cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+
+.cloud::before {
+  animation: morph-cw 8s ease-in-out infinite;
+}
+.cloud::after {
+  animation: morph-ccw 10s ease-in-out infinite;
+}
+
+:root[data-theme='dark'] .cloud {
+  background: #1c2d5a;
+  opacity: 0.6;
+}
+
+.popping {
+  transform: scale(0) !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+@keyframes morph-cw {
+  0%,
+  100% {
+    border-radius: 50%;
+    transform: scale(1) translate(0, 0);
+  }
+  33% {
+    border-radius: 60% 40% 50% 50%;
+    transform: scale(1.05) translate(3px, -2px);
+  }
+  66% {
+    border-radius: 40% 60% 55% 45%;
+    transform: scale(0.95) translate(-2px, 3px);
+  }
+}
+
+@keyframes morph-ccw {
+  0%,
+  100% {
+    border-radius: 50%;
+    transform: scale(1) translate(0, 0);
+  }
+  33% {
+    border-radius: 45% 55% 40% 60%;
+    transform: scale(0.95) translate(-3px, -2px);
+  }
+  66% {
+    border-radius: 55% 45% 60% 40%;
+    transform: scale(1.05) translate(2px, 3px);
+  }
+}
+
+.cloud1 {
+  top: 20%;
+  left: 15%;
+  width: 160px;
+  height: 50px;
+  z-index: 1;
+}
+.cloud1::before {
+  width: 70px;
+  height: 70px;
+  top: -30px;
+  left: 20px;
+}
+.cloud1::after {
+  width: 90px;
+  height: 90px;
+  top: -45px;
+  right: 25px;
+}
+
+.cloud2 {
+  top: 15%;
+  left: 78%;
+  width: 200px;
+  height: 60px;
+  z-index: 1;
+}
+.cloud2::before {
+  width: 80px;
+  height: 80px;
+  top: -40px;
+  left: 30px;
+}
+.cloud2::after {
+  width: 100px;
+  height: 100px;
+  top: -50px;
+  right: 30px;
+}
+
+.cloud3 {
+  top: 68%;
+  left: 5%;
+  width: 220px;
+  height: 70px;
+  z-index: 1;
+}
+.cloud3::before {
+  width: 90px;
+  height: 90px;
+  top: -45px;
+  left: 40px;
+}
+.cloud3::after {
+  width: 110px;
+  height: 110px;
+  top: -55px;
+  right: 40px;
+}
+
+.cloud4 {
+  top: 72%;
+  left: 72%;
+  width: 180px;
+  height: 55px;
+  z-index: 3;
+}
+.cloud4::before {
+  width: 80px;
+  height: 80px;
+  top: -35px;
+  left: 25px;
+}
+.cloud4::after {
+  width: 90px;
+  height: 90px;
+  top: -45px;
+  right: 25px;
+}
+
+.cloud5 {
+  top: 45%;
+  left: 25%;
+  width: 120px;
+  height: 40px;
+  z-index: 3;
+}
+.cloud5::before {
+  width: 50px;
+  height: 50px;
+  top: -25px;
+  left: 15px;
+}
+.cloud5::after {
+  width: 60px;
+  height: 60px;
+  top: -30px;
+  right: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sunRays,
+  .cloud::before,
+  .cloud::after {
+    animation: none;
+  }
+  .cloud,
+  .sunWrapper,
+  .moon {
+    transition-duration: 1ms;
+  }
+}
