@@ -116,6 +116,10 @@ model Message {
   senderId String?
   sender   User?   @relation(fields: [senderId], references: [id], onDelete: SetNull)
 
+  /// Идентификатор клиента (генерируется при отправке): повтор после обрыва сокета
+  /// не создаёт дубль — сервер возвращает уже существующую запись (секция 3).
+  clientId String? @unique
+
   type    MessageType @default(TEXT)
   content String?
 

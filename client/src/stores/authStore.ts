@@ -3,6 +3,8 @@ import { create } from 'zustand';
 
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
 import { setAccessToken, setRefreshHandler } from '../api/client';
+import { connectSocket, disconnectSocket } from '../realtime/socket';
+import { useChatStore } from './chatStore';
 
 type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'anonymous';
 
@@ -17,13 +19,22 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => {
+  // React StrictMode вызывает эффект монтирования дважды в dev — без дедупликации это
+  // означало два параллельных /auth/refresh с одним и тем же токеном (секция 3, этап 2).
+  let bootstrapPromise: Promise<void> | null = null;
+
   function applyAuth(response: AuthResponse): void {
     setAccessToken(response.accessToken);
     set({ user: response.user, status: 'authenticated' });
+    // Сокет — единственное соединение на вкладку; переподключается со свежим токеном при логине/рефреше (секция 4).
+    connectSocket(response.accessToken);
+    useChatStore.getState().subscribeToSocket();
   }
 
   function clearAuth(): void {
     setAccessToken(null);
+    disconnectSocket();
+    useChatStore.getState().reset();
     set({ user: null, status: 'anonymous' });
   }
 
@@ -54,13 +65,18 @@ export const useAuthStore = create<AuthState>((set) => {
       clearAuth();
     },
 
-    async bootstrap() {
-      set({ status: 'loading' });
-      try {
-        applyAuth(await refreshRequest());
-      } catch {
-        clearAuth();
+    bootstrap() {
+      if (!bootstrapPromise) {
+        bootstrapPromise = (async () => {
+          set({ status: 'loading' });
+          try {
+            applyAuth(await refreshRequest());
+          } catch {
+            clearAuth();
+          }
+        })();
       }
+      return bootstrapPromise;
     },
   };
 });

@@ -67,7 +67,10 @@ export async function refresh(
   }
 
   const user = await getUserById(session.userId);
-  await prisma.session.delete({ where: { id: session.id } });
+  // deleteMany, а не delete: параллельный повторный /refresh с тем же токеном (двойной
+  // вызов bootstrap в React StrictMode, гонка нескольких вкладок) уже мог удалить строку —
+  // delete() бросил бы P2025 вместо аккуратной ротации токена.
+  await prisma.session.deleteMany({ where: { id: session.id } });
   return issueSession(user, userAgent);
 }
 
