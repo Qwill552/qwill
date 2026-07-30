@@ -51,22 +51,23 @@
 .list {
   flex: 1;
   overflow-y: auto;
-}
-
-.empty {
-  padding: var(--space-4);
-  color: var(--text-secondary);
-  text-align: center;
+  padding: var(--space-2) 0;
 }
 
 .item {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  margin: 0 var(--space-2);
   color: inherit;
   text-decoration: none;
   transition: background var(--transition);
+}
+
+.item + .item {
+  margin-top: 2px;
 }
 
 .item:hover {
@@ -75,33 +76,6 @@
 
 .itemActive {
   background: var(--primary-soft);
-}
-
-.avatarWrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 600;
-}
-
-.onlineDot {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 11px;
-  height: 11px;
-  border: 2px solid var(--surface);
-  border-radius: 50%;
-  background: var(--online);
 }
 
 .itemBody {

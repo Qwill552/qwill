@@ -43,6 +43,8 @@
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-bubble: 18px;
+  /* Скруглённый угол между соседними пузырями одной серии — «хвостик» остаётся только у последнего (секция 5). */
+  --radius-bubble-tight: 6px;
   --radius-card: 20px;
   --radius-pill: 999px;
 

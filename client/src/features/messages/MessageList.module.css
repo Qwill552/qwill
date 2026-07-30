@@ -2,7 +2,6 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-2);
   overflow-y: auto;
   padding: var(--space-4);
 }
@@ -22,10 +21,31 @@
 
 .row {
   display: flex;
+  margin-top: var(--space-2);
+}
+
+.rowGrouped {
+  margin-top: 2px;
 }
 
 .rowOwn {
   justify-content: flex-end;
+}
+
+.dayDivider {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.dayDivider span {
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .bubble {

@@ -16,22 +16,49 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .me {
-  color: var(--text-primary);
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.logout {
+.meName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
   border: none;
-  background: none;
+  border-radius: 50%;
+  background: transparent;
   color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 13px;
+  font-size: 16px;
   cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.iconButton:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .main {
@@ -41,23 +68,33 @@
   background: var(--chat-bg);
 }
 
-.empty {
+.emptyWrap {
   display: grid;
   flex: 1;
   place-items: center;
-  color: var(--text-secondary);
 }
 
 .chatHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 
+.chatHeaderText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
 .chatTitle {
-  display: block;
+  overflow: hidden;
   color: var(--text-primary);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chatSubtitle {
@@ -69,4 +106,39 @@
 
 .chatSubtitleTyping {
   color: var(--primary);
+}
+
+.backButton {
+  display: none;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: calc(var(--space-2) * -1);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.backButton:hover {
+  background: var(--primary-soft);
+}
+
+/* Мобильный layout: одна панель за раз, переключение через showList/showChat (секция 4). */
+@media (max-width: 860px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .showList .main,
+  .showChat .sidebar {
+    display: none;
+  }
+
+  .backButton {
+    display: grid;
+  }
 }

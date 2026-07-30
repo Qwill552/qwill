@@ -3,7 +3,9 @@ import { type FormEvent, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 import { useChatStore } from '../../stores/chatStore';
+import { Avatar } from './Avatar';
 import styles from './ChatList.module.css';
+import { EmptyState } from './EmptyState';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -53,7 +55,12 @@ export function ChatList() {
       {error && <p className={styles.error}>{error}</p>}
 
       <nav className={styles.list}>
-        {chats.length === 0 && <p className={styles.empty}>Пока нет чатов</p>}
+        {chats.length === 0 && (
+          <EmptyState
+            title="Пока нет чатов"
+            subtitle="Введите @username выше, чтобы написать первому и начать переписку"
+          />
+        )}
         {chats.map((chat) => {
           const online = chat.otherMember ? (presenceByUser[chat.otherMember.id]?.online ?? false) : false;
 
@@ -63,10 +70,7 @@ export function ChatList() {
               to={`/chats/${chat.id}`}
               className={({ isActive }) => `${styles.item} ${isActive ? styles.itemActive : ''}`}
             >
-              <div className={styles.avatarWrap}>
-                <div className={styles.avatar}>{chat.title.charAt(0).toUpperCase()}</div>
-                {online && <span className={styles.onlineDot} />}
-              </div>
+              <Avatar label={chat.title} size={52} online={online} />
               <div className={styles.itemBody}>
                 <div className={styles.itemTop}>
                   <span className={styles.itemTitle}>{chat.title}</span>

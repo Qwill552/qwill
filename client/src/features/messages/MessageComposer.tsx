@@ -6,6 +6,8 @@ import styles from './MessageComposer.module.css';
 
 /** Меньше TYPING_TIMEOUT_MS (5с) — явный stop почти всегда опережает автогашение у получателя (секция 3). */
 const TYPING_STOP_DELAY_MS = 3000;
+/** Совпадает с max-height в CSS — иначе авторасширение упрётся в обрезанный textarea раньше скролла. */
+const INPUT_MAX_HEIGHT_PX = 120;
 
 export function MessageComposer({ chatId }: { chatId: string }) {
   const [value, setValue] = useState('');
@@ -16,6 +18,15 @@ export function MessageComposer({ chatId }: { chatId: string }) {
 
   const isTypingRef = useRef(false);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    // Авторасширение по содержимому до INPUT_MAX_HEIGHT_PX, дальше — собственный скролл textarea.
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, INPUT_MAX_HEIGHT_PX)}px`;
+  }, [value]);
 
   useEffect(() => {
     // Смена чата или уход со страницы — сообщаем «перестал печатать» в прежнем чате.
@@ -75,6 +86,7 @@ export function MessageComposer({ chatId }: { chatId: string }) {
   return (
     <form className={styles.composer} onSubmit={handleSubmit}>
       <textarea
+        ref={textareaRef}
         className={styles.input}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
@@ -82,8 +94,16 @@ export function MessageComposer({ chatId }: { chatId: string }) {
         placeholder="Написать сообщение…"
         rows={1}
       />
-      <button className={styles.send} type="submit" disabled={!value.trim()}>
-        Отправить
+      <button className={styles.send} type="submit" disabled={!value.trim()} aria-label="Отправить">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4 12.5 20 4l-5.5 16-3.5-6.5L4 12.5Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </svg>
       </button>
     </form>
   );
