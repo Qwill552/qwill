@@ -3,7 +3,9 @@ import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../lib/errors.js';
+import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { assertAvatarEligible } from './file.js';
 import type { User } from '../generated/prisma/client.js';
 
 export function toPublicUser(user: User): PublicUser {
@@ -11,7 +13,7 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: fileUrl(user.avatarFileId),
     theme: user.theme,
     createdAt: user.createdAt.toISOString(),
     lastSeenAt: user.lastSeenAt.toISOString(),
@@ -58,4 +60,10 @@ export async function getUserById(id: string): Promise<User> {
     throw new AppError(ErrorCode.UNAUTHORIZED, 401, 'Пользователь не найден');
   }
   return user;
+}
+
+export async function setAvatar(userId: string, fileId: string, sha256: string): Promise<PublicUser> {
+  await assertAvatarEligible(fileId, sha256);
+  const user = await prisma.user.update({ where: { id: userId }, data: { avatarFileId: fileId } });
+  return toPublicUser(user);
 }

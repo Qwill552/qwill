@@ -5,10 +5,12 @@ import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './db/prisma.js';
 import { logger } from './lib/logger.js';
 import { createSocketServer } from './realtime/index.js';
+import { ensureStorageDirs } from './services/file.js';
 
-/** Порядок старта: env → БД → http → socket (секция 3). */
+/** Порядок старта: env → БД → storage → http → socket (секция 3, 7). */
 async function main(): Promise<void> {
   await connectDatabase();
+  await ensureStorageDirs();
 
   const app = createApp();
   const httpServer = createServer(app);

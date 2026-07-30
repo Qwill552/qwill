@@ -1,6 +1,7 @@
 import type { ApiErrorBody, ErrorCode } from '@messenger/shared';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+export { API_URL };
 
 export class ApiError extends Error {
   readonly code: ErrorCode;
@@ -61,6 +62,27 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
   }
 
   return data as T;
+}
+
+/**
+ * Сырой fetch с тем же Bearer/401-retry, что и apiRequest, но без JSON-обёртки — для чанков
+ * загрузки файлов (секция 7), где тело бинарное и ответ разбирается вызывающим кодом самостоятельно.
+ */
+export async function apiFetch(
+  path: string,
+  init: RequestInit & { skipAuthRetry?: boolean } = {},
+): Promise<Response> {
+  const { skipAuthRetry, ...rest } = init;
+  const headers = new Headers(rest.headers);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+
+  const res = await fetch(`${API_URL}${path}`, { ...rest, credentials: 'include', headers });
+
+  if (res.status === 401 && !skipAuthRetry && refreshHandler) {
+    const refreshed = await refreshHandler();
+    if (refreshed) return apiFetch(path, { ...init, skipAuthRetry: true });
+  }
+  return res;
 }
 
 /**

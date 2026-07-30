@@ -32,11 +32,14 @@ model User {
   id String @id @default(cuid(2))
 
   /// Уникален, хранится в нижнем регистре, неизменяем после регистрации.
-  username     String  @unique
+  username     String @unique
   passwordHash String
   displayName  String
-  avatarUrl    String?
-  theme        String  @default("system")
+  theme        String @default("system")
+
+  /// Файл аватара — дедуплицирован как любой другой File (секция 7).
+  avatarFileId String?
+  avatarFile   File?   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
 
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
@@ -47,6 +50,8 @@ model User {
   reactions         Reaction[]
   createdChats      Chat[]             @relation("ChatCreatedBy")
   pushSubscriptions PushSubscription[]
+  uploadSessions    UploadSession[]
+  uploadedFiles     File[]             @relation("FileUploadedBy")
 }
 
 model Session {
@@ -127,7 +132,7 @@ model Message {
   replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[] @relation("MessageReply")
 
-  editedAt DateTime?
+  editedAt  DateTime?
   /// Мягкое удаление: строка остаётся, content очищается — цитаты не рассыпаются.
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -146,7 +151,11 @@ model Attachment {
   message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   fileId String
-  file   File   @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  file   File   @relation("AttachmentFile", fields: [fileId], references: [id], onDelete: Restrict)
+
+  /// Уменьшенная копия/кадр, снятые клиентом через canvas перед загрузкой (секция 7). Тоже File — тоже дедуплицируется.
+  thumbnailFileId String?
+  thumbnail       File?   @relation("AttachmentThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
 
   originalName String
   width        Int?
@@ -156,13 +165,14 @@ model Attachment {
 
   @@index([messageId])
   @@index([fileId])
+  @@index([thumbnailFileId])
 }
 
 model File {
   id String @id @default(cuid(2))
 
   /// Дедупликация: одна физическая копия на много вложений (секция 7).
-  sha256 String @unique
+  sha256     String @unique
   /// Имя на диске внутри приватной STORAGE_DIR. Наружу не отдаётся.
   storedName String
   mimeType   String
@@ -170,7 +180,15 @@ model File {
 
   createdAt DateTime @default(now())
 
-  attachments Attachment[]
+  /// Кто первым загрузил этот контент — используется только для проверки права поставить
+  /// файл своим аватаром (иначе можно было бы угадать id чужого приватного вложения и
+  /// назначить его своим аватаром, сделав публично доступным). Дедупликации не мешает.
+  uploadedByUserId String?
+  uploadedBy       User?   @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  attachments            Attachment[] @relation("AttachmentFile")
+  thumbnailOfAttachments Attachment[] @relation("AttachmentThumbnail")
+  avatarOfUsers          User[]       @relation("UserAvatar")
 }
 
 model Reaction {
@@ -198,6 +216,30 @@ model PushSubscription {
   auth     String
   /// Реализация PushProvider: "webpush" сейчас, "fcm" — для Android (секция 6).
   provider String @default("webpush")
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UploadSession {
+  id String @id @default(cuid(2))
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Заявлен клиентом до передачи байтов — финальный File создаётся только после проверки реального
+  /// хэша содержимого на сервере (секция 7: клиенту нельзя доверять для дедупликации/идентичности).
+  sha256       String
+  size         BigInt
+  mimeType     String
+  originalName String
+  /// "message" — обычный лимит MAX_FILE_SIZE_BYTES; "avatar" — более строгий MAX_AVATAR_SIZE_BYTES и только изображения.
+  purpose      String
+
+  /// Путь к временному файлу на диске, куда дописываются чанки.
+  tempPath      String
+  receivedBytes BigInt @default(0)
 
   createdAt DateTime @default(now())
 

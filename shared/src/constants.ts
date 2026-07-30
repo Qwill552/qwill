@@ -19,3 +19,37 @@ export const MESSAGES_PAGE_SIZE = 50;
 
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;
+
+/**
+ * Белый список MIME-типов для вложений (секция 7). Сервер дополнительно проверяет
+ * содержимое по сигнатуре — этот список используется и там, и для accept= на клиенте.
+ */
+export const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'application/pdf',
+  'application/zip',
+  'text/plain',
+] as const;
+export type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
+
+/** Аватар — только изображения (секция 7). */
+export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/** Значения по умолчанию — сервер авторитетен (реальные лимиты берёт из env), это только для быстрой UX-проверки на клиенте до хэширования. */
+export const DEFAULT_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+export const DEFAULT_MAX_AVATAR_SIZE_BYTES = 50 * 1024 * 1024;
+export const DEFAULT_UPLOAD_CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
+
+/** Сторона сообщает реальное смещение уже принятых байт клиенту при обрыве и докачке (секция 7). */
+export const UPLOAD_OFFSET_HEADER = 'x-upload-offset';
+
+/** Не больше стольки пикселей по длинной стороне у превью, снятого клиентом через canvas (секция 7). */
+export const THUMBNAIL_MAX_DIMENSION = 320;

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
+import { AttachmentView } from './Attachment';
 import styles from './MessageList.module.css';
 
 /** Сообщения одного автора ближе этого интервала визуально группируются (секция 5: хвостик только у последнего). */
@@ -126,7 +127,12 @@ export function MessageList({ chatId }: { chatId: string }) {
                 }`}
                 style={cornerStyle}
               >
-                <p className={styles.text}>{message.content}</p>
+                {message.attachment && (
+                  <div className={styles.attachment}>
+                    <AttachmentView attachment={message.attachment} />
+                  </div>
+                )}
+                {message.content && <p className={styles.text}>{message.content}</p>}
                 <span className={styles.time}>
                   {statusLabel}
                   {isOwn && delivered && (

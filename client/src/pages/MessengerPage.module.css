@@ -28,6 +28,29 @@
   min-width: 0;
 }
 
+.avatarButton {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.avatarButton:hover {
+  opacity: 0.8;
+}
+
+.avatarButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.hiddenInput {
+  display: none;
+}
+
 .meName {
   overflow: hidden;
   color: var(--text-primary);

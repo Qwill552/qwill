@@ -1,0 +1,45 @@
+.image,
+.video {
+  display: block;
+  max-width: 280px;
+  max-height: 320px;
+  border-radius: calc(var(--radius-bubble) - 4px);
+  background: var(--bg);
+  object-fit: cover;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 200px;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: inherit;
+  text-decoration: none;
+}
+
+.fileIcon {
+  font-size: 22px;
+}
+
+.fileInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.fileName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  color: var(--text-secondary);
+  font-size: 12px;
+}

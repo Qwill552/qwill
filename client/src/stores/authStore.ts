@@ -16,6 +16,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Вызывается один раз при старте приложения — восстанавливает сессию по refresh-куке. */
   bootstrap: () => Promise<void>;
+  /** Точечное обновление профиля (пока только аватар) без повторного логина. */
+  updateUser: (user: PublicUser) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => {
@@ -77,6 +79,10 @@ export const useAuthStore = create<AuthState>((set) => {
         })();
       }
       return bootstrapPromise;
+    },
+
+    updateUser(user) {
+      set({ user });
     },
   };
 });

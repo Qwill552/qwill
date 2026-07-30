@@ -1,6 +1,9 @@
-import { useEffect } from 'react';
+import { AVATAR_MIME_TYPES } from '@messenger/shared';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { setAvatarRequest } from '../api/auth';
+import { uploadFile } from '../api/files';
 import { Avatar } from '../features/chats/Avatar';
 import { ChatList } from '../features/chats/ChatList';
 import { EmptyState } from '../features/chats/EmptyState';
@@ -25,8 +28,12 @@ export function MessengerPage() {
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -51,6 +58,22 @@ export function MessengerPage() {
     navigate('/login', { replace: true });
   }
 
+  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setAvatarUploading(true);
+    try {
+      const uploaded = await uploadFile(file, 'avatar');
+      updateUser(await setAvatarRequest(uploaded.id, uploaded.sha256));
+    } catch {
+      // Полноценный профиль/настройки — отдельный этап; здесь достаточно тихо не сломать интерфейс.
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   const activeChat = chats.find((c) => c.id === chatId);
   const otherOnline = activeChat?.otherMember
     ? (presenceByUser[activeChat.otherMember.id]?.online ?? false)
@@ -70,7 +93,23 @@ export function MessengerPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <div className={styles.me}>
-            <Avatar label={user?.displayName ?? '?'} size={40} />
+            <button
+              className={styles.avatarButton}
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarUploading}
+              title="Сменить аватар"
+              aria-label="Сменить аватар"
+            >
+              <Avatar label={user?.displayName ?? '?'} avatarUrl={user?.avatarUrl} size={40} />
+            </button>
+            <input
+              ref={avatarInputRef}
+              className={styles.hiddenInput}
+              type="file"
+              accept={AVATAR_MIME_TYPES.join(',')}
+              onChange={(e) => void handleAvatarChange(e)}
+            />
             <span className={styles.meName}>{user?.displayName}</span>
           </div>
           <div className={styles.headerActions}>
@@ -144,7 +183,7 @@ export function MessengerPage() {
                   />
                 </svg>
               </button>
-              <Avatar label={activeChat?.title ?? '?'} size={40} online={otherOnline} />
+              <Avatar label={activeChat?.title ?? '?'} avatarUrl={activeChat?.avatarUrl} size={40} online={otherOnline} />
               <div className={styles.chatHeaderText}>
                 <span className={styles.chatTitle}>{activeChat?.title ?? '…'}</span>
                 {subtitle && (

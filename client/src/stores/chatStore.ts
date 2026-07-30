@@ -3,6 +3,7 @@ import type {
   ChatListItemDto,
   ChatMemberSummary,
   ChatReadEvent,
+  MessageAttachmentInput,
   MessageDto,
   MessageSendAck,
   PublicUser,
@@ -54,7 +55,7 @@ interface ChatState {
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
-  sendMessage: (chatId: string, content: string, sender: PublicUser) => void;
+  sendMessage: (chatId: string, content: string, sender: PublicUser, attachment?: MessageAttachmentInput) => void;
   markRead: (chatId: string, messageId: number) => void;
   startTyping: (chatId: string) => void;
   stopTyping: (chatId: string) => void;
@@ -163,7 +164,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return chat;
   },
 
-  sendMessage(chatId, content, sender) {
+  sendMessage(chatId, content, sender, attachment) {
     const socket = getSocket();
     if (!socket) return;
 
@@ -173,8 +174,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chatId,
       clientId,
       sender,
-      type: 'TEXT',
-      content,
+      type: attachment ? 'MEDIA' : 'TEXT',
+      content: content || null,
+      // Вложение появится в ленте только после ack — превью во время отправки не показываем (см. композер).
+      attachment: null,
       replyToId: null,
       editedAt: null,
       deletedAt: null,
@@ -189,7 +192,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    socket.emit(SocketEvent.MessageSend, { chatId, clientId, content }, (ack: MessageSendAck) => {
+    socket.emit(SocketEvent.MessageSend, { chatId, clientId, content: content || undefined, attachment }, (ack: MessageSendAck) => {
       if (ack.ok && ack.message) {
         get().applyIncomingMessage(ack.message);
         return;

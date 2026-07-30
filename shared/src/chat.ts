@@ -4,6 +4,7 @@ import {
   MESSAGE_MAX_LENGTH,
   MESSAGES_PAGE_SIZE,
 } from './constants.js';
+import { messageAttachmentInputSchema, type AttachmentDto } from './files.js';
 
 export const createPrivateChatSchema = z.object({
   username: z.string().trim().toLowerCase().min(1, 'Укажите имя пользователя'),
@@ -16,14 +17,21 @@ export const messagesQuerySchema = z.object({
 });
 export type MessagesQuery = z.infer<typeof messagesQuerySchema>;
 
-/** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3). */
-export const messageSendSchema = z.object({
-  chatId: z.string().min(1),
-  /** Генерируется клиентом; повтор после обрыва не создаёт дубль (секция 3). */
-  clientId: z.string().min(1),
-  content: z.string().trim().min(1, 'Пустое сообщение').max(MESSAGE_MAX_LENGTH),
-  replyToId: z.number().int().positive().optional(),
-});
+/** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).
+ *  content — подпись; обязателен, только если вложения нет. */
+export const messageSendSchema = z
+  .object({
+    chatId: z.string().min(1),
+    /** Генерируется клиентом; повтор после обрыва не создаёт дубль (секция 3). */
+    clientId: z.string().min(1),
+    content: z.string().trim().max(MESSAGE_MAX_LENGTH).optional(),
+    replyToId: z.number().int().positive().optional(),
+    attachment: messageAttachmentInputSchema.optional(),
+  })
+  .refine((data) => (data.content && data.content.length > 0) || data.attachment, {
+    message: 'Пустое сообщение',
+    path: ['content'],
+  });
 export type MessageSendInput = z.infer<typeof messageSendSchema>;
 
 export type ChatType = 'PRIVATE' | 'GROUP';
@@ -46,6 +54,7 @@ export interface MessageDto {
   sender: ChatMemberSummary | null;
   type: MessageType;
   content: string | null;
+  attachment: AttachmentDto | null;
   replyToId: number | null;
   editedAt: string | null;
   deletedAt: string | null;

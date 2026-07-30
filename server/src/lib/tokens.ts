@@ -37,3 +37,27 @@ export function refreshTokenExpiry(): Date {
   const days = env.REFRESH_TOKEN_TTL_DAYS;
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
+
+export interface FileTokenPayload {
+  sub: string;
+  fid: string;
+}
+
+/**
+ * `<img>`/`<video>` не умеют слать Authorization-заголовок, а межсайтовые куки ненадёжны
+ * (и вовсе отсутствуют у будущего Capacitor-клиента, секция 6) — поэтому доступ к файлу
+ * по прямой ссылке идёт через короткоживущий подписанный токен в query, а не Bearer.
+ */
+export function signFileToken(userId: string, fileId: string): string {
+  return jwt.sign({ sub: userId, fid: fileId } satisfies FileTokenPayload, env.JWT_SECRET, {
+    expiresIn: '1h',
+  });
+}
+
+export function verifyFileToken(token: string): FileTokenPayload {
+  const payload = jwt.verify(token, env.JWT_SECRET);
+  if (typeof payload === 'string' || typeof payload.sub !== 'string' || typeof payload.fid !== 'string') {
+    throw new Error('Некорректный файловый токен');
+  }
+  return { sub: payload.sub, fid: payload.fid };
+}

@@ -3,22 +3,28 @@ import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
-import { toMessageDto } from './message.js';
-import type { Chat, ChatMember, Message, User } from '../generated/prisma/client.js';
+import { fileUrl } from '../lib/fileUrl.js';
+import { messageInclude, toMessageDto } from './message.js';
+import type { Attachment, Chat, ChatMember, File, Message, User } from '../generated/prisma/client.js';
+
+type MessageWithRelations = Message & {
+  sender: User | null;
+  attachments: (Attachment & { file: File; thumbnail: File | null })[];
+};
 
 type ChatWithRelations = Chat & {
   members: (ChatMember & { user: User })[];
-  messages: (Message & { sender: User | null })[];
+  messages: MessageWithRelations[];
 };
 
 function toMemberSummary(
-  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl' | 'lastSeenAt'>,
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'lastSeenAt'>,
 ): ChatMemberSummary {
   return {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: fileUrl(user.avatarFileId),
     lastSeenAt: user.lastSeenAt.toISOString(),
   };
 }
@@ -53,7 +59,7 @@ function countUnread(chatId: string, userId: string, lastReadMessageId: number |
 
 const chatWithListRelations = {
   members: { include: { user: true } },
-  messages: { orderBy: { id: 'desc' as const }, take: 1, include: { sender: true } },
+  messages: { orderBy: { id: 'desc' as const }, take: 1, include: messageInclude },
 };
 
 /** Проверка членства — вызывается любым сервисом, работающим с чатом (секция 3). */
@@ -188,7 +194,7 @@ export async function getMessages(
     where: { chatId, ...(before ? { id: { lt: before } } : {}) },
     orderBy: { id: 'desc' },
     take: limit + 1,
-    include: { sender: true },
+    include: messageInclude,
   });
 
   const hasMore = rows.length > limit;

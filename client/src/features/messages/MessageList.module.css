@@ -67,6 +67,10 @@
   outline: 1px solid #d14343;
 }
 
+.attachment {
+  margin: -10px -14px 4px;
+}
+
 .text {
   margin: 0;
   color: var(--text-primary);

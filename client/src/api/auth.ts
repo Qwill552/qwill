@@ -35,3 +35,7 @@ export function logoutRequest(): Promise<void> {
 export function meRequest(): Promise<PublicUser> {
   return apiRequest<PublicUser>('/api/users/me');
 }
+
+export function setAvatarRequest(fileId: string, sha256: string): Promise<PublicUser> {
+  return apiRequest<PublicUser>('/api/users/me/avatar', { method: 'POST', body: { fileId, sha256 } });
+}

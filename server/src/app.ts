@@ -8,6 +8,7 @@ import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
 import { authRouter } from './http/routes/auth.js';
 import { chatsRouter } from './http/routes/chats.js';
+import { filesRouter } from './http/routes/files.js';
 import { healthRouter } from './http/routes/health.js';
 import { usersRouter } from './http/routes/users.js';
 import { logger } from './lib/logger.js';
@@ -23,7 +24,13 @@ export function createApp(): Express {
   app.disable('x-powered-by');
 
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/health' } }));
-  app.use(helmet());
+  app.use(
+    helmet({
+      // Клиент и API — разные origin по дизайну (секция 6); дефолтный same-origin CORP
+      // молча блокирует <img>/<video> с /api/files несмотря на успешный fetch() (CORS его не покрывает).
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
   app.use(
     cors({
       origin: env.clientOrigins,
@@ -38,6 +45,7 @@ export function createApp(): Express {
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/chats', chatsRouter);
+  app.use('/api/files', filesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

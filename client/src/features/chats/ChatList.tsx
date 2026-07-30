@@ -70,7 +70,7 @@ export function ChatList() {
               to={`/chats/${chat.id}`}
               className={({ isActive }) => `${styles.item} ${isActive ? styles.itemActive : ''}`}
             >
-              <Avatar label={chat.title} size={52} online={online} />
+              <Avatar label={chat.title} avatarUrl={chat.avatarUrl} size={52} online={online} />
               <div className={styles.itemBody}>
                 <div className={styles.itemTop}>
                   <span className={styles.itemTitle}>{chat.title}</span>
