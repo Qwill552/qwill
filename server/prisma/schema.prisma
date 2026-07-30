@@ -1,0 +1,201 @@
+// Единственная точка правды по модели данных (секция 2 дизайна).
+// Миграции и типы генерируются отсюда — три init_db*.js и папка migrations/ больше не нужны.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Строка подключения задаётся в prisma.config.ts (Prisma 7), а не здесь.
+datasource db {
+  provider = "postgresql"
+}
+
+enum ChatType {
+  PRIVATE
+  GROUP
+}
+
+enum ChatRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  MEDIA
+  SYSTEM
+}
+
+model User {
+  id String @id @default(cuid(2))
+
+  /// Уникален, хранится в нижнем регистре, неизменяем после регистрации.
+  username     String  @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  theme        String  @default("system")
+
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  sessions          Session[]
+  memberships       ChatMember[]
+  messages          Message[]
+  reactions         Reaction[]
+  createdChats      Chat[]             @relation("ChatCreatedBy")
+  pushSubscriptions PushSubscription[]
+}
+
+model Session {
+  id String @id @default(cuid(2))
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// В БД только хэш refresh-токена; сам токен живёт лишь у клиента.
+  refreshTokenHash String   @unique
+  expiresAt        DateTime
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Chat {
+  id String @id @default(cuid(2))
+
+  type      ChatType
+  title     String?
+  avatarUrl String?
+
+  /// Защита от гонки при одновременном создании приватного чата с обеих сторон:
+  /// "<меньший userId>:<больший userId>". Для групп — null.
+  pairKey String? @unique
+
+  createdById String?
+  createdBy   User?   @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  ChatMember[]
+  messages Message[]
+}
+
+model ChatMember {
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role     ChatRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  /// Курсор прочтения у каждого участника отдельно (вместо messages.is_read).
+  /// Непрочитанные = сообщения чата с id > lastReadMessageId от других авторов.
+  lastReadMessageId Int?
+
+  @@id([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  /// Автоинкремент, а не cuid: по id строится курсорная пагинация,
+  /// подсчёт непрочитанных и догрузка пропущенного после реконнекта.
+  id Int @id @default(autoincrement())
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  /// null = автор удалил аккаунт; в ленте показывается «Удалённый аккаунт» (секция 8).
+  senderId String?
+  sender   User?   @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  type    MessageType @default(TEXT)
+  content String?
+
+  replyToId Int?
+  replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReply")
+
+  editedAt DateTime?
+  /// Мягкое удаление: строка остаётся, content очищается — цитаты не рассыпаются.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  attachments Attachment[]
+  reactions   Reaction[]
+
+  @@index([chatId, id])
+  @@index([senderId])
+}
+
+model Attachment {
+  id String @id @default(cuid(2))
+
+  messageId Int
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  originalName String
+  width        Int?
+  height       Int?
+  /// Длительность аудио/видео в миллисекундах.
+  duration     Int?
+
+  @@index([messageId])
+  @@index([fileId])
+}
+
+model File {
+  id String @id @default(cuid(2))
+
+  /// Дедупликация: одна физическая копия на много вложений (секция 7).
+  sha256 String @unique
+  /// Имя на диске внутри приватной STORAGE_DIR. Наружу не отдаётся.
+  storedName String
+  mimeType   String
+  size       BigInt
+
+  createdAt DateTime @default(now())
+
+  attachments Attachment[]
+}
+
+model Reaction {
+  messageId Int
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@id([messageId, userId, emoji])
+  @@index([userId])
+}
+
+model PushSubscription {
+  id String @id @default(cuid(2))
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+  /// Реализация PushProvider: "webpush" сейчас, "fcm" — для Android (секция 6).
+  provider String @default("webpush")
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

@@ -1,0 +1,88 @@
+/* Дизайн-токены (секция 5). Значения задаются здесь и только здесь — компоненты
+   обращаются к переменным, хардкод цветов в CSS-модулях не допускается. */
+
+:root,
+:root[data-theme='light'] {
+  --primary: #8c52ff;
+  --primary-soft: #f3ecff;
+  --bg: #f6f4fb;
+  --surface: #ffffff;
+  --chat-bg: #ece7f6;
+  --message-out: #ede2ff;
+  --message-in: #ffffff;
+  --text-primary: #14121a;
+  --text-secondary: #6f6a7d;
+  --border: #e6e1f0;
+  --online: #4ec97e;
+
+  --shadow-sm: 0 1px 2px rgb(20 18 26 / 6%);
+  --shadow-md: 0 4px 16px rgb(20 18 26 / 8%);
+  --shadow-lg: 0 12px 40px rgb(20 18 26 / 12%);
+}
+
+:root[data-theme='dark'] {
+  --primary: #a074ff;
+  --primary-soft: #2a2140;
+  --bg: #15131c;
+  --surface: #1e1b28;
+  --chat-bg: #0e0c14;
+  --message-out: #4a3378;
+  --message-in: #262233;
+  --text-primary: #f2f0f7;
+  --text-secondary: #9d97ad;
+  --border: #322c42;
+  --online: #4ec97e;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 32%);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 52%);
+}
+
+:root {
+  /* Скругления: пузырь 18, карточки 20, кнопки-пилюли. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-bubble: 18px;
+  --radius-card: 20px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-size-base: 15px;
+
+  --transition: 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 1ms linear;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}

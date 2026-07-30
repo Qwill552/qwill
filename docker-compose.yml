@@ -1,0 +1,24 @@
+version: "3.9"
+
+# Только Postgres. Приложение (server + client) запускается локально через `npm run dev`.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: messenger-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-messenger}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-messenger}
+      POSTGRES_DB: ${POSTGRES_DB:-messenger}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - messenger-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-messenger} -d ${POSTGRES_DB:-messenger}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  messenger-pgdata:
