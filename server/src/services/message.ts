@@ -19,6 +19,7 @@ export function toMessageDto(message: MessageWithSender): MessageDto {
           username: message.sender.username,
           displayName: message.sender.displayName,
           avatarUrl: message.sender.avatarUrl,
+          lastSeenAt: message.sender.lastSeenAt.toISOString(),
         }
       : null,
     type: message.type,

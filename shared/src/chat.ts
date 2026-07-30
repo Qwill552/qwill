@@ -35,6 +35,8 @@ export interface ChatMemberSummary {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  /** Онлайн-статус — не хранится здесь, вычисляется клиентом из user:presence поверх этого значения. */
+  lastSeenAt: string;
 }
 
 export interface MessageDto {
@@ -60,10 +62,14 @@ export interface ChatListItemDto {
   otherMember: ChatMemberSummary | null;
   lastMessage: MessageDto | null;
   updatedAt: string;
+  /** Сообщения чужих авторов с id больше собственного lastReadMessageId (секция 2). */
+  unreadCount: number;
 }
 
 export interface ChatDto extends ChatListItemDto {
   members: ChatMemberSummary[];
+  /** lastReadMessageId каждого участника — по нему клиент красит галочки прочтения на своих сообщениях. */
+  readCursors: Record<string, number | null>;
 }
 
 export interface ChatListResponse {

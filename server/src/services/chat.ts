@@ -11,11 +11,19 @@ type ChatWithRelations = Chat & {
   messages: (Message & { sender: User | null })[];
 };
 
-function toMemberSummary(user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>): ChatMemberSummary {
-  return { id: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl };
+function toMemberSummary(
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl' | 'lastSeenAt'>,
+): ChatMemberSummary {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    lastSeenAt: user.lastSeenAt.toISOString(),
+  };
 }
 
-function toChatListItem(chat: ChatWithRelations, userId: string): ChatListItemDto {
+function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: number): ChatListItemDto {
   const other = chat.type === 'PRIVATE' ? chat.members.find((m) => m.userId !== userId) : undefined;
   const otherSummary = other ? toMemberSummary(other.user) : null;
   const lastMessageRow = chat.messages[0];
@@ -28,7 +36,19 @@ function toChatListItem(chat: ChatWithRelations, userId: string): ChatListItemDt
     otherMember: otherSummary,
     lastMessage: lastMessageRow ? toMessageDto(lastMessageRow) : null,
     updatedAt: chat.updatedAt.toISOString(),
+    unreadCount,
   };
+}
+
+/** Сообщения чужих авторов с id больше курсора прочтения (секция 2: lastReadMessageId вместо is_read). */
+function countUnread(chatId: string, userId: string, lastReadMessageId: number | null): Promise<number> {
+  return prisma.message.count({
+    where: {
+      chatId,
+      senderId: { not: userId },
+      id: { gt: lastReadMessageId ?? 0 },
+    },
+  });
 }
 
 const chatWithListRelations = {
@@ -96,9 +116,14 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
     include: { chat: { include: chatWithListRelations } },
   });
 
-  return memberships
-    .map(({ chat }) => toChatListItem(chat, userId))
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const items = await Promise.all(
+    memberships.map(async (membership) => {
+      const unreadCount = await countUnread(membership.chatId, userId, membership.lastReadMessageId);
+      return toChatListItem(membership.chat, userId, unreadCount);
+    }),
+  );
+
+  return items.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 export async function getChatDetail(chatId: string, userId: string): Promise<ChatDto> {
@@ -109,10 +134,46 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
     include: chatWithListRelations,
   });
 
+  const own = chat.members.find((m) => m.userId === userId) ?? null;
+  const unreadCount = await countUnread(chatId, userId, own?.lastReadMessageId ?? null);
+  const readCursors = Object.fromEntries(chat.members.map((m) => [m.userId, m.lastReadMessageId]));
+
   return {
-    ...toChatListItem(chat, userId),
+    ...toChatListItem(chat, userId, unreadCount),
     members: chat.members.map((m) => toMemberSummary(m.user)),
+    readCursors,
   };
+}
+
+/** Курсор прочтения не может уйти назад — обновляем только если новое значение больше текущего (секция 3). */
+export async function markChatRead(chatId: string, userId: string, messageId: number): Promise<number> {
+  await assertMember(chatId, userId);
+
+  const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+  const nextCursor = Math.max(member.lastReadMessageId ?? 0, messageId);
+  if (nextCursor === member.lastReadMessageId) return nextCursor;
+
+  await prisma.chatMember.update({
+    where: { chatId_userId: { chatId, userId } },
+    data: { lastReadMessageId: nextCursor },
+  });
+  return nextCursor;
+}
+
+/** Все пользователи, с которыми у userId есть общий чат — получатели его presence-событий (секция 3). */
+export async function getCoMemberIds(userId: string): Promise<string[]> {
+  const memberships = await prisma.chatMember.findMany({
+    where: { userId },
+    select: { chatId: true },
+  });
+  if (memberships.length === 0) return [];
+
+  const coMembers = await prisma.chatMember.findMany({
+    where: { chatId: { in: memberships.map((m) => m.chatId) }, userId: { not: userId } },
+    select: { userId: true },
+    distinct: ['userId'],
+  });
+  return coMembers.map((m) => m.userId);
 }
 
 export async function getMessages(

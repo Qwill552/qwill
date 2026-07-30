@@ -1,6 +1,15 @@
 import type { Server as HttpServer } from 'node:http';
 
-import { messageSendSchema, SocketEvent, type MessageSendAck } from '@messenger/shared';
+import {
+  messageSendSchema,
+  SocketEvent,
+  type ChatReadEvent,
+  type ChatReadPayload,
+  type MessageSendAck,
+  type TypingPayload,
+  type UserPresenceEvent,
+  type UserTypingEvent,
+} from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 import { Server as SocketServer, type Socket } from 'socket.io';
 
@@ -9,7 +18,10 @@ import { prisma } from '../db/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
+import { assertMember, getCoMemberIds, markChatRead } from '../services/chat.js';
 import { sendMessage } from '../services/message.js';
+import { getUserById } from '../services/user.js';
+import { presenceStore } from './presence.js';
 
 let io: SocketServer | null = null;
 
@@ -33,11 +45,98 @@ export function emitToUser(userId: string, event: string, payload: unknown): voi
   io?.to(userRoom(userId)).emit(event, payload);
 }
 
+/**
+ * Разово синхронизирует онлайн-статус между двумя пользователями сразу после создания чата —
+ * без этого собеседник узнаёт о статусе друг друга только после переподключения сокета,
+ * так как getCoMemberIds на момент их последнего connect ещё не видел этот чат (секция 3).
+ */
+export async function syncPresenceBetween(userIdA: string, userIdB: string): Promise<void> {
+  const [userA, userB] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userIdA } }),
+    prisma.user.findUnique({ where: { id: userIdB } }),
+  ]);
+
+  if (userA) {
+    const event: UserPresenceEvent = {
+      userId: userIdA,
+      online: presenceStore.isOnline(userIdA),
+      lastSeenAt: userA.lastSeenAt.toISOString(),
+    };
+    emitToUser(userIdB, SocketEvent.UserPresence, event);
+  }
+  if (userB) {
+    const event: UserPresenceEvent = {
+      userId: userIdB,
+      online: presenceStore.isOnline(userIdB),
+      lastSeenAt: userB.lastSeenAt.toISOString(),
+    };
+    emitToUser(userIdA, SocketEvent.UserPresence, event);
+  }
+}
+
 /** Подписка на комнаты при подключении, а не при открытии чата (секция 3). */
 async function bootstrapSocket(socket: Socket, userId: string): Promise<void> {
   await socket.join(userRoom(userId));
   const memberships = await prisma.chatMember.findMany({ where: { userId }, select: { chatId: true } });
   for (const membership of memberships) await socket.join(membership.chatId);
+
+  const user = await getUserById(userId);
+  socket.data.displayName = user.displayName;
+
+  // Первый сокет пользователя — он был оффлайн, и нужно и разослать его "онлайн", и прислать снапшот чужих статусов.
+  const wasOffline = presenceStore.addSocket(userId) === 1;
+  const coMemberIds = await getCoMemberIds(userId);
+
+  for (const coMemberId of coMemberIds) {
+    if (presenceStore.isOnline(coMemberId)) {
+      socket.emit(SocketEvent.UserPresence, {
+        userId: coMemberId,
+        online: true,
+        lastSeenAt: new Date().toISOString(),
+      } satisfies UserPresenceEvent);
+    }
+  }
+
+  if (wasOffline) {
+    const event: UserPresenceEvent = { userId, online: true, lastSeenAt: new Date().toISOString() };
+    for (const coMemberId of coMemberIds) emitToUser(coMemberId, SocketEvent.UserPresence, event);
+  }
+}
+
+/** Последний сокет пользователя отключился — пишем lastSeenAt и оповещаем совместные чаты (секция 3). */
+async function teardownSocket(userId: string): Promise<void> {
+  const stillOnline = presenceStore.removeSocket(userId) > 0;
+  if (stillOnline) return;
+
+  const lastSeenAt = new Date();
+  await prisma.user.update({ where: { id: userId }, data: { lastSeenAt } });
+
+  const coMemberIds = await getCoMemberIds(userId);
+  const event: UserPresenceEvent = { userId, online: false, lastSeenAt: lastSeenAt.toISOString() };
+  for (const coMemberId of coMemberIds) emitToUser(coMemberId, SocketEvent.UserPresence, event);
+}
+
+async function handleChatRead(userId: string, payload: ChatReadPayload): Promise<void> {
+  if (!payload?.chatId || !Number.isInteger(payload.messageId)) return;
+
+  // Членство проверяется в БД (markChatRead → assertMember), а не через socket.rooms —
+  // join комнаты в bootstrapSocket асинхронный и может ещё не завершиться к этому моменту.
+  const lastReadMessageId = await markChatRead(payload.chatId, userId, payload.messageId);
+  const event: ChatReadEvent = { chatId: payload.chatId, userId, lastReadMessageId };
+  io?.to(payload.chatId).emit(SocketEvent.ChatRead, event);
+}
+
+async function handleTyping(socket: Socket, userId: string, payload: TypingPayload, isTyping: boolean): Promise<void> {
+  if (!payload?.chatId) return;
+  await assertMember(payload.chatId, userId);
+
+  const event: UserTypingEvent = {
+    chatId: payload.chatId,
+    userId,
+    displayName: (socket.data.displayName as string | undefined) ?? '',
+    isTyping,
+  };
+  socket.to(payload.chatId).emit(SocketEvent.UserTyping, event);
 }
 
 async function handleMessageSend(
@@ -99,8 +198,29 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       });
     });
 
+    socket.on(SocketEvent.ChatRead, (payload: ChatReadPayload) => {
+      handleChatRead(userId, payload).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки chat:read');
+      });
+    });
+
+    socket.on(SocketEvent.TypingStart, (payload: TypingPayload) => {
+      handleTyping(socket, userId, payload, true).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки typing:start');
+      });
+    });
+
+    socket.on(SocketEvent.TypingStop, (payload: TypingPayload) => {
+      handleTyping(socket, userId, payload, false).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки typing:stop');
+      });
+    });
+
     socket.on('disconnect', (reason) => {
       logger.debug({ socketId: socket.id, reason }, 'Сокет отключён');
+      teardownSocket(userId).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Не удалось обработать отключение сокета');
+      });
     });
   });
 

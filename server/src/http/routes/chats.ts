@@ -2,7 +2,7 @@ import { createPrivateChatSchema, messagesQuerySchema, SocketEvent } from '@mess
 import { Router } from 'express';
 
 import { parseOrThrow } from '../../lib/validate.js';
-import { emitToUser, subscribeUserToChat } from '../../realtime/index.js';
+import { emitToUser, subscribeUserToChat, syncPresenceBetween } from '../../realtime/index.js';
 import * as chatService from '../../services/chat.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
@@ -32,6 +32,8 @@ chatsRouter.post('/private', validateBody(createPrivateChatSchema), (req, res, n
       if (isNew) {
         const dtoForTarget = await chatService.getChatDetail(chatId, targetUserId);
         emitToUser(targetUserId, SocketEvent.ChatCreated, dtoForTarget);
+        // Иначе онлайн-статус собеседника узнаётся только после переподключения (секция 3).
+        await syncPresenceBetween(userId, targetUserId);
       }
 
       res.status(isNew ? 201 : 200).json(dto);

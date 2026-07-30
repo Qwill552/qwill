@@ -1,5 +1,15 @@
-import type { ChatDto, ChatListItemDto, MessageDto, MessageSendAck, PublicUser } from '@messenger/shared';
-import { SocketEvent } from '@messenger/shared';
+import type {
+  ChatDto,
+  ChatListItemDto,
+  ChatMemberSummary,
+  ChatReadEvent,
+  MessageDto,
+  MessageSendAck,
+  PublicUser,
+  UserPresenceEvent,
+  UserTypingEvent,
+} from '@messenger/shared';
+import { SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
 import {
@@ -13,60 +23,126 @@ import { getSocket } from '../realtime/socket';
 /** Локальное расширение сообщения статусом оптимистичной отправки — на сервер не уходит. */
 export type LocalMessage = MessageDto & { status?: 'sending' | 'failed' };
 
+interface PresenceInfo {
+  online: boolean;
+  lastSeenAt: string;
+}
+
+interface TypingUser {
+  userId: string;
+  displayName: string;
+}
+
 interface ChatState {
   chats: ChatListItemDto[];
   messagesByChat: Record<string, LocalMessage[]>;
   hasMoreByChat: Record<string, boolean>;
+  /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
+  readCursorsByChat: Record<string, Record<string, number | null>>;
+  /** Кто печатает в чате прямо сейчас, кроме меня самого. */
+  typingByChat: Record<string, TypingUser[]>;
+  /** Онлайн-статус известных клиенту пользователей (секция 3). */
+  presenceByUser: Record<string, PresenceInfo>;
   chatsLoaded: boolean;
   chatError: string | null;
+  myUserId: string | null;
+  /** Чат, открытый в текущей вкладке — новые сообщения в нём читаются сразу же (секция 8). */
+  activeChatId: string | null;
 
   loadChats: () => Promise<void>;
   openChat: (chatId: string) => Promise<void>;
+  closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   sendMessage: (chatId: string, content: string, sender: PublicUser) => void;
-  subscribeToSocket: () => void;
+  markRead: (chatId: string, messageId: number) => void;
+  startTyping: (chatId: string) => void;
+  stopTyping: (chatId: string) => void;
+  subscribeToSocket: (myUserId: string) => void;
   reset: () => void;
   /** Внутренний метод: применяет message:new и ack от message:send по одной логике реконсиляции. */
   applyIncomingMessage: (message: MessageDto) => void;
+  /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
+  applyChatDetail: (chat: ChatDto) => void;
+  /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
+  setTyping: (event: UserTypingEvent) => void;
 }
 
 function upsertChat(chats: ChatListItemDto[], chat: ChatListItemDto): ChatListItemDto[] {
   return [chat, ...chats.filter((c) => c.id !== chat.id)];
 }
 
+/** Заполняет presence только для новых пользователей — не затирает уже известный live-статус. */
+function seedPresence(
+  presence: Record<string, PresenceInfo>,
+  members: ChatMemberSummary[],
+): Record<string, PresenceInfo> {
+  let next = presence;
+  for (const member of members) {
+    if (!(member.id in next)) {
+      if (next === presence) next = { ...presence };
+      next[member.id] = { online: false, lastSeenAt: member.lastSeenAt };
+    }
+  }
+  return next;
+}
+
+// Таймеры автогашения «печатает» — вне стора, ключ `${chatId}:${userId}` (секция 3: TYPING_TIMEOUT_MS).
+const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function typingKey(chatId: string, userId: string): string {
+  return `${chatId}:${userId}`;
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
   hasMoreByChat: {},
+  readCursorsByChat: {},
+  typingByChat: {},
+  presenceByUser: {},
   chatsLoaded: false,
   chatError: null,
+  myUserId: null,
+  activeChatId: null,
 
   async loadChats() {
     const { chats } = await listChatsRequest();
-    set({ chats, chatsLoaded: true });
+    set((state) => {
+      let presenceByUser = state.presenceByUser;
+      for (const chat of chats) {
+        if (chat.otherMember) presenceByUser = seedPresence(presenceByUser, [chat.otherMember]);
+      }
+      return { chats, chatsLoaded: true, presenceByUser };
+    });
   },
 
   async openChat(chatId) {
-    set({ chatError: null });
+    set({ chatError: null, activeChatId: chatId });
 
-    if (!get().chats.some((c) => c.id === chatId)) {
-      try {
-        const chat = await getChatRequest(chatId);
-        set((state) => ({ chats: upsertChat(state.chats, chat) }));
-      } catch {
-        set({ chatError: 'Чат не найден или недоступен' });
-        return;
-      }
+    try {
+      const chat = await getChatRequest(chatId);
+      get().applyChatDetail(chat);
+    } catch {
+      set({ chatError: 'Чат не найден или недоступен' });
+      return;
     }
 
-    if (get().messagesByChat[chatId]) return;
+    if (!get().messagesByChat[chatId]) {
+      const page = await getMessagesRequest(chatId);
+      set((state) => ({
+        messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
+      }));
+    }
 
-    const page = await getMessagesRequest(chatId);
-    set((state) => ({
-      messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
-      hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-    }));
+    const messages = get().messagesByChat[chatId] ?? [];
+    const lastReal = [...messages].reverse().find((m) => m.id > 0);
+    if (lastReal) get().markRead(chatId, lastReal.id);
+  },
+
+  closeChat() {
+    set({ activeChatId: null });
   },
 
   async loadMore(chatId) {
@@ -83,7 +159,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   async startPrivateChat(username) {
     const chat = await createPrivateChatRequest({ username });
-    set((state) => ({ chats: upsertChat(state.chats, chat) }));
+    get().applyChatDetail(chat);
     return chat;
   },
 
@@ -129,7 +205,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  subscribeToSocket() {
+  markRead(chatId, messageId) {
+    getSocket()?.emit(SocketEvent.ChatRead, { chatId, messageId });
+  },
+
+  startTyping(chatId) {
+    getSocket()?.emit(SocketEvent.TypingStart, { chatId });
+  },
+
+  stopTyping(chatId) {
+    getSocket()?.emit(SocketEvent.TypingStop, { chatId });
+  },
+
+  subscribeToSocket(myUserId) {
+    set({ myUserId });
     const socket = getSocket();
     if (!socket) return;
 
@@ -138,12 +227,54 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.ChatCreated).on(SocketEvent.ChatCreated, (chat: ChatDto) => {
-      set((state) => ({ chats: upsertChat(state.chats, chat) }));
+      get().applyChatDetail(chat);
+    });
+
+    socket.off(SocketEvent.ChatRead).on(SocketEvent.ChatRead, (event: ChatReadEvent) => {
+      set((state) => {
+        const cursors = { ...(state.readCursorsByChat[event.chatId] ?? {}) };
+        cursors[event.userId] = event.lastReadMessageId;
+        // Прочтение с любого устройства гасит собственный бейдж непрочитанного (секция 8).
+        const chats =
+          event.userId === state.myUserId
+            ? state.chats.map((c) => (c.id === event.chatId ? { ...c, unreadCount: 0 } : c))
+            : state.chats;
+        return {
+          readCursorsByChat: { ...state.readCursorsByChat, [event.chatId]: cursors },
+          chats,
+        };
+      });
+    });
+
+    socket.off(SocketEvent.UserTyping).on(SocketEvent.UserTyping, (event: UserTypingEvent) => {
+      get().setTyping(event);
+    });
+
+    socket.off(SocketEvent.UserPresence).on(SocketEvent.UserPresence, (event: UserPresenceEvent) => {
+      set((state) => ({
+        presenceByUser: {
+          ...state.presenceByUser,
+          [event.userId]: { online: event.online, lastSeenAt: event.lastSeenAt },
+        },
+      }));
     });
   },
 
   reset() {
-    set({ chats: [], messagesByChat: {}, hasMoreByChat: {}, chatsLoaded: false, chatError: null });
+    for (const timer of typingTimers.values()) clearTimeout(timer);
+    typingTimers.clear();
+    set({
+      chats: [],
+      messagesByChat: {},
+      hasMoreByChat: {},
+      readCursorsByChat: {},
+      typingByChat: {},
+      presenceByUser: {},
+      chatsLoaded: false,
+      chatError: null,
+      myUserId: null,
+      activeChatId: null,
+    });
   },
 
   // Не часть публичного интерфейса стора — вызывается изнутри при message:new и после ack.
@@ -166,8 +297,72 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const chat = state.chats.find((c) => c.id === message.chatId);
       if (!chat) return state;
-      const updatedChat: ChatListItemDto = { ...chat, lastMessage: message, updatedAt: message.createdAt };
+
+      const isMine = message.sender?.id === state.myUserId;
+      const isActive = state.activeChatId === message.chatId;
+      const unreadCount = isMine ? chat.unreadCount : isActive ? 0 : chat.unreadCount + 1;
+
+      const updatedChat: ChatListItemDto = {
+        ...chat,
+        lastMessage: message,
+        updatedAt: message.createdAt,
+        unreadCount,
+      };
       return { ...state, chats: upsertChat(state.chats, updatedChat) };
+    });
+
+    const state = get();
+    if (state.activeChatId === message.chatId && message.sender?.id !== state.myUserId && message.id > 0) {
+      get().markRead(message.chatId, message.id);
+    }
+  },
+
+  applyChatDetail(chat: ChatDto) {
+    set((state) => ({
+      chats: upsertChat(state.chats, chat),
+      readCursorsByChat: { ...state.readCursorsByChat, [chat.id]: chat.readCursors },
+      presenceByUser: seedPresence(state.presenceByUser, chat.members),
+    }));
+  },
+
+  setTyping(event: UserTypingEvent) {
+    const key = typingKey(event.chatId, event.userId);
+    const existingTimer = typingTimers.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+    typingTimers.delete(key);
+
+    if (!event.isTyping) {
+      set((state) => ({
+        typingByChat: {
+          ...state.typingByChat,
+          [event.chatId]: (state.typingByChat[event.chatId] ?? []).filter((u) => u.userId !== event.userId),
+        },
+      }));
+      return;
+    }
+
+    typingTimers.set(
+      key,
+      setTimeout(() => {
+        typingTimers.delete(key);
+        set((state) => ({
+          typingByChat: {
+            ...state.typingByChat,
+            [event.chatId]: (state.typingByChat[event.chatId] ?? []).filter((u) => u.userId !== event.userId),
+          },
+        }));
+      }, TYPING_TIMEOUT_MS),
+    );
+
+    set((state) => {
+      const current = state.typingByChat[event.chatId] ?? [];
+      if (current.some((u) => u.userId === event.userId)) return state;
+      return {
+        typingByChat: {
+          ...state.typingByChat,
+          [event.chatId]: [...current, { userId: event.userId, displayName: event.displayName }],
+        },
+      };
     });
   },
 }));

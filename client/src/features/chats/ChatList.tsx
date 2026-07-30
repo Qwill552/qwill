@@ -12,6 +12,7 @@ function formatTime(iso: string): string {
 export function ChatList() {
   const chats = useChatStore((s) => s.chats);
   const startPrivateChat = useChatStore((s) => s.startPrivateChat);
+  const presenceByUser = useChatStore((s) => s.presenceByUser);
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -53,24 +54,34 @@ export function ChatList() {
 
       <nav className={styles.list}>
         {chats.length === 0 && <p className={styles.empty}>Пока нет чатов</p>}
-        {chats.map((chat) => (
-          <NavLink
-            key={chat.id}
-            to={`/chats/${chat.id}`}
-            className={({ isActive }) => `${styles.item} ${isActive ? styles.itemActive : ''}`}
-          >
-            <div className={styles.avatar}>{chat.title.charAt(0).toUpperCase()}</div>
-            <div className={styles.itemBody}>
-              <div className={styles.itemTop}>
-                <span className={styles.itemTitle}>{chat.title}</span>
-                {chat.lastMessage && (
-                  <span className={styles.itemTime}>{formatTime(chat.lastMessage.createdAt)}</span>
-                )}
+        {chats.map((chat) => {
+          const online = chat.otherMember ? (presenceByUser[chat.otherMember.id]?.online ?? false) : false;
+
+          return (
+            <NavLink
+              key={chat.id}
+              to={`/chats/${chat.id}`}
+              className={({ isActive }) => `${styles.item} ${isActive ? styles.itemActive : ''}`}
+            >
+              <div className={styles.avatarWrap}>
+                <div className={styles.avatar}>{chat.title.charAt(0).toUpperCase()}</div>
+                {online && <span className={styles.onlineDot} />}
               </div>
-              <p className={styles.itemPreview}>{chat.lastMessage?.content ?? 'Нет сообщений'}</p>
-            </div>
-          </NavLink>
-        ))}
+              <div className={styles.itemBody}>
+                <div className={styles.itemTop}>
+                  <span className={styles.itemTitle}>{chat.title}</span>
+                  {chat.lastMessage && (
+                    <span className={styles.itemTime}>{formatTime(chat.lastMessage.createdAt)}</span>
+                  )}
+                </div>
+                <div className={styles.itemBottom}>
+                  <p className={styles.itemPreview}>{chat.lastMessage?.content ?? 'Нет сообщений'}</p>
+                  {chat.unreadCount > 0 && <span className={styles.badge}>{chat.unreadCount}</span>}
+                </div>
+              </div>
+            </NavLink>
+          );
+        })}
       </nav>
     </div>
   );

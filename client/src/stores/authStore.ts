@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => {
     set({ user: response.user, status: 'authenticated' });
     // Сокет — единственное соединение на вкладку; переподключается со свежим токеном при логине/рефреше (секция 4).
     connectSocket(response.accessToken);
-    useChatStore.getState().subscribeToSocket();
+    useChatStore.getState().subscribeToSocket(response.user.id);
   }
 
   function clearAuth(): void {

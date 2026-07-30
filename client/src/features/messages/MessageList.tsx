@@ -8,11 +8,24 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Прочитано всеми, кроме автора, — курсоры участников есть всегда, даже «никогда не читал» (null) (секция 3). */
+function isReadByOthers(
+  cursors: Record<string, number | null> | undefined,
+  myId: string | null,
+  messageId: number,
+): boolean {
+  if (!cursors) return false;
+  const others = Object.entries(cursors).filter(([userId]) => userId !== myId);
+  if (others.length === 0) return false;
+  return others.every(([, cursor]) => cursor !== null && cursor !== undefined && cursor >= messageId);
+}
+
 export function MessageList({ chatId }: { chatId: string }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
   const loadMore = useChatStore((s) => s.loadMore);
-  const myId = useAuthStore((s) => s.user?.id);
+  const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
+  const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevLength = useRef(0);
@@ -33,6 +46,8 @@ export function MessageList({ chatId }: { chatId: string }) {
 
       {messages.map((message) => {
         const isOwn = message.sender?.id === myId;
+        const delivered = message.status !== 'sending' && message.status !== 'failed';
+        const read = isOwn && delivered && isReadByOthers(readCursors, myId, message.id);
         const statusLabel =
           message.status === 'sending'
             ? 'отправка…'
@@ -48,7 +63,14 @@ export function MessageList({ chatId }: { chatId: string }) {
               }`}
             >
               <p className={styles.text}>{message.content}</p>
-              <span className={styles.time}>{statusLabel}</span>
+              <span className={styles.time}>
+                {statusLabel}
+                {isOwn && delivered && (
+                  <span className={`${styles.check} ${read ? styles.checkRead : ''}`}>
+                    {read ? '✓✓' : '✓'}
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         );

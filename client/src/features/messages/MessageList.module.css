@@ -61,3 +61,13 @@
   font-size: 11px;
   text-align: right;
 }
+
+.check {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  letter-spacing: -2px;
+}
+
+.checkRead {
+  color: var(--primary);
+}

@@ -55,6 +55,18 @@
 }
 
 .chatTitle {
+  display: block;
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.chatSubtitle {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.chatSubtitleTyping {
+  color: var(--primary);
 }
