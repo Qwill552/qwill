@@ -10,7 +10,7 @@
   height: 100%;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   font-weight: 600;
   user-select: none;
 }
@@ -23,6 +23,7 @@
   object-fit: cover;
 }
 
+/* Точка «в сети». Кольцо цветом подложки, поэтому на списке и на шапке читается одинаково. */
 .onlineDot {
   position: absolute;
   right: 0;

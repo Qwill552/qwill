@@ -85,7 +85,7 @@
 }
 
 .bubbleFailed {
-  outline: 1px solid #d14343;
+  outline: 1px solid var(--danger);
 }
 
 .attachment {

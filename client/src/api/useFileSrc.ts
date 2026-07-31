@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { buildFileSrc, fetchFileToken } from '../../api/files';
+import { buildFileSrc, fetchFileToken } from './files';
 
 // Токен живёт час на сервере — кэш на вкладку, чтобы не дёргать /token на каждый ре-рендер (секция 7).
 const tokenCache = new Map<string, string>();

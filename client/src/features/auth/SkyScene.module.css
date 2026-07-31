@@ -5,30 +5,30 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #7bd3f7;
+  background: var(--auth-sky-day);
   transition: background 1s ease;
 }
 
 :root[data-theme='dark'] .scene {
-  background: linear-gradient(180deg, #091024 0%, #15224a 65%, #1e3368 100%);
+  background: var(--auth-sky-night);
 }
 
 .stars {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(2px 2px at 15% 25%, #fff 100%, transparent),
-    radial-gradient(3px 3px at 75% 15%, #fff 100%, transparent),
-    radial-gradient(2px 2px at 85% 45%, #fff 80%, transparent),
-    radial-gradient(1px 1px at 30% 60%, #fff 100%, transparent),
-    radial-gradient(2px 2px at 50% 10%, #fff 90%, transparent),
-    radial-gradient(1px 1px at 10% 80%, #fff 100%, transparent),
-    radial-gradient(2.5px 2.5px at 90% 80%, #fff 100%, transparent),
-    radial-gradient(1.5px 1.5px at 60% 70%, #fff 100%, transparent),
-    radial-gradient(1.5px 1.5px at 20% 45%, #fff 90%, transparent),
-    radial-gradient(2px 2px at 45% 85%, #fff 80%, transparent),
-    radial-gradient(1px 1px at 80% 25%, #fff 100%, transparent),
-    radial-gradient(2.5px 2.5px at 35% 15%, #fff 85%, transparent);
+    radial-gradient(2px 2px at 15% 25%, var(--auth-white) 100%, transparent),
+    radial-gradient(3px 3px at 75% 15%, var(--auth-white) 100%, transparent),
+    radial-gradient(2px 2px at 85% 45%, var(--auth-white) 80%, transparent),
+    radial-gradient(1px 1px at 30% 60%, var(--auth-white) 100%, transparent),
+    radial-gradient(2px 2px at 50% 10%, var(--auth-white) 90%, transparent),
+    radial-gradient(1px 1px at 10% 80%, var(--auth-white) 100%, transparent),
+    radial-gradient(2.5px 2.5px at 90% 80%, var(--auth-white) 100%, transparent),
+    radial-gradient(1.5px 1.5px at 60% 70%, var(--auth-white) 100%, transparent),
+    radial-gradient(1.5px 1.5px at 20% 45%, var(--auth-white) 90%, transparent),
+    radial-gradient(2px 2px at 45% 85%, var(--auth-white) 80%, transparent),
+    radial-gradient(1px 1px at 80% 25%, var(--auth-white) 100%, transparent),
+    radial-gradient(2.5px 2.5px at 35% 15%, var(--auth-white) 85%, transparent);
   opacity: 0;
   transition: opacity 1.2s ease;
   z-index: 0;
@@ -68,10 +68,10 @@
 .sunDisc {
   position: absolute;
   inset: 0;
-  background: #ffdf73;
+  background: var(--auth-sun);
   border-radius: 50%;
   z-index: 2;
-  box-shadow: 0 0 50px 15px rgb(255 223 115 / 70%);
+  box-shadow: 0 0 50px 15px var(--auth-sun-glow);
 }
 
 .sunRays {
@@ -89,16 +89,16 @@
   height: 6px;
   background: linear-gradient(
     90deg,
-    #ffdf73 0%,
-    #ffdf73 18%,
+    var(--auth-sun) 0%,
+    var(--auth-sun) 18%,
     transparent 18%,
     transparent 82%,
-    #ffdf73 82%,
-    #ffdf73 100%
+    var(--auth-sun) 82%,
+    var(--auth-sun) 100%
   );
   transform: translate(-50%, -50%);
   border-radius: 6px;
-  filter: drop-shadow(0 0 8px rgb(255 223 115 / 80%));
+  filter: drop-shadow(0 0 8px var(--auth-sun-ray-glow));
 }
 
 .rayLine:nth-child(2) {
@@ -125,7 +125,7 @@
   left: 15px;
   border-radius: 50%;
   background: transparent;
-  box-shadow: -18px 12px 0 0 #fff;
+  box-shadow: -18px 12px 0 0 var(--auth-white);
   transform: translate(-300px, 150px) rotate(-45deg);
   opacity: 0;
   transition:
@@ -140,7 +140,7 @@
 
 .cloud {
   position: absolute;
-  background: #fff;
+  background: var(--auth-white);
   border-radius: 50px;
   transition:
     background 1s ease,
@@ -165,7 +165,7 @@
 }
 
 :root[data-theme='dark'] .cloud {
-  background: #1c2d5a;
+  background: var(--auth-cloud-night);
   opacity: 0.6;
 }
 

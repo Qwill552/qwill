@@ -1,0 +1,61 @@
+.button {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  /* Тап-цель никогда не меньше 44×44, даже если иконка внутри 20 (незыблемое правило 4). */
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* На основном цвете: круглая кнопка отправки и подобные. */
+.primary {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--primary-press);
+  color: var(--text-on-primary);
+}
+
+.plain {
+  color: var(--text-primary);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.glyph {
+  position: relative;
+  z-index: 1;
+}

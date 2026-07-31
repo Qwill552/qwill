@@ -100,22 +100,33 @@ describe('users profile/settings/search (этап 8)', () => {
   });
 
   describe('настройки', () => {
-    it('тема и размер шрифта сохраняются', async () => {
+    it('тема, размер шрифта и оформление сохраняются', async () => {
       const { token } = await registerUser('settings', 'Настройщик');
 
       const initial = await request.get('/api/users/me/settings').set('Authorization', `Bearer ${token}`);
       expect(initial.status).toBe(200);
-      expect(initial.body).toEqual({ theme: 'system', fontSize: 'medium' });
+      expect(initial.body).toEqual({ theme: 'system', fontSize: 'medium', surface: 'glass' });
 
       const updated = await request
         .patch('/api/users/me/settings')
         .set('Authorization', `Bearer ${token}`)
-        .send({ theme: 'dark', fontSize: 'large' });
+        .send({ theme: 'dark', fontSize: 'large', surface: 'solid' });
       expect(updated.status).toBe(200);
-      expect(updated.body).toEqual({ theme: 'dark', fontSize: 'large' });
+      expect(updated.body).toEqual({ theme: 'dark', fontSize: 'large', surface: 'solid' });
 
       const again = await request.get('/api/users/me/settings').set('Authorization', `Bearer ${token}`);
-      expect(again.body).toEqual({ theme: 'dark', fontSize: 'large' });
+      expect(again.body).toEqual({ theme: 'dark', fontSize: 'large', surface: 'solid' });
+    });
+
+    it('отклоняет некорректное оформление', async () => {
+      const { token } = await registerUser('settings_surface', 'Настройщик3');
+
+      const res = await request
+        .patch('/api/users/me/settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ surface: 'frosted' });
+
+      expect(res.status).toBe(400);
     });
 
     it('отклоняет некорректное значение темы', async () => {

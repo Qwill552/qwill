@@ -6,7 +6,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { useChatStore } from '../../stores/chatStore';
 import { UserSearch } from '../users/UserSearch';
-import { Avatar } from './Avatar';
+import { Avatar } from '../../ui/Avatar';
 import styles from './ChatList.module.css';
 import { EmptyState } from './EmptyState';
 

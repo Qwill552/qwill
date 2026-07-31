@@ -23,7 +23,7 @@
   border: none;
   border-radius: var(--radius-pill);
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   font-family: inherit;
   font-size: 15px;
   font-weight: 600;

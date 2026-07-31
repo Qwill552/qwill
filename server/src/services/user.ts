@@ -1,5 +1,5 @@
 import type { PublicUser, UpdateProfileDTO, UpdateSettingsInput, UserSearchResult, UserSettingsDTO } from '@messenger/shared';
-import { ErrorCode, FONT_SIZE_VALUES, THEME_VALUES, USER_SEARCH_PAGE_SIZE } from '@messenger/shared';
+import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES, USER_SEARCH_PAGE_SIZE } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../lib/errors.js';
@@ -77,12 +77,15 @@ export async function updateProfile(userId: string, data: UpdateProfileDTO): Pro
   return toPublicUser(user);
 }
 
-function toUserSettingsDto(user: Pick<User, 'theme' | 'fontSize'>): UserSettingsDTO {
+function toUserSettingsDto(user: Pick<User, 'theme' | 'fontSize' | 'surface'>): UserSettingsDTO {
   return {
     theme: (THEME_VALUES as readonly string[]).includes(user.theme) ? (user.theme as UserSettingsDTO['theme']) : 'system',
     fontSize: (FONT_SIZE_VALUES as readonly string[]).includes(user.fontSize)
       ? (user.fontSize as UserSettingsDTO['fontSize'])
       : 'medium',
+    surface: (SURFACE_VALUES as readonly string[]).includes(user.surface)
+      ? (user.surface as UserSettingsDTO['surface'])
+      : 'glass',
   };
 }
 
@@ -97,6 +100,7 @@ export async function updateSettings(userId: string, data: UpdateSettingsInput):
     data: {
       ...(data.theme !== undefined ? { theme: data.theme } : {}),
       ...(data.fontSize !== undefined ? { fontSize: data.fontSize } : {}),
+      ...(data.surface !== undefined ? { surface: data.surface } : {}),
     },
   });
   return toUserSettingsDto(user);

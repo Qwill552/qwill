@@ -1,0 +1,23 @@
+.spinner {
+  display: block;
+  flex-shrink: 0;
+  color: var(--primary);
+  animation: spin 900ms linear infinite;
+}
+
+.track {
+  opacity: 0.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    /* Совсем останавливать нельзя — иначе индикатор загрузки перестаёт быть индикатором. */
+    animation-duration: 2400ms;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

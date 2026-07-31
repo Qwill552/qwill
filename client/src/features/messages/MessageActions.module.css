@@ -47,10 +47,10 @@
 }
 
 .danger {
-  color: #d14343;
+  color: var(--danger);
 }
 
 .danger:hover {
-  background: rgb(209 67 67 / 12%);
-  color: #d14343;
+  background: var(--danger-soft);
+  color: var(--danger);
 }

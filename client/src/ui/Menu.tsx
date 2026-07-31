@@ -1,0 +1,87 @@
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+
+import { Icon, type IconName } from './Icon';
+import { Ripple } from './Ripple';
+import styles from './Menu.module.css';
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  icon?: IconName;
+  danger?: boolean;
+  onSelect: () => void;
+}
+
+interface MenuProps {
+  /** Прямоугольник элемента, от которого раскрывается меню — обычно getBoundingClientRect() кнопки. */
+  anchor: DOMRect;
+  items: MenuItem[];
+  onClose: () => void;
+}
+
+/** Зазор между якорем и меню и минимальный отступ от краёв экрана. */
+const GAP = 6;
+const EDGE = 8;
+
+/** Всплывающее меню: само решает, раскрыться вверх или вниз, влево или вправо —
+ *  по тому, сколько места осталось до края экрана. Фон размывается, а не затемняется:
+ *  в строгом режиме то же самое делает токен --scrim-*. */
+export function Menu({ anchor, items, onClose }: MenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({ visibility: 'hidden', top: 0, left: 0 });
+
+  // Позиция считается после отрисовки, когда известны реальные размеры меню, но до кадра — иначе дёрнется.
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const { offsetWidth: width, offsetHeight: height } = menu;
+    const { innerWidth: vw, innerHeight: vh } = window;
+
+    const spaceBelow = vh - anchor.bottom;
+    const dropUp = spaceBelow < height + GAP + EDGE && anchor.top > spaceBelow;
+    const top = dropUp ? Math.max(EDGE, anchor.top - height - GAP) : Math.min(anchor.bottom + GAP, vh - height - EDGE);
+
+    const openLeft = anchor.left + width + EDGE > vw;
+    const left = openLeft ? Math.max(EDGE, anchor.right - width) : Math.min(anchor.left, vw - width - EDGE);
+
+    setStyle({
+      top,
+      left,
+      ['--menu-origin' as string]: `${dropUp ? 'bottom' : 'top'} ${openLeft ? 'right' : 'left'}`,
+    });
+  }, [anchor]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <>
+      <div className={styles.scrim} onClick={onClose} aria-hidden="true" />
+      <div ref={menuRef} className={styles.menu} style={style} role="menu">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitem"
+            className={`${styles.item} ${item.danger ? styles.danger : ''}`}
+            onClick={() => {
+              item.onSelect();
+              onClose();
+            }}
+          >
+            {item.icon && <Icon name={item.icon} size={20} className={styles.glyph} />}
+            <span className={styles.label}>{item.label}</span>
+            <Ripple />
+          </button>
+        ))}
+      </div>
+    </>,
+    document.body,
+  );
+}

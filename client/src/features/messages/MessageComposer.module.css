@@ -69,7 +69,7 @@
   border: none;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   cursor: pointer;
   transition: background var(--transition), transform var(--transition), opacity var(--transition);
 }
@@ -113,7 +113,7 @@
 
 .error {
   margin: var(--space-2) var(--space-4) 0;
-  color: #d14343;
+  color: var(--danger);
   font-size: 13px;
 }
 

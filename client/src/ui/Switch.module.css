@@ -1,0 +1,51 @@
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 50px;
+  /* Сам тумблер 30 высотой, но тап-цель — полные 44. */
+  height: var(--tap-min);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.track {
+  width: 100%;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition: background var(--dur-menu) var(--ease-screen);
+}
+
+.switch[aria-checked='true'] .track {
+  background: var(--primary);
+}
+
+.thumb {
+  position: absolute;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-menu) var(--ease-screen);
+}
+
+.switch[aria-checked='true'] .thumb {
+  transform: translateX(20px);
+}

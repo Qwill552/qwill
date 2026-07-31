@@ -1,0 +1,89 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  animation: fade var(--dur-menu) var(--ease-screen);
+}
+
+.menu {
+  position: fixed;
+  z-index: 301;
+  min-width: 180px;
+  max-width: min(280px, calc(100vw - var(--space-4) * 2));
+  padding: var(--space-1);
+  border: 1px solid var(--menu-border);
+  border-radius: var(--radius-md);
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  -webkit-backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+  animation: pop var(--dur-menu) var(--ease-screen);
+  /* Раскрывается от того угла, которым прижато к якорю. */
+  transform-origin: var(--menu-origin, top left);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-name);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.item:hover {
+  background: var(--primary-soft);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.danger:hover {
+  background: var(--danger-soft);
+}
+
+.label {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glyph {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}

@@ -11,7 +11,7 @@
 
 .error {
   margin: var(--space-3) 0 0;
-  color: #d14343;
+  color: var(--danger);
   font-size: 13px;
 }
 

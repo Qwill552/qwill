@@ -56,7 +56,7 @@
   border: none;
   border-radius: var(--radius-pill);
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   font-weight: 600;
   font-family: inherit;
   font-size: 13px;
@@ -170,13 +170,13 @@
 }
 
 .iconButtonDanger:hover {
-  background: rgb(209 67 67 / 12%);
-  color: #d14343;
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .error {
   margin: 0 0 var(--space-3);
-  color: #d14343;
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -193,7 +193,7 @@
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: #d14343;
+  color: var(--danger);
   font-weight: 600;
   font-family: inherit;
   font-size: 13px;
@@ -201,5 +201,5 @@
 }
 
 .leaveButton:hover {
-  background: rgb(209 67 67 / 10%);
+  background: var(--danger-soft);
 }

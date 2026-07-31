@@ -39,5 +39,5 @@
 .segmentActive,
 .segmentActive:hover {
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
 }

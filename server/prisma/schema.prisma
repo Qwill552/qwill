@@ -37,6 +37,8 @@ model User {
   displayName  String
   theme        String @default("system")
   fontSize     String @default("medium")
+  /// Режим оформления: "glass" | "solid". Ортогонален теме (UI-1).
+  surface      String @default("glass")
 
   /// Файл аватара — дедуплицирован как любой другой File (секция 7).
   avatarFileId String?

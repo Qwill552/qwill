@@ -1,0 +1,95 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  animation: fade var(--dur-menu) var(--ease-screen);
+}
+
+.scrimClosing {
+  animation: fade var(--dur-close) var(--ease-close) reverse forwards;
+}
+
+.sheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 201;
+  display: flex;
+  max-height: calc(100dvh - var(--header-h) - var(--safe-top));
+  flex-direction: column;
+  padding-bottom: var(--safe-bottom);
+  border-top: 1px solid var(--sheet-border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+  -webkit-backdrop-filter: var(--sheet-blur);
+  box-shadow: var(--sheet-shadow);
+  animation: rise var(--dur-menu) var(--ease-screen);
+  /* Вертикальные жесты обрабатывает сам шит — браузеру их отдавать нельзя. */
+  touch-action: none;
+}
+
+.sheetClosing {
+  animation: rise var(--dur-close) var(--ease-close) reverse forwards;
+}
+
+/* Во время перетаскивания позицией управляет указатель, анимации нет. */
+.dragging {
+  animation: none;
+  transition: none;
+}
+
+/* Отпустили, но не закрыли — доезд обратно. */
+.settling {
+  animation: none;
+  transition: transform var(--dur-menu) var(--ease-screen);
+}
+
+.grip {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  height: 28px;
+  cursor: grab;
+}
+
+.gripBar {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.title {
+  flex-shrink: 0;
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-4);
+  color: var(--text-primary);
+  font-size: var(--font-screen-title);
+  font-weight: 600;
+}
+
+.body {
+  overflow-y: auto;
+  padding: 0 var(--space-4) var(--space-4);
+  overscroll-behavior: contain;
+  /* Содержимое прокручивается вертикально, даже когда сам шит перехватывает жесты. */
+  touch-action: pan-y;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(100%);
+  }
+}

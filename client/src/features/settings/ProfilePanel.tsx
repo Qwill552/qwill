@@ -5,7 +5,7 @@ import { setAvatarRequest } from '../../api/auth';
 import { ApiError } from '../../api/client';
 import { uploadFile } from '../../api/files';
 import { updateProfileRequest } from '../../api/users';
-import { Avatar } from '../chats/Avatar';
+import { Avatar } from '../../ui/Avatar';
 import { useAuthStore } from '../../stores/authStore';
 import { Modal } from '../groups/Modal';
 import styles from './ProfilePanel.module.css';

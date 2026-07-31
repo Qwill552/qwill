@@ -1,0 +1,24 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.drop {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.18;
+  transform: scale(0);
+  animation: spread var(--dur-screen) var(--ease-screen) forwards;
+}
+
+@keyframes spread {
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}

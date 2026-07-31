@@ -3,23 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#8c52ff" />
-    <title>Messenger</title>
+    <meta name="theme-color" content="#f6f4fb" />
+    <title>Qwill</title>
     <script>
-      // Тема применяется до первого кадра, чтобы не мелькала чужая (секция 4).
+      // Тема и режим оформления применяются до первого кадра, иначе моргнёт чужое (UI-1).
+      // Значения должны совпадать с --bg из tokens.css.
       (function () {
+        var BG = { light: '#f6f4fb', dark: '#131020' };
+        var root = document.documentElement;
+        var theme = 'light';
+        var surface = 'glass';
         try {
-          var stored = localStorage.getItem('messenger.theme');
-          var theme =
-            stored === 'light' || stored === 'dark'
-              ? stored
+          var storedTheme = localStorage.getItem('messenger.theme');
+          theme =
+            storedTheme === 'light' || storedTheme === 'dark'
+              ? storedTheme
               : window.matchMedia('(prefers-color-scheme: dark)').matches
                 ? 'dark'
                 : 'light';
-          document.documentElement.dataset.theme = theme;
+          var storedSurface = localStorage.getItem('messenger.surface');
+          if (storedSurface === 'glass' || storedSurface === 'solid') surface = storedSurface;
         } catch (e) {
-          document.documentElement.dataset.theme = 'light';
+          /* приватный режим без localStorage — остаются значения по умолчанию */
         }
+        root.dataset.theme = theme;
+        root.dataset.surface = surface;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', BG[theme]);
       })();
     </script>
   </head>

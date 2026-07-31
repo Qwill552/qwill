@@ -1,0 +1,30 @@
+.skeleton {
+  display: block;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  /* Блик едет по подложке; цвета оба из палитры — градиент, а не полупрозрачность. */
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1400ms linear infinite;
+}
+
+.circle {
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--surface-2);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '../../api/client';
 import { searchUsersRequest } from '../../api/users';
 import { useChatStore } from '../../stores/chatStore';
-import { Avatar } from '../chats/Avatar';
+import { Avatar } from '../../ui/Avatar';
 import { Modal } from '../groups/Modal';
 import styles from './UserSearch.module.css';
 

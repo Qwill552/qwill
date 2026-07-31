@@ -1,6 +1,6 @@
 import type { AttachmentDto } from '@messenger/shared';
 
-import { useFileSrc } from '../chats/useFileSrc';
+import { useFileSrc } from '../../api/useFileSrc';
 import styles from './Attachment.module.css';
 
 function formatBytes(bytes: number): string {

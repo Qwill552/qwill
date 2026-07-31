@@ -6,18 +6,24 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgb(20 18 26 / 45%);
+  /* В режиме Стекло фон размывается, в Строгом — затемняется. Решает токен, не компонент. */
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
   animation: fadeIn var(--transition);
 }
 
 .card {
   width: 100%;
   max-width: 420px;
-  max-height: 85vh;
+  max-height: 85dvh;
   overflow-y: auto;
+  border: 1px solid var(--sheet-border);
   border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+  -webkit-backdrop-filter: var(--sheet-blur);
+  box-shadow: var(--sheet-shadow);
   animation: popIn var(--transition);
 }
 

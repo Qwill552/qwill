@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 
 import { ApiError } from '../../api/client';
 import { uploadFile } from '../../api/files';
-import { Avatar } from '../chats/Avatar';
+import { Avatar } from '../../ui/Avatar';
 import { useChatStore } from '../../stores/chatStore';
 import styles from './GroupPanel.module.css';
 import { Modal } from './Modal';

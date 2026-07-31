@@ -23,15 +23,22 @@ export type ThemePreference = (typeof THEME_VALUES)[number];
 export const FONT_SIZE_VALUES = ['small', 'medium', 'large'] as const;
 export type FontSize = (typeof FONT_SIZE_VALUES)[number];
 
+/** Режим оформления: 'glass' — прозрачные поверхности с размытием, 'solid' — непрозрачные с границами.
+ *  Ортогонален теме: обе темы работают в обоих режимах (UI-1). */
+export const SURFACE_VALUES = ['glass', 'solid'] as const;
+export type SurfaceMode = (typeof SURFACE_VALUES)[number];
+
 export const updateSettingsSchema = z.object({
   theme: z.enum(THEME_VALUES).optional(),
   fontSize: z.enum(FONT_SIZE_VALUES).optional(),
+  surface: z.enum(SURFACE_VALUES).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 
 export interface UserSettingsDTO {
   theme: ThemePreference;
   fontSize: FontSize;
+  surface: SurfaceMode;
 }
 
 /** Поиск по подстроке username — минимум 2 символа против полного скана таблицы на каждое нажатие (этап 8). */

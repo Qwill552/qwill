@@ -85,7 +85,7 @@
 
 .error {
   margin: 0 0 var(--space-3);
-  color: #d14343;
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -95,7 +95,7 @@
   border: none;
   border-radius: var(--radius-pill);
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   font-weight: 600;
   font-family: inherit;
   font-size: 14px;

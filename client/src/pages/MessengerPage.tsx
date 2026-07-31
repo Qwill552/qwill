@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Avatar } from '../features/chats/Avatar';
+import { Avatar } from '../ui/Avatar';
 import { ChatList } from '../features/chats/ChatList';
 import { EmptyState } from '../features/chats/EmptyState';
 import { GroupPanel } from '../features/groups/GroupPanel';
@@ -12,6 +12,7 @@ import { SettingsPanel } from '../features/settings/SettingsPanel';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { useUiStore } from '../stores/uiStore';
+import { IconButton } from '../ui/IconButton';
 import styles from './MessengerPage.module.css';
 
 function formatLastSeen(iso: string): string {
@@ -105,63 +106,24 @@ export function MessengerPage() {
             <span className={styles.meName}>{user?.displayName}</span>
           </div>
           <div className={styles.headerActions}>
-            <button
-              className={styles.iconButton}
-              type="button"
+            <IconButton
+              icon={theme === 'dark' ? 'moon' : 'sun'}
+              size={18}
+              label="Сменить тему"
               onClick={toggleTheme}
-              title="Сменить тему"
-              aria-label="Сменить тему"
-            >
-              {theme === 'dark' ? '🌙' : '☀️'}
-            </button>
-            <button
-              className={styles.iconButton}
-              type="button"
+            />
+            <IconButton
+              icon="settings"
+              size={18}
+              label="Настройки"
               onClick={() => setSettingsPanelOpen(true)}
-              title="Настройки"
-              aria-label="Настройки"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              className={styles.iconButton}
-              type="button"
+            />
+            <IconButton
+              icon="logout"
+              size={18}
+              label="Выйти"
               onClick={() => void handleLogout()}
-              title="Выйти"
-              aria-label="Выйти"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M15 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M10 12h11m0 0-3-3m3 3-3 3"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+            />
           </div>
         </div>
         <ChatList />
@@ -186,22 +148,14 @@ export function MessengerPage() {
         {chatId && !chatError && (
           <>
             <header className={styles.chatHeader}>
-              <button
+              <IconButton
                 className={styles.backButton}
-                type="button"
+                icon="back"
+                size={20}
+                label="Назад к чатам"
+                variant="plain"
                 onClick={() => navigate('/chats')}
-                aria-label="Назад к чатам"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M15 5 8 12l7 7"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              />
               <button
                 className={styles.chatHeaderInfo}
                 type="button"

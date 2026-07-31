@@ -1,0 +1,20 @@
+.badge {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--unread-badge);
+  color: var(--text-on-primary);
+  font-size: var(--font-time);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Приглушённый: чат замьючен — счётчик виден, но внимания не требует. */
+.muted {
+  background: var(--text-secondary);
+}
