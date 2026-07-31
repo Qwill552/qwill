@@ -47,10 +47,6 @@
   opacity: 0.5;
 }
 
-.hiddenInput {
-  display: none;
-}
-
 .meName {
   overflow: hidden;
   color: var(--text-primary);

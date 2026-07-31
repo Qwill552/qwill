@@ -1,15 +1,14 @@
-import { AVATAR_MIME_TYPES } from '@messenger/shared';
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { setAvatarRequest } from '../api/auth';
-import { uploadFile } from '../api/files';
 import { Avatar } from '../features/chats/Avatar';
 import { ChatList } from '../features/chats/ChatList';
 import { EmptyState } from '../features/chats/EmptyState';
 import { GroupPanel } from '../features/groups/GroupPanel';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
 import { MessageList } from '../features/messages/MessageList';
+import { ProfilePanel } from '../features/settings/ProfilePanel';
+import { SettingsPanel } from '../features/settings/SettingsPanel';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { useUiStore } from '../stores/uiStore';
@@ -29,14 +28,13 @@ export function MessengerPage() {
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const updateUser = useAuthStore((s) => s.updateUser);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
 
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
   const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
+  const [profilePanelOpen, setProfilePanelOpen] = useState(false);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -76,22 +74,6 @@ export function MessengerPage() {
     navigate('/login', { replace: true });
   }
 
-  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    setAvatarUploading(true);
-    try {
-      const uploaded = await uploadFile(file, 'avatar');
-      updateUser(await setAvatarRequest(uploaded.id, uploaded.sha256));
-    } catch {
-      // Полноценный профиль/настройки — отдельный этап; здесь достаточно тихо не сломать интерфейс.
-    } finally {
-      setAvatarUploading(false);
-    }
-  }
-
   const activeChat = chats.find((c) => c.id === chatId);
   const otherOnline = activeChat?.otherMember
     ? (presenceByUser[activeChat.otherMember.id]?.online ?? false)
@@ -114,20 +96,12 @@ export function MessengerPage() {
             <button
               className={styles.avatarButton}
               type="button"
-              onClick={() => avatarInputRef.current?.click()}
-              disabled={avatarUploading}
-              title="Сменить аватар"
-              aria-label="Сменить аватар"
+              onClick={() => setProfilePanelOpen(true)}
+              title="Профиль"
+              aria-label="Профиль"
             >
               <Avatar label={user?.displayName ?? '?'} avatarUrl={user?.avatarUrl} size={40} />
             </button>
-            <input
-              ref={avatarInputRef}
-              className={styles.hiddenInput}
-              type="file"
-              accept={AVATAR_MIME_TYPES.join(',')}
-              onChange={(e) => void handleAvatarChange(e)}
-            />
             <span className={styles.meName}>{user?.displayName}</span>
           </div>
           <div className={styles.headerActions}>
@@ -139,6 +113,30 @@ export function MessengerPage() {
               aria-label="Сменить тему"
             >
               {theme === 'dark' ? '🌙' : '☀️'}
+            </button>
+            <button
+              className={styles.iconButton}
+              type="button"
+              onClick={() => setSettingsPanelOpen(true)}
+              title="Настройки"
+              aria-label="Настройки"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
             <button
               className={styles.iconButton}
@@ -168,6 +166,9 @@ export function MessengerPage() {
         </div>
         <ChatList />
       </aside>
+
+      {profilePanelOpen && <ProfilePanel onClose={() => setProfilePanelOpen(false)} />}
+      {settingsPanelOpen && <SettingsPanel onClose={() => setSettingsPanelOpen(false)} />}
 
       <main className={styles.main}>
         {!chatId && (

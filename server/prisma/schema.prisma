@@ -36,6 +36,7 @@ model User {
   passwordHash String
   displayName  String
   theme        String @default("system")
+  fontSize     String @default("medium")
 
   /// Файл аватара — дедуплицирован как любой другой File (секция 7).
   avatarFileId String?

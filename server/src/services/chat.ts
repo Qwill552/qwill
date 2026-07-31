@@ -70,7 +70,7 @@ export async function assertMember(chatId: string, userId: string): Promise<void
   throw forbidden('Вы не участник этого чата', ErrorCode.NOT_A_MEMBER);
 }
 
-function pairKeyFor(a: string, b: string): string {
+export function pairKeyFor(a: string, b: string): string {
   return [a, b].sort().join(':');
 }
 

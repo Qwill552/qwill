@@ -5,6 +5,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 
 import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { useChatStore } from '../../stores/chatStore';
+import { UserSearch } from '../users/UserSearch';
 import { Avatar } from './Avatar';
 import styles from './ChatList.module.css';
 import { EmptyState } from './EmptyState';
@@ -31,6 +32,7 @@ export function ChatList() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   async function handleStartChat(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -63,9 +65,14 @@ export function ChatList() {
           Написать
         </button>
       </form>
-      <button className={styles.newGroupButton} type="button" onClick={() => setCreateGroupOpen(true)}>
-        + Новая группа
-      </button>
+      <div className={styles.actionsRow}>
+        <button className={styles.newGroupButton} type="button" onClick={() => setCreateGroupOpen(true)}>
+          + Новая группа
+        </button>
+        <button className={styles.newGroupButton} type="button" onClick={() => setSearchOpen(true)}>
+          🔍 Найти
+        </button>
+      </div>
       {error && <p className={styles.error}>{error}</p>}
 
       {createGroupOpen && (
@@ -73,6 +80,16 @@ export function ChatList() {
           onClose={() => setCreateGroupOpen(false)}
           onCreated={(chatId) => {
             setCreateGroupOpen(false);
+            navigate(`/chats/${chatId}`);
+          }}
+        />
+      )}
+
+      {searchOpen && (
+        <UserSearch
+          onClose={() => setSearchOpen(false)}
+          onOpenChat={(chatId) => {
+            setSearchOpen(false);
             navigate(`/chats/${chatId}`);
           }}
         />

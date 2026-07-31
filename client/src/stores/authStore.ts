@@ -3,8 +3,10 @@ import { create } from 'zustand';
 
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
 import { setAccessToken, setRefreshHandler } from '../api/client';
+import { getSettingsRequest } from '../api/users';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
 import { useChatStore } from './chatStore';
+import { useUiStore } from './uiStore';
 
 type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'anonymous';
 
@@ -31,6 +33,11 @@ export const useAuthStore = create<AuthState>((set) => {
     // Сокет — единственное соединение на вкладку; переподключается со свежим токеном при логине/рефреше (секция 4).
     connectSocket(response.accessToken);
     useChatStore.getState().subscribeToSocket(response.user.id);
+    // Тема/размер шрифта уже применены локально (localStorage) — подтягиваем серверную версию,
+    // чтобы настройки не терялись при входе с другого устройства (этап 8).
+    getSettingsRequest()
+      .then((settings) => useUiStore.getState().hydrateFromServer(settings))
+      .catch(() => undefined);
   }
 
   function clearAuth(): void {
