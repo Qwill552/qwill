@@ -100,3 +100,11 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Фокус-кольцо по умолчанию для любого интерактивного элемента без своего :focus-стиля
+   (секция 10: доступность). Элементы с кастомным фокусом (например .input) сильнее по
+   специфичности и перекрывают это правило сами. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

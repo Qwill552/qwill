@@ -166,6 +166,7 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
           onClick={() => avatarInputRef.current?.click()}
           disabled={!canManage || avatarUploading}
           title={canManage ? 'Сменить аватар группы' : undefined}
+          aria-label={canManage ? 'Сменить аватар группы' : undefined}
         >
           <Avatar label={chat?.title ?? '?'} avatarUrl={chat?.avatarUrl} size={56} />
         </button>

@@ -17,11 +17,14 @@ export function MessageReactions({
     <div className={styles.row}>
       {reactions.map((reaction) => {
         const mine = !!myId && reaction.userIds.includes(myId);
+        const label = `${reaction.emoji} — ${mine ? 'убрать вашу реакцию' : 'поставить реакцию'} (${reaction.userIds.length})`;
         return (
           <button
             key={reaction.emoji}
             type="button"
             className={`${styles.pill} ${mine ? styles.pillMine : ''}`}
+            title={label}
+            aria-label={label}
             onClick={() => onToggle(reaction.emoji)}
           >
             <span>{reaction.emoji}</span>

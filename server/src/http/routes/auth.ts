@@ -4,6 +4,7 @@ import { Router, type Request, type Response } from 'express';
 import { env } from '../../config/env.js';
 import { unauthorized } from '../../lib/errors.js';
 import * as authService from '../../services/auth.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const authRouter: Router = Router();
@@ -37,7 +38,7 @@ function toAuthResponse(tokens: authService.SessionTokens): AuthResponse {
   return { accessToken: tokens.accessToken, user: tokens.user };
 }
 
-authRouter.post('/register', validateBody(registerSchema), (req, res, next) => {
+authRouter.post('/register', authLimiter, validateBody(registerSchema), (req, res, next) => {
   authService
     .register(req.body, req.headers['user-agent'])
     .then((tokens) => {
@@ -47,7 +48,7 @@ authRouter.post('/register', validateBody(registerSchema), (req, res, next) => {
     .catch(next);
 });
 
-authRouter.post('/login', validateBody(loginSchema), (req, res, next) => {
+authRouter.post('/login', authLimiter, validateBody(loginSchema), (req, res, next) => {
   const { username, password } = req.body;
   authService
     .login(username, password, req.headers['user-agent'])

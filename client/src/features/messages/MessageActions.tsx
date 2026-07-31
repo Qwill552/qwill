@@ -35,6 +35,8 @@ export function MessageActions({ own, canModify, onReply, onEdit, onDelete, onRe
             key={emoji}
             type="button"
             className={styles.button}
+            title={`Отреагировать ${emoji}`}
+            aria-label={`Отреагировать ${emoji}`}
             onClick={() => {
               onReact(emoji);
               setPickerOpen(false);

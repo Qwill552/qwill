@@ -16,6 +16,7 @@ import { signFileToken, verifyFileToken } from '../../lib/tokens.js';
 import * as fileService from '../../services/file.js';
 import { requireUserFromAccessToken } from '../../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
+import { uploadLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const filesRouter: Router = Router();
@@ -27,7 +28,7 @@ function paramId(req: Request): string {
   return Array.isArray(id) ? (id[0] ?? '') : (id ?? '');
 }
 
-filesRouter.post('/upload', requireAuth, validateBody(initUploadSchema), (req, res, next) => {
+filesRouter.post('/upload', requireAuth, uploadLimiter, validateBody(initUploadSchema), (req, res, next) => {
   fileService
     .initUpload(req.userId!, req.body)
     .then((result) => res.status(result.status === 'pending' ? 201 : 200).json(result))
@@ -37,6 +38,7 @@ filesRouter.post('/upload', requireAuth, validateBody(initUploadSchema), (req, r
 filesRouter.patch(
   '/upload/:id',
   requireAuth,
+  uploadLimiter,
   raw({ type: () => true, limit: env.UPLOAD_CHUNK_SIZE_BYTES + 64 * 1024 }),
   (req, res, next) => {
     const offsetHeader = req.header(UPLOAD_OFFSET_HEADER);

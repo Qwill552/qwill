@@ -20,13 +20,14 @@ import { Server as SocketServer, type Socket } from 'socket.io';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
-import { AppError } from '../lib/errors.js';
+import { AppError, rateLimited } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { assertMember, getCoMemberIds, markChatRead } from '../services/chat.js';
 import { deleteMessage, editMessage, reactToMessage, sendMessage } from '../services/message.js';
 import { getUserById } from '../services/user.js';
 import { presenceStore } from './presence.js';
+import { messageRateLimiter } from './rateLimit.js';
 
 let io: SocketServer | null = null;
 
@@ -164,6 +165,13 @@ async function handleMessageSend(
   const parsed = messageSendSchema.safeParse(payload);
   if (!parsed.success) {
     ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректное сообщение' } });
+    return;
+  }
+
+  // env.isTest: интеграционные/socket-тесты не должны душить себя тем же лимитом (rateLimit.ts).
+  if (!env.isTest && !messageRateLimiter.tryConsume(userId)) {
+    const err = rateLimited('Слишком много сообщений, подождите немного');
+    ack?.({ ok: false, error: { code: err.code, message: err.message } });
     return;
   }
 
