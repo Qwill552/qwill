@@ -10,6 +10,7 @@ import { authRouter } from './http/routes/auth.js';
 import { chatsRouter } from './http/routes/chats.js';
 import { filesRouter } from './http/routes/files.js';
 import { healthRouter } from './http/routes/health.js';
+import { pushRouter } from './http/routes/push.js';
 import { usersRouter } from './http/routes/users.js';
 import { logger } from './lib/logger.js';
 
@@ -46,6 +47,7 @@ export function createApp(): Express {
   app.use('/api/users', usersRouter);
   app.use('/api/chats', chatsRouter);
   app.use('/api/files', filesRouter);
+  app.use('/api/push', pushRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

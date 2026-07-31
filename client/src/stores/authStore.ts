@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
 import { setAccessToken, setRefreshHandler } from '../api/client';
 import { getSettingsRequest } from '../api/users';
+import { subscribeToPush, unsubscribePush } from '../realtime/push';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
 import { useChatStore } from './chatStore';
 import { useUiStore } from './uiStore';
@@ -38,6 +39,8 @@ export const useAuthStore = create<AuthState>((set) => {
     getSettingsRequest()
       .then((settings) => useUiStore.getState().hydrateFromServer(settings))
       .catch(() => undefined);
+    // Не блокирует вход — молча пропускается, если разрешение ещё не дано или браузер не умеет (этап 9).
+    subscribeToPush().catch(() => undefined);
   }
 
   function clearAuth(): void {
@@ -45,6 +48,8 @@ export const useAuthStore = create<AuthState>((set) => {
     disconnectSocket();
     useChatStore.getState().reset();
     set({ user: null, status: 'anonymous' });
+    // Иначе следующий пользователь на этом же устройстве получал бы пуши по чужой подписке (этап 9).
+    unsubscribePush().catch(() => undefined);
   }
 
   setRefreshHandler(async () => {

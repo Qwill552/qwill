@@ -22,4 +22,11 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Service worker — свой глобальный контекст (self = ServiceWorkerGlobalScope, не window), этап 9.
+    files: ['client/src/sw.js'],
+    languageOptions: {
+      globals: { self: 'readonly' },
+    },
+  },
 );

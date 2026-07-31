@@ -10,8 +10,11 @@ import { ErrorCode } from '@messenger/shared';
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
+import { logger } from '../lib/logger.js';
+import { presenceStore } from '../realtime/presence.js';
 import { assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
+import * as pushService from './push.js';
 import type { Attachment, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
 type ReplyWithRelations = Message & { sender: User | null; attachments: { id: string }[] };
@@ -145,7 +148,32 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
 
   await prisma.chat.update({ where: { id: input.chatId }, data: { updatedAt: new Date() } });
 
-  return toMessageDto(message);
+  const dto = toMessageDto(message);
+  // Не блокируем ack отправителю ожиданием push-провайдера — шлём в фоне (этап 9).
+  notifyOfflineMembers(input.chatId, input.senderId, dto).catch((error: unknown) => {
+    logger.error({ err: error, chatId: input.chatId }, 'Не удалось отправить push-уведомления о новом сообщении');
+  });
+
+  return dto;
+}
+
+/** Пуш только офлайн-получателям чата, кроме отправителя (этап 9). */
+async function notifyOfflineMembers(chatId: string, senderId: string, message: MessageDto): Promise<void> {
+  const members = await prisma.chatMember.findMany({
+    where: { chatId, userId: { not: senderId } },
+    select: { userId: true },
+  });
+  const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.isOnline(userId));
+  if (offlineMemberIds.length === 0) return;
+
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, title: true } });
+  const senderName = message.sender?.displayName ?? 'Кто-то';
+  const title = chat?.type === 'GROUP' ? `${senderName} · ${chat.title ?? 'Группа'}` : senderName;
+  const body = message.content ?? (message.attachment ? 'Прислал(а) файл' : 'Новое сообщение');
+
+  await Promise.all(
+    offlineMemberIds.map((userId) => pushService.sendToUser(userId, { title, body, chatId })),
+  );
 }
 
 /** Проверяет доказательство владения содержимым (и превью, если есть) до того, как разрешить вложить файл в сообщение. */

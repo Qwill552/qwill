@@ -34,6 +34,12 @@ const envSchema = z.object({
   UPLOAD_CHUNK_SIZE_BYTES: bytes.default(5 * 1024 * 1024),
   STORAGE_LIMIT_GB: z.coerce.number().positive().default(100),
   STORAGE_POLICY: z.enum(['warn', 'evict']).default('warn'),
+
+  /// Пара опциональна: без неё push просто не отправляется (лог warn), сервер не падает на старте.
+  /// Сгенерировать: node -e "console.log(require('web-push').generateVAPIDKeys())" (секция 9).
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:admin@messenger.local'),
 });
 
 const parsed = envSchema.safeParse(process.env);
