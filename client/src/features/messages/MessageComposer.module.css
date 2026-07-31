@@ -117,6 +117,58 @@
   font-size: 13px;
 }
 
+.context {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.contextBar {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+  background: var(--primary-soft);
+  overflow: hidden;
+}
+
+.contextLabel {
+  display: block;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contextText {
+  display: block;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contextCancel {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.contextCancel:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .send,
   .progressFill {

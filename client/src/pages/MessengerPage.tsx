@@ -7,7 +7,7 @@ import { uploadFile } from '../api/files';
 import { Avatar } from '../features/chats/Avatar';
 import { ChatList } from '../features/chats/ChatList';
 import { EmptyState } from '../features/chats/EmptyState';
-import { MessageComposer } from '../features/messages/MessageComposer';
+import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
 import { MessageList } from '../features/messages/MessageList';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
@@ -34,6 +34,7 @@ export function MessengerPage() {
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -52,6 +53,11 @@ export function MessengerPage() {
     void openChat(chatId);
     return () => closeChat();
   }, [chatId, openChat, closeChat]);
+
+  useEffect(() => {
+    // Ответ/правка привязаны к открытому чату — при переходе в другой чат контекст неактуален.
+    setComposerContext(null);
+  }, [chatId]);
 
   async function handleLogout(): Promise<void> {
     await logout();
@@ -195,8 +201,16 @@ export function MessengerPage() {
                 )}
               </div>
             </header>
-            <MessageList chatId={chatId} />
-            <MessageComposer chatId={chatId} />
+            <MessageList
+              chatId={chatId}
+              onReply={(message) => setComposerContext({ mode: 'reply', message })}
+              onEdit={(message) => setComposerContext({ mode: 'edit', message })}
+            />
+            <MessageComposer
+              chatId={chatId}
+              context={composerContext}
+              onClearContext={() => setComposerContext(null)}
+            />
           </>
         )}
       </main>

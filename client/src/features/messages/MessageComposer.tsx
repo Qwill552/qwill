@@ -4,7 +4,7 @@ import { type ChangeEvent, type FormEvent, type KeyboardEvent, useEffect, useRef
 import { ApiError } from '../../api/client';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../../api/files';
 import { useAuthStore } from '../../stores/authStore';
-import { useChatStore } from '../../stores/chatStore';
+import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import styles from './MessageComposer.module.css';
 
 /** Меньше TYPING_TIMEOUT_MS (5с) — явный stop почти всегда опережает автогашение у получателя (секция 3). */
@@ -18,11 +18,30 @@ interface PendingUpload {
   progress: number;
 }
 
-export function MessageComposer({ chatId }: { chatId: string }) {
+/** Что сейчас делает композер помимо обычного набора текста — задаётся кликом по действиям сообщения (этап 6). */
+export type ComposerContext = { mode: 'reply' | 'edit'; message: LocalMessage };
+
+function contextPreviewText(message: LocalMessage): string {
+  if (message.deletedAt) return 'Сообщение удалено';
+  if (message.content) return message.content;
+  if (message.attachment) return '📎 Вложение';
+  return '';
+}
+
+export function MessageComposer({
+  chatId,
+  context,
+  onClearContext,
+}: {
+  chatId: string;
+  context: ComposerContext | null;
+  onClearContext: () => void;
+}) {
   const [value, setValue] = useState('');
   const [pending, setPending] = useState<PendingUpload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const editMessage = useChatStore((s) => s.editMessage);
   const startTyping = useChatStore((s) => s.startTyping);
   const stopTyping = useChatStore((s) => s.stopTyping);
   const user = useAuthStore((s) => s.user);
@@ -39,6 +58,12 @@ export function MessageComposer({ chatId }: { chatId: string }) {
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, INPUT_MAX_HEIGHT_PX)}px`;
   }, [value]);
+
+  useEffect(() => {
+    // Правка предзаполняет поле текущим текстом; ответ — только переносит фокус в поле ввода.
+    if (context?.mode === 'edit') setValue(context.message.content ?? '');
+    if (context) textareaRef.current?.focus();
+  }, [context]);
 
   useEffect(() => {
     // Смена чата или уход со страницы — сообщаем «перестал печатать» в прежнем чате.
@@ -75,23 +100,48 @@ export function MessageComposer({ chatId }: { chatId: string }) {
     stopTimerRef.current = setTimeout(markStopped, TYPING_STOP_DELAY_MS);
   }
 
-  function submit(): void {
+  function handleCancelContext(): void {
+    if (context?.mode === 'edit') setValue('');
+    setError(null);
+    onClearContext();
+  }
+
+  async function submit(): Promise<void> {
     const content = value.trim();
     if (!content || !user || pending) return;
     markStopped();
-    sendMessage(chatId, content, user);
+
+    if (context?.mode === 'edit') {
+      try {
+        await editMessage(chatId, context.message.id, content);
+        setValue('');
+        onClearContext();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Не удалось изменить сообщение');
+      }
+      return;
+    }
+
+    const replyTo = context?.mode === 'reply' ? context.message : undefined;
+    sendMessage(chatId, content, user, undefined, replyTo);
     setValue('');
+    if (replyTo) onClearContext();
   }
 
   function handleSubmit(event: FormEvent): void {
     event.preventDefault();
-    submit();
+    void submit();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (event.key === 'Escape' && context) {
+      event.preventDefault();
+      handleCancelContext();
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      submit();
+      void submit();
     }
   }
 
@@ -135,8 +185,10 @@ export function MessageComposer({ chatId }: { chatId: string }) {
         duration: videoThumb?.duration,
       };
 
-      sendMessage(chatId, value.trim(), user, attachment);
+      const replyTo = context?.mode === 'reply' ? context.message : undefined;
+      sendMessage(chatId, value.trim(), user, attachment, replyTo);
       setValue('');
+      if (replyTo) onClearContext();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось отправить файл');
     } finally {
@@ -144,8 +196,30 @@ export function MessageComposer({ chatId }: { chatId: string }) {
     }
   }
 
+  const editing = context?.mode === 'edit';
+
   return (
     <div className={styles.wrap}>
+      {context && (
+        <div className={styles.context}>
+          <div className={styles.contextBar}>
+            <span className={styles.contextLabel}>
+              {editing ? 'Редактирование' : `Ответ ${context.message.sender?.displayName ?? 'удалённому аккаунту'}`}
+            </span>
+            <span className={styles.contextText}>{contextPreviewText(context.message)}</span>
+          </div>
+          <button
+            type="button"
+            className={styles.contextCancel}
+            onClick={handleCancelContext}
+            aria-label="Отменить"
+            title="Отменить"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {pending && (
         <div className={styles.upload}>
           <span className={styles.uploadName}>
@@ -170,7 +244,7 @@ export function MessageComposer({ chatId }: { chatId: string }) {
           className={styles.attach}
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={!!pending}
+          disabled={!!pending || editing}
           aria-label="Прикрепить файл"
           title="Прикрепить файл"
         >
@@ -190,7 +264,7 @@ export function MessageComposer({ chatId }: { chatId: string }) {
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Написать сообщение…"
+          placeholder={editing ? 'Изменить сообщение…' : 'Написать сообщение…'}
           rows={1}
         />
         <button className={styles.send} type="submit" disabled={!value.trim() || !!pending} aria-label="Отправить">

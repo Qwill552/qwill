@@ -48,8 +48,29 @@
   font-weight: 600;
 }
 
+.messageWrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  max-width: 68%;
+}
+
+.messageWrapOwn {
+  flex-direction: row-reverse;
+}
+
+.bubbleColumn {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.bubbleColumnOwn {
+  align-items: flex-end;
+}
+
 .bubble {
-  max-width: 60%;
   padding: 10px 14px;
   border-radius: var(--radius-bubble);
   box-shadow: var(--shadow-sm);
@@ -76,6 +97,17 @@
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.deletedText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.edited {
+  margin-right: 4px;
+  font-style: italic;
 }
 
 .time {

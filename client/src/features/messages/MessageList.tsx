@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
-import { useChatStore } from '../../stores/chatStore';
+import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { AttachmentView } from './Attachment';
+import { MessageActions } from './MessageActions';
 import styles from './MessageList.module.css';
+import { MessageReactions } from './MessageReactions';
+import { ReplyQuote } from './ReplyQuote';
 
 /** Сообщения одного автора ближе этого интервала визуально группируются (секция 5: хвостик только у последнего). */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -43,11 +46,21 @@ function isReadByOthers(
   return others.every(([, cursor]) => cursor !== null && cursor !== undefined && cursor >= messageId);
 }
 
-export function MessageList({ chatId }: { chatId: string }) {
+export function MessageList({
+  chatId,
+  onReply,
+  onEdit,
+}: {
+  chatId: string;
+  onReply: (message: LocalMessage) => void;
+  onEdit: (message: LocalMessage) => void;
+}) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
   const loadMore = useChatStore((s) => s.loadMore);
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
+  const deleteMessage = useChatStore((s) => s.deleteMessage);
+  const toggleReaction = useChatStore((s) => s.toggleReaction);
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -111,6 +124,9 @@ export function MessageList({ chatId }: { chatId: string }) {
               borderBottomLeftRadius: groupedWithNext ? tight : full,
             };
 
+        const isReal = message.id > 0;
+        const canAct = isReal && !message.deletedAt;
+
         return (
           <div key={message.clientId ?? message.id}>
             {showDayDivider && (
@@ -121,26 +137,59 @@ export function MessageList({ chatId }: { chatId: string }) {
             <div
               className={`${styles.row} ${isOwn ? styles.rowOwn : ''} ${groupedWithPrev ? styles.rowGrouped : ''}`}
             >
-              <div
-                className={`${styles.bubble} ${isOwn ? styles.bubbleOwn : styles.bubbleIn} ${
-                  message.status === 'failed' ? styles.bubbleFailed : ''
-                }`}
-                style={cornerStyle}
-              >
-                {message.attachment && (
-                  <div className={styles.attachment}>
-                    <AttachmentView attachment={message.attachment} />
-                  </div>
-                )}
-                {message.content && <p className={styles.text}>{message.content}</p>}
-                <span className={styles.time}>
-                  {statusLabel}
-                  {isOwn && delivered && (
-                    <span className={`${styles.check} ${read ? styles.checkRead : ''}`}>
-                      {read ? '✓✓' : '✓'}
+              <div className={`message-wrap ${styles.messageWrap} ${isOwn ? styles.messageWrapOwn : ''}`}>
+                <div className={`${styles.bubbleColumn} ${isOwn ? styles.bubbleColumnOwn : ''}`}>
+                  <div
+                    className={`${styles.bubble} ${isOwn ? styles.bubbleOwn : styles.bubbleIn} ${
+                      message.status === 'failed' ? styles.bubbleFailed : ''
+                    }`}
+                    style={cornerStyle}
+                  >
+                    {message.replyTo && <ReplyQuote reply={message.replyTo} />}
+                    {message.deletedAt ? (
+                      <p className={styles.deletedText}>Сообщение удалено</p>
+                    ) : (
+                      <>
+                        {message.attachment && (
+                          <div className={styles.attachment}>
+                            <AttachmentView attachment={message.attachment} />
+                          </div>
+                        )}
+                        {message.content && <p className={styles.text}>{message.content}</p>}
+                      </>
+                    )}
+                    <span className={styles.time}>
+                      {message.editedAt && !message.deletedAt && <span className={styles.edited}>изменено</span>}
+                      {statusLabel}
+                      {isOwn && delivered && (
+                        <span className={`${styles.check} ${read ? styles.checkRead : ''}`}>
+                          {read ? '✓✓' : '✓'}
+                        </span>
+                      )}
                     </span>
+                  </div>
+                  {isReal && !message.deletedAt && (
+                    <MessageReactions
+                      reactions={message.reactions}
+                      myId={myId}
+                      onToggle={(emoji) => toggleReaction(chatId, message.id, emoji)}
+                    />
                   )}
-                </span>
+                </div>
+                {canAct && (
+                  <MessageActions
+                    own={isOwn}
+                    canModify={isOwn}
+                    onReply={() => onReply(message)}
+                    onEdit={() => onEdit(message)}
+                    onDelete={() => {
+                      deleteMessage(chatId, message.id).catch(() => {
+                        // Удаление своего сообщения почти никогда не падает — тихо не ломаем интерфейс.
+                      });
+                    }}
+                    onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
+                  />
+                )}
               </div>
             </div>
           </div>

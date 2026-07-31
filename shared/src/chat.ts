@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   MESSAGE_MAX_LENGTH,
   MESSAGES_PAGE_SIZE,
+  REACTION_EMOJIS,
 } from './constants.js';
 import { messageAttachmentInputSchema, type AttachmentDto } from './files.js';
 
@@ -34,6 +35,29 @@ export const messageSendSchema = z
   });
 export type MessageSendInput = z.infer<typeof messageSendSchema>;
 
+/** Правка сообщения — только автор, только текст (секция 3, этап 6). */
+export const messageEditSchema = z.object({
+  chatId: z.string().min(1),
+  messageId: z.number().int().positive(),
+  content: z.string().trim().min(1, 'Пустое сообщение').max(MESSAGE_MAX_LENGTH),
+});
+export type MessageEditInput = z.infer<typeof messageEditSchema>;
+
+/** Удаление — мягкое, строка остаётся ради целостности цитат в replyToId (секция 2). */
+export const messageDeleteSchema = z.object({
+  chatId: z.string().min(1),
+  messageId: z.number().int().positive(),
+});
+export type MessageDeleteInput = z.infer<typeof messageDeleteSchema>;
+
+/** Реакция — фиксированный набор эмодзи, повтор того же эмодзи снимает реакцию (тоггл). */
+export const messageReactSchema = z.object({
+  chatId: z.string().min(1),
+  messageId: z.number().int().positive(),
+  emoji: z.enum(REACTION_EMOJIS),
+});
+export type MessageReactInput = z.infer<typeof messageReactSchema>;
+
 export type ChatType = 'PRIVATE' | 'GROUP';
 export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM';
 
@@ -47,6 +71,21 @@ export interface ChatMemberSummary {
   lastSeenAt: string;
 }
 
+/** Краткая цитата в ответе — снимок сообщения на момент отправки ответа (секция 6, этап 6). */
+export interface MessageReplyPreviewDto {
+  id: number;
+  senderName: string;
+  content: string | null;
+  hasAttachment: boolean;
+  deletedAt: string | null;
+}
+
+/** Реакции сгруппированы по эмодзи; userIds включает и меня, если я реагировал (этап 6). */
+export interface MessageReactionDto {
+  emoji: string;
+  userIds: string[];
+}
+
 export interface MessageDto {
   id: number;
   chatId: string;
@@ -56,6 +95,8 @@ export interface MessageDto {
   content: string | null;
   attachment: AttachmentDto | null;
   replyToId: number | null;
+  replyTo: MessageReplyPreviewDto | null;
+  reactions: MessageReactionDto[];
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

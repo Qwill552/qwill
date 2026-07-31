@@ -53,3 +53,7 @@ export const UPLOAD_OFFSET_HEADER = 'x-upload-offset';
 
 /** Не больше стольки пикселей по длинной стороне у превью, снятого клиентом через canvas (секция 7). */
 export const THUMBNAIL_MAX_DIMENSION = 320;
+
+/** Быстрые реакции на сообщение — фиксированный набор, без произвольных emoji (этап 6). */
+export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];

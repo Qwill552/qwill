@@ -1,0 +1,56 @@
+.actions {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+/* .message-wrap — простой глобальный хук из MessageList.tsx: CSS-модули хэшируют классы
+   только внутри своего файла, поэтому кросс-компонентный hover виден через :global(). */
+:global(.message-wrap):hover .actions,
+:global(.message-wrap):focus-within .actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.button:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.danger {
+  color: #d14343;
+}
+
+.danger:hover {
+  background: rgb(209 67 67 / 12%);
+  color: #d14343;
+}

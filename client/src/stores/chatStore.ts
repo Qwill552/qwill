@@ -3,9 +3,12 @@ import type {
   ChatListItemDto,
   ChatMemberSummary,
   ChatReadEvent,
+  MessageActionAck,
   MessageAttachmentInput,
   MessageDto,
+  MessageReactionEvent,
   MessageSendAck,
+  MessageUpdatedEvent,
   PublicUser,
   UserPresenceEvent,
   UserTypingEvent,
@@ -55,7 +58,17 @@ interface ChatState {
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
-  sendMessage: (chatId: string, content: string, sender: PublicUser, attachment?: MessageAttachmentInput) => void;
+  sendMessage: (
+    chatId: string,
+    content: string,
+    sender: PublicUser,
+    attachment?: MessageAttachmentInput,
+    replyTo?: MessageDto,
+  ) => void;
+  /** Правка и удаление резолвятся/реджектятся по ack — компонент показывает ошибку сам (секция 6). */
+  editMessage: (chatId: string, messageId: number, content: string) => Promise<void>;
+  deleteMessage: (chatId: string, messageId: number) => Promise<void>;
+  toggleReaction: (chatId: string, messageId: number, emoji: string) => void;
   markRead: (chatId: string, messageId: number) => void;
   startTyping: (chatId: string) => void;
   stopTyping: (chatId: string) => void;
@@ -63,6 +76,10 @@ interface ChatState {
   reset: () => void;
   /** Внутренний метод: применяет message:new и ack от message:send по одной логике реконсиляции. */
   applyIncomingMessage: (message: MessageDto) => void;
+  /** Внутренний метод: заменяет сообщение по id — message:updated/message:deleted (этап 6). */
+  applyMessageUpdate: (message: MessageDto) => void;
+  /** Внутренний метод: обновляет только реакции сообщения по id — message:reaction (этап 6). */
+  applyReactionUpdate: (event: MessageReactionEvent) => void;
   /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
   applyChatDetail: (chat: ChatDto) => void;
   /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
@@ -164,7 +181,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return chat;
   },
 
-  sendMessage(chatId, content, sender, attachment) {
+  sendMessage(chatId, content, sender, attachment, replyTo) {
     const socket = getSocket();
     if (!socket) return;
 
@@ -178,7 +195,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content: content || null,
       // Вложение появится в ленте только после ack — превью во время отправки не показываем (см. композер).
       attachment: null,
-      replyToId: null,
+      replyToId: replyTo?.id ?? null,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            senderName: replyTo.sender?.displayName ?? 'Удалённый аккаунт',
+            content: replyTo.deletedAt ? null : replyTo.content,
+            hasAttachment: !replyTo.deletedAt && !!replyTo.attachment,
+            deletedAt: replyTo.deletedAt,
+          }
+        : null,
+      reactions: [],
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -192,20 +219,61 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    socket.emit(SocketEvent.MessageSend, { chatId, clientId, content: content || undefined, attachment }, (ack: MessageSendAck) => {
-      if (ack.ok && ack.message) {
-        get().applyIncomingMessage(ack.message);
-        return;
-      }
-      set((state) => ({
-        messagesByChat: {
-          ...state.messagesByChat,
-          [chatId]: (state.messagesByChat[chatId] ?? []).map((m) =>
-            m.clientId === clientId ? { ...m, status: 'failed' } : m,
-          ),
-        },
-      }));
+    socket.emit(
+      SocketEvent.MessageSend,
+      { chatId, clientId, content: content || undefined, attachment, replyToId: replyTo?.id },
+      (ack: MessageSendAck) => {
+        if (ack.ok && ack.message) {
+          get().applyIncomingMessage(ack.message);
+          return;
+        }
+        set((state) => ({
+          messagesByChat: {
+            ...state.messagesByChat,
+            [chatId]: (state.messagesByChat[chatId] ?? []).map((m) =>
+              m.clientId === clientId ? { ...m, status: 'failed' } : m,
+            ),
+          },
+        }));
+      },
+    );
+  },
+
+  editMessage(chatId, messageId, content) {
+    const socket = getSocket();
+    if (!socket) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      socket.emit(SocketEvent.MessageEdit, { chatId, messageId, content }, (ack: MessageActionAck) => {
+        if (ack.ok && ack.message) {
+          get().applyMessageUpdate(ack.message);
+          resolve();
+          return;
+        }
+        reject(new Error(ack.error?.message ?? 'Не удалось изменить сообщение'));
+      });
     });
+  },
+
+  deleteMessage(chatId, messageId) {
+    const socket = getSocket();
+    if (!socket) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      socket.emit(SocketEvent.MessageDelete, { chatId, messageId }, (ack: MessageActionAck) => {
+        if (ack.ok && ack.message) {
+          get().applyMessageUpdate(ack.message);
+          resolve();
+          return;
+        }
+        reject(new Error(ack.error?.message ?? 'Не удалось удалить сообщение'));
+      });
+    });
+  },
+
+  toggleReaction(chatId, messageId, emoji) {
+    // Итог приходит broadcast'ом message:reaction — в комнату входит и сам отправитель (bootstrapSocket).
+    getSocket()?.emit(SocketEvent.MessageReact, { chatId, messageId, emoji });
   },
 
   markRead(chatId, messageId) {
@@ -227,6 +295,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off(SocketEvent.MessageNew).on(SocketEvent.MessageNew, (message: MessageDto) => {
       get().applyIncomingMessage(message);
+    });
+
+    socket.off(SocketEvent.MessageUpdated).on(SocketEvent.MessageUpdated, (event: MessageUpdatedEvent) => {
+      get().applyMessageUpdate(event.message);
+    });
+
+    socket.off(SocketEvent.MessageDeleted).on(SocketEvent.MessageDeleted, (event: MessageUpdatedEvent) => {
+      get().applyMessageUpdate(event.message);
+    });
+
+    socket.off(SocketEvent.MessageReaction).on(SocketEvent.MessageReaction, (event: MessageReactionEvent) => {
+      get().applyReactionUpdate(event);
     });
 
     socket.off(SocketEvent.ChatCreated).on(SocketEvent.ChatCreated, (chat: ChatDto) => {
@@ -318,6 +398,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (state.activeChatId === message.chatId && message.sender?.id !== state.myUserId && message.id > 0) {
       get().markRead(message.chatId, message.id);
     }
+  },
+
+  // Не часть публичного интерфейса стора — заменяет сообщение по id (правка/удаление уже собраны сервером).
+  applyMessageUpdate(message: MessageDto) {
+    set((state) => {
+      const list = state.messagesByChat[message.chatId];
+      const nextMessagesByChat = list
+        ? {
+            ...state.messagesByChat,
+            [message.chatId]: list.map((m) => (m.id === message.id ? { ...message, status: m.status } : m)),
+          }
+        : state.messagesByChat;
+
+      const chat = state.chats.find((c) => c.id === message.chatId);
+      const chats =
+        chat?.lastMessage?.id === message.id
+          ? state.chats.map((c) => (c.id === message.chatId ? { ...c, lastMessage: message } : c))
+          : state.chats;
+
+      return { messagesByChat: nextMessagesByChat, chats };
+    });
+  },
+
+  // Не часть публичного интерфейса стора — обновляет только набор реакций сообщения по id.
+  applyReactionUpdate(event: MessageReactionEvent) {
+    set((state) => {
+      const list = state.messagesByChat[event.chatId];
+      const nextMessagesByChat = list
+        ? {
+            ...state.messagesByChat,
+            [event.chatId]: list.map((m) => (m.id === event.messageId ? { ...m, reactions: event.reactions } : m)),
+          }
+        : state.messagesByChat;
+
+      const chat = state.chats.find((c) => c.id === event.chatId);
+      const chats =
+        chat?.lastMessage?.id === event.messageId
+          ? state.chats.map((c) =>
+              c.id === event.chatId ? { ...c, lastMessage: { ...c.lastMessage!, reactions: event.reactions } } : c,
+            )
+          : state.chats;
+
+      return { messagesByChat: nextMessagesByChat, chats };
+    });
   },
 
   applyChatDetail(chat: ChatDto) {

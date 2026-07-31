@@ -4,13 +4,8 @@ import { ErrorCode } from '@messenger/shared';
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
-import { messageInclude, toMessageDto } from './message.js';
-import type { Attachment, Chat, ChatMember, File, Message, User } from '../generated/prisma/client.js';
-
-type MessageWithRelations = Message & {
-  sender: User | null;
-  attachments: (Attachment & { file: File; thumbnail: File | null })[];
-};
+import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
+import type { Chat, ChatMember, User } from '../generated/prisma/client.js';
 
 type ChatWithRelations = Chat & {
   members: (ChatMember & { user: User })[];

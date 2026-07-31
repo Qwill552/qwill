@@ -1,10 +1,15 @@
 import type { Server as HttpServer } from 'node:http';
 
 import {
+  messageDeleteSchema,
+  messageEditSchema,
+  messageReactSchema,
   messageSendSchema,
   SocketEvent,
   type ChatReadEvent,
   type ChatReadPayload,
+  type MessageActionAck,
+  type MessageReactionEvent,
   type MessageSendAck,
   type TypingPayload,
   type UserPresenceEvent,
@@ -19,7 +24,7 @@ import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { assertMember, getCoMemberIds, markChatRead } from '../services/chat.js';
-import { sendMessage } from '../services/message.js';
+import { deleteMessage, editMessage, reactToMessage, sendMessage } from '../services/message.js';
 import { getUserById } from '../services/user.js';
 import { presenceStore } from './presence.js';
 
@@ -163,6 +168,79 @@ async function handleMessageSend(
   }
 }
 
+async function handleMessageEdit(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageActionAck) => void,
+): Promise<void> {
+  const parsed = messageEditSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректная правка' } });
+    return;
+  }
+
+  try {
+    const message = await editMessage({ ...parsed.data, userId });
+    io?.to(parsed.data.chatId).emit(SocketEvent.MessageUpdated, { message });
+    ack?.({ ok: true, message });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleMessageDelete(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageActionAck) => void,
+): Promise<void> {
+  const parsed = messageDeleteSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректный запрос' } });
+    return;
+  }
+
+  try {
+    const message = await deleteMessage({ ...parsed.data, userId });
+    io?.to(parsed.data.chatId).emit(SocketEvent.MessageDeleted, { message });
+    ack?.({ ok: true, message });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleMessageReact(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageActionAck) => void,
+): Promise<void> {
+  const parsed = messageReactSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректная реакция' } });
+    return;
+  }
+
+  try {
+    const reactions = await reactToMessage({ ...parsed.data, userId });
+    const event: MessageReactionEvent = { chatId: parsed.data.chatId, messageId: parsed.data.messageId, reactions };
+    io?.to(parsed.data.chatId).emit(SocketEvent.MessageReaction, event);
+    ack?.({ ok: true });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   io = new SocketServer(httpServer, {
     cors: { origin: env.clientOrigins, credentials: true },
@@ -195,6 +273,24 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     socket.on(SocketEvent.MessageSend, (payload, ack?: (response: MessageSendAck) => void) => {
       handleMessageSend(userId, payload, ack).catch((error: unknown) => {
         logger.error({ err: error, userId }, 'Ошибка обработки message:send');
+      });
+    });
+
+    socket.on(SocketEvent.MessageEdit, (payload, ack?: (response: MessageActionAck) => void) => {
+      handleMessageEdit(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки message:edit');
+      });
+    });
+
+    socket.on(SocketEvent.MessageDelete, (payload, ack?: (response: MessageActionAck) => void) => {
+      handleMessageDelete(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки message:delete');
+      });
+    });
+
+    socket.on(SocketEvent.MessageReact, (payload, ack?: (response: MessageActionAck) => void) => {
+      handleMessageReact(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки message:react');
       });
     });
 

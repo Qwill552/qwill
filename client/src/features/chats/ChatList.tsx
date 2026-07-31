@@ -1,3 +1,4 @@
+import type { ChatListItemDto } from '@messenger/shared';
 import { ApiError } from '../../api/client';
 import { type FormEvent, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -9,6 +10,14 @@ import { EmptyState } from './EmptyState';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+function lastMessagePreview(lastMessage: ChatListItemDto['lastMessage']): string {
+  if (!lastMessage) return 'Нет сообщений';
+  if (lastMessage.deletedAt) return 'Сообщение удалено';
+  if (lastMessage.content) return lastMessage.content;
+  if (lastMessage.attachment) return '📎 Вложение';
+  return 'Нет сообщений';
 }
 
 export function ChatList() {
@@ -79,7 +88,7 @@ export function ChatList() {
                   )}
                 </div>
                 <div className={styles.itemBottom}>
-                  <p className={styles.itemPreview}>{chat.lastMessage?.content ?? 'Нет сообщений'}</p>
+                  <p className={styles.itemPreview}>{lastMessagePreview(chat.lastMessage)}</p>
                   {chat.unreadCount > 0 && <span className={styles.badge}>{chat.unreadCount}</span>}
                 </div>
               </div>
