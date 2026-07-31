@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 import {
+  CHAT_TITLE_MAX_LENGTH,
   MESSAGE_MAX_LENGTH,
   MESSAGES_PAGE_SIZE,
   REACTION_EMOJIS,
 } from './constants.js';
-import { messageAttachmentInputSchema, type AttachmentDto } from './files.js';
+import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto } from './files.js';
 
 export const createPrivateChatSchema = z.object({
   username: z.string().trim().toLowerCase().min(1, 'Укажите имя пользователя'),
@@ -58,8 +59,47 @@ export const messageReactSchema = z.object({
 });
 export type MessageReactInput = z.infer<typeof messageReactSchema>;
 
+/** Создание группы — создатель становится OWNER, остальные резолвятся по @username в MEMBER
+ *  (поиска пользователей по /users/search в этапе 7 ещё нет — только точное имя, как в приватном чате). */
+export const createGroupSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Название не может быть пустым')
+    .max(CHAT_TITLE_MAX_LENGTH, `Название не длиннее ${CHAT_TITLE_MAX_LENGTH} символов`),
+  usernames: z.array(z.string().trim().toLowerCase().min(1)).min(1, 'Добавьте хотя бы одного участника'),
+});
+export type CreateGroupInput = z.infer<typeof createGroupSchema>;
+
+/** Добавление участника (и передача владения — та же форма, один @username в теле) — только
+ *  OWNER/ADMIN, целевой пользователь получает роль MEMBER (этап 7). */
+export const addMemberSchema = z.object({
+  username: z.string().trim().toLowerCase().min(1, 'Укажите имя пользователя'),
+});
+export type AddMemberInput = z.infer<typeof addMemberSchema>;
+
+/** Смена роли — OWNER назначается только при создании группы, сюда не передаётся. */
+export const updateRoleSchema = z.object({
+  role: z.enum(['ADMIN', 'MEMBER']),
+});
+export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
+
+/** avatar — тот же proof-of-possession (fileId+sha256), что и setAvatarSchema для User (секция 7):
+ *  без него можно было бы объявить аватаром группы чей-то приватный файл, угадав его id. */
+export const updateGroupSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Название не может быть пустым')
+    .max(CHAT_TITLE_MAX_LENGTH, `Название не длиннее ${CHAT_TITLE_MAX_LENGTH} символов`)
+    .optional(),
+  avatar: z.object({ fileId: z.string().min(1), sha256: sha256Schema }).optional(),
+});
+export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
+
 export type ChatType = 'PRIVATE' | 'GROUP';
 export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM';
+export type GroupRole = 'OWNER' | 'ADMIN' | 'MEMBER';
 
 /** Участник чата — облегчённая проекция User, без приватных полей. */
 export interface ChatMemberSummary {
@@ -69,6 +109,26 @@ export interface ChatMemberSummary {
   avatarUrl: string | null;
   /** Онлайн-статус — не хранится здесь, вычисляется клиентом из user:presence поверх этого значения. */
   lastSeenAt: string;
+}
+
+/** Участник группы с ролью — панель управления группой (этап 7). username — чтобы клиент мог
+ *  вызвать addMemberSchema-совместимые действия (передача владения) без отдельного поиска. */
+export interface GroupMemberDTO {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: GroupRole;
+  joinedAt: string;
+}
+
+export interface UpdateRoleDTO {
+  role: 'ADMIN' | 'MEMBER';
+}
+
+export interface UpdateGroupDTO {
+  title?: string;
+  avatar?: { fileId: string; sha256: string };
 }
 
 /** Краткая цитата в ответе — снимок сообщения на момент отправки ответа (секция 6, этап 6). */

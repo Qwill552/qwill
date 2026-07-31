@@ -276,12 +276,22 @@ export async function assertAvatarEligible(fileId: string, sha256: string): Prom
 }
 
 /**
- * Доступ к файлу разрешён, если он чей-то аватар (условно публичны в рамках приложения)
- * либо вложен в сообщение чата, участником которого является userId (секция 3, 7).
+ * Доступ к файлу разрешён, если он чей-то аватар пользователя (условно публичны в рамках
+ * приложения), либо аватар группы, участником которой является userId (в отличие от аватара
+ * пользователя — не публичен, виден только участникам), либо вложен в сообщение чата, участником
+ * которого является userId (секция 3, 7).
  */
 export async function assertFileAccess(fileId: string, userId: string): Promise<void> {
-  const isAvatar = await prisma.user.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
-  if (isAvatar) return;
+  const isUserAvatar = await prisma.user.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
+  if (isUserAvatar) return;
+
+  const chatAvatarOf = await prisma.chat.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
+  if (chatAvatarOf) {
+    const member = await prisma.chatMember.findUnique({
+      where: { chatId_userId: { chatId: chatAvatarOf.id, userId } },
+    });
+    if (member) return;
+  }
 
   const attachment = await prisma.attachment.findFirst({
     where: { OR: [{ fileId }, { thumbnailFileId: fileId }] },

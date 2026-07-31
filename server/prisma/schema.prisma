@@ -73,9 +73,13 @@ model Session {
 model Chat {
   id String @id @default(cuid(2))
 
-  type      ChatType
-  title     String?
-  avatarUrl String?
+  type  ChatType
+  title String?
+
+  /// Аватар группы — файл вне публичной директории, доказательство владения (sha256) проверяется
+  /// так же, как для User.avatarFileId (секция 7). Для PRIVATE — null, аватар берётся у собеседника.
+  avatarFileId String?
+  avatarFile   File?   @relation("ChatAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
 
   /// Защита от гонки при одновременном создании приватного чата с обеих сторон:
   /// "<меньший userId>:<больший userId>". Для групп — null.
@@ -189,6 +193,7 @@ model File {
   attachments            Attachment[] @relation("AttachmentFile")
   thumbnailOfAttachments Attachment[] @relation("AttachmentThumbnail")
   avatarOfUsers          User[]       @relation("UserAvatar")
+  avatarOfChats          Chat[]       @relation("ChatAvatar")
 }
 
 model Reaction {

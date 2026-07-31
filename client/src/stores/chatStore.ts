@@ -3,6 +3,9 @@ import type {
   ChatListItemDto,
   ChatMemberSummary,
   ChatReadEvent,
+  ChatUpdatedEvent,
+  GroupMemberDTO,
+  MemberChangedEvent,
   MessageActionAck,
   MessageAttachmentInput,
   MessageDto,
@@ -10,6 +13,7 @@ import type {
   MessageSendAck,
   MessageUpdatedEvent,
   PublicUser,
+  UpdateGroupInput,
   UserPresenceEvent,
   UserTypingEvent,
 } from '@messenger/shared';
@@ -17,10 +21,18 @@ import { SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
 import {
+  addMemberRequest,
+  createGroupRequest,
   createPrivateChatRequest,
   getChatRequest,
+  getMembersRequest,
   getMessagesRequest,
+  leaveGroupRequest,
   listChatsRequest,
+  removeMemberRequest,
+  transferOwnershipRequest,
+  updateGroupRequest,
+  updateMemberRoleRequest,
 } from '../api/chats';
 import { getSocket } from '../realtime/socket';
 
@@ -52,12 +64,26 @@ interface ChatState {
   myUserId: string | null;
   /** Чат, открытый в текущей вкладке — новые сообщения в нём читаются сразу же (секция 8). */
   activeChatId: string | null;
+  /** Участники группы с ролями — грузятся отдельно от ChatDto.members (панель управления группой, этап 7). */
+  membersByChat: Record<string, GroupMemberDTO[]>;
+  /** chatId группы, из которой меня только что удалили/я вышел — компонент страницы сам решает, что делать
+   *  (обычно редирект на /chats), и сбрасывает флаг через clearKicked (этап 7). */
+  kickedChatId: string | null;
 
   loadChats: () => Promise<void>;
   openChat: (chatId: string) => Promise<void>;
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
+  createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
+  loadMembers: (chatId: string) => Promise<void>;
+  addMember: (chatId: string, username: string) => Promise<void>;
+  removeMember: (chatId: string, userId: string) => Promise<void>;
+  updateMemberRole: (chatId: string, userId: string, role: 'ADMIN' | 'MEMBER') => Promise<void>;
+  leaveGroup: (chatId: string) => Promise<void>;
+  transferOwnership: (chatId: string, username: string) => Promise<void>;
+  updateGroupInfo: (chatId: string, input: UpdateGroupInput) => Promise<void>;
+  clearKicked: () => void;
   sendMessage: (
     chatId: string,
     content: string,
@@ -82,6 +108,10 @@ interface ChatState {
   applyReactionUpdate: (event: MessageReactionEvent) => void;
   /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
   applyChatDetail: (chat: ChatDto) => void;
+  /** Внутренний метод: применяет member:changed — из REST-ответа группового действия или socket-broadcast (этап 7). */
+  applyMemberChanged: (event: MemberChangedEvent) => void;
+  /** Внутренний метод: применяет chat:updated — смена названия/аватара группы (этап 7). */
+  applyChatUpdated: (event: ChatUpdatedEvent) => void;
   /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
   setTyping: (event: UserTypingEvent) => void;
 }
@@ -123,6 +153,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chatError: null,
   myUserId: null,
   activeChatId: null,
+  membersByChat: {},
+  kickedChatId: null,
 
   async loadChats() {
     const { chats } = await listChatsRequest();
@@ -179,6 +211,54 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const chat = await createPrivateChatRequest({ username });
     get().applyChatDetail(chat);
     return chat;
+  },
+
+  async createGroup(title, usernames) {
+    const chat = await createGroupRequest({ title, usernames });
+    get().applyChatDetail(chat);
+    return chat;
+  },
+
+  async loadMembers(chatId) {
+    const { members } = await getMembersRequest(chatId);
+    set((state) => ({ membersByChat: { ...state.membersByChat, [chatId]: members } }));
+  },
+
+  async addMember(chatId, username) {
+    const member = await addMemberRequest(chatId, username);
+    get().applyMemberChanged({ type: 'added', chatId, member });
+  },
+
+  async removeMember(chatId, userId) {
+    await removeMemberRequest(chatId, userId);
+    get().applyMemberChanged({ type: 'removed', chatId, userId });
+  },
+
+  async updateMemberRole(chatId, userId, role) {
+    const member = await updateMemberRoleRequest(chatId, userId, { role });
+    get().applyMemberChanged({ type: 'role', chatId, userId: member.userId, role: member.role });
+  },
+
+  async leaveGroup(chatId) {
+    const userId = get().myUserId;
+    await leaveGroupRequest(chatId);
+    if (userId) get().applyMemberChanged({ type: 'left', chatId, userId });
+  },
+
+  async transferOwnership(chatId, username) {
+    const { members } = await transferOwnershipRequest(chatId, username);
+    for (const member of members) {
+      get().applyMemberChanged({ type: 'role', chatId, userId: member.userId, role: member.role });
+    }
+  },
+
+  async updateGroupInfo(chatId, input) {
+    const event = await updateGroupRequest(chatId, input);
+    get().applyChatUpdated(event);
+  },
+
+  clearKicked() {
+    set({ kickedChatId: null });
   },
 
   sendMessage(chatId, content, sender, attachment, replyTo) {
@@ -313,6 +393,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().applyChatDetail(chat);
     });
 
+    socket.off(SocketEvent.MemberChanged).on(SocketEvent.MemberChanged, (event: MemberChangedEvent) => {
+      get().applyMemberChanged(event);
+    });
+
+    socket.off(SocketEvent.ChatUpdated).on(SocketEvent.ChatUpdated, (event: ChatUpdatedEvent) => {
+      get().applyChatUpdated(event);
+    });
+
     socket.off(SocketEvent.ChatRead).on(SocketEvent.ChatRead, (event: ChatReadEvent) => {
       set((state) => {
         const cursors = { ...(state.readCursorsByChat[event.chatId] ?? {}) };
@@ -357,6 +445,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chatError: null,
       myUserId: null,
       activeChatId: null,
+      membersByChat: {},
+      kickedChatId: null,
     });
   },
 
@@ -449,6 +539,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: upsertChat(state.chats, chat),
       readCursorsByChat: { ...state.readCursorsByChat, [chat.id]: chat.readCursors },
       presenceByUser: seedPresence(state.presenceByUser, chat.members),
+    }));
+  },
+
+  // Не часть публичного интерфейса стора — вызывается и из REST-ответа группового действия
+  // (для мгновенной обратной связи инициатору), и из socket-broadcast member:changed (для остальных).
+  // Идемпотентен, чтобы двойное применение одного и того же события не создавало дублей.
+  applyMemberChanged(event: MemberChangedEvent) {
+    set((state) => {
+      const members = state.membersByChat[event.chatId];
+      let nextMembers: GroupMemberDTO[] | undefined = members;
+
+      if (event.type === 'added') {
+        if (members && !members.some((m) => m.userId === event.member.userId)) {
+          nextMembers = [...members, event.member];
+        }
+      } else if (event.type === 'removed' || event.type === 'left') {
+        if (members) nextMembers = members.filter((m) => m.userId !== event.userId);
+      } else {
+        if (members) nextMembers = members.map((m) => (m.userId === event.userId ? { ...m, role: event.role } : m));
+      }
+
+      const membersByChat =
+        nextMembers && nextMembers !== members
+          ? { ...state.membersByChat, [event.chatId]: nextMembers }
+          : state.membersByChat;
+
+      // «removed»/«left» про самого себя — чат закрыт для меня, страница сама решает, что делать (этап 7).
+      const isSelfGone = (event.type === 'removed' || event.type === 'left') && event.userId === state.myUserId;
+      const chats = isSelfGone ? state.chats.filter((c) => c.id !== event.chatId) : state.chats;
+      const kickedChatId = isSelfGone ? event.chatId : state.kickedChatId;
+
+      return { membersByChat, chats, kickedChatId };
+    });
+  },
+
+  // Не часть публичного интерфейса стора — обновляет название/аватар группы в списке чатов.
+  applyChatUpdated(event: ChatUpdatedEvent) {
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === event.chatId ? { ...c, title: event.title, avatarUrl: event.avatarUrl } : c,
+      ),
     }));
   },
 

@@ -1,9 +1,10 @@
-import type { ChatDto, ChatListItemDto, ChatMemberSummary, MessagesPage } from '@messenger/shared';
+import type { ChatDto, ChatListItemDto, ChatMemberSummary, MessagesPage, UpdateGroupDTO } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
+import { assertAvatarEligible } from './file.js';
 import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
 import type { Chat, ChatMember, User } from '../generated/prisma/client.js';
 
@@ -33,7 +34,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
     id: chat.id,
     type: chat.type,
     title: chat.type === 'GROUP' ? (chat.title ?? 'Группа') : (otherSummary?.displayName ?? 'Пользователь'),
-    avatarUrl: chat.type === 'GROUP' ? chat.avatarUrl : (otherSummary?.avatarUrl ?? null),
+    avatarUrl: chat.type === 'GROUP' ? fileUrl(chat.avatarFileId) : (otherSummary?.avatarUrl ?? null),
     otherMember: otherSummary,
     lastMessage: lastMessageRow ? toMessageDto(lastMessageRow) : null,
     updatedAt: chat.updatedAt.toISOString(),
@@ -109,6 +110,45 @@ export async function getOrCreatePrivateChat(userId: string, targetUsername: str
     if (afterRace) return { chatId: afterRace.id, isNew: false, targetUserId: target.id };
     throw notFound(ErrorCode.CHAT_NOT_FOUND, 'Не удалось создать чат');
   }
+}
+
+export interface GroupChatResult {
+  chatId: string;
+  /** Все участники, включая создателя — вызывающий код подписывает их сокеты на комнату чата. */
+  memberIds: string[];
+}
+
+/** Создание группы — создатель становится OWNER, остальные резолвятся по @username в MEMBER
+ *  (поиска пользователей по /users/search в этапе 7 ещё нет — только точное имя, как в приватном чате). */
+export async function createGroupChat(creatorId: string, title: string, usernames: string[]): Promise<GroupChatResult> {
+  const creator = await prisma.user.findUniqueOrThrow({ where: { id: creatorId } });
+  const uniqueUsernames = [...new Set(usernames)].filter((u) => u !== creator.username);
+  if (uniqueUsernames.length === 0) {
+    throw badRequest(ErrorCode.VALIDATION_FAILED, 'Добавьте хотя бы одного участника, кроме себя');
+  }
+
+  const users = await prisma.user.findMany({ where: { username: { in: uniqueUsernames } } });
+  const foundUsernames = new Set(users.map((u) => u.username));
+  const missing = uniqueUsernames.find((u) => !foundUsernames.has(u));
+  if (missing) throw notFound(ErrorCode.NOT_FOUND, `Пользователь @${missing} не найден`);
+
+  const chat = await prisma.chat.create({
+    data: {
+      type: 'GROUP',
+      title,
+      createdById: creatorId,
+      members: {
+        createMany: {
+          data: [
+            { userId: creatorId, role: 'OWNER' },
+            ...users.map((u) => ({ userId: u.id, role: 'MEMBER' as const })),
+          ],
+        },
+      },
+    },
+  });
+
+  return { chatId: chat.id, memberIds: [creatorId, ...users.map((u) => u.id)] };
 }
 
 export async function listChats(userId: string): Promise<ChatListItemDto[]> {
@@ -195,4 +235,43 @@ export async function getMessages(
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit).reverse();
   return { messages: page.map(toMessageDto), hasMore };
+}
+
+export interface GroupUpdateResult {
+  chatId: string;
+  title: string;
+  avatarUrl: string | null;
+  updatedAt: string;
+}
+
+/** Название/аватар может менять только OWNER или ADMIN группы (секция «Правило слоёв», этап 7). */
+export async function updateGroup(chatId: string, userId: string, input: UpdateGroupDTO): Promise<GroupUpdateResult> {
+  await assertMember(chatId, userId);
+
+  const chat = await prisma.chat.findUniqueOrThrow({ where: { id: chatId } });
+  if (chat.type !== 'GROUP') throw forbidden('Изменить название и аватар можно только у группы');
+
+  const membership = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+  if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+    throw forbidden('Только владелец или администратор может менять данные группы');
+  }
+
+  // Тот же proof-of-possession (fileId+sha256), что и для аватара пользователя (секция 7):
+  // без него можно было бы угадать id чужого приватного файла и сделать его аватаром группы.
+  if (input.avatar) await assertAvatarEligible(input.avatar.fileId, input.avatar.sha256);
+
+  const updated = await prisma.chat.update({
+    where: { id: chatId },
+    data: {
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.avatar !== undefined ? { avatarFileId: input.avatar.fileId } : {}),
+    },
+  });
+
+  return {
+    chatId: updated.id,
+    title: updated.title ?? 'Группа',
+    avatarUrl: fileUrl(updated.avatarFileId),
+    updatedAt: updated.updatedAt.toISOString(),
+  };
 }

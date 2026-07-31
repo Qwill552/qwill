@@ -34,6 +34,8 @@ export const forbidden = (message = 'Нет доступа', code: ErrorCode = E
 
 export const notFound = (code: ErrorCode, message: string) => new AppError(code, 404, message);
 
+export const conflict = (code: ErrorCode, message: string) => new AppError(code, 409, message);
+
 export const tooLarge = (message: string) => new AppError(ErrorCode.FILE_TOO_LARGE, 413, message);
 
 export const rateLimited = (message = 'Слишком много запросов, попробуйте позже') =>

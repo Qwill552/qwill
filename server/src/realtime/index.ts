@@ -46,6 +46,18 @@ export async function subscribeUserToChat(userId: string, chatId: string): Promi
   for (const socket of sockets) socket.join(chatId);
 }
 
+/**
+ * Отключает все сокеты пользователя от комнаты чата — вызывается после исключения/выхода из
+ * группы (секция 8: «доступ к истории теряется с момента выхода»). Без этого сокет остаётся в
+ * комнате и продолжает получать message:new и другие события чата, к которому уже нет доступа.
+ * Вызывать после broadcast member:changed — иначе сам исключённый не увидит событие о себе.
+ */
+export async function unsubscribeUserFromChat(userId: string, chatId: string): Promise<void> {
+  if (!io) return;
+  const sockets = await io.in(userRoom(userId)).fetchSockets();
+  for (const socket of sockets) socket.leave(chatId);
+}
+
 export function emitToUser(userId: string, event: string, payload: unknown): void {
   io?.to(userRoom(userId)).emit(event, payload);
 }

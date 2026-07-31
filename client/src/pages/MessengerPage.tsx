@@ -7,6 +7,7 @@ import { uploadFile } from '../api/files';
 import { Avatar } from '../features/chats/Avatar';
 import { ChatList } from '../features/chats/ChatList';
 import { EmptyState } from '../features/chats/EmptyState';
+import { GroupPanel } from '../features/groups/GroupPanel';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
 import { MessageList } from '../features/messages/MessageList';
 import { useAuthStore } from '../stores/authStore';
@@ -35,6 +36,7 @@ export function MessengerPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
+  const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -43,6 +45,8 @@ export function MessengerPage() {
   const closeChat = useChatStore((s) => s.closeChat);
   const typingUsers = useChatStore((s) => (chatId ? s.typingByChat[chatId] : undefined)) ?? [];
   const presenceByUser = useChatStore((s) => s.presenceByUser);
+  const kickedChatId = useChatStore((s) => s.kickedChatId);
+  const clearKicked = useChatStore((s) => s.clearKicked);
 
   useEffect(() => {
     void loadChats();
@@ -57,7 +61,15 @@ export function MessengerPage() {
   useEffect(() => {
     // Ответ/правка привязаны к открытому чату — при переходе в другой чат контекст неактуален.
     setComposerContext(null);
+    setGroupPanelOpen(false);
   }, [chatId]);
+
+  useEffect(() => {
+    // Меня удалили из группы (или я вышел) — если это открытый чат, уходим из него (секция 8).
+    if (!kickedChatId) return;
+    if (kickedChatId === chatId) navigate('/chats', { replace: true });
+    clearKicked();
+  }, [kickedChatId, chatId, navigate, clearKicked]);
 
   async function handleLogout(): Promise<void> {
     await logout();
@@ -189,17 +201,24 @@ export function MessengerPage() {
                   />
                 </svg>
               </button>
-              <Avatar label={activeChat?.title ?? '?'} avatarUrl={activeChat?.avatarUrl} size={40} online={otherOnline} />
-              <div className={styles.chatHeaderText}>
-                <span className={styles.chatTitle}>{activeChat?.title ?? '…'}</span>
-                {subtitle && (
-                  <span
-                    className={`${styles.chatSubtitle} ${typingUsers.length > 0 ? styles.chatSubtitleTyping : ''}`}
-                  >
-                    {subtitle}
-                  </span>
-                )}
-              </div>
+              <button
+                className={styles.chatHeaderInfo}
+                type="button"
+                onClick={() => activeChat?.type === 'GROUP' && setGroupPanelOpen(true)}
+                disabled={activeChat?.type !== 'GROUP'}
+              >
+                <Avatar label={activeChat?.title ?? '?'} avatarUrl={activeChat?.avatarUrl} size={40} online={otherOnline} />
+                <div className={styles.chatHeaderText}>
+                  <span className={styles.chatTitle}>{activeChat?.title ?? '…'}</span>
+                  {subtitle && (
+                    <span
+                      className={`${styles.chatSubtitle} ${typingUsers.length > 0 ? styles.chatSubtitleTyping : ''}`}
+                    >
+                      {subtitle}
+                    </span>
+                  )}
+                </div>
+              </button>
             </header>
             <MessageList
               chatId={chatId}
@@ -211,6 +230,7 @@ export function MessengerPage() {
               context={composerContext}
               onClearContext={() => setComposerContext(null)}
             />
+            {groupPanelOpen && <GroupPanel chatId={chatId} onClose={() => setGroupPanelOpen(false)} />}
           </>
         )}
       </main>

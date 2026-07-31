@@ -1,4 +1,4 @@
-import type { MessageDto, MessageReactionDto } from './chat.js';
+import type { GroupMemberDTO, GroupRole, MessageDto, MessageReactionDto } from './chat.js';
 
 /** Имена socket-событий — общий словарь для сервера и клиента (секция 3). */
 export const SocketEvent = {
@@ -16,6 +16,8 @@ export const SocketEvent = {
   TypingStop: 'typing:stop',
   UserTyping: 'user:typing',
   UserPresence: 'user:presence',
+  ChatUpdated: 'chat:updated',
+  MemberChanged: 'member:changed',
 } as const;
 
 export type SocketEvent = (typeof SocketEvent)[keyof typeof SocketEvent];
@@ -73,3 +75,18 @@ export interface UserPresenceEvent {
   online: boolean;
   lastSeenAt: string;
 }
+
+/** Сервер → клиент: изменились название/аватар группы (этап 7). */
+export interface ChatUpdatedEvent {
+  chatId: string;
+  title: string;
+  avatarUrl: string | null;
+  updatedAt: string;
+}
+
+/** Сервер → клиент: изменился состав или роли участников группы (этап 7). */
+export type MemberChangedEvent =
+  | { type: 'added'; chatId: string; member: GroupMemberDTO }
+  | { type: 'removed'; chatId: string; userId: string }
+  | { type: 'role'; chatId: string; userId: string; role: GroupRole }
+  | { type: 'left'; chatId: string; userId: string };

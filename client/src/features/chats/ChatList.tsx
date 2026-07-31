@@ -3,6 +3,7 @@ import { ApiError } from '../../api/client';
 import { type FormEvent, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
+import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from './Avatar';
 import styles from './ChatList.module.css';
@@ -29,6 +30,7 @@ export function ChatList() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
 
   async function handleStartChat(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -61,7 +63,20 @@ export function ChatList() {
           Написать
         </button>
       </form>
+      <button className={styles.newGroupButton} type="button" onClick={() => setCreateGroupOpen(true)}>
+        + Новая группа
+      </button>
       {error && <p className={styles.error}>{error}</p>}
+
+      {createGroupOpen && (
+        <CreateGroupModal
+          onClose={() => setCreateGroupOpen(false)}
+          onCreated={(chatId) => {
+            setCreateGroupOpen(false);
+            navigate(`/chats/${chatId}`);
+          }}
+        />
+      )}
 
       <nav className={styles.list}>
         {chats.length === 0 && (
