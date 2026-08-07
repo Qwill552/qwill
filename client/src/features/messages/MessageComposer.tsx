@@ -2,44 +2,37 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ClipboardEvent,
   CompositionEvent,
+  DragEvent,
   FormEvent,
   KeyboardEvent,
   PointerEvent as ReactPointerEvent,
-  ReactNode,
 } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
-import { Emoji } from '../emoji/Emoji';
+import { useEmojiIndex, type EmojiIndex } from '../emoji/emojiIndex';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice/VoiceRecorder';
 import { AttachSheet } from './AttachSheet';
 import { ComposerContextBar, type ComposerContextValue } from './ComposerContext';
 import {
+  composerDomMatchesTokens,
+  createComposerEmojiElement,
   getComposerCaretOffset,
+  getComposerCaretRange,
+  renderComposerDom,
   serializeComposerDom,
   setComposerCaretOffset,
   tokenizeComposerValue,
-  type ComposerToken,
 } from './composerContent';
 import { MediaPickerSheet } from './MediaPickerSheet';
 import styles from './MessageComposer.module.css';
 
 const TYPING_STOP_DELAY_MS = 3000;
+const COMPOSER_EMOJI_SIZE = 20;
 
 export type ComposerContext = ComposerContextValue;
-
-function renderComposerTokens(tokens: ComposerToken[]): ReactNode[] {
-  return tokens.map((token, index) => {
-    if (token.kind === 'text') return token.text;
-    return (
-      <span key={`e-${index}`} contentEditable={false} data-emoji={token.emoji} className={styles.inlineEmoji}>
-        <Emoji emoji={token.emoji} size={20} />
-      </span>
-    );
-  });
-}
 
 export function MessageComposer({
   chatId,
@@ -66,13 +59,15 @@ export function MessageComposer({
   const startTyping = useChatStore((s) => s.startTyping);
   const stopTyping = useChatStore((s) => s.stopTyping);
   const user = useAuthStore((s) => s.user);
+  const emojiIndex = useEmojiIndex();
 
   const isTypingRef = useRef(false);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fieldRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
-  const caretOffsetRef = useRef(0);
+  const caretRangeRef = useRef({ start: 0, end: 0 });
   const pendingCaretRef = useRef<number | null>(null);
+  const renderedEmojiIndexRef = useRef<EmojiIndex | null | undefined>(undefined);
   const roundButtonRef = useRef<HTMLButtonElement>(null);
   const recorderRef = useRef<VoiceRecorderHandle>(null);
   const recordOriginRef = useRef({ x: 0, y: 0 });
@@ -90,18 +85,35 @@ export function MessageComposer({
     if (context?.mode === 'edit') {
       const content = context.message.content ?? '';
       pendingCaretRef.current = content.length;
-      caretOffsetRef.current = content.length;
+      caretRangeRef.current = { start: content.length, end: content.length };
       setValue(content);
     }
     if (context) fieldRef.current?.focus();
   }, [context]);
 
   useLayoutEffect(() => {
-    if (pendingCaretRef.current == null) return;
     const el = fieldRef.current;
-    if (el && document.activeElement === el) setComposerCaretOffset(el, pendingCaretRef.current);
+    if (!el || recording || isComposingRef.current) return;
+
+    const tokens = tokenizeComposerValue(value);
+    const staleSprites = renderedEmojiIndexRef.current !== emojiIndex && tokens.some((token) => token.kind === 'emoji');
+    renderedEmojiIndexRef.current = emojiIndex;
+
+    if (!staleSprites && composerDomMatchesTokens(el, tokens)) {
+      pendingCaretRef.current = null;
+      return;
+    }
+
+    const focused = document.activeElement === el;
+    const caret = focused ? (pendingCaretRef.current ?? getComposerCaretOffset(el)) : null;
     pendingCaretRef.current = null;
-  }, [value]);
+
+    renderComposerDom(el, tokens, (emoji) =>
+      createComposerEmojiElement(emoji, emojiIndex, COMPOSER_EMOJI_SIZE, styles.inlineEmoji),
+    );
+
+    if (caret != null) setComposerCaretOffset(el, caret);
+  }, [value, emojiIndex, recording]);
 
   useEffect(() => {
     return () => {
@@ -141,10 +153,10 @@ export function MessageComposer({
     if (isComposingRef.current) return;
     const el = fieldRef.current;
     if (!el) return;
-    const offset = getComposerCaretOffset(el);
+    const range = getComposerCaretRange(el);
     const next = serializeComposerDom(el);
-    pendingCaretRef.current = offset;
-    caretOffsetRef.current = offset;
+    pendingCaretRef.current = range.start;
+    caretRangeRef.current = range;
     handleChange(next);
   }
 
@@ -163,23 +175,33 @@ export function MessageComposer({
 
   function handleFieldBlur(): void {
     const el = fieldRef.current;
-    if (el) caretOffsetRef.current = getComposerCaretOffset(el);
+    if (el) caretRangeRef.current = getComposerCaretRange(el);
+  }
+
+  function insertPlainText(text: string): void {
+    if (!text) return;
+    const el = fieldRef.current;
+    if (el) caretRangeRef.current = getComposerCaretRange(el);
+    insertTextAtCaret(text);
   }
 
   function handleFieldPaste(event: ClipboardEvent<HTMLDivElement>): void {
     event.preventDefault();
-    const text = event.clipboardData.getData('text/plain');
-    if (!text) return;
-    const el = fieldRef.current;
-    if (el) caretOffsetRef.current = getComposerCaretOffset(el);
-    insertTextAtCaret(text);
+    insertPlainText(event.clipboardData.getData('text/plain'));
+  }
+
+  function handleFieldDrop(event: DragEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    insertPlainText(event.dataTransfer.getData('text/plain'));
   }
 
   function insertTextAtCaret(text: string): void {
-    const at = Math.min(caretOffsetRef.current, value.length);
-    const next = value.slice(0, at) + text + value.slice(at);
-    pendingCaretRef.current = at + text.length;
-    caretOffsetRef.current = at + text.length;
+    const start = Math.min(caretRangeRef.current.start, value.length);
+    const end = Math.min(Math.max(caretRangeRef.current.end, start), value.length);
+    const next = value.slice(0, start) + text + value.slice(end);
+    const caret = start + text.length;
+    pendingCaretRef.current = caret;
+    caretRangeRef.current = { start: caret, end: caret };
     handleChange(next);
   }
 
@@ -319,20 +341,19 @@ export function MessageComposer({
               ref={fieldRef}
               className={styles.input}
               contentEditable
-              suppressContentEditableWarning
               role="textbox"
               aria-multiline="true"
               aria-label={editing ? 'Изменить сообщение' : 'Сообщение'}
               data-placeholder={editing ? 'Изменить сообщение' : 'Сообщение'}
+              data-empty={value.length === 0 ? 'true' : undefined}
               onInput={handleFieldInput}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
               onBlur={handleFieldBlur}
               onPaste={handleFieldPaste}
+              onDrop={handleFieldDrop}
               onKeyDown={handleKeyDown}
-            >
-              {renderComposerTokens(tokenizeComposerValue(value))}
-            </div>
+            />
             <button
               className={styles.round}
               type="button"

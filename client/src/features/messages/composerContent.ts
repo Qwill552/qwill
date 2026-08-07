@@ -1,6 +1,13 @@
 import { matchEmojis } from '@messenger/shared';
 
+import type { EmojiIndex } from '../emoji/emojiIndex';
+
 export type ComposerToken = { kind: 'text'; text: string } | { kind: 'emoji'; emoji: string };
+
+export interface ComposerCaretRange {
+  start: number;
+  end: number;
+}
 
 export const COMPOSER_EMOJI_ATTR = 'data-emoji';
 
@@ -19,56 +26,99 @@ export function tokenizeComposerValue(value: string): ComposerToken[] {
   return tokens;
 }
 
-function nodeCharLength(node: ChildNode): number {
-  if (node.nodeType === Node.TEXT_NODE) return node.textContent?.length ?? 0;
-  if (node instanceof HTMLElement) {
-    const emoji = node.getAttribute(COMPOSER_EMOJI_ATTR);
-    if (emoji != null) return emoji.length;
-  }
-  return 0;
+function atomicEmojiOf(node: Node): string | null {
+  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+  return (node as Element).getAttribute(COMPOSER_EMOJI_ATTR);
+}
+
+function textLengthOf(node: Node): number {
+  return node.nodeValue?.length ?? 0;
 }
 
 export function serializeComposerDom(root: HTMLElement): string {
   let text = '';
-  root.childNodes.forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      text += node.textContent ?? '';
-      return;
+
+  function visit(node: Node): void {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        text += child.nodeValue ?? '';
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      const emoji = atomicEmojiOf(child);
+      if (emoji != null) {
+        text += emoji;
+        continue;
+      }
+      visit(child);
     }
-    if (node instanceof HTMLElement) {
-      const emoji = node.getAttribute(COMPOSER_EMOJI_ATTR);
-      if (emoji != null) text += emoji;
-    }
-  });
+  }
+
+  visit(root);
   return text;
 }
 
-export function getComposerCaretOffset(root: HTMLElement): number {
+function measureOffsetOfPoint(root: HTMLElement, container: Node, containerOffset: number): number | null {
+  let total = 0;
+  let found = false;
+
+  function visit(node: Node): void {
+    const children = Array.from(node.childNodes);
+    for (let i = 0; i < children.length; i += 1) {
+      if (node === container && i === containerOffset) {
+        found = true;
+        return;
+      }
+      const child = children[i]!;
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child === container) {
+          total += Math.min(Math.max(containerOffset, 0), textLengthOf(child));
+          found = true;
+          return;
+        }
+        total += textLengthOf(child);
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+
+      const emoji = atomicEmojiOf(child);
+      if (emoji != null) {
+        if (child === container || child.contains(container)) {
+          found = true;
+          return;
+        }
+        total += emoji.length;
+        continue;
+      }
+
+      visit(child);
+      if (found) return;
+    }
+
+    if (node === container && containerOffset >= children.length) found = true;
+  }
+
+  visit(root);
+  return found ? total : null;
+}
+
+export function getComposerCaretRange(root: HTMLElement): ComposerCaretRange {
   const selection = window.getSelection();
+  const fallback = serializeComposerDom(root).length;
   if (!selection || selection.rangeCount === 0 || !root.contains(selection.anchorNode)) {
-    return serializeComposerDom(root).length;
+    return { start: fallback, end: fallback };
   }
 
   const range = selection.getRangeAt(0);
-  const children = Array.from(root.childNodes);
+  const start = measureOffsetOfPoint(root, range.startContainer, range.startOffset) ?? fallback;
+  const end = range.collapsed ? start : (measureOffsetOfPoint(root, range.endContainer, range.endOffset) ?? fallback);
+  return { start, end: Math.max(start, end) };
+}
 
-  if (range.startContainer === root) {
-    let offset = 0;
-    for (let i = 0; i < range.startOffset && i < children.length; i += 1) offset += nodeCharLength(children[i]!);
-    return offset;
-  }
-
-  let offset = 0;
-  for (const child of children) {
-    if (child === range.startContainer) {
-      return offset + (child.nodeType === Node.TEXT_NODE ? range.startOffset : 0);
-    }
-    if (child.contains(range.startContainer)) {
-      return offset + nodeCharLength(child);
-    }
-    offset += nodeCharLength(child);
-  }
-  return offset;
+export function getComposerCaretOffset(root: HTMLElement): number {
+  return getComposerCaretRange(root).start;
 }
 
 export function setComposerCaretOffset(root: HTMLElement, offset: number): void {
@@ -77,28 +127,106 @@ export function setComposerCaretOffset(root: HTMLElement, offset: number): void 
 
   const range = document.createRange();
   let remaining = Math.max(0, offset);
+  let placed = false;
 
-  for (const child of Array.from(root.childNodes)) {
-    const length = nodeCharLength(child);
-    if (child.nodeType === Node.TEXT_NODE && remaining <= length) {
-      range.setStart(child, remaining);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+  function visit(node: Node): void {
+    for (const child of Array.from(node.childNodes)) {
+      if (placed) return;
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        const length = textLengthOf(child);
+        if (remaining <= length) {
+          range.setStart(child, remaining);
+          placed = true;
+          return;
+        }
+        remaining -= length;
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+
+      const emoji = atomicEmojiOf(child);
+      if (emoji != null) {
+        if (remaining < emoji.length) {
+          range.setStartBefore(child);
+          placed = true;
+          return;
+        }
+        remaining -= emoji.length;
+        continue;
+      }
+
+      visit(child);
     }
-    if (child.nodeType !== Node.TEXT_NODE && remaining < length) {
-      range.setStartBefore(child);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
-    }
-    remaining -= length;
   }
 
-  range.selectNodeContents(root);
-  range.collapse(false);
+  visit(root);
+
+  if (placed) {
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(root);
+    range.collapse(false);
+  }
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+export function createComposerEmojiElement(
+  emoji: string,
+  index: EmojiIndex | null | undefined,
+  size: number,
+  className: string | undefined,
+): HTMLElement {
+  const node = document.createElement('span');
+  node.setAttribute(COMPOSER_EMOJI_ATTR, emoji);
+  node.setAttribute('contenteditable', 'false');
+  node.setAttribute('role', 'img');
+  if (className) node.className = className;
+  node.style.width = `${size}px`;
+  node.style.height = `${size}px`;
+
+  const entry = index?.byChar.get(emoji);
+  if (!index || !entry) {
+    node.setAttribute('aria-label', emoji);
+    node.style.fontSize = `${size}px`;
+    node.style.lineHeight = '1';
+    node.textContent = emoji;
+    return node;
+  }
+
+  node.setAttribute('aria-label', entry.k[0] ?? emoji);
+  node.style.backgroundImage = 'url(/emoji/sheet.webp)';
+  node.style.backgroundRepeat = 'no-repeat';
+  node.style.backgroundSize = `${index.cols * size}px ${index.rows * size}px`;
+  node.style.backgroundPosition = `-${entry.x * size}px -${entry.y * size}px`;
+  return node;
+}
+
+export function composerDomMatchesTokens(root: HTMLElement, tokens: ComposerToken[]): boolean {
+  const children = root.childNodes;
+  if (children.length !== tokens.length) return false;
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const node = children[i]!;
+    const token = tokens[i]!;
+    if (token.kind === 'text') {
+      if (node.nodeType !== Node.TEXT_NODE || node.nodeValue !== token.text) return false;
+      continue;
+    }
+    if (atomicEmojiOf(node) !== token.emoji) return false;
+  }
+  return true;
+}
+
+export function renderComposerDom(
+  root: HTMLElement,
+  tokens: ComposerToken[],
+  createEmojiNode: (emoji: string) => HTMLElement,
+): void {
+  const nodes = tokens.map((token) =>
+    token.kind === 'text' ? document.createTextNode(token.text) : createEmojiNode(token.emoji),
+  );
+  root.replaceChildren(...nodes);
 }
