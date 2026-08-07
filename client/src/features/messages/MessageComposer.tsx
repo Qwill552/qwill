@@ -1,46 +1,67 @@
-import { ALLOWED_MIME_TYPES, type MessageAttachmentInput } from '@messenger/shared';
-import { type ChangeEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type {
+  ClipboardEvent,
+  CompositionEvent,
+  FormEvent,
+  KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 
-import { ApiError } from '../../api/client';
-import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../../api/files';
 import { useAuthStore } from '../../stores/authStore';
-import { type LocalMessage, useChatStore } from '../../stores/chatStore';
+import { useChatStore } from '../../stores/chatStore';
+import { Icon } from '../../ui/Icon';
+import { Emoji } from '../emoji/Emoji';
+import { EmojiPanel } from '../emoji/EmojiPanel';
+import { VoiceRecorder, type VoiceRecorderHandle } from '../voice/VoiceRecorder';
+import { AttachSheet } from './AttachSheet';
+import { ComposerContextBar, type ComposerContextValue } from './ComposerContext';
+import {
+  getComposerCaretOffset,
+  serializeComposerDom,
+  setComposerCaretOffset,
+  tokenizeComposerValue,
+  type ComposerToken,
+} from './composerContent';
+import { MediaPickerSheet } from './MediaPickerSheet';
 import styles from './MessageComposer.module.css';
 
-/** Меньше TYPING_TIMEOUT_MS (5с) — явный stop почти всегда опережает автогашение у получателя (секция 3). */
 const TYPING_STOP_DELAY_MS = 3000;
-/** Совпадает с max-height в CSS — иначе авторасширение упрётся в обрезанный textarea раньше скролла. */
-const INPUT_MAX_HEIGHT_PX = 120;
 
-interface PendingUpload {
-  name: string;
-  stage: 'превью' | 'загрузка';
-  progress: number;
-}
+export type ComposerContext = ComposerContextValue;
 
-/** Что сейчас делает композер помимо обычного набора текста — задаётся кликом по действиям сообщения (этап 6). */
-export type ComposerContext = { mode: 'reply' | 'edit'; message: LocalMessage };
-
-function contextPreviewText(message: LocalMessage): string {
-  if (message.deletedAt) return 'Сообщение удалено';
-  if (message.content) return message.content;
-  if (message.attachment) return '📎 Вложение';
-  return '';
+function renderComposerTokens(tokens: ComposerToken[]): ReactNode[] {
+  return tokens.map((token, index) => {
+    if (token.kind === 'text') return token.text;
+    return (
+      <span key={`e-${index}`} contentEditable={false} data-emoji={token.emoji} className={styles.inlineEmoji}>
+        <Emoji emoji={token.emoji} size={20} />
+      </span>
+    );
+  });
 }
 
 export function MessageComposer({
   chatId,
   context,
   onClearContext,
+  onEmojiPanelToggle,
 }: {
   chatId: string;
   context: ComposerContext | null;
   onClearContext: () => void;
+  onEmojiPanelToggle?: (open: boolean) => void;
 }) {
   const [value, setValue] = useState('');
-  const [pending, setPending] = useState<PendingUpload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
+  const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  const [pickedFiles, setPickedFiles] = useState<File[] | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingLocked, setRecordingLocked] = useState(false);
+
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendAttachmentMessage = useChatStore((s) => s.sendAttachmentMessage);
   const editMessage = useChatStore((s) => s.editMessage);
   const startTyping = useChatStore((s) => s.startTyping);
   const stopTyping = useChatStore((s) => s.stopTyping);
@@ -48,25 +69,41 @@ export function MessageComposer({
 
   const isTypingRef = useRef(false);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const isComposingRef = useRef(false);
+  const caretOffsetRef = useRef(0);
+  const pendingCaretRef = useRef<number | null>(null);
+  const roundButtonRef = useRef<HTMLButtonElement>(null);
+  const recorderRef = useRef<VoiceRecorderHandle>(null);
+  const recordOriginRef = useRef({ x: 0, y: 0 });
+
+  function setEmojiPanelOpen(open: boolean): void {
+    setEmojiPanelOpenState(open);
+    onEmojiPanelToggle?.(open);
+  }
 
   useEffect(() => {
-    // Авторасширение по содержимому до INPUT_MAX_HEIGHT_PX, дальше — собственный скролл textarea.
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, INPUT_MAX_HEIGHT_PX)}px`;
+    return () => onEmojiPanelToggle?.(false);
+  }, [onEmojiPanelToggle]);
+
+  useEffect(() => {
+    if (context?.mode === 'edit') {
+      const content = context.message.content ?? '';
+      pendingCaretRef.current = content.length;
+      caretOffsetRef.current = content.length;
+      setValue(content);
+    }
+    if (context) fieldRef.current?.focus();
+  }, [context]);
+
+  useLayoutEffect(() => {
+    if (pendingCaretRef.current == null) return;
+    const el = fieldRef.current;
+    if (el && document.activeElement === el) setComposerCaretOffset(el, pendingCaretRef.current);
+    pendingCaretRef.current = null;
   }, [value]);
 
   useEffect(() => {
-    // Правка предзаполняет поле текущим текстом; ответ — только переносит фокус в поле ввода.
-    if (context?.mode === 'edit') setValue(context.message.content ?? '');
-    if (context) textareaRef.current?.focus();
-  }, [context]);
-
-  useEffect(() => {
-    // Смена чата или уход со страницы — сообщаем «перестал печатать» в прежнем чате.
     return () => {
       clearTimeout(stopTimerRef.current);
       if (isTypingRef.current) {
@@ -100,6 +137,56 @@ export function MessageComposer({
     stopTimerRef.current = setTimeout(markStopped, TYPING_STOP_DELAY_MS);
   }
 
+  function flushFieldContent(): void {
+    if (isComposingRef.current) return;
+    const el = fieldRef.current;
+    if (!el) return;
+    const offset = getComposerCaretOffset(el);
+    const next = serializeComposerDom(el);
+    pendingCaretRef.current = offset;
+    caretOffsetRef.current = offset;
+    handleChange(next);
+  }
+
+  function handleFieldInput(): void {
+    flushFieldContent();
+  }
+
+  function handleCompositionStart(): void {
+    isComposingRef.current = true;
+  }
+
+  function handleCompositionEnd(_event: CompositionEvent<HTMLDivElement>): void {
+    isComposingRef.current = false;
+    flushFieldContent();
+  }
+
+  function handleFieldBlur(): void {
+    const el = fieldRef.current;
+    if (el) caretOffsetRef.current = getComposerCaretOffset(el);
+  }
+
+  function handleFieldPaste(event: ClipboardEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    const text = event.clipboardData.getData('text/plain');
+    if (!text) return;
+    const el = fieldRef.current;
+    if (el) caretOffsetRef.current = getComposerCaretOffset(el);
+    insertTextAtCaret(text);
+  }
+
+  function insertTextAtCaret(text: string): void {
+    const at = Math.min(caretOffsetRef.current, value.length);
+    const next = value.slice(0, at) + text + value.slice(at);
+    pendingCaretRef.current = at + text.length;
+    caretOffsetRef.current = at + text.length;
+    handleChange(next);
+  }
+
+  function insertEmoji(emoji: string): void {
+    insertTextAtCaret(emoji);
+  }
+
   function handleCancelContext(): void {
     if (context?.mode === 'edit') setValue('');
     setError(null);
@@ -108,7 +195,7 @@ export function MessageComposer({
 
   async function submit(): Promise<void> {
     const content = value.trim();
-    if (!content || !user || pending) return;
+    if (!content || !user) return;
     markStopped();
 
     if (context?.mode === 'edit') {
@@ -133,152 +220,163 @@ export function MessageComposer({
     void submit();
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Escape' && context) {
       event.preventDefault();
       handleCancelContext();
       return;
     }
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void submit();
     }
   }
 
-  async function handleFileSelected(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file || !user) return;
+  function handleFilesFromSheet(files: File[]): void {
+    setAttachSheetOpen(false);
+    setPickedFiles(files);
+  }
 
-    markStopped();
-    setError(null);
-    setPending({ name: file.name, stage: 'превью', progress: 0 });
-
-    try {
-      const isImage = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
-
-      const videoThumb = isVideo ? await generateVideoThumbnail(file) : null;
-      const thumb = isImage ? await generateImageThumbnail(file) : videoThumb;
-
-      let thumbnailFileId: string | undefined;
-      let thumbnailSha256: string | undefined;
-      if (thumb) {
-        const uploadedThumb = await uploadFile(thumb.file, 'message');
-        thumbnailFileId = uploadedThumb.id;
-        thumbnailSha256 = uploadedThumb.sha256;
-      }
-
-      setPending({ name: file.name, stage: 'загрузка', progress: 0 });
-      const uploaded = await uploadFile(file, 'message', (loaded, total) => {
-        setPending({ name: file.name, stage: 'загрузка', progress: total ? loaded / total : 0 });
+  function handleMediaSend(caption: string): void {
+    if (!user || !pickedFiles) return;
+    const replyTo = context?.mode === 'reply' ? context.message : undefined;
+    pickedFiles.forEach((file, index) => {
+      sendAttachmentMessage(chatId, user, file, {
+        caption: index === 0 ? caption || undefined : undefined,
+        replyTo: index === 0 ? replyTo : undefined,
       });
-
-      const attachment: MessageAttachmentInput = {
-        fileId: uploaded.id,
-        sha256: uploaded.sha256,
-        thumbnailFileId,
-        thumbnailSha256,
-        originalName: file.name,
-        width: thumb?.width,
-        height: thumb?.height,
-        duration: videoThumb?.duration,
-      };
-
-      const replyTo = context?.mode === 'reply' ? context.message : undefined;
-      sendMessage(chatId, value.trim(), user, attachment, replyTo);
-      setValue('');
-      if (replyTo) onClearContext();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось отправить файл');
-    } finally {
-      setPending(null);
-    }
+    });
+    setPickedFiles(null);
+    if (replyTo) onClearContext();
   }
 
   const editing = context?.mode === 'edit';
+  const hasText = value.trim().length > 0;
+
+  function handleRoundPointerDown(event: ReactPointerEvent<HTMLButtonElement>): void {
+    if (hasText || editing || recording || !user) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    recordOriginRef.current = { x: event.clientX, y: event.clientY };
+    setRecording(true);
+  }
+
+  function handleRoundPointerMove(event: ReactPointerEvent<HTMLButtonElement>): void {
+    recorderRef.current?.onPointerMove(event);
+  }
+
+  function handleRoundPointerUp(): void {
+    recorderRef.current?.onPointerUp();
+  }
+
+  function handleRoundPointerCancel(): void {
+    recorderRef.current?.onPointerCancel();
+  }
+
+  function handleVoiceSend(file: File, durationMs: number, peaks: number[]): void {
+    setRecording(false);
+    setRecordingLocked(false);
+    if (!user) return;
+    const replyTo = context?.mode === 'reply' ? context.message : undefined;
+    sendAttachmentMessage(chatId, user, file, { duration: durationMs, peaks, replyTo });
+    if (replyTo) onClearContext();
+  }
+
+  function handleVoiceCancel(): void {
+    setRecording(false);
+    setRecordingLocked(false);
+  }
 
   return (
     <div className={styles.wrap}>
-      {context && (
-        <div className={styles.context}>
-          <div className={styles.contextBar}>
-            <span className={styles.contextLabel}>
-              {editing ? 'Редактирование' : `Ответ ${context.message.sender?.displayName ?? 'удалённому аккаунту'}`}
-            </span>
-            <span className={styles.contextText}>{contextPreviewText(context.message)}</span>
-          </div>
-          <button
-            type="button"
-            className={styles.contextCancel}
-            onClick={handleCancelContext}
-            aria-label="Отменить"
-            title="Отменить"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {pending && (
-        <div className={styles.upload}>
-          <span className={styles.uploadName}>
-            {pending.stage === 'превью' ? 'Готовим превью…' : pending.name}
-          </span>
-          <div className={styles.progressTrack}>
-            <div className={styles.progressFill} style={{ width: `${Math.round(pending.progress * 100)}%` }} />
-          </div>
-        </div>
-      )}
+      {context && <ComposerContextBar context={context} onCancel={handleCancelContext} />}
       {error && <p className={styles.error}>{error}</p>}
 
       <form className={styles.composer} onSubmit={handleSubmit}>
-        <input
-          ref={fileInputRef}
-          className={styles.hiddenInput}
-          type="file"
-          accept={ALLOWED_MIME_TYPES.join(',')}
-          onChange={(e) => void handleFileSelected(e)}
-        />
+        {recording ? (
+          <VoiceRecorder
+            ref={recorderRef}
+            originX={recordOriginRef.current.x}
+            originY={recordOriginRef.current.y}
+            micButtonRef={roundButtonRef}
+            onPhaseChange={(phase) => setRecordingLocked(phase === 'locked')}
+            onCancel={handleVoiceCancel}
+            onSend={handleVoiceSend}
+          />
+        ) : (
+          <div className={styles.field}>
+            <button
+              className={styles.round}
+              type="button"
+              onClick={() => setEmojiPanelOpen(!emojiPanelOpen)}
+              aria-label="Эмодзи"
+              title="Эмодзи"
+              aria-pressed={emojiPanelOpen}
+            >
+              <Icon name="emoji" size={22} />
+            </button>
+            <div
+              ref={fieldRef}
+              className={styles.input}
+              contentEditable
+              suppressContentEditableWarning
+              role="textbox"
+              aria-multiline="true"
+              aria-label={editing ? 'Изменить сообщение' : 'Сообщение'}
+              data-placeholder={editing ? 'Изменить сообщение' : 'Сообщение'}
+              onInput={handleFieldInput}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              onBlur={handleFieldBlur}
+              onPaste={handleFieldPaste}
+              onKeyDown={handleKeyDown}
+            >
+              {renderComposerTokens(tokenizeComposerValue(value))}
+            </div>
+            <button
+              className={styles.round}
+              type="button"
+              onClick={() => setAttachSheetOpen(true)}
+              disabled={editing}
+              aria-label="Прикрепить"
+              title="Прикрепить"
+            >
+              <Icon name="attach" size={21} />
+            </button>
+          </div>
+        )}
+
         <button
-          className={styles.attach}
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!!pending || editing}
-          aria-label="Прикрепить файл"
-          title="Прикрепить файл"
+          ref={roundButtonRef}
+          className={styles.send}
+          type={hasText ? 'submit' : 'button'}
+          disabled={editing ? !hasText : recordingLocked}
+          data-recording={recording && !recordingLocked ? 'true' : undefined}
+          onPointerDown={handleRoundPointerDown}
+          onPointerMove={handleRoundPointerMove}
+          onPointerUp={handleRoundPointerUp}
+          onPointerCancel={handleRoundPointerCancel}
+          aria-label={hasText ? 'Отправить' : 'Записать голосовое'}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M8 12.5V7a4 4 0 1 1 8 0v9a2.5 2.5 0 0 1-5 0V8"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <textarea
-          ref={textareaRef}
-          className={styles.input}
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={editing ? 'Изменить сообщение…' : 'Написать сообщение…'}
-          rows={1}
-        />
-        <button className={styles.send} type="submit" disabled={!value.trim() || !!pending} aria-label="Отправить">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 12.5 20 4l-5.5 16-3.5-6.5L4 12.5Z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          </svg>
+          <span className={styles.morph}>
+            <Icon name="mic" size={22} className={`${styles.morphIcon} ${hasText ? styles.morphHidden : ''}`} />
+            <Icon name="send" size={22} className={`${styles.morphIcon} ${hasText ? '' : styles.morphHidden}`} />
+          </span>
         </button>
       </form>
+
+      {emojiPanelOpen && <EmojiPanel onSelect={insertEmoji} onClose={() => setEmojiPanelOpen(false)} />}
+
+      {attachSheetOpen && <AttachSheet onClose={() => setAttachSheetOpen(false)} onFilesSelected={handleFilesFromSheet} />}
+
+      {pickedFiles && pickedFiles.length > 0 && (
+        <MediaPickerSheet
+          files={pickedFiles}
+          onRemove={(index) => setPickedFiles((prev) => (prev ? prev.filter((_, i) => i !== index) : prev))}
+          onClose={() => setPickedFiles(null)}
+          onSend={handleMediaSend}
+        />
+      )}
     </div>
   );
 }
