@@ -31,11 +31,27 @@ function atomicEmojiOf(node: Node): string | null {
   return (node as Element).getAttribute(COMPOSER_EMOJI_ATTR);
 }
 
+function isBrElement(node: Node): boolean {
+  return node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'BR';
+}
+
+function lastNodeInTreeOrder(root: Node): Node | null {
+  let node: Node = root;
+  while (node.lastChild) node = node.lastChild;
+  return node === root ? null : node;
+}
+
+function findTrailingBogusBr(root: HTMLElement): Node | null {
+  const last = lastNodeInTreeOrder(root);
+  return last && isBrElement(last) ? last : null;
+}
+
 function textLengthOf(node: Node): number {
   return node.nodeValue?.length ?? 0;
 }
 
 export function serializeComposerDom(root: HTMLElement): string {
+  const trailingBogusBr = findTrailingBogusBr(root);
   let text = '';
 
   function visit(node: Node): void {
@@ -50,6 +66,10 @@ export function serializeComposerDom(root: HTMLElement): string {
         text += emoji;
         continue;
       }
+      if (isBrElement(child)) {
+        if (child !== trailingBogusBr) text += '\n';
+        continue;
+      }
       visit(child);
     }
   }
@@ -58,7 +78,12 @@ export function serializeComposerDom(root: HTMLElement): string {
   return text;
 }
 
-function measureOffsetOfPoint(root: HTMLElement, container: Node, containerOffset: number): number | null {
+function measureOffsetOfPoint(
+  root: HTMLElement,
+  container: Node,
+  containerOffset: number,
+  trailingBogusBr: Node | null,
+): number | null {
   let total = 0;
   let found = false;
 
@@ -93,6 +118,15 @@ function measureOffsetOfPoint(root: HTMLElement, container: Node, containerOffse
         continue;
       }
 
+      if (isBrElement(child)) {
+        if (child === container) {
+          found = true;
+          return;
+        }
+        if (child !== trailingBogusBr) total += 1;
+        continue;
+      }
+
       visit(child);
       if (found) return;
     }
@@ -112,8 +146,11 @@ export function getComposerCaretRange(root: HTMLElement): ComposerCaretRange {
   }
 
   const range = selection.getRangeAt(0);
-  const start = measureOffsetOfPoint(root, range.startContainer, range.startOffset) ?? fallback;
-  const end = range.collapsed ? start : (measureOffsetOfPoint(root, range.endContainer, range.endOffset) ?? fallback);
+  const trailingBogusBr = findTrailingBogusBr(root);
+  const start = measureOffsetOfPoint(root, range.startContainer, range.startOffset, trailingBogusBr) ?? fallback;
+  const end = range.collapsed
+    ? start
+    : (measureOffsetOfPoint(root, range.endContainer, range.endOffset, trailingBogusBr) ?? fallback);
   return { start, end: Math.max(start, end) };
 }
 
@@ -125,6 +162,7 @@ export function setComposerCaretOffset(root: HTMLElement, offset: number): void 
   const selection = window.getSelection();
   if (!selection) return;
 
+  const trailingBogusBr = findTrailingBogusBr(root);
   const range = document.createRange();
   let remaining = Math.max(0, offset);
   let placed = false;
@@ -154,6 +192,22 @@ export function setComposerCaretOffset(root: HTMLElement, offset: number): void 
           return;
         }
         remaining -= emoji.length;
+        continue;
+      }
+
+      if (isBrElement(child)) {
+        if (child === trailingBogusBr) continue;
+        if (remaining === 0) {
+          range.setStartBefore(child);
+          placed = true;
+          return;
+        }
+        if (remaining === 1) {
+          range.setStartAfter(child);
+          placed = true;
+          return;
+        }
+        remaining -= 1;
         continue;
       }
 
