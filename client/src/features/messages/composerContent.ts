@@ -45,7 +45,7 @@ export function serializeComposerDom(root: HTMLElement): string {
 
 export function getComposerCaretOffset(root: HTMLElement): number {
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0 || !selection.anchorNode || !root.contains(selection.anchorNode)) {
+  if (!selection || selection.rangeCount === 0 || !root.contains(selection.anchorNode)) {
     return serializeComposerDom(root).length;
   }
 
