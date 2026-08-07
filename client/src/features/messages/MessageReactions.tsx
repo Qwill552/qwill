@@ -13,6 +13,10 @@ export function MessageReactions({
 }) {
   if (reactions.length === 0) return null;
 
+  function stopPointerBubble(event: React.PointerEvent): void {
+    event.stopPropagation();
+  }
+
   return (
     <div className={styles.row}>
       {reactions.map((reaction) => {
@@ -25,6 +29,10 @@ export function MessageReactions({
             className={`${styles.pill} ${mine ? styles.pillMine : ''}`}
             title={label}
             aria-label={label}
+            onPointerDown={stopPointerBubble}
+            onPointerMove={stopPointerBubble}
+            onPointerUp={stopPointerBubble}
+            onPointerCancel={stopPointerBubble}
             onClick={() => onToggle(reaction.emoji)}
           >
             <span>{reaction.emoji}</span>
