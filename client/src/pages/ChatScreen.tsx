@@ -116,6 +116,23 @@ export function ChatScreen() {
     return () => observer.disconnect();
   }, [chatId]);
 
+  // Плашка обновления живёт в AppShell — другая ветка DOM, куда переменные с этого экрана
+  // не наследуются, поэтому смещение публикуется на корне документа. Берётся фактическая
+  // позиция композера, а не сумма переменных: она уже учитывает и safe-area, и подъём
+  // композера при открытой панели эмодзи.
+  useLayoutEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+
+    const root = document.documentElement;
+    const offset = window.innerHeight - el.getBoundingClientRect().top;
+    root.style.setProperty('--update-banner-bottom', `calc(${Math.max(offset, 0)}px + var(--chrome-gap))`);
+
+    return () => {
+      root.style.removeProperty('--update-banner-bottom');
+    };
+  }, [composerHeight, emojiPanelOpen]);
+
   const activeChat = chats.find((c) => c.id === chatId);
   const isGroup = activeChat?.type === 'GROUP';
   const isTyping = typingUsers.length > 0;

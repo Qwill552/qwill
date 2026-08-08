@@ -8,6 +8,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 
+import { setPendingDraftProvider, takePendingDraft } from '../../app/pendingDraft';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
@@ -45,7 +46,7 @@ export function MessageComposer({
   onClearContext: () => void;
   onEmojiPanelToggle?: (open: boolean) => void;
 }) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
   const [error, setError] = useState<string | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
@@ -60,6 +61,14 @@ export function MessageComposer({
   const stopTyping = useChatStore((s) => s.stopTyping);
   const user = useAuthStore((s) => s.user);
   const emojiIndex = useEmojiIndex();
+
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    setPendingDraftProvider(() => ({ chatId, text: valueRef.current }));
+    return () => setPendingDraftProvider(null);
+  }, [chatId]);
 
   const isTypingRef = useRef(false);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

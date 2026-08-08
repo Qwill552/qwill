@@ -4,12 +4,23 @@ import { precacheAndRoute } from 'workbox-precaching';
 // Список файлов для прекэша подставляет vite-plugin-pwa при сборке (self.__WB_MANIFEST).
 precacheAndRoute(self.__WB_MANIFEST);
 
-// Без этих двух строк новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный
-// билд всем уже открытым вкладкам, пока их не закрыть все разом, — на активной разработке это
-// выглядит так, будто правки не применяются вообще. skipWaiting активирует новый SW сразу же
-// после установки, clientsClaim забирает под его контроль уже открытые вкладки без reload.
-self.skipWaiting();
-clientsClaim();
+// В dev новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный билд всем
+// уже открытым вкладкам, пока их не закрыть все разом, — выглядит так, будто правки не
+// применяются вообще. В проде ожидание нужно: именно оно даёт возможность спросить
+// пользователя, а обновление применяется по команде из UpdateBanner.
+// Режим определяется по URL регистрации (push.ts ставит /dev-sw.js?dev-sw в dev), а не по
+// import.meta.env.DEV: service worker собирается отдельным проходом, в котором DEV истинен
+// и в продакшен-сборке.
+const isDevServiceWorker = self.location.search.includes('dev-sw');
+
+if (isDevServiceWorker) {
+  self.skipWaiting();
+  clientsClaim();
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 /** Пуш приходит даже когда вкладка закрыта — SW сам показывает нативное уведомление (этап 9). */
 self.addEventListener('push', (event) => {
