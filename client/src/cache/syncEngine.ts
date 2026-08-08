@@ -9,16 +9,19 @@ export function mergeSyncedMessages(
   created: MessageDto[],
   changed: MessageDto[],
 ): MessageDto[] {
-  const changedById = new Map(changed.map((message) => [message.id, message]));
+  const latestById = new Map<number, MessageDto>();
+  for (const message of created) latestById.set(message.id, message);
+  for (const message of changed) latestById.set(message.id, message);
+
   const pending = current.filter((message) => message.id < 0);
 
   const confirmed = current
     .filter((message) => message.id > 0)
-    .map((message) => changedById.get(message.id) ?? message)
+    .map((message) => latestById.get(message.id) ?? message)
     .filter((message) => !message.deletedAt);
 
   const known = new Set(confirmed.map((message) => message.id));
-  const appended = created.filter((message) => !known.has(message.id) && !message.deletedAt);
+  const appended = [...latestById.values()].filter((message) => !known.has(message.id) && !message.deletedAt);
 
   return [...pending, ...confirmed, ...appended].sort((a, b) => {
     if (a.id < 0 && b.id < 0) return 0;

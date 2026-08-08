@@ -46,4 +46,10 @@ describe('mergeSyncedMessages', () => {
 
     expect(merged.map((m) => m.id)).toEqual([-1, 4]);
   });
+
+  it('обновляет уже известное сообщение, даже если оно пришло в created', () => {
+    const merged = mergeSyncedMessages([message(1, 'старое'), message(2, 'второе')], [message(1, 'новое')], []);
+
+    expect(merged.map((m) => m.content)).toEqual(['новое', 'второе']);
+  });
 });
