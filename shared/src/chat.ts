@@ -16,6 +16,12 @@ export const messagesQuerySchema = z.object({
 });
 export type MessagesQuery = z.infer<typeof messagesQuerySchema>;
 
+export const messagesSyncQuerySchema = z.object({
+  sinceId: z.coerce.number().int().min(0).default(0),
+  sinceUpdatedAt: z.iso.datetime().optional(),
+});
+export type MessagesSyncQuery = z.infer<typeof messagesSyncQuerySchema>;
+
 /** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).
  *  content — подпись; обязателен, только если вложения нет. */
 export const messageSendSchema = z
@@ -222,6 +228,14 @@ export interface ChatListResponse {
 
 export interface MessagesPage {
   messages: MessageDto[];
+  hasMore: boolean;
+}
+
+export interface MessagesSyncResponse {
+  created: MessageDto[];
+  changed: MessageDto[];
+  maxId: number | null;
+  maxUpdatedAt: string | null;
   hasMore: boolean;
 }
 

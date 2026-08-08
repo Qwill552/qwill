@@ -3,6 +3,7 @@ import {
   createGroupSchema,
   createPrivateChatSchema,
   messagesQuerySchema,
+  messagesSyncQuerySchema,
   SocketEvent,
   updateGroupSchema,
   updateRoleSchema,
@@ -15,6 +16,7 @@ import { emitChatUpdated, emitMemberChanged } from '../../realtime/group-handler
 import { emitToUser, subscribeUserToChat, syncPresenceBetween, unsubscribeUserFromChat } from '../../realtime/index.js';
 import * as chatService from '../../services/chat.js';
 import * as groupService from '../../services/group.js';
+import * as messageService from '../../services/message.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -92,6 +94,23 @@ chatsRouter.get('/:id/messages', (req, res, next) => {
     chatService
       .getMessages(req.params.id, req.userId!, before, limit)
       .then((page) => res.json(page))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.get('/:id/sync', (req, res, next) => {
+  try {
+    const query = parseOrThrow(messagesSyncQuerySchema, req.query);
+    messageService
+      .syncMessages({
+        chatId: paramId(req, 'id'),
+        userId: req.userId!,
+        sinceId: query.sinceId,
+        sinceUpdatedAt: query.sinceUpdatedAt ? new Date(query.sinceUpdatedAt) : null,
+      })
+      .then((result) => res.json(result))
       .catch(next);
   } catch (error) {
     next(error);

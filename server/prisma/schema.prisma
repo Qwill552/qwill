@@ -159,6 +159,7 @@ model Message {
   /// Мягкое удаление: строка остаётся, content очищается — цитаты не рассыпаются.
   deletedAt DateTime?
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   attachments Attachment[]
   reactions   Reaction[]
@@ -167,6 +168,7 @@ model Message {
   @@index([chatId, id])
   @@index([senderId])
   @@index([forwardedFromId])
+  @@index([chatId, updatedAt])
 }
 
 model Attachment {

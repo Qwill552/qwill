@@ -5,6 +5,7 @@ import type {
   MessageForwardPreviewDto,
   MessageReactionDto,
   MessageReplyPreviewDto,
+  MessagesSyncResponse,
 } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 import { randomUUID } from 'node:crypto';
@@ -383,6 +384,52 @@ export async function forwardMessages(input: ForwardMessagesInput): Promise<Mess
 
   await prisma.chat.update({ where: { id: input.toChatId }, data: { updatedAt: new Date() } });
   return created.map(toMessageDto);
+}
+
+export interface SyncMessagesInput {
+  chatId: string;
+  userId: string;
+  sinceId: number;
+  sinceUpdatedAt: Date | null;
+}
+
+const SYNC_PAGE_SIZE = 200;
+
+export async function syncMessages(input: SyncMessagesInput): Promise<MessagesSyncResponse> {
+  await assertMember(input.chatId, input.userId);
+
+  const created = await prisma.message.findMany({
+    where: { chatId: input.chatId, id: { gt: input.sinceId } },
+    include: messageInclude,
+    orderBy: { id: 'asc' },
+    take: SYNC_PAGE_SIZE + 1,
+  });
+
+  const changed = input.sinceUpdatedAt
+    ? await prisma.message.findMany({
+        where: {
+          chatId: input.chatId,
+          id: { lte: input.sinceId },
+          updatedAt: { gt: input.sinceUpdatedAt },
+        },
+        include: messageInclude,
+        orderBy: { updatedAt: 'asc' },
+        take: SYNC_PAGE_SIZE,
+      })
+    : [];
+
+  const hasMore = created.length > SYNC_PAGE_SIZE;
+  const createdPage = hasMore ? created.slice(0, SYNC_PAGE_SIZE) : created;
+  const all = [...createdPage, ...changed];
+
+  return {
+    created: createdPage.map(toMessageDto),
+    changed: changed.map(toMessageDto),
+    maxId: createdPage.length > 0 ? createdPage[createdPage.length - 1]!.id : null,
+    maxUpdatedAt:
+      all.length > 0 ? new Date(Math.max(...all.map((m) => m.updatedAt.getTime()))).toISOString() : null,
+    hasMore,
+  };
 }
 
 export interface ReactToMessageInput {
