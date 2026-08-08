@@ -1,5 +1,5 @@
 import { ErrorCode, type ApiErrorBody } from '@messenger/shared';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Request, Response } from 'express';
 
 import { env } from '../../config/env.js';
@@ -32,7 +32,9 @@ export const uploadLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.userId ?? req.ip ?? 'unknown',
+  // Сырой IPv6-адрес как ключ обходится сменой адреса внутри своей /64 —
+  // ipKeyGenerator сводит подсеть к одному ключу (ERR_ERL_KEY_GEN_IPV6).
+  keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
   skip: skipInTest,
   handler: sendRateLimited,
 });
