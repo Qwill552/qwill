@@ -39,6 +39,7 @@ import {
 } from '../api/chats';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
+import { bumpAttempts, dequeueOutbox, enqueueOutbox, MAX_OUTBOX_ATTEMPTS, readOutbox } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { getSocket } from '../realtime/socket';
 
@@ -149,6 +150,7 @@ interface ChatState {
   startTyping: (chatId: string) => void;
   stopTyping: (chatId: string) => void;
   subscribeToSocket: (myUserId: string) => void;
+  drainOutbox: () => Promise<void>;
   reset: () => void;
   /** Внутренний метод: применяет message:new и ack от message:send по одной логике реконсиляции. */
   applyIncomingMessage: (message: MessageDto) => void;
@@ -367,8 +369,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage(chatId, content, sender, attachment, replyTo) {
     const socket = getSocket();
-    if (!socket) return;
-
     const clientId = crypto.randomUUID();
     const optimistic: LocalMessage = {
       id: -Date.now(),
@@ -405,11 +405,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
+    void enqueueOutbox({
+      clientId,
+      chatId,
+      content: content || null,
+      replyToId: replyTo?.id ?? null,
+      attachment: null,
+      createdAt: Date.now(),
+      attempts: 0,
+    });
+
+    if (!socket) return;
+
     socket.emit(
       SocketEvent.MessageSend,
       { chatId, clientId, content: content || undefined, attachment, replyToId: replyTo?.id },
       (ack: MessageSendAck) => {
         if (ack.ok && ack.message) {
+          void dequeueOutbox(clientId);
           get().applyIncomingMessage(ack.message);
           return;
         }
@@ -618,6 +631,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
         get().setMessageFailed(chatId, clientId);
       },
     );
+  },
+
+  async drainOutbox() {
+    const socket = getSocket();
+    if (!socket?.connected) return;
+
+    for (const entry of await readOutbox()) {
+      if (entry.attachment) continue;
+
+      const attempts = await bumpAttempts(entry.clientId);
+      if (attempts > MAX_OUTBOX_ATTEMPTS) {
+        get().setMessageFailed(entry.chatId, entry.clientId);
+        continue;
+      }
+
+      socket.emit(
+        SocketEvent.MessageSend,
+        {
+          chatId: entry.chatId,
+          clientId: entry.clientId,
+          content: entry.content ?? undefined,
+          replyToId: entry.replyToId ?? undefined,
+        },
+        (ack: MessageSendAck) => {
+          if (ack.ok && ack.message) {
+            void dequeueOutbox(entry.clientId);
+            get().applyIncomingMessage(ack.message);
+          }
+        },
+      );
+    }
   },
 
   updateLocalAttachment(chatId, clientId, patch) {
@@ -831,6 +875,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       void syncAllCachedChats().then(() => {
         if (activeChatId) void get().syncChatMessages(activeChatId);
       });
+      void get().drainOutbox();
     });
   },
 
