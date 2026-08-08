@@ -55,6 +55,16 @@ export function sniffMimeType(head: Buffer): string | null {
   return null;
 }
 
+const CONTAINER_FAMILIES: Record<string, readonly string[]> = {
+  'video/webm': ['video/webm', 'audio/webm'],
+  'video/mp4': ['video/mp4', 'audio/mp4'],
+};
+
+export function resolveContainerMimeType(sniffed: string, declaredMimeType: string): string {
+  const family = CONTAINER_FAMILIES[sniffed];
+  return family?.includes(declaredMimeType) ? declaredMimeType : sniffed;
+}
+
 /** У текстовых файлов нет сигнатуры — эвристика: нет нулевых байт и почти всё в печатном ASCII/UTF-8 диапазоне. */
 export function looksLikeText(head: Buffer): boolean {
   if (head.length === 0) return true;

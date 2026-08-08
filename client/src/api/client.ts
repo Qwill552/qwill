@@ -1,6 +1,6 @@
 import type { ApiErrorBody, ErrorCode } from '@messenger/shared';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
 export { API_URL };
 
 export class ApiError extends Error {

@@ -1,0 +1,33 @@
+/* Буквально из референса (строка 135): 56px, фирменный градиент, тень с бликом сверху.
+ * Позиция right:18/bottom:104 буквальна — safe-area добавлена поверх (у демо-инструмента
+ * с рамкой телефона её не было и не могло быть). */
+
+.fab {
+  position: absolute;
+  z-index: 3;
+  right: calc(18px + var(--safe-right));
+  bottom: calc(104px + var(--safe-bottom));
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #4d8dff, #a05aff);
+  box-shadow:
+    0 16px 34px -12px rgba(90, 120, 255, 0.95),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.4);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (hover: hover) {
+  .fab:hover {
+    transform: scale(1.08) rotate(90deg);
+  }
+}
+
+.fab:active {
+  transform: scale(0.94);
+}

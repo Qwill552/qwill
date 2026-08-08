@@ -1,0 +1,183 @@
+/* Буквально из референса (строки 63-110): шапка — статичный блок (не плавающая хрома),
+ * список — отдельный скроллер под ней (см. ChatList.module.css). */
+
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.top {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(6px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left));
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Задержка действует только на возвращение шапки: пока капсула-подделка уходит вниз,
+   * она ещё перекрывает правый край шапки, и проявившаяся под ней стеклянная кнопка меню
+   * дала бы то же удвоение стекла, что и строка поиска (см. .searchWrapMuted). */
+  transition: opacity 0.12s ease-out 0.14s;
+}
+
+/* Пока открыт поиск, строка поиска стыкуется на месте шапки (см. SearchReveal) — аватар,
+ * вордмарк и кнопка меню на это время прячутся. Гаснут быстрее, чем едет капсула, — иначе
+ * будет кадр, где оба слоя видны непрозрачными друг поверх друга. */
+.headerRowHidden {
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0s;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.wordmark {
+  color: rgb(var(--pulse-ink));
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Кнопка-лупа в шапке проявляется, только когда полное поле поиска ниже уехало —
+ * буквально searchCollapsed из референса. */
+.searchToggleSlot {
+  display: grid;
+  overflow: hidden;
+  flex-shrink: 0;
+  max-width: 0;
+  opacity: 0;
+  transition:
+    max-width 0.2s,
+    opacity 0.2s;
+}
+
+.searchToggleVisible {
+  max-width: 36px;
+  opacity: 1;
+  animation: pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.iconBtn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(var(--pulse-glass), 0.08);
+  border-radius: 50%;
+  background: rgba(var(--pulse-glass), 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: rgb(var(--pulse-ink));
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+@media (hover: hover) {
+  .iconBtn:hover {
+    background: rgba(var(--pulse-glass), 0.14);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Полное поле поиска гаснет и уезжает вверх, схлопывая свою высоту — буквально
+ * searchWrap из референса. */
+.searchWrap {
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.searchWrapHidden {
+  margin-top: -56px;
+  opacity: 0;
+  transform: translateY(-14px) scale(0.97);
+  pointer-events: none;
+}
+
+/* Настоящая строка поиска на время жизни SearchReveal убирается мгновенно и без всякого
+ * влияния на раскладку — это не то же самое, что .searchWrapHidden выше (там схлопывание
+ * по прокрутке, и оно обязано быть плавным).
+ *
+ * Почему мгновенно: две стеклянные капсулы, видимые одновременно, дважды блюрят и дважды
+ * сатурируют один и тот же фон и дважды кладут свою заливку. Замерено на стенде —
+ * заливка одной капсулы rgb(25,30,43), двух наложенных rgb(36,51,82), синий +90%. Там,
+ * где настоящая строка и капсула-подделка перекрывались лишь частично (весь плавный фейд
+ * на открытии и весь возврат), это и читалось как яркий «шлейф» позади летящей капсулы
+ * и как вторая скруглённая кромка над ней.
+ *
+ * Почему без margin-top: прежний -56px с переходом 0.4s тянул за собой весь список чатов,
+ * и под летящей капсулой ехал ещё и он — «старый интерфейс выглядывает из-под капсулы».
+ * Перелёт пружины тут ни при чём: cubic-bezier(0.2, 1.5, 0.4, 1) даёт пик 1.08, то есть
+ * 2.7px на 34px пути.
+ *
+ * Рывка на возврате нет: у строки и у капсулы совпадают ширина, высота и радиус
+ * (SearchReveal.tsx, pillLike), капсула садится ровно на её место и размонтируется в том
+ * же кадре, в котором строка становится видимой. */
+.searchWrapMuted {
+  visibility: hidden;
+  transition: none;
+}
+
+/* Буквально из референса (строка 96): не поле ввода, а цельная кнопка — там тоже просто
+ * иконка и подпись в div, не input. Раскрывает SearchReveal, сама ничего не редактирует. */
+.searchTrigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 15px;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  border-radius: 22px;
+  background: rgba(var(--pulse-glass), 0.07);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.12);
+  color: rgba(var(--pulse-ink), 0.5);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchTrigger span {
+  overflow: hidden;
+  color: rgba(var(--pulse-ink), 0.42);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetBody {
+  padding-bottom: var(--space-2);
+}

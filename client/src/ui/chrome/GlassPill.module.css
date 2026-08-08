@@ -1,0 +1,93 @@
+/* Растяжимый кусок хромы: аватар + заголовок + подзаголовок, капсула стекла. */
+
+.pill {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--chrome-h);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--chrome-radius);
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--chrome-shadow);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:disabled {
+  cursor: default;
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-screen-title);
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitle {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Капсула имени собеседника в шапке чата — буквально строка 300 референса: свой
+   фиолетовый градиент вместо нейтрального стекла `--chrome-*`, крупнее заголовок.
+   Идёт до .subtitleOnline/.subtitleAccent ниже — их цвет статуса обязан перебивать
+   базовый цвет .capSubtitle при равной специфичности, а не наоборот. */
+.cap {
+  min-height: 0;
+  gap: 11px;
+  padding: 5px 14px 5px 6px;
+  border: 1px solid var(--pulse-capbd);
+  border-radius: 24px;
+  background: var(--pulse-cap);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.16);
+}
+
+.capTitle {
+  color: rgb(var(--pulse-ink));
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.capSubtitle {
+  color: rgba(var(--pulse-ink), 0.45);
+  font-size: 12.5px;
+}
+
+.subtitleOnline {
+  color: var(--online);
+}
+
+.subtitleAccent {
+  color: var(--primary);
+}

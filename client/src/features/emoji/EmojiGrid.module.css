@@ -1,0 +1,42 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--emoji-cell));
+  justify-content: space-between;
+}
+
+.cell {
+  display: grid;
+  place-items: center;
+  width: var(--emoji-cell);
+  height: var(--emoji-cell);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.cell:active {
+  background: var(--surface-3);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.empty {
+  padding: var(--space-6) 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-caption);
+  text-align: center;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+}

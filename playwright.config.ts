@@ -14,7 +14,8 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 30_000,
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: 'https://127.0.0.1:5173',
+    ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
@@ -26,7 +27,8 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://127.0.0.1:5173',
+    url: 'https://127.0.0.1:5173',
+    ignoreHTTPSErrors: true,
     cwd: here,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

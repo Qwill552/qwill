@@ -1,0 +1,34 @@
+/* Полоса хромы. В стекле она пуста и служит только раскладкой — залиты её куски
+   (GlassButton, GlassPill, TabBar). В строгом наоборот: залита полоса, куски прозрачны.
+   Поэтому одна и та же разметка даёт и плавающие капсулы, и полноширинную панель. */
+
+.bar {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--chrome-gap);
+  background: var(--chrome-bar-bg);
+  /* Пустоты полосы не должны перехватывать прокрутку ленты под ней. */
+  pointer-events: none;
+}
+
+.bar > * {
+  pointer-events: auto;
+}
+
+.top {
+  top: 0;
+  padding: calc(var(--safe-top) + var(--chrome-inset)) calc(var(--safe-right) + var(--chrome-pad-x))
+    var(--chrome-inset) calc(var(--safe-left) + var(--chrome-pad-x));
+  border-bottom: 1px solid var(--chrome-divider);
+}
+
+.bottom {
+  bottom: 0;
+  padding: var(--chrome-inset) calc(var(--safe-right) + var(--chrome-pad-x))
+    calc(var(--safe-bottom) + var(--chrome-inset)) calc(var(--safe-left) + var(--chrome-pad-x));
+  border-top: 1px solid var(--chrome-divider);
+}

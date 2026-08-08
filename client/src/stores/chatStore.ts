@@ -2,12 +2,15 @@ import type {
   ChatDto,
   ChatListItemDto,
   ChatMemberSummary,
+  ChatPinnedEvent,
   ChatReadEvent,
   ChatUpdatedEvent,
   GroupMemberDTO,
   MemberChangedEvent,
   MessageActionAck,
   MessageAttachmentInput,
+  MessageBatchAck,
+  MessageDeletedBatchEvent,
   MessageDto,
   MessageReactionEvent,
   MessageSendAck,
@@ -34,10 +37,29 @@ import {
   updateGroupRequest,
   updateMemberRoleRequest,
 } from '../api/chats';
+import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
 import { getSocket } from '../realtime/socket';
 
-/** Локальное расширение сообщения статусом оптимистичной отправки — на сервер не уходит. */
-export type LocalMessage = MessageDto & { status?: 'sending' | 'failed' };
+export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
+
+export interface LocalAttachmentState {
+  kind: LocalAttachmentKind;
+  previewUrl?: string;
+  name: string;
+  size: number;
+  progress: number;
+  error?: string;
+}
+
+/** Локальное расширение сообщения статусом оптимистичной отправки и черновиком вложения
+ *  до подтверждения сервером — на сервер не уходит (этап 7, ux-ui/07-composer.md). */
+export type LocalMessage = MessageDto & { status?: 'sending' | 'failed'; localAttachment?: LocalAttachmentState };
+
+interface PendingUpload {
+  file: File;
+  duration?: number;
+  peaks?: number[];
+}
 
 interface PresenceInfo {
   online: boolean;
@@ -69,6 +91,11 @@ interface ChatState {
   /** chatId группы, из которой меня только что удалили/я вышел — компонент страницы сам решает, что делать
    *  (обычно редирект на /chats), и сбрасывает флаг через clearKicked (этап 7). */
   kickedChatId: string | null;
+  /** Закреплённое сообщение открытого чата — обновляется из ChatDto и chat:pinned (этап 6). */
+  pinnedByChat: Record<string, MessageDto | null>;
+  /** Режим мультивыбора ленты — общий на всё приложение, так как открыт ровно один чат за раз (этап 6). */
+  selectionMode: boolean;
+  selectedIds: Set<number>;
 
   loadChats: () => Promise<void>;
   openChat: (chatId: string) => Promise<void>;
@@ -91,11 +118,31 @@ interface ChatState {
     attachment?: MessageAttachmentInput,
     replyTo?: MessageDto,
   ) => void;
+  /** Вложение — оптимистичный пузырь с локальным превью появляется сразу, а не после ack
+   *  (этап 7): file уходит на загрузку в фоне, прогресс и ошибка живут в localAttachment. */
+  sendAttachmentMessage: (
+    chatId: string,
+    sender: PublicUser,
+    file: File,
+    options?: { caption?: string; replyTo?: MessageDto; duration?: number; peaks?: number[] },
+  ) => void;
+  /** Отмена во время загрузки — убирает оптимистичный пузырь целиком, а не переводит в failed. */
+  cancelAttachmentUpload: (chatId: string, clientId: string) => void;
+  /** Повтор после обрыва сети — тот же clientId, сервер дедуплицирует (секция 3). */
+  retryMessage: (chatId: string, clientId: string) => void;
   /** Правка и удаление резолвятся/реджектятся по ack — компонент показывает ошибку сам (секция 6). */
   editMessage: (chatId: string, messageId: number, content: string) => Promise<void>;
   deleteMessage: (chatId: string, messageId: number) => Promise<void>;
+  deleteMessagesBatch: (chatId: string, messageIds: number[]) => Promise<void>;
+  /** toChatId=null снимает закреп (то же, что messageId=null на сервере). */
+  pinMessage: (chatId: string, messageId: number | null) => void;
+  forwardMessages: (fromChatId: string, toChatId: string, messageIds: number[]) => Promise<void>;
   toggleReaction: (chatId: string, messageId: number, emoji: string) => void;
   markRead: (chatId: string, messageId: number) => void;
+  /** Мультивыбор (секция 3, ux-ui/06): long-press по пузырю/пустой зоне строки. */
+  enterSelection: (messageId: number) => void;
+  toggleSelected: (messageId: number) => void;
+  exitSelection: () => void;
   startTyping: (chatId: string) => void;
   stopTyping: (chatId: string) => void;
   subscribeToSocket: (myUserId: string) => void;
@@ -106,6 +153,10 @@ interface ChatState {
   applyMessageUpdate: (message: MessageDto) => void;
   /** Внутренний метод: обновляет только реакции сообщения по id — message:reaction (этап 6). */
   applyReactionUpdate: (event: MessageReactionEvent) => void;
+  /** Внутренний метод: заменяет пачку сообщений разом — message:deletedBatch (этап 6). */
+  applyMessagesBatchUpdate: (messages: MessageDto[]) => void;
+  /** Внутренний метод: обновляет закреп чата — из ChatDto или chat:pinned (этап 6). */
+  applyChatPinned: (event: ChatPinnedEvent) => void;
   /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
   applyChatDetail: (chat: ChatDto) => void;
   /** Внутренний метод: применяет member:changed — из REST-ответа группового действия или socket-broadcast (этап 7). */
@@ -114,6 +165,13 @@ interface ChatState {
   applyChatUpdated: (event: ChatUpdatedEvent) => void;
   /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
   setTyping: (event: UserTypingEvent) => void;
+  /** Внутренний метод: гоняет хэш/превью/загрузку/emit одного вложения, вызывается и при
+   *  первой отправке, и при повторе (этап 7). */
+  runAttachmentUpload: (chatId: string, clientId: string) => Promise<void>;
+  /** Внутренний метод: точечно обновляет прогресс/ошибку localAttachment по clientId. */
+  updateLocalAttachment: (chatId: string, clientId: string, patch: Partial<LocalAttachmentState>) => void;
+  /** Внутренний метод: помечает сообщение неотправленным по clientId. */
+  setMessageFailed: (chatId: string, clientId: string) => void;
 }
 
 function upsertChat(chats: ChatListItemDto[], chat: ChatListItemDto): ChatListItemDto[] {
@@ -138,6 +196,10 @@ function seedPresence(
 // Таймеры автогашения «печатает» — вне стора, ключ `${chatId}:${userId}` (секция 3: TYPING_TIMEOUT_MS).
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// File нельзя держать в сериализуемом состоянии стора — только вне него, ключ clientId (этап 7).
+const pendingUploads = new Map<string, PendingUpload>();
+const uploadAbortControllers = new Map<string, AbortController>();
+
 function typingKey(chatId: string, userId: string): string {
   return `${chatId}:${userId}`;
 }
@@ -155,6 +217,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeChatId: null,
   membersByChat: {},
   kickedChatId: null,
+  pinnedByChat: {},
+  selectionMode: false,
+  selectedIds: new Set(),
 
   async loadChats() {
     const { chats } = await listChatsRequest();
@@ -192,7 +257,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   closeChat() {
-    set({ activeChatId: null });
+    set({ activeChatId: null, selectionMode: false, selectedIds: new Set() });
   },
 
   async loadMore(chatId) {
@@ -285,6 +350,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             deletedAt: replyTo.deletedAt,
           }
         : null,
+      // Отправка сообщения не пересылает — оптимистичное сообщение никогда не forwarded.
+      forwardedFrom: null,
       reactions: [],
       editedAt: null,
       deletedAt: null,
@@ -319,6 +386,229 @@ export const useChatStore = create<ChatState>((set, get) => ({
     );
   },
 
+  sendAttachmentMessage(chatId, sender, file, options = {}) {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const clientId = crypto.randomUUID();
+    const kind: LocalAttachmentKind = options.peaks
+      ? 'voice'
+      : file.type.startsWith('image/')
+        ? 'image'
+        : file.type.startsWith('video/')
+          ? 'video'
+          : 'file';
+    const previewUrl = kind === 'image' || kind === 'video' ? URL.createObjectURL(file) : undefined;
+    const replyTo = options.replyTo;
+
+    const optimistic: LocalMessage = {
+      id: -Date.now(),
+      chatId,
+      clientId,
+      sender,
+      type: 'MEDIA',
+      content: options.caption || null,
+      attachment: null,
+      replyToId: replyTo?.id ?? null,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            senderName: replyTo.sender?.displayName ?? 'Удалённый аккаунт',
+            content: replyTo.deletedAt ? null : replyTo.content,
+            hasAttachment: !replyTo.deletedAt && !!replyTo.attachment,
+            deletedAt: replyTo.deletedAt,
+          }
+        : null,
+      forwardedFrom: null,
+      reactions: [],
+      editedAt: null,
+      deletedAt: null,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+      localAttachment: { kind, previewUrl, name: file.name, size: file.size, progress: 0 },
+    };
+
+    pendingUploads.set(clientId, { file, duration: options.duration, peaks: options.peaks });
+
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
+      },
+    }));
+
+    void get().runAttachmentUpload(chatId, clientId);
+  },
+
+  async runAttachmentUpload(chatId, clientId) {
+    const pending = pendingUploads.get(clientId);
+    if (!pending) return;
+
+    const controller = new AbortController();
+    uploadAbortControllers.set(clientId, controller);
+    get().updateLocalAttachment(chatId, clientId, { progress: 0, error: undefined });
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: (state.messagesByChat[chatId] ?? []).map((m) =>
+          m.clientId === clientId ? { ...m, status: 'sending' } : m,
+        ),
+      },
+    }));
+
+    try {
+      const { file, duration, peaks } = pending;
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+
+      let thumbnailFileId: string | undefined;
+      let thumbnailSha256: string | undefined;
+      let width: number | undefined;
+      let height: number | undefined;
+      let videoDuration: number | undefined;
+
+      if (isImage) {
+        const thumb = await generateImageThumbnail(file);
+        const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
+        thumbnailFileId = uploadedThumb.id;
+        thumbnailSha256 = uploadedThumb.sha256;
+        width = thumb.width;
+        height = thumb.height;
+      } else if (isVideo) {
+        const thumb = await generateVideoThumbnail(file);
+        const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
+        thumbnailFileId = uploadedThumb.id;
+        thumbnailSha256 = uploadedThumb.sha256;
+        width = thumb.width;
+        height = thumb.height;
+        videoDuration = thumb.duration;
+      }
+
+      const uploaded = await uploadFile(
+        file,
+        'message',
+        (loaded, total) => get().updateLocalAttachment(chatId, clientId, { progress: total ? loaded / total : 0 }),
+        controller.signal,
+      );
+
+      const message = get().messagesByChat[chatId]?.find((m) => m.clientId === clientId);
+      if (!message) return;
+
+      const attachment: MessageAttachmentInput = {
+        fileId: uploaded.id,
+        sha256: uploaded.sha256,
+        thumbnailFileId,
+        thumbnailSha256,
+        originalName: file.name,
+        width,
+        height,
+        duration: duration ?? videoDuration,
+        peaks,
+      };
+
+      const socket = getSocket();
+      if (!socket) throw new Error('Нет соединения');
+
+      socket.emit(
+        SocketEvent.MessageSend,
+        { chatId, clientId, content: message.content || undefined, attachment, replyToId: message.replyToId ?? undefined },
+        (ack: MessageSendAck) => {
+          uploadAbortControllers.delete(clientId);
+          if (ack.ok && ack.message) {
+            pendingUploads.delete(clientId);
+            get().applyIncomingMessage(ack.message);
+            return;
+          }
+          get().updateLocalAttachment(chatId, clientId, { error: ack.error?.message ?? 'Не удалось отправить' });
+          get().setMessageFailed(chatId, clientId);
+        },
+      );
+    } catch (error) {
+      uploadAbortControllers.delete(clientId);
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      get().updateLocalAttachment(chatId, clientId, {
+        error: error instanceof Error ? error.message : 'Не удалось загрузить файл',
+      });
+      get().setMessageFailed(chatId, clientId);
+    }
+  },
+
+  cancelAttachmentUpload(chatId, clientId) {
+    uploadAbortControllers.get(clientId)?.abort();
+    uploadAbortControllers.delete(clientId);
+    pendingUploads.delete(clientId);
+
+    set((state) => {
+      const list = state.messagesByChat[chatId];
+      if (!list) return state;
+      const target = list.find((m) => m.clientId === clientId);
+      if (target?.localAttachment?.previewUrl) URL.revokeObjectURL(target.localAttachment.previewUrl);
+      return { messagesByChat: { ...state.messagesByChat, [chatId]: list.filter((m) => m.clientId !== clientId) } };
+    });
+  },
+
+  retryMessage(chatId, clientId) {
+    const message = get().messagesByChat[chatId]?.find((m) => m.clientId === clientId);
+    if (!message || message.status !== 'failed') return;
+
+    if (message.localAttachment) {
+      if (pendingUploads.has(clientId)) void get().runAttachmentUpload(chatId, clientId);
+      return;
+    }
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: (state.messagesByChat[chatId] ?? []).map((m) =>
+          m.clientId === clientId ? { ...m, status: 'sending' } : m,
+        ),
+      },
+    }));
+
+    socket.emit(
+      SocketEvent.MessageSend,
+      { chatId, clientId, content: message.content || undefined, replyToId: message.replyToId ?? undefined },
+      (ack: MessageSendAck) => {
+        if (ack.ok && ack.message) {
+          get().applyIncomingMessage(ack.message);
+          return;
+        }
+        get().setMessageFailed(chatId, clientId);
+      },
+    );
+  },
+
+  updateLocalAttachment(chatId, clientId, patch) {
+    set((state) => {
+      const list = state.messagesByChat[chatId];
+      if (!list) return state;
+      return {
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: list.map((m) =>
+            m.clientId === clientId && m.localAttachment ? { ...m, localAttachment: { ...m.localAttachment, ...patch } } : m,
+          ),
+        },
+      };
+    });
+  },
+
+  setMessageFailed(chatId, clientId) {
+    set((state) => {
+      const list = state.messagesByChat[chatId];
+      if (!list) return state;
+      return {
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: list.map((m) => (m.clientId === clientId ? { ...m, status: 'failed' } : m)),
+        },
+      };
+    });
+  },
+
   editMessage(chatId, messageId, content) {
     const socket = getSocket();
     if (!socket) return Promise.resolve();
@@ -351,6 +641,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  deleteMessagesBatch(chatId, messageIds) {
+    const socket = getSocket();
+    if (!socket) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      socket.emit(SocketEvent.MessageDeleteBatch, { chatId, messageIds }, (ack: MessageBatchAck) => {
+        if (ack.ok && ack.messages) {
+          get().applyMessagesBatchUpdate(ack.messages);
+          get().exitSelection();
+          resolve();
+          return;
+        }
+        reject(new Error(ack.error?.message ?? 'Не удалось удалить сообщения'));
+      });
+    });
+  },
+
+  pinMessage(chatId, messageId) {
+    // Итог приходит broadcast'ом chat:pinned — в комнату входит и сам закрепивший (bootstrapSocket).
+    getSocket()?.emit(SocketEvent.ChatPin, { chatId, messageId });
+  },
+
+  forwardMessages(fromChatId, toChatId, messageIds) {
+    const socket = getSocket();
+    if (!socket) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      socket.emit(SocketEvent.MessageForward, { fromChatId, toChatId, messageIds }, (ack: MessageBatchAck) => {
+        if (ack.ok) {
+          // Пришедшие сообщения принадлежат toChatId — если это открытый чат, message:new
+          // уже применит их через broadcast; здесь только закрываем мультивыбор источника.
+          get().exitSelection();
+          resolve();
+          return;
+        }
+        reject(new Error(ack.error?.message ?? 'Не удалось переслать сообщения'));
+      });
+    });
+  },
+
   toggleReaction(chatId, messageId, emoji) {
     // Итог приходит broadcast'ом message:reaction — в комнату входит и сам отправитель (bootstrapSocket).
     getSocket()?.emit(SocketEvent.MessageReact, { chatId, messageId, emoji });
@@ -368,6 +698,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     getSocket()?.emit(SocketEvent.TypingStop, { chatId });
   },
 
+  enterSelection(messageId) {
+    set({ selectionMode: true, selectedIds: new Set([messageId]) });
+  },
+
+  toggleSelected(messageId) {
+    set((state) => {
+      const next = new Set(state.selectedIds);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      // Снятие последнего выбора выходит из режима мультивыбора (ux-ui/06, «Готово когда»).
+      return next.size === 0 ? { selectionMode: false, selectedIds: next } : { selectedIds: next };
+    });
+  },
+
+  exitSelection() {
+    set({ selectionMode: false, selectedIds: new Set() });
+  },
+
   subscribeToSocket(myUserId) {
     set({ myUserId });
     const socket = getSocket();
@@ -383,6 +731,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off(SocketEvent.MessageDeleted).on(SocketEvent.MessageDeleted, (event: MessageUpdatedEvent) => {
       get().applyMessageUpdate(event.message);
+    });
+
+    socket.off(SocketEvent.MessageDeletedBatch).on(SocketEvent.MessageDeletedBatch, (event: MessageDeletedBatchEvent) => {
+      get().applyMessagesBatchUpdate(event.messages);
+    });
+
+    socket.off(SocketEvent.ChatPinned).on(SocketEvent.ChatPinned, (event: ChatPinnedEvent) => {
+      get().applyChatPinned(event);
     });
 
     socket.off(SocketEvent.MessageReaction).on(SocketEvent.MessageReaction, (event: MessageReactionEvent) => {
@@ -434,6 +790,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset() {
     for (const timer of typingTimers.values()) clearTimeout(timer);
     typingTimers.clear();
+    for (const controller of uploadAbortControllers.values()) controller.abort();
+    uploadAbortControllers.clear();
+    pendingUploads.clear();
+    for (const list of Object.values(get().messagesByChat)) {
+      for (const message of list) {
+        if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);
+      }
+    }
     set({
       chats: [],
       messagesByChat: {},
@@ -447,6 +811,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeChatId: null,
       membersByChat: {},
       kickedChatId: null,
+      pinnedByChat: {},
+      selectionMode: false,
+      selectedIds: new Set(),
     });
   },
 
@@ -458,6 +825,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const pendingIndex = list.findIndex((m) => m.clientId === message.clientId && m.id < 0);
         let nextList: LocalMessage[];
         if (pendingIndex !== -1) {
+          const previewUrl = list[pendingIndex]?.localAttachment?.previewUrl;
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
           nextList = [...list];
           nextList[pendingIndex] = message;
         } else if (list.some((m) => m.id === message.id)) {
@@ -507,8 +876,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ? state.chats.map((c) => (c.id === message.chatId ? { ...c, lastMessage: message } : c))
           : state.chats;
 
-      return { messagesByChat: nextMessagesByChat, chats };
+      // Правка/удаление закреплённого сообщения обновляет и баннер закрепа без похода на сервер.
+      const pinnedByChat =
+        state.pinnedByChat[message.chatId]?.id === message.id
+          ? { ...state.pinnedByChat, [message.chatId]: message }
+          : state.pinnedByChat;
+
+      return { messagesByChat: nextMessagesByChat, chats, pinnedByChat };
     });
+  },
+
+  // Не часть публичного интерфейса стора — то же самое, что applyMessageUpdate, но для пачки разом (message:deletedBatch).
+  applyMessagesBatchUpdate(messages: MessageDto[]) {
+    for (const message of messages) get().applyMessageUpdate(message);
+  },
+
+  // Не часть публичного интерфейса стора — chat:pinned broadcast или собственный ack pinMessage.
+  applyChatPinned(event: ChatPinnedEvent) {
+    set((state) => ({ pinnedByChat: { ...state.pinnedByChat, [event.chatId]: event.message } }));
   },
 
   // Не часть публичного интерфейса стора — обновляет только набор реакций сообщения по id.
@@ -539,6 +924,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: upsertChat(state.chats, chat),
       readCursorsByChat: { ...state.readCursorsByChat, [chat.id]: chat.readCursors },
       presenceByUser: seedPresence(state.presenceByUser, chat.members),
+      pinnedByChat: { ...state.pinnedByChat, [chat.id]: chat.pinnedMessage },
     }));
   },
 

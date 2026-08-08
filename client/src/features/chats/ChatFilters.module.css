@@ -1,0 +1,14 @@
+/* Буквально из референса (строка 102): ряд чипсов — часть статичной шапки, не липнет
+ * к скроллу (сам список теперь отдельный скроллер ниже, см. ChatsScreen). */
+
+.row {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
+}

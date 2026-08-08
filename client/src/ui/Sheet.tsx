@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useBackHandler } from '../app/useBackHandler';
+import { ScrollIndicator } from './ScrollIndicator';
 import styles from './Sheet.module.css';
 
 interface SheetProps {
@@ -20,6 +22,7 @@ type Phase = 'open' | 'dragging' | 'settling' | 'closing';
  *  Один из четырёх разрешённых размывающих слоёв. */
 export function Sheet({ title, onClose, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
 
   // Жест живёт в ref, а не в состоянии: перерисовывать на каждое движение пальца незачем.
@@ -28,6 +31,8 @@ export function Sheet({ title, onClose, children }: SheetProps) {
   const startClose = useCallback(() => {
     setPhase((current) => (current === 'closing' ? current : 'closing'));
   }, []);
+
+  useBackHandler(phase !== 'closing', startClose);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -127,7 +132,10 @@ export function Sheet({ title, onClose, children }: SheetProps) {
           <span className={styles.gripBar} />
         </div>
         {title && <h2 className={styles.title}>{title}</h2>}
-        <div className={styles.body}>{children}</div>
+        <div ref={bodyRef} className={`${styles.body} hide-native-scrollbar`}>
+          <ScrollIndicator target={bodyRef} />
+          {children}
+        </div>
       </div>
     </>,
     document.body,

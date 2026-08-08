@@ -1,0 +1,132 @@
+/* Раскрытие в два слоя: .dockBar едет геометрией (top/left/width/height/border-radius, тот же
+ * приём, которым капсула раньше раздвигалась во весь экран) от места нажатия до места шапки;
+ * .wave раскрывается снизу от неё движущейся маской с мягким тающим краем — не жёсткая шторка,
+ * а наплыв (см. комментарий в SearchReveal.tsx). */
+
+.root {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Стекло живёт на самой капсуле и размывает то, что реально позади неё. Ключевое для
+ * «шлейфа»: размывающий слой не должен каждый кадр менять свои габариты или форму выреза —
+ * браузер не успевает пересчитать блюр на новой геометрии и оставляет на экране куски старой
+ * (пробовали и движущийся размер, и clip-path по статичному слою на весь экран — смазывало
+ * в обоих случаях). Поэтому в основном сценарии (из полной строки поиска) капсула вообще не
+ * меняет ни размер, ни радиус — у строки и у места стыковки они совпадают, отличается только
+ * вертикаль, — и едет она чистым transform, который считается на GPU и блюр не ломает.
+ * Морф размеров остаётся только для входа из кнопки-лупы (SearchReveal.tsx, pillLike). */
+.dockBar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  background: rgba(var(--pulse-glass), 0.07);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.12);
+  color: rgba(var(--pulse-ink), 0.5);
+  pointer-events: auto;
+  transition-property: transform, top, left, width, height, border-radius;
+  will-change: transform;
+}
+
+.dockIcon {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.dockLabel {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  color: rgba(var(--pulse-ink), 0.42);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition-property: opacity;
+}
+
+.close {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 -4px 0 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgb(var(--pulse-ink));
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+@media (hover: hover) {
+  .close:hover {
+    background: rgba(var(--pulse-glass), 0.14);
+  }
+}
+
+/* Панель — на весь экран (top приходит инлайн-стилем нулём), а не прямоугольник от нижней
+ * кромки капсулы вниз: иначе за капсулой остаётся прежний экран и по её кромке видна граница
+ * двух интерфейсов. Раскрытие «от капсулы» задаёт маска, а не геометрия элемента. */
+.wave {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: auto;
+  /* Тающий нижний край — фиксированные 28px феньера (FEATHER_PX в .tsx), сама позиция и
+   * масштаб маски приходят инлайн-стилем (JS знает реальную высоту панели). */
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 28px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 28px), transparent 100%);
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  transition-property: mask-position, -webkit-mask-position;
+}
+
+/* Капли внутри панели обязаны совпадать с настоящими каплями фона и по месту, и по фазе:
+ * панель непрозрачна и закрывает их собой, а капсула сквозь стекло показывает ровно этот же
+ * свет. Место даёт растяжка на весь экран (панель тоже на весь экран, поэтому смещать слой
+ * больше не нужно), фазу — перенос currentTime в AmbientBlobs (проп secondary). */
+.waveBlobs {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+/* padding-top приходит инлайн-стилем: панель лежит на весь экран, но её содержимое начинается
+ * под капсулой (см. waveBodyStyle в .tsx). */
+.waveBody {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dockBar,
+  .wave,
+  .dockLabel {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}

@@ -1,7 +1,8 @@
-import { createServer } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 
 import { createApp } from './app.js';
-import { env } from './config/env.js';
+import { devHttpsCredentials, env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './db/prisma.js';
 import { logger } from './lib/logger.js';
 import { createSocketServer } from './realtime/index.js';
@@ -13,13 +14,16 @@ async function main(): Promise<void> {
   await ensureStorageDirs();
 
   const app = createApp();
-  const httpServer = createServer(app);
+  const httpServer = devHttpsCredentials
+    ? createHttpsServer(devHttpsCredentials, app)
+    : createHttpServer(app);
   const io = createSocketServer(httpServer);
 
   await new Promise<void>((resolve) => {
     httpServer.listen(env.PORT, resolve);
   });
-  logger.info(`Сервер слушает http://localhost:${env.PORT} (${env.NODE_ENV})`);
+  const scheme = devHttpsCredentials ? 'https' : 'http';
+  logger.info(`Сервер слушает ${scheme}://localhost:${env.PORT} (${env.NODE_ENV})`);
 
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {

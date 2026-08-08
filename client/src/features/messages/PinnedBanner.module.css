@@ -1,0 +1,110 @@
+/* Баннер закреплённого сообщения — буквальный перенос референса (скриншот пользователя):
+   полоса-акцент слева, подпись + превью, крестик справа. Стекло — тот же рецепт, что у
+   капсулы имени собеседника в шапке чата (`.cap` в GlassPill.module.css): те же токены
+   `--pulse-cap`/`--pulse-capbd`, тот же blur/saturate и внутренний блик. Отличие одно —
+   форма: не вытянутая капсула (24px), а прямоугольник со скруглением поменьше (по прямой
+   просьбе пользователя после сверки со скриншотом референса). Позиционирование — забота
+   контейнера-портала (ChatScreen.pinnedSlot): здесь только собственная раскладка. Высота
+   фиксирована и совпадает с `--pinned-h` в ChatScreen.tsx, которым лента резервирует под
+   баннер место в padding — держать оба значения в синхроне при правке одного из них. */
+
+.banner {
+  display: flex;
+  align-items: stretch;
+  height: 48px;
+  border: 1px solid var(--pulse-capbd);
+  border-radius: var(--radius-md);
+  background: var(--pulse-cap);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.16);
+  animation: bannerIn var(--dur-menu) var(--ease-screen);
+}
+
+.body {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.body:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.bar {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+}
+
+.text {
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.label {
+  overflow: hidden;
+  color: var(--primary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview {
+  overflow: hidden;
+  /* Тот же токен, что и .capTitle в GlassPill.module.css — цвет ink настроен именно под
+     фон --pulse-cap, обычный --text-primary на нём читался бы менее контрастно. */
+  color: rgb(var(--pulse-ink));
+  font-size: var(--font-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  background: transparent;
+  /* Тот же токен, что и .capSubtitle — приглушённый ink, не общий --text-tertiary. */
+  color: rgba(var(--pulse-ink), 0.45);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+@keyframes bannerIn {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation-duration: 1ms;
+  }
+}

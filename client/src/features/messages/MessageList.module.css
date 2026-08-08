@@ -1,129 +1,170 @@
+/* Лента — буквально строка 326 референса: padding 12/12, gap 4 между сообщениями,
+   единый для всех пар (без своего отступа для серий — тех в референсе нет). Сверху
+   и снизу padding довешивает высоту плавающей шапки/композера (--chat-header-h из
+   ChatScreen, измеренная высота композера) — контент обязан проезжать под ними. */
+
 .list {
+  position: relative;
+  z-index: 2;
   display: flex;
-  flex: 1;
+  height: 100%;
   flex-direction: column;
+  gap: 4px;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
+    calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 40px);
+  overscroll-behavior: contain;
+  transition: padding-bottom var(--dur-menu) var(--ease-screen);
+  /* Строка — user-select:none (жест long-press не должен запускать выделение всей строки
+     браузером), текст пузыря — user-select:text (ux-ui/gestures.md, «Выделение текста
+     против выделения сообщения»). */
+  user-select: none;
+}
+
+/* Скроллящаяся флекс-колонка сжимает детей, когда их суммарная высота превышает
+   контент-бокс: строка становится ниже своего пузыря, пузырь вылезает за неё и
+   накладывается на следующий. Видно тем сильнее, чем больше padding-bottom, поэтому
+   вылезло вместе с резервом места под панель эмодзи. */
+.list > * {
+  flex-shrink: 0;
 }
 
 .loadMore {
   align-self: center;
-  margin-bottom: var(--space-3);
-  padding: 6px 16px;
-  border: 1px solid var(--border);
+  display: block;
+  margin: var(--space-3) auto;
+  padding: 5px var(--space-4);
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 13px;
+  background: rgba(var(--pulse-dock), 0.5);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: rgba(var(--pulse-ink), 0.72);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.row {
+/* Короткая переписка прижимается к низу, а не висит под шапкой. Отдельная распорка,
+   а не `justify-content: flex-end` у контейнера: последнее делает верх ленты
+   недостижимым при прокрутке. И не `:first-child`, иначе отступ достаётся липкому
+   разделителю даты и сбивает его. */
+.filler {
+  flex: 1 0 auto;
+}
+
+.spacer {
+  flex-shrink: 0;
+  height: 1px;
+}
+
+/* Точки «печатает…» — буквально строки 344-352 референса. */
+.typingRow {
   display: flex;
-  margin-top: var(--space-2);
+  justify-content: flex-start;
+  animation: typingIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.rowGrouped {
-  margin-top: 2px;
-}
-
-.rowOwn {
-  justify-content: flex-end;
-}
-
-.dayDivider {
+.typingBubble {
   display: flex;
-  justify-content: center;
-  margin: var(--space-4) 0 var(--space-2);
+  gap: 5px;
+  padding: 12px 15px;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  border-radius: 20px 20px 20px 7px;
+  background: rgba(var(--pulse-glass), 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
-.dayDivider span {
-  padding: 4px 14px;
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(var(--pulse-ink));
+  animation: dot 1.1s infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes typingIn {
+  from {
+    transform: translateY(12px) scale(0.94);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.25;
+  }
+
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* Кнопка «вниз»: появляется, когда пользователь ушёл вверх больше чем на полтора экрана.
+   Своей вёрстки в референсе нет — держит рецепт стекла остального чата. */
+.jump {
+  position: absolute;
+  z-index: 3;
+  right: calc(var(--safe-right) + 14px);
+  bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(var(--pulse-glass), 0.1);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  background: rgba(var(--pulse-glass), 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: rgb(var(--pulse-ink));
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
 }
 
-.messageWrap {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  max-width: 68%;
+@media (hover: hover) {
+  .jump:hover {
+    background: rgba(var(--pulse-glass), 0.16);
+  }
 }
 
-.messageWrapOwn {
-  flex-direction: row-reverse;
+.jumpHidden {
+  transform: scale(0.8);
+  opacity: 0;
+  pointer-events: none;
 }
 
-.bubbleColumn {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
+.jumpBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
 }
 
-.bubbleColumnOwn {
-  align-items: flex-end;
-}
-
-.bubble {
-  padding: 10px 14px;
-  border-radius: var(--radius-bubble);
-  box-shadow: var(--shadow-sm);
-}
-
-.bubbleIn {
-  background: var(--message-in);
-}
-
-.bubbleOwn {
-  background: var(--message-out);
-}
-
-.bubbleFailed {
-  outline: 1px solid var(--danger);
-}
-
-.attachment {
-  margin: -10px -14px 4px;
-}
-
-.text {
-  margin: 0;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.deletedText {
-  margin: 0;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.edited {
-  margin-right: 4px;
-  font-style: italic;
-}
-
-.time {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  text-align: right;
-}
-
-.check {
-  margin-left: 4px;
-  color: var(--text-secondary);
-  letter-spacing: -2px;
-}
-
-.checkRead {
-  color: var(--primary);
+.empty {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 0 var(--space-6);
+  color: rgba(var(--pulse-ink), 0.5);
+  font-size: var(--font-meta);
+  text-align: center;
 }

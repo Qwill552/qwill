@@ -1,11 +1,17 @@
-.avatarRow {
+/* Своего экрана в референсе нет (CLAUDE.md, этап 6) — карточки-секции на токенах --card-*
+   (едут вместе с содержимым, не размывают: design-system.md, класс card), а не ещё один
+   размывающий слой поверх уже размытой карточки Modal (--sheet-*). */
+
+.hero {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-1);
   margin-bottom: var(--space-4);
 }
 
 .avatarButton {
+  position: relative;
   padding: 0;
   border: none;
   background: transparent;
@@ -17,124 +23,186 @@
   cursor: default;
 }
 
+.avatarEdit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--surface-2);
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
 .hiddenInput {
   display: none;
 }
 
 .titleRow {
-  flex: 1;
-  min-width: 0;
   display: flex;
+  align-items: center;
   gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .titleInput {
-  flex: 1;
   min-width: 0;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
+  height: 36px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text-primary);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font: inherit;
+  font-size: 1.05em;
+  font-weight: 700;
+  outline: none;
+  text-align: center;
+}
+
+.titleInput:focus {
+  border-color: var(--primary);
+}
+
+.saveButton {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--text-on-primary);
+  cursor: pointer;
+}
+
+.saveButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.titleButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.titleButton:disabled {
+  cursor: default;
 }
 
 .titleText {
   overflow: hidden;
+  max-width: 260px;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 1.15em;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.saveButton {
+.titleEditIcon {
   flex-shrink: 0;
-  padding: 6px 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--primary);
-  color: var(--text-on-primary);
-  font-weight: 600;
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
+  color: var(--text-tertiary);
 }
 
-.saveButton:disabled {
-  opacity: 0.6;
-  cursor: default;
+.memberCount {
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.error {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-caption);
+}
+
+.section {
+  margin-bottom: var(--space-4);
 }
 
 .sectionTitle {
-  margin: var(--space-4) 0 var(--space-2);
+  margin: 0 0 var(--space-2);
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-caption);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .addRow {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
+  height: var(--tap-min);
+  padding: 0 var(--space-3);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: var(--bg);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   color: var(--text-primary);
-  font-family: inherit;
-  font-size: 14px;
+  font: inherit;
+  font-size: var(--font-meta);
 }
 
-.addButton {
-  flex-shrink: 0;
-  padding: 8px 16px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: 600;
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
-.addButton:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.card {
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
 }
 
 .member {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.member + .member::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: calc(40px + var(--space-3) * 2);
+  height: 1px;
+  background: var(--border);
 }
 
 .memberBody {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
 }
 
 .memberName {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--font-name);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -142,64 +210,38 @@
 
 .memberRole {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-caption);
 }
 
 .memberActions {
   display: flex;
   flex-shrink: 0;
-  gap: 4px;
+  align-items: center;
 }
 
-.iconButton {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.iconButton:hover {
-  background: var(--primary-soft);
+.actionActive {
   color: var(--primary);
 }
 
-.iconButtonDanger:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.error {
-  margin: 0 0 var(--space-3);
-  color: var(--danger);
-  font-size: 13px;
-}
-
-.footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
 .leaveButton {
-  padding: 8px 16px;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--tap-min);
+  margin-top: var(--space-4);
   border: none;
   border-radius: var(--radius-pill);
-  background: transparent;
+  background: var(--danger-soft);
   color: var(--danger);
+  font: inherit;
   font-weight: 600;
-  font-family: inherit;
-  font-size: 13px;
+  font-size: var(--font-meta);
   cursor: pointer;
 }
 
-.leaveButton:hover {
-  background: var(--danger-soft);
+.leaveButton:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

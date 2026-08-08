@@ -1,8 +1,9 @@
-import type { ChatDto, ChatListItemDto, ChatMemberSummary, MessagesPage, UpdateGroupDTO } from '@messenger/shared';
+import type { ChatDto, ChatListItemDto, ChatMemberSummary, MessageDto, MessagesPage, UpdateGroupDTO } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
+import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { assertAvatarEligible } from './file.js';
 import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
@@ -14,13 +15,14 @@ type ChatWithRelations = Chat & {
 };
 
 function toMemberSummary(
-  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'lastSeenAt'>,
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'avatarColor' | 'lastSeenAt'>,
 ): ChatMemberSummary {
   return {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
     avatarUrl: fileUrl(user.avatarFileId),
+    avatarColor: toAvatarColor(user.avatarColor),
     lastSeenAt: user.lastSeenAt.toISOString(),
   };
 }
@@ -179,11 +181,48 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
   const unreadCount = await countUnread(chatId, userId, own?.lastReadMessageId ?? null);
   const readCursors = Object.fromEntries(chat.members.map((m) => [m.userId, m.lastReadMessageId]));
 
+  const pinned = chat.pinnedMessageId
+    ? await prisma.message.findUnique({ where: { id: chat.pinnedMessageId }, include: messageInclude })
+    : null;
+
   return {
     ...toChatListItem(chat, userId, unreadCount),
     members: chat.members.map((m) => toMemberSummary(m.user)),
     readCursors,
+    pinnedMessage: pinned ? toMessageDto(pinned) : null,
   };
+}
+
+export interface PinResult {
+  chatId: string;
+  message: MessageDto | null;
+}
+
+/** Закрепление — messageId=null снимает закреп. Приватный чат: любой участник; группа —
+ *  только OWNER/ADMIN, тот же порог, что и updateGroup (этап 6, ux-ui/06). */
+export async function pinMessage(chatId: string, userId: string, messageId: number | null): Promise<PinResult> {
+  await assertMember(chatId, userId);
+  const chat = await prisma.chat.findUniqueOrThrow({ where: { id: chatId } });
+
+  if (chat.type === 'GROUP') {
+    const membership = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+      throw forbidden('Только владелец или администратор может закреплять сообщения');
+    }
+  }
+
+  if (messageId !== null) {
+    const target = await prisma.message.findUnique({ where: { id: messageId } });
+    if (!target || target.chatId !== chatId || target.deletedAt) {
+      throw notFound(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение не найдено');
+    }
+  }
+
+  await prisma.chat.update({ where: { id: chatId }, data: { pinnedMessageId: messageId } });
+  if (messageId === null) return { chatId, message: null };
+
+  const message = await prisma.message.findUniqueOrThrow({ where: { id: messageId }, include: messageInclude });
+  return { chatId, message: toMessageDto(message) };
 }
 
 /** Курсор прочтения не может уйти назад — обновляем только если новое значение больше текущего (секция 3). */

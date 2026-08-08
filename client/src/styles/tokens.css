@@ -2,145 +2,282 @@
    переменным. Хардкод цвета, rgba(), blur() и box-shadow в CSS-модулях запрещён.
 
    Два уровня (ux-ui/design-system.md):
-     1. Палитра        — зависит от темы (data-theme), не зависит от режима оформления.
-     2. Поверхности    — зависят от режима оформления (data-surface). Компоненты пишут только их.
-   На этом разделении держится переключение Стекло ↔ Строгий одним блоком CSS. */
+     1. Палитра  — зависит от темы (data-theme).
+     2. Поверхности — единый визуальный язык liquid glass (референс «Пульс»), компоненты
+        пишут только эти переменные:
+          --chrome-*   плавающая хрома: шапки, таб-бар, композер, FAB. Размывает подложку.
+          --card-*     вставные карточки и поля. Едут вместе с контентом, НЕ размывают.
+          --sheet-* / --menu-* / --scrim-*   оверлеи. Размывают.
 
-/* ─────────────────────────────  Уровень 1: палитра  ───────────────────────────── */
+   Альтернативный режим «Строгий» (полноширинная хрома без размытия) убран по прямой
+   просьбе — один визуальный язык, см. журнал ux-ui.md. */
 
-/* Светлая тема доводится на этапе 13 — значения пока прежние, но набор имён уже полный,
-   чтобы ни один компонент не остался без токена. */
+/* ───────────────────────────────  Гарнитуры  ─────────────────────────────── */
+
+/* Лежат локально: PWA обязана подниматься офлайн, обращение к CDN шрифтов это ломает. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Golos Text';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/golos-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Golos Text';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/golos-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ─────────────────────────────  Уровень 1: палитра  ───────────────────────── */
+
+/* Светлая тема доводится на этапе 13 — набор имён уже полный, чтобы ни один компонент
+   не остался без токена. */
+/* Второй селектор без :root — чтобы тему можно было применить и к обычному контейнеру, а не
+   только к <html>. На этом держится оверлей кругового раскрытия темы (app/viewTransition.ts):
+   он рисует копию интерфейса в противоположной теме поверх настоящей. Токены наследуются,
+   поэтому ближайший предок с data-theme перекрывает их для всего своего поддерева. */
 :root,
-:root[data-theme='light'] {
-  --bg: #f6f4fb;
+:root[data-theme='light'],
+[data-theme='light'] {
+  --bg: #eef1f6;
   --surface: #ffffff;
   --surface-2: #ffffff;
-  --chat-bg: #ece7f6;
+  --surface-3: #e4e9f4;
+  --chat-bg: #e7ebf4;
   --message-in: #ffffff;
-  --message-out: #ede2ff;
+  --message-out: #dbe6ff;
+  --message-out-from: #5b8dff;
+  --message-out-to: #8b5cf6;
 
-  --primary: #8c52ff;
-  --primary-press: #7a3df0;
-  --primary-soft: #f3ecff;
+  --primary: #3d7de0;
+  --primary-press: #2f6fe0;
+  --primary-soft: #e6edff;
+  /* Насыщенная пара под белую иконку: FAB, кнопка отправки, исходящий пузырь. */
+  --accent-from: #4d8dff;
+  --accent-to: #8b5cf6;
 
-  --text-primary: #14121a;
-  --text-secondary: #6f6a7d;
+  --text-primary: #1c202d;
+  --text-secondary: #6d7385;
+  --text-tertiary: #9aa0b0;
   --text-on-primary: #ffffff;
-  --text-on-out: #14121a;
+  --text-on-out: #ffffff;
+  --meta-on-out: rgb(255 255 255 / 85%);
 
-  --border: #e6e1f0;
-  --online: #4ec97e;
-  --danger: #d14343;
-  --danger-soft: #fbeaea;
-  --unread-badge: #8c52ff;
+  --border: #e1e4ec;
+  --online: #2fae63;
+  --danger: #d93a50;
+  --danger-soft: #fbeaec;
+  --unread-badge: #4d8dff;
+  --unread-muted: #c4cddf;
 
   /* Подложка затемнения. В тёмной теме совпадает с --chat-bg, в светлой — своя:
      светлый скрим ничего не затемняет. */
-  --scrim-tint: #14121a;
+  --scrim-tint: #1c202d;
 
-  --shadow-sm: 0 1px 2px rgb(20 18 26 / 6%);
-  --shadow-md: 0 4px 16px rgb(20 18 26 / 8%);
-  --shadow-lg: 0 12px 40px rgb(20 18 26 / 12%);
+  --shadow-sm: 0 1px 2px rgb(20 24 35 / 6%);
+  --shadow-md: 0 4px 16px rgb(20 24 35 / 8%);
+  --shadow-lg: 0 10px 34px rgb(20 24 35 / 14%);
+
+  --theme-wave: rgb(255 252 245 / 98%);
+  --theme-wave-mid: rgb(255 243 224 / 55%);
+  --blob-opacity: 0.42;
+
+  /* Буквальные RGB-каналы «Пульса» (design-archive/reference) — то, что в референсе
+     живёт как --txr/--gl/--dock и собирается в rgba(var(--…),alpha) прямо в разметке.
+     Отдельно от палитры выше: та подобрана под старую систему токенов, эта — числа
+     один в один из источника правды. Наполняется по экрану на каждом этапе переноса. */
+  --pulse-ink: 28, 32, 45; /* --txr */
+  --pulse-glass: 22, 28, 44; /* --gl */
+  --pulse-dock: 255, 255, 255; /* --dock */
+
+  /* Капсула шапки чата (имя собеседника) и капсула закреплённого сообщения — буквально
+     --cap/--capbd из референса. Не то же самое, что --chrome-bg: у капсулы свой
+     фиолетовый градиент, а не нейтральное стекло. */
+  --pulse-cap: linear-gradient(130deg, rgba(124, 88, 214, 0.15), rgba(70, 104, 210, 0.11));
+  --pulse-capbd: rgba(120, 86, 210, 0.24);
+
+  /* Пузырь входящего сообщения — буквально --bub/--bubbd из референса. */
+  --pulse-bub: #ffffff;
+  --pulse-bubbd: rgba(20, 26, 40, 0.09);
 }
 
-/* Тонирована фиолетом, один hue 265°. */
-:root[data-theme='dark'] {
-  --bg: #131020;
-  --surface: #1b1730;
-  --surface-2: #241f3f;
-  --chat-bg: #0d0a17;
-  --message-in: #221d38;
-  --message-out: #6d3fd4;
+/* Тонирована фиолетом, один hue 265°; канвас уведён холоднее (258°), чтобы акцент
+   читался тёплым на нём. */
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --bg: #0a0c12;
+  --surface: #141a2b;
+  --surface-2: #1b2338;
+  --surface-3: #232c46;
+  --chat-bg: #0d0f18;
+  --message-in: #1c2336;
+  --message-out: #6a7de0;
+  --message-out-from: #4d8dff;
+  --message-out-to: #a05aff;
 
-  --primary: #a074ff;
-  --primary-press: #8c5cf0;
-  --primary-soft: #2a2140;
+  --primary: #6aa5ff;
+  --primary-press: #4d8dff;
+  --primary-soft: #1b2a4a;
+  --accent-from: #4d8dff;
+  --accent-to: #a05aff;
 
-  --text-primary: #ece9f5;
-  --text-secondary: #9a93b5;
+  --text-primary: #eef1f7;
+  --text-secondary: #9096a8;
+  --text-tertiary: #666d80;
   --text-on-primary: #ffffff;
   --text-on-out: #ffffff;
+  --meta-on-out: rgb(255 255 255 / 85%);
 
-  --border: #2e2749;
-  --online: #4ec97e;
-  --danger: #ff5f6d;
+  --border: #262c3c;
+  --online: #3ddc84;
+  --danger: #ff5d73;
   --danger-soft: #35202c;
-  --unread-badge: #7c4dff;
+  --unread-badge: #4d8dff;
+  --unread-muted: #333c52;
 
-  --scrim-tint: #0d0a17;
+  --scrim-tint: #0a0c12;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 32%);
-  --shadow-md: 0 4px 16px rgb(0 0 0 / 40%);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 52%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 34%);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 42%);
+  --shadow-lg: 0 10px 34px rgb(0 0 0 / 46%);
+
+  --theme-wave: rgb(11 13 19 / 98%);
+  --theme-wave-mid: rgb(13 16 24 / 55%);
+  --blob-opacity: 1;
+
+  --pulse-ink: 238, 241, 247;
+  --pulse-glass: 255, 255, 255;
+  --pulse-dock: 30, 36, 50;
+
+  --pulse-cap: linear-gradient(130deg, rgba(126, 92, 214, 0.4), rgba(77, 110, 214, 0.28));
+  --pulse-capbd: rgba(186, 166, 255, 0.24);
+
+  --pulse-bub: rgba(255, 255, 255, 0.08);
+  --pulse-bubbd: rgba(255, 255, 255, 0.09);
+}
+
+/* Белый как «подъём» поверхности: блик на буквенном аватаре, подложка цитаты на исходящем
+   пузыре, кромка стекла. Отдельным именем — чтобы компонентам не приходилось писать #fff
+   и нарушать правило «цвет только через var()». */
+:root {
+  --lift: #ffffff;
+}
+
+/* Тона цветных плиток в списках настроек: одна светлота и одна насыщенность на все восемь,
+   иначе ряд читается радугой, а не набором. */
+:root {
+  --tint-blue: #4d8dff;
+  --tint-violet: #a05aff;
+  --tint-orange: #f0913e;
+  --tint-green: #3ddc84;
+  --tint-red: #f0566b;
+  --tint-teal: #1fb8ab;
+  --tint-pink: #ff6b9d;
+  --tint-indigo: #6470f0;
 }
 
 /* ────────────────────  Уровень 2: рецепты поверхностей  ──────────────────── */
 
-/* Стекло: полупрозрачные поверхности с размытием подложки. Одновременно размывающих
-   слоёв не больше четырёх — шапка, таб-бар, оверлей меню, боттом-шит. */
-:root,
-:root[data-surface='glass'] {
-  --panel-bg: color-mix(in srgb, var(--surface) 72%, transparent);
-  --panel-blur: blur(24px) saturate(160%);
-  --panel-border: color-mix(in srgb, #fff 10%, transparent);
-  --panel-shadow: var(--shadow-md);
+/* Единственный визуальный язык — liquid glass (референс «Пульс»): хрома отрывается от краёв
+   и распадается на куски, полоса пуста, залиты куски. Одновременно размывающих слоёв не
+   больше четырёх — куски шапки, таб-бар, оверлей, шит. Альтернативный режим «Строгий»
+   убран — см. журнал ux-ui.md. */
+:root {
+  --chrome-inset: 8px;
+  --chrome-gap: 8px;
+  --chrome-pad-x: 8px;
+  --chrome-radius: 26px;
+
+  --chrome-bar-bg: transparent;
+  --chrome-bar-blur: none;
+  --chrome-bar-shadow: none;
+  --chrome-divider: transparent;
+
+  --chrome-bg: color-mix(in srgb, var(--surface-2) 64%, transparent);
+  --chrome-blur: blur(30px) saturate(190%);
+  --chrome-border: color-mix(in srgb, var(--lift) 9%, transparent);
+  --chrome-shadow: var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--lift) 14%, transparent);
+
+  --card-inset: 12px;
+  --card-radius: 18px;
+  --card-bg: var(--surface);
+  --card-border: color-mix(in srgb, var(--lift) 5%, transparent);
+  --card-shadow: var(--shadow-sm);
 
   --sheet-bg: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  --sheet-blur: blur(32px) saturate(170%);
-  --sheet-border: var(--panel-border);
+  --sheet-blur: blur(32px) saturate(180%);
+  --sheet-border: var(--chrome-border);
   --sheet-shadow: var(--shadow-lg);
 
   --menu-bg: color-mix(in srgb, var(--surface-2) 78%, transparent);
-  --menu-blur: blur(28px) saturate(170%);
-  --menu-border: var(--panel-border);
+  --menu-blur: blur(28px) saturate(180%);
+  --menu-border: var(--chrome-border);
   --menu-shadow: var(--shadow-lg);
 
   --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
   --scrim-blur: blur(14px);
 }
 
-/* В светлой теме белая граница на белой панели невидима — берём обычный бордюр. */
-:root[data-theme='light'][data-surface='glass'],
-:root[data-theme='light']:not([data-surface]) {
-  --panel-border: color-mix(in srgb, var(--border) 80%, transparent);
+/* В светлой теме белая граница на белой поверхности невидима — берём обычный бордюр. */
+:root[data-theme='light'],
+[data-theme='light'] {
+  --chrome-border: color-mix(in srgb, var(--border) 85%, transparent);
+  --chrome-bg: color-mix(in srgb, var(--surface) 70%, transparent);
+  --chrome-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--lift) 70%, transparent);
+  --card-border: var(--border);
 }
 
-/* Строгий: непрозрачные поверхности. Держится на границах, а не на тенях. */
-:root[data-surface='solid'] {
-  --panel-bg: var(--surface);
-  --panel-blur: none;
-  --panel-border: var(--border);
-  --panel-shadow: none;
-
-  --sheet-bg: var(--surface-2);
-  --sheet-blur: none;
-  --sheet-border: var(--border);
-  --sheet-shadow: none;
-
-  --menu-bg: var(--surface-2);
-  --menu-blur: none;
-  --menu-border: var(--border);
-  --menu-shadow: none;
-
-  --scrim-bg: color-mix(in srgb, #000 55%, transparent);
-  --scrim-blur: none;
+/* Минималистичный индикатор прокрутки (ScrollIndicator): овал без подложки и трека, той
+   же светлоты, что и основной текст, — поэтому не нужен отдельный подбор под тему.
+   --scrollbar-edge считается от --safe-right, а не от паддинга конкретного скроллера:
+   ScrollIndicator вычитает паддинг контейнера в JS, чтобы овал прижимался к физическому
+   краю экрана, а не к краю текстового блока внутри него (см. ux-ui.md). */
+:root {
+  --scrollbar-w: 1.5px;
+  --scrollbar-thumb-h: 20px;
+  --scrollbar-edge: calc(var(--safe-right) + 3px);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-primary) 32%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--text-primary) 46%, transparent);
 }
 
-/* Без backdrop-filter прозрачность превращается в грязь — поверхности становятся непрозрачными. */
+/* Без backdrop-filter прозрачность превращается в грязь — поверхности становятся непрозрачными.
+   Формы, отступы и радиусы при этом сохраняются: капсулы остаются капсулами. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root,
-  :root[data-surface='glass'] {
-    --panel-bg: var(--surface);
-    --panel-blur: none;
+  :root {
+    --chrome-bg: var(--surface-2);
+    --chrome-blur: none;
     --sheet-bg: var(--surface-2);
     --sheet-blur: none;
     --menu-bg: var(--surface-2);
     --menu-blur: none;
     --scrim-bg: color-mix(in srgb, #000 55%, transparent);
     --scrim-blur: none;
-  }
-
-  :root {
     --auth-card-bg: var(--surface);
     --auth-card-blur: none;
   }
@@ -149,9 +286,7 @@
 /* ───────────────────────────  Экран входа (искл.)  ─────────────────────────── */
 
 /* Единственное место в приложении с собственным liquid glass — не участвует в переключении
-   Стекло ↔ Строгий (экран входа вне области этапов UI, см. ux-ui.md). Значения здесь только
-   переносят существующий хардкод AuthPage.module.css/SkyScene.module.css в токены — один в один,
-   без визуальных изменений, — иначе правило 1 («цвет только через var(--…)») было бы нарушено. */
+   Стекло ↔ Строгий (экран входа вне области этапов UI, см. ux-ui.md). */
 :root {
   --auth-sky-day: #7bd3f7;
   --auth-white: #fff;
@@ -169,7 +304,8 @@
   --auth-danger-soft: rgb(209 67 67 / 10%);
 }
 
-:root[data-theme='dark'] {
+:root[data-theme='dark'],
+[data-theme='dark'] {
   --auth-sky-night: linear-gradient(180deg, #091024 0%, #15224a 65%, #1e3368 100%);
 
   --auth-card-bg: rgb(30 27 40 / 55%);
@@ -195,16 +331,26 @@
 }
 
 :root {
+  /* Inter — базовый шрифт до редизайна под референс, теперь зарезервирован только под текст
+     сообщений (пузыри, поле ввода): так исходящее сообщение выглядит одинаково в момент набора
+     и после отправки, независимо от того, каким шрифтом нарисован остальной интерфейс. */
   --font-sans:
     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     sans-serif;
 
-  --font-screen-title: 1.2em;   /* заголовок экрана, 600 */
-  --font-name: 1em;             /* имя в списке чатов, 500 */
-  --font-meta: 0.93em;          /* превью сообщения, статусы */
+  /* Базовый шрифт интерфейса (референс «Пульс»): шапки, списки, карточки, кнопки, таб-бар.
+     Текст сообщений — исключение, см. --font-sans выше. */
+  --font-display: 'Golos Text', var(--font-sans);
+
+  --font-wordmark: 1.35em; /* «Qwill» в шапке списка, 800 */
+  --font-display-title: 1.75em; /* «Контакты», «Настройки», 800 */
+  --font-screen-title: 1.1em; /* заголовок в капсуле хромы, 600 */
+  --font-name: 1em; /* имя в списке чатов, 500 */
+  --font-meta: 0.93em; /* превью сообщения, статусы */
+  --font-caption: 0.82em; /* подписи секций, сабтитулы строк */
   --font-message: 1em;
-  --font-time: 0.75em;          /* время в пузыре */
-  --font-tab: 0.7em;            /* подпись таб-бара */
+  --font-time: 0.75em; /* время в пузыре */
+  --font-tab: 0.68em; /* подпись таб-бара */
 }
 
 /* ──────────────────────────  Метрики и скругления  ────────────────────────── */
@@ -212,10 +358,9 @@
 :root {
   --radius-sm: 10px;
   --radius-md: 14px;
-  --radius-bubble: 18px;
-  /* Поджатый угол между соседними пузырями одной серии. */
-  --radius-bubble-tight: 6px;
+  --radius-bubble: 20px; /* буквально из референса; фиксирован для всех пузырей, без поджатия в сериях */
   --radius-card: 20px;
+  --radius-tile: 9px;
   --radius-pill: 999px;
 
   --space-1: 4px;
@@ -225,10 +370,25 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  /* Высоты шапки и таб-бара — без safe-area: её добавляет сам компонент,
+  /* Плавающая хрома. Высота куска — без safe-area: её добавляет сам компонент,
      чтобы фон уходил под вырез, а содержимое — нет. */
-  --header-h: 56px;
-  --tabbar-h: 56px;
+  --chrome-h: 52px;
+  --chrome-btn: 44px;
+  --tabbar-h: 54px;
+  --tabbar-pill-radius: 18px;
+
+  /* Сколько места хрома отъедает сверху и снизу. Контент кладёт это в padding, а не в
+     высоту: он обязан проезжать под хромой, а не начинаться после неё. */
+  --chrome-space-top: calc(var(--safe-top) + var(--chrome-inset) + var(--chrome-h) + var(--chrome-gap));
+  --chrome-space-bottom: calc(
+    var(--safe-bottom) + var(--chrome-inset) + var(--tabbar-h) + var(--chrome-gap)
+  );
+
+  --card-row-h: 56px;
+  --icon-tile: 30px;
+  --fab-size: 56px;
+  --chip-h: 32px;
+  --search-h: 40px;
 
   --row-chat-h: 72px;
   --row-contact-h: 60px;
@@ -236,16 +396,16 @@
   --avatar-contact: 44px;
   --avatar-header: 40px;
 
-  --bubble-max-w: 78%;
+  --bubble-max-w: 76%;
   --bubble-pad-y: 8px;
   --bubble-pad-x: 12px;
-  --bubble-gap-series: 2px;
-  --bubble-gap-groups: 10px;
 
   --composer-min-h: 48px;
+  --composer-max-h: 120px;
   --emoji-cell: 44px;
   --emoji-size: 34px;
   --reaction-h: 26px;
+  --emoji-panel-h: clamp(280px, 42dvh, 420px);
 
   /* Горизонтальные поля экрана и минимальная тап-цель. */
   --screen-pad-x: 12px;
@@ -260,13 +420,14 @@
 /* ─────────────────────────────────  Движение  ───────────────────────────────── */
 
 :root {
-  --dur-screen: 280ms;   /* переход между экранами */
-  --dur-menu: 200ms;     /* открытие меню и шита */
-  --dur-close: 160ms;    /* закрытие */
-  --dur-theme: 400ms;    /* смена темы или оформления */
-  --dur-tab: 120ms;      /* переключение вкладок */
-  --dur-check: 140ms;    /* чекбокс мультивыбора */
+  --dur-screen: 280ms; /* переход между экранами */
+  --dur-menu: 200ms; /* открытие меню и шита */
+  --dur-close: 160ms; /* закрытие */
+  --dur-theme: 400ms; /* смена темы или оформления */
+  --dur-tab: 120ms; /* переключение вкладок */
+  --dur-check: 140ms; /* чекбокс мультивыбора */
   --dur-reaction: 320ms; /* «прилетевшая» реакция */
+  --dur-scrollbar: 220ms; /* проявление/скрытие индикатора прокрутки */
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-close: ease-in;
@@ -285,6 +446,7 @@
     --dur-tab: 1ms;
     --dur-check: 1ms;
     --dur-reaction: 1ms;
+    --dur-scrollbar: 1ms;
     --transition: 1ms linear;
   }
 }
@@ -310,7 +472,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--font-size-base);
   line-height: 1.45;
   overscroll-behavior: none;
@@ -338,4 +500,32 @@ textarea,
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Слой кругового раскрытия темы (app/viewTransition.ts): копия интерфейса в противоположной
+   теме поверх настоящей, обрезанная кругом. Обычный элемент, а не ::view-transition-*, поэтому
+   не зависит от «snapshot containing block» и выдвижной хромы браузера. Сам круг задаётся из JS
+   только в процентах — почему именно так, см. комментарий там же.
+   Стекло внутри копии размывает только её собственное содержимое: clip-path создаёт backdrop
+   root, поэтому backdrop-filter не «просвечивает» настоящий интерфейс под слоем. */
+.theme-reveal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+/* Нативный скроллбар прячется здесь у всех скроллеров приложения — его место занимает
+   свой минималистичный индикатор (ui/ScrollIndicator). Глобальный класс, а не токен
+   поверхности: тут нет цвета/размытия/тени, только видимость браузерного элемента. */
+.hide-native-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-native-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }

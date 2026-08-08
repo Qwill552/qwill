@@ -1,0 +1,108 @@
+.catcher {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: transparent;
+}
+
+.panel {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 221;
+  display: flex;
+  height: calc(var(--emoji-panel-h) + var(--safe-bottom));
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--safe-bottom);
+  border-top: 1px solid var(--sheet-border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+  -webkit-backdrop-filter: var(--sheet-blur);
+  box-shadow: var(--sheet-shadow);
+  animation: rise var(--dur-menu) var(--ease-screen);
+}
+
+.panelClosing {
+  animation: rise var(--dur-close) var(--ease-close) reverse forwards;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.categoryWrap {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.searchRow {
+  padding: var(--space-2) 0;
+}
+
+.body {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  padding: 0 var(--space-4);
+  overscroll-behavior: contain;
+}
+
+.stub {
+  padding: var(--space-6) 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-caption);
+  text-align: center;
+}
+
+.tabsWrap {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--sheet-border);
+}
+
+.tab {
+  flex: 1;
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.tabActive {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .panelClosing {
+    animation-duration: 1ms;
+  }
+}

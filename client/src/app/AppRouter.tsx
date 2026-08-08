@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AuthPage } from '../pages/AuthPage';
-import { MessengerPage } from '../pages/MessengerPage';
+import { StubScreen } from '../pages/StubScreen';
+import { AppShell } from './AppShell';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ProtectedRoute } from './ProtectedRoute';
 
@@ -16,20 +17,23 @@ export function AppRouter() {
           </ErrorBoundary>
         }
       />
+      <Route
+        path="/onboarding/appearance"
+        element={
+          <ErrorBoundary>
+            <StubScreen title="Оформление" backTo="/chats" />
+          </ErrorBoundary>
+        }
+      />
       <Route element={<ProtectedRoute />}>
+        {/* AppShell владеет всей авторизованной частью — вложенные экраны матчатся
+            внутри ScreenStack, а не отдельными <Route> здесь (иначе анимированный
+            переход между ними невозможен, см. ux-ui/02-shell.md). */}
         <Route
-          path="/chats"
+          path="/*"
           element={
             <ErrorBoundary>
-              <MessengerPage />
-            </ErrorBoundary>
-          }
-        />
-        <Route
-          path="/chats/:chatId"
-          element={
-            <ErrorBoundary>
-              <MessengerPage />
+              <AppShell />
             </ErrorBoundary>
           }
         />

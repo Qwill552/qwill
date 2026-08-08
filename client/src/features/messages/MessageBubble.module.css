@@ -1,0 +1,138 @@
+/* Пузырь — буквально строка 332 референса: радиус 20/20/7/20 (свои) или 20/20/20/7
+   (чужие), фиксирован всегда — без поджатия углов в сериях и без хвостиков (в
+   референсе их нет, серию читает форма углов на всех сообщениях одинаково). Пузырь
+   стеклянный (backdrop-filter) — сквозь него видны обои чата, а не плоская заливка. */
+
+.bubble {
+  position: relative;
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 12px 7px;
+  font-size: 15px;
+  line-height: 1.34;
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+.in {
+  border-radius: 20px 20px 20px 7px;
+  border: 1px solid var(--pulse-bubbd);
+  background: var(--pulse-bub);
+  box-shadow: 0 6px 16px -11px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(var(--pulse-glass), 0.1);
+  color: rgb(var(--pulse-ink));
+}
+
+/* Градиент 140° — единственное яркое пятно на тёмных обоях. */
+.out {
+  border-radius: 20px 20px 7px 20px;
+  border: 1px solid rgba(180, 200, 255, 0.35);
+  background: linear-gradient(140deg, rgba(77, 141, 255, 0.85), rgba(150, 88, 255, 0.8));
+  box-shadow: 0 12px 26px -16px rgba(90, 120, 255, 0.95), inset 0 1px 0 rgba(var(--pulse-glass), 0.25);
+  color: #fff;
+}
+
+.failed {
+  outline: 1px solid var(--danger);
+}
+
+.retryText {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: var(--font-caption);
+}
+
+/* Имя автора над первым сообщением серии в группе — своей вёрстки в референсе нет
+   (там только приватный чат), цвет — хешем от userId. */
+.author {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 2px;
+  color: var(--author-tint, var(--primary));
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Метка пересылки — «Переслано от X» (этап 6). Тот же принцип цвета, что у .author: свой
+   акцент на входящем, белый на градиенте исходящего — акцентный фиолетовый там не читается. */
+.forwarded {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+  color: var(--primary);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+.out .forwarded {
+  color: color-mix(in srgb, var(--text-on-out) 82%, transparent);
+}
+
+/* Якорь метаданных — только по высоте текста, а не всего пузыря: если ниже есть реакции
+   (children бабла, не из референса), они не утаскивают время вниз за собой. */
+.textRow {
+  position: relative;
+  display: block;
+}
+
+/* Текст сообщений — Inter, а не базовый Golos Text интерфейса: так набранное сообщение
+   выглядит одинаково в пузыре и в поле ввода (см. .input в MessageComposer.module.css). */
+.text {
+  font-family: var(--font-sans);
+  /* cv05 — одноэтажная «l», ss03 — открытая «a»: черты Inter, не теряющие разборчивости на 13 px. */
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* Ленты — user-select:none (MessageList.module.css); текст — единственное исключение,
+     там работает нативное выделение браузера (ux-ui/gestures.md, «Выделение текста против
+     выделения сообщения»). Внутренние поля пузыря (8/12, см. .bubble) в этот span не входят —
+     остаётся рамка захвата ≥8px по периметру для long-press «выделить сообщение». */
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+.pad {
+  display: inline-block;
+  height: 1px;
+}
+
+.deleted {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.attachment {
+  margin: -8px -12px 4px;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+
+.attachmentOnly {
+  margin-bottom: -7px;
+  border-radius: 20px;
+}
+
+.emojiOnly {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.emojiAnchor {
+  position: relative;
+  display: block;
+}
+
+.emojiRow {
+  display: flex;
+  gap: var(--space-1);
+}

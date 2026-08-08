@@ -1,6 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 
+import { useBackHandler } from '../../app/useBackHandler';
+import { Icon } from '../../ui/Icon';
+import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import styles from './Modal.module.css';
 
 interface ModalProps {
@@ -11,6 +14,9 @@ interface ModalProps {
 
 /** Общая карточка-оверлей для модалок группы (создание, панель управления) — своего reusable-модала в проекте ещё не было. */
 export function Modal({ title, onClose, children }: ModalProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useBackHandler(true, onClose);
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === 'Escape') onClose();
@@ -25,11 +31,12 @@ export function Modal({ title, onClose, children }: ModalProps) {
 
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>
-      <div className={styles.card} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={cardRef} className={`${styles.card} hide-native-scrollbar`} role="dialog" aria-modal="true" aria-label={title}>
+        <ScrollIndicator target={cardRef} />
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
           <button className={styles.closeButton} type="button" onClick={onClose} aria-label="Закрыть">
-            ✕
+            <Icon name="close" size={18} />
           </button>
         </div>
         <div className={styles.body}>{children}</div>

@@ -15,7 +15,7 @@ import {
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { AppError, notFound, tooLarge } from '../lib/errors.js';
-import { looksLikeText, sniffMimeType } from '../lib/fileSignature.js';
+import { looksLikeText, resolveContainerMimeType, sniffMimeType } from '../lib/fileSignature.js';
 import { logger } from '../lib/logger.js';
 import type { File, UploadSession } from '../generated/prisma/client.js';
 
@@ -157,7 +157,11 @@ async function finalizeUpload(session: UploadSession): Promise<FileDto> {
   const head = await readHead(session.tempPath, 4096);
   const sniffed = sniffMimeType(head);
   const allowedTypes: readonly string[] = session.purpose === 'avatar' ? AVATAR_MIME_TYPES : ALLOWED_MIME_TYPES;
-  const finalMime = sniffed ?? (session.mimeType === 'text/plain' && looksLikeText(head) ? 'text/plain' : null);
+  const finalMime = sniffed
+    ? resolveContainerMimeType(sniffed, session.mimeType)
+    : session.mimeType === 'text/plain' && looksLikeText(head)
+      ? 'text/plain'
+      : null;
 
   if (!finalMime || !allowedTypes.includes(finalMime)) {
     await safeUnlink(session.tempPath);

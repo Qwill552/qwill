@@ -1,0 +1,49 @@
+/* Кружок хромы: «назад», ⋮. Буквально back-кнопка шапки чата из референса (строка 297) —
+   тот же рецепт стекла держат кнопки поиска/меню в шапке списка чатов (ChatsScreen). */
+
+.button {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(var(--pulse-glass), 0.1);
+  border-radius: 50%;
+  background: rgba(var(--pulse-glass), 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: rgb(var(--pulse-ink));
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    background: rgba(var(--pulse-glass), 0.16);
+  }
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.primary {
+  border-color: transparent;
+  background: linear-gradient(140deg, var(--accent-from), var(--accent-to));
+  color: #fff;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.glyph {
+  pointer-events: none;
+}

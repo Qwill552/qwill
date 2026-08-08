@@ -51,9 +51,8 @@
   font-size: 15.5px;
   line-height: 1.35;
   outline: none;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
+  resize: none;
+  overflow-y: hidden;
 }
 
 /* Курсор в поле уже показывает фокус — капсула композера не нуждается в кольце сверху
@@ -62,15 +61,8 @@
   outline: none;
 }
 
-.input[data-empty]::before {
-  content: attr(data-placeholder);
+.input::placeholder {
   color: rgba(var(--pulse-ink), 0.45);
-  pointer-events: none;
-}
-
-.inlineEmoji {
-  display: inline-block;
-  vertical-align: middle;
 }
 
 /* В референсе иконки лежат в капсуле голыми (без кружка-кнопки под ними) — здесь

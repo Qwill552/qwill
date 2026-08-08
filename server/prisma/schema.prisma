@@ -44,6 +44,11 @@ model User {
   avatarFileId String?
   avatarFile   File?   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
 
+  /// Цвет буквенного аватара (blue/violet/teal/orange/pink/green), когда фото не загружено —
+  /// назначается случайно один раз при регистрации и больше не меняется, чтобы один и тот же
+  /// человек не красился по-разному на разных экранах (shared/src/user.ts, AVATAR_COLOR_VALUES).
+  avatarColor String @default("blue")
+
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
@@ -90,6 +95,11 @@ model Chat {
 
   createdById String?
   createdBy   User?   @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// Одно закреплённое сообщение на чат (этап 6). SetNull — удаление сообщения открепляет
+  /// само себя, а не роняет чат.
+  pinnedMessageId Int?
+  pinnedMessage   Message? @relation("ChatPinnedMessage", fields: [pinnedMessageId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,6 +149,12 @@ model Message {
   replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[] @relation("MessageReply")
 
+  /// Оригинал при пересылке (этап 6) — тот же приём, что и replyTo: снимок автора берётся
+  /// с оригинала на момент чтения, само сообщение при удалении оригинала не трогается.
+  forwardedFromId Int?
+  forwardedFrom   Message?  @relation("MessageForward", fields: [forwardedFromId], references: [id], onDelete: SetNull)
+  forwardedAs     Message[] @relation("MessageForward")
+
   editedAt  DateTime?
   /// Мягкое удаление: строка остаётся, content очищается — цитаты не рассыпаются.
   deletedAt DateTime?
@@ -146,9 +162,11 @@ model Message {
 
   attachments Attachment[]
   reactions   Reaction[]
+  pinnedInChats Chat[] @relation("ChatPinnedMessage")
 
   @@index([chatId, id])
   @@index([senderId])
+  @@index([forwardedFromId])
 }
 
 model Attachment {
@@ -169,6 +187,8 @@ model Attachment {
   height       Int?
   /// Длительность аудио/видео в миллисекундах.
   duration     Int?
+  /// Амплитуды волны голосового (0..1), посчитанные клиентом (этап 7, ux-ui/07-composer.md). Пусто у остальных вложений.
+  peaks        Float[] @default([])
 
   @@index([messageId])
   @@index([fileId])

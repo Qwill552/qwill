@@ -8,16 +8,22 @@ export const SocketEvent = {
   MessageUpdated: 'message:updated',
   MessageDelete: 'message:delete',
   MessageDeleted: 'message:deleted',
+  MessageDeleteBatch: 'message:deleteBatch',
+  MessageDeletedBatch: 'message:deletedBatch',
+  MessageForward: 'message:forward',
   MessageReact: 'message:react',
   MessageReaction: 'message:reaction',
   ChatCreated: 'chat:created',
   ChatRead: 'chat:read',
+  ChatPin: 'chat:pin',
+  ChatPinned: 'chat:pinned',
   TypingStart: 'typing:start',
   TypingStop: 'typing:stop',
   UserTyping: 'user:typing',
   UserPresence: 'user:presence',
   ChatUpdated: 'chat:updated',
   MemberChanged: 'member:changed',
+  VisibilityChange: 'visibility:change',
 } as const;
 
 export type SocketEvent = (typeof SocketEvent)[keyof typeof SocketEvent];
@@ -43,6 +49,25 @@ export interface MessageReactionEvent {
   reactions: MessageReactionDto[];
 }
 
+/** Ack на message:deleteBatch/message:forward — групповые операции мультивыбора (этап 6). */
+export interface MessageBatchAck {
+  ok: boolean;
+  messages?: MessageDto[];
+  error?: { code: string; message: string };
+}
+
+/** Сервер → клиент: пачка сообщений удалена одним запросом мультивыбора (этап 6). */
+export interface MessageDeletedBatchEvent {
+  chatId: string;
+  messages: MessageDto[];
+}
+
+/** Сервер → клиент: закреп чата изменился — message=null означает открепление (этап 6). */
+export interface ChatPinnedEvent {
+  chatId: string;
+  message: MessageDto | null;
+}
+
 /** Клиент → сервер: «прочитано всё вплоть до этого сообщения» (секция 3). */
 export interface ChatReadPayload {
   chatId: string;
@@ -59,6 +84,11 @@ export interface ChatReadEvent {
 /** Клиент → сервер: печатает/перестал печатать в чате. */
 export interface TypingPayload {
   chatId: string;
+}
+
+/** Клиент → сервер: вкладка стала видимой/скрытой (Page Visibility API) — определяет, слать ли push. */
+export interface VisibilityPayload {
+  visible: boolean;
 }
 
 /** Сервер → клиент: кто-то печатает в чате. Гаснет сам через TYPING_TIMEOUT_MS, если stop потерялся. */

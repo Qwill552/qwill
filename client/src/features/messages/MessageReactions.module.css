@@ -1,34 +1,88 @@
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
 }
 
 .pill {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
+  gap: 3px;
+  height: var(--reaction-h);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  background: var(--reaction-bg, var(--surface-3));
   color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.6;
+  font: inherit;
+  font-size: var(--font-caption);
+  line-height: 1;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition);
 }
 
 .pillMine {
   border-color: var(--primary);
-  background: var(--primary-soft);
   color: var(--primary);
 }
 
+.bump {
+  animation: bump var(--dur-reaction) var(--ease-spring);
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1.25);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 .count {
-  font-size: 11px;
+  font-size: var(--font-time);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.countRoll {
+  display: inline-block;
+  animation: rollIn var(--dur-reaction) var(--ease-spring);
+}
+
+@keyframes rollIn {
+  from {
+    transform: translateY(-40%);
+    opacity: 0;
+  }
+}
+
+.reactorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+}
+
+.reactorName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-caption);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bump,
+  .countRoll {
+    animation-duration: 1ms;
+  }
 }

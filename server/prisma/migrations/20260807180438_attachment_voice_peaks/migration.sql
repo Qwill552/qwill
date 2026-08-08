@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Attachment" ADD COLUMN     "peaks" DOUBLE PRECISION[] DEFAULT ARRAY[]::DOUBLE PRECISION[];

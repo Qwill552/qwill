@@ -1,0 +1,30 @@
+.row {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-4) var(--space-2);
+  overflow-x: auto;
+}
+
+.button {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}

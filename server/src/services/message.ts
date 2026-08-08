@@ -2,12 +2,15 @@ import type {
   AttachmentDto,
   MessageAttachmentInput,
   MessageDto,
+  MessageForwardPreviewDto,
   MessageReactionDto,
   MessageReplyPreviewDto,
 } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
+import { randomUUID } from 'node:crypto';
 
 import { prisma } from '../db/prisma.js';
+import { toAvatarColor } from '../lib/avatarColor.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { logger } from '../lib/logger.js';
@@ -15,15 +18,18 @@ import { presenceStore } from '../realtime/presence.js';
 import { assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
 import * as pushService from './push.js';
+import { ChatRole } from '../generated/prisma/client.js';
 import type { Attachment, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
 type ReplyWithRelations = Message & { sender: User | null; attachments: { id: string }[] };
+type ForwardOriginWithRelations = Message & { sender: User | null };
 
 export type MessageWithRelations = Message & {
   sender: User | null;
   attachments: (Attachment & { file: File; thumbnail: File | null })[];
   reactions: Reaction[];
   replyTo: ReplyWithRelations | null;
+  forwardedFrom: ForwardOriginWithRelations | null;
 };
 
 function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
@@ -35,6 +41,7 @@ function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File 
     width: attachment.width,
     height: attachment.height,
     duration: attachment.duration,
+    peaks: attachment.peaks.length > 0 ? attachment.peaks : null,
   };
 }
 
@@ -68,6 +75,16 @@ function toReplyPreview(replyTo: ReplyWithRelations | null): MessageReplyPreview
   };
 }
 
+/** Снимок автора оригинала при пересылке — само пересланное сообщение уже несёт своё
+ *  содержимое, оригинал не нужен, даже если позже удалён. */
+function toForwardPreview(forwardedFrom: ForwardOriginWithRelations | null): MessageForwardPreviewDto | null {
+  if (!forwardedFrom) return null;
+  return {
+    id: forwardedFrom.id,
+    senderName: forwardedFrom.sender?.displayName ?? 'Удалённый аккаунт',
+  };
+}
+
 export function toMessageDto(message: MessageWithRelations): MessageDto {
   const deleted = !!message.deletedAt;
 
@@ -81,6 +98,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
           username: message.sender.username,
           displayName: message.sender.displayName,
           avatarUrl: fileUrl(message.sender.avatarFileId),
+          avatarColor: toAvatarColor(message.sender.avatarColor),
           lastSeenAt: message.sender.lastSeenAt.toISOString(),
         }
       : null,
@@ -90,6 +108,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
     attachment: deleted ? null : (message.attachments[0] ? toAttachmentDto(message.attachments[0]) : null),
     replyToId: message.replyToId,
     replyTo: toReplyPreview(message.replyTo),
+    forwardedFrom: toForwardPreview(message.forwardedFrom),
     reactions: deleted ? [] : toReactionDtos(message.reactions),
     editedAt: message.editedAt?.toISOString() ?? null,
     deletedAt: message.deletedAt?.toISOString() ?? null,
@@ -102,6 +121,7 @@ export const messageInclude = {
   attachments: { include: { file: true, thumbnail: true } },
   reactions: true,
   replyTo: { include: { sender: true, attachments: { select: { id: true } } } },
+  forwardedFrom: { include: { sender: true } },
 } as const;
 
 export interface SendMessageInput {
@@ -157,13 +177,14 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
   return dto;
 }
 
-/** Пуш только офлайн-получателям чата, кроме отправителя (этап 9). */
+/** Пуш всем, у кого нет видимой вкладки чата, кроме отправителя — сокет мог остаться подключён
+ *  в фоне (свёрнутое приложение), но push всё равно нужен, раз человек сейчас не смотрит (этап 9). */
 async function notifyOfflineMembers(chatId: string, senderId: string, message: MessageDto): Promise<void> {
   const members = await prisma.chatMember.findMany({
     where: { chatId, userId: { not: senderId } },
     select: { userId: true },
   });
-  const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.isOnline(userId));
+  const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.hasVisibleClient(userId));
   if (offlineMemberIds.length === 0) return;
 
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, title: true } });
@@ -193,6 +214,7 @@ async function buildAttachmentCreate(input: MessageAttachmentInput) {
     width: input.width,
     height: input.height,
     duration: input.duration,
+    peaks: input.peaks ?? [],
   };
 }
 
@@ -227,18 +249,29 @@ export async function editMessage(input: EditMessageInput): Promise<MessageDto> 
   return toMessageDto(message);
 }
 
+/** Своё может удалить автор; чужое в группе — OWNER/ADMIN (этап 6, ux-ui/06-message-interaction.md). */
+async function assertCanDeleteMessage(chatId: string, userId: string, message: Message): Promise<void> {
+  if (message.senderId === userId) return;
+
+  const membership = await prisma.chatMember.findUnique({
+    where: { chatId_userId: { chatId, userId } },
+    include: { chat: { select: { type: true } } },
+  });
+  const isGroupAdmin =
+    membership?.chat.type === 'GROUP' && (membership.role === ChatRole.OWNER || membership.role === ChatRole.ADMIN);
+  if (!isGroupAdmin) throw forbidden('Можно удалить только свои сообщения');
+}
+
 export interface DeleteMessageInput {
   chatId: string;
   messageId: number;
   userId: string;
 }
 
-/** Удаление — своё может удалить автор; право админа группы добавится вместе с ролями в этапе 7. */
 export async function deleteMessage(input: DeleteMessageInput): Promise<MessageDto> {
   await assertMember(input.chatId, input.userId);
   const existing = await getMessageInChatOrThrow(input.chatId, input.messageId);
-
-  if (existing.senderId !== input.userId) throw forbidden('Можно удалить только свои сообщения');
+  await assertCanDeleteMessage(input.chatId, input.userId, existing);
 
   const message = existing.deletedAt
     ? await prisma.message.findUniqueOrThrow({ where: { id: input.messageId }, include: messageInclude })
@@ -250,6 +283,108 @@ export async function deleteMessage(input: DeleteMessageInput): Promise<MessageD
   return toMessageDto(message);
 }
 
+export interface DeleteMessagesBatchInput {
+  chatId: string;
+  userId: string;
+  messageIds: number[];
+}
+
+/** Групповое удаление мультивыбора — один запрос вместо цикла message:delete (ux-ui/06, секция 3). */
+export async function deleteMessagesBatch(input: DeleteMessagesBatchInput): Promise<MessageDto[]> {
+  await assertMember(input.chatId, input.userId);
+
+  const existing = await prisma.message.findMany({
+    where: { id: { in: input.messageIds }, chatId: input.chatId },
+  });
+  if (existing.length !== input.messageIds.length) {
+    throw notFound(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение не найдено');
+  }
+  for (const message of existing) {
+    await assertCanDeleteMessage(input.chatId, input.userId, message);
+  }
+
+  const toDelete = existing.filter((m) => !m.deletedAt).map((m) => m.id);
+  if (toDelete.length > 0) {
+    await prisma.message.updateMany({
+      where: { id: { in: toDelete } },
+      data: { content: null, deletedAt: new Date() },
+    });
+  }
+
+  const messages = await prisma.message.findMany({
+    where: { id: { in: input.messageIds } },
+    include: messageInclude,
+    orderBy: { id: 'asc' },
+  });
+  return messages.map(toMessageDto);
+}
+
+export interface ForwardMessagesInput {
+  fromChatId: string;
+  toChatId: string;
+  userId: string;
+  messageIds: number[];
+}
+
+/** Пересылка копирует содержимое (и вложение — тот же File, дедупликация не страдает) в
+ *  целевой чат от имени пересылающего; forwardedFromId сплющивает цепочку до самого первого
+ *  оригинала — «Переслано от X» всегда указывает на первого автора, а не на посредника
+ *  (ux-ui/06). Удалённые сообщения из выборки молча пропускаются, а не роняют весь запрос —
+ *  мультивыбор мог зацепить то, что удалили параллельно. */
+export async function forwardMessages(input: ForwardMessagesInput): Promise<MessageDto[]> {
+  await assertMember(input.fromChatId, input.userId);
+  await assertMember(input.toChatId, input.userId);
+
+  const sources = await prisma.message.findMany({
+    where: { id: { in: input.messageIds }, chatId: input.fromChatId },
+    include: messageInclude,
+    orderBy: { id: 'asc' },
+  });
+  if (sources.length !== input.messageIds.length) {
+    throw notFound(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение не найдено');
+  }
+
+  const forwardable = sources.filter((m) => !m.deletedAt);
+  if (forwardable.length === 0) {
+    throw badRequest(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщения удалены');
+  }
+
+  const created: MessageWithRelations[] = [];
+  for (const source of forwardable) {
+    const attachment = source.attachments[0];
+    const message = await prisma.message.create({
+      data: {
+        chatId: input.toChatId,
+        senderId: input.userId,
+        clientId: randomUUID(),
+        content: source.content,
+        type: source.type,
+        forwardedFromId: source.forwardedFromId ?? source.id,
+        ...(attachment
+          ? {
+              attachments: {
+                create: {
+                  fileId: attachment.fileId,
+                  thumbnailFileId: attachment.thumbnailFileId,
+                  originalName: attachment.originalName,
+                  width: attachment.width,
+                  height: attachment.height,
+                  duration: attachment.duration,
+                  peaks: attachment.peaks,
+                },
+              },
+            }
+          : {}),
+      },
+      include: messageInclude,
+    });
+    created.push(message);
+  }
+
+  await prisma.chat.update({ where: { id: input.toChatId }, data: { updatedAt: new Date() } });
+  return created.map(toMessageDto);
+}
+
 export interface ReactToMessageInput {
   chatId: string;
   messageId: number;
@@ -257,7 +392,7 @@ export interface ReactToMessageInput {
   emoji: string;
 }
 
-/** Тоггл: повтор той же реакции снимает её. Эмодзи ограничен REACTION_EMOJIS схемой ещё до сервиса. */
+/** Тоггл: повтор той же реакции снимает её. Эмодзи провалидирован messageReactSchema ещё до сервиса. */
 export async function reactToMessage(input: ReactToMessageInput): Promise<MessageReactionDto[]> {
   await assertMember(input.chatId, input.userId);
   const existing = await getMessageInChatOrThrow(input.chatId, input.messageId);

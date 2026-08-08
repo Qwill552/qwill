@@ -1,0 +1,160 @@
+/* Экран чата — слои: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
+   Буквальный перенос из «Пульс» (design-archive/reference), CLAUDE.md, этап 2. */
+
+.screen {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  background: var(--chat-bg);
+  /* Высота шапки (буквально 40px кнопки + 6/10 отступов сверху/снизу референса) —
+     ленте нужна отдельно от --composer-h, чтобы не проезжать под кругом «назад». */
+  --chat-header-h: calc(6px + var(--safe-top) + 40px + 10px);
+}
+
+/* Размытая подложка шапки — прогрессивный блюр вместо одного слоя (см. журнал ux-ui.md,
+   ад-хок редизайн): референс «Пульс» (строка 294) даёт один blur(22px) под общей маской
+   «чёрный до 74%, дальше прозрачный», а фон при этом красится СВОИМ градиентом (0.58→0.3).
+   У двух кривых — маски и заливки — разные точки перегиба, и именно на стыке 74% глаз
+   читает эту рассинхронизацию как чёткую полосу (сравнение со скриншотом настоящего
+   Telegram, где резкой границы нет). Чинится тем, что сила блюра растёт плавно к шапке,
+   а не одним прыжком: четыре вложенных слоя одинаковой формы маски (тон несёт только
+   самый внешний), каждый следующий — короче и сильнее размыт. У каждого слоя переход
+   в прозрачность сам по себе плавный (5 стопов вместо 2), поэтому на границах, где слой
+   гаснет до нуля, доля общего блюра меняется постепенно, а не скачком. */
+.headerFade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: calc(106px + var(--safe-top));
+  pointer-events: none;
+}
+
+/* Место под баннер закрепа — сидит ниже шапки, но выше .headerFade (z-index 3): та зона
+   размытия и так продолжается заметно ниже видимой шапки (106px против ~56 её высоты)
+   специально ради подобного контента, но сам баннер должен читаться чётко, не сквозь
+   размытие поверх себя. MessageList порталит содержимое сюда (ux-ui.md, журнал, этап 6).
+   Отступ от шапки — `--chrome-gap` (8px), тот же зазор, что и между любыми двумя кусками
+   плавающей хромы (design-system.md, «Отступ хромы от краёв / зазор между кусками»). */
+.pinnedSlot {
+  position: absolute;
+  top: calc(var(--chat-header-h) + var(--chrome-gap));
+  right: 0;
+  left: 0;
+  z-index: 4;
+  padding: 0 12px;
+}
+
+.headerFadeLayer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  mask-image: linear-gradient(to bottom, black 0%, black 22%, rgba(0, 0, 0, 0.62) 46%, rgba(0, 0, 0, 0.24) 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 22%,
+    rgba(0, 0, 0, 0.62) 46%,
+    rgba(0, 0, 0, 0.24) 70%,
+    transparent 100%
+  );
+}
+
+.headerFadeLayer:nth-child(1) {
+  height: 100%;
+  background: rgba(var(--pulse-dock), 0.55);
+  backdrop-filter: blur(8px) saturate(170%);
+  -webkit-backdrop-filter: blur(8px) saturate(170%);
+}
+
+.headerFadeLayer:nth-child(2) {
+  height: 78%;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.headerFadeLayer:nth-child(3) {
+  height: 55%;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.headerFadeLayer:nth-child(4) {
+  height: 30%;
+  backdrop-filter: blur(34px);
+  -webkit-backdrop-filter: blur(34px);
+}
+
+/* Размытая подложка композера — то же лечение, зеркально: капсула поля ввода снизу,
+   слои растут по силе блюра книзу, самый внешний держит форму прежнего единого слоя
+   (blur 14 / saturate 150), у него же не было своей заливки — и здесь не появляется. */
+.composerFade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  height: calc(96px + var(--safe-bottom));
+  pointer-events: none;
+}
+
+.composerFadeLayer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  mask-image: linear-gradient(to top, black 0%, black 22%, rgba(0, 0, 0, 0.62) 46%, rgba(0, 0, 0, 0.24) 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 22%,
+    rgba(0, 0, 0, 0.62) 46%,
+    rgba(0, 0, 0, 0.24) 70%,
+    transparent 100%
+  );
+}
+
+.composerFadeLayer:nth-child(1) {
+  height: 100%;
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+}
+
+.composerFadeLayer:nth-child(2) {
+  height: 78%;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.composerFadeLayer:nth-child(3) {
+  height: 55%;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.composerFadeLayer:nth-child(4) {
+  height: 28%;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+/* Обёртка, которую меряет ResizeObserver: её высота уходит в --composer-h и оттуда
+   в нижний отступ ленты. */
+.composerSlot {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
+.error {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 0 var(--space-6);
+  color: var(--danger);
+  font-size: var(--font-meta);
+  text-align: center;
+}

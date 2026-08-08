@@ -1,30 +1,45 @@
 import type { Server as HttpServer } from 'node:http';
+import type { Server as HttpsServer } from 'node:https';
 
 import {
+  chatPinSchema,
+  messageDeleteBatchSchema,
   messageDeleteSchema,
   messageEditSchema,
+  messageForwardSchema,
   messageReactSchema,
   messageSendSchema,
   SocketEvent,
+  type ChatPinnedEvent,
   type ChatReadEvent,
   type ChatReadPayload,
   type MessageActionAck,
+  type MessageBatchAck,
+  type MessageDeletedBatchEvent,
   type MessageReactionEvent,
   type MessageSendAck,
   type TypingPayload,
   type UserPresenceEvent,
   type UserTypingEvent,
+  type VisibilityPayload,
 } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 import { Server as SocketServer, type Socket } from 'socket.io';
 
-import { env } from '../config/env.js';
+import { env, isAllowedClientOrigin } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { AppError, rateLimited } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
-import { assertMember, getCoMemberIds, markChatRead } from '../services/chat.js';
-import { deleteMessage, editMessage, reactToMessage, sendMessage } from '../services/message.js';
+import { assertMember, getCoMemberIds, markChatRead, pinMessage } from '../services/chat.js';
+import {
+  deleteMessage,
+  deleteMessagesBatch,
+  editMessage,
+  forwardMessages,
+  reactToMessage,
+  sendMessage,
+} from '../services/message.js';
 import { getUserById } from '../services/user.js';
 import { presenceStore } from './presence.js';
 import { messageRateLimiter } from './rateLimit.js';
@@ -102,7 +117,7 @@ async function bootstrapSocket(socket: Socket, userId: string): Promise<void> {
   socket.data.displayName = user.displayName;
 
   // Первый сокет пользователя — он был оффлайн, и нужно и разослать его "онлайн", и прислать снапшот чужих статусов.
-  const wasOffline = presenceStore.addSocket(userId) === 1;
+  const wasOffline = presenceStore.addSocket(userId, socket.id) === 1;
   const coMemberIds = await getCoMemberIds(userId);
 
   for (const coMemberId of coMemberIds) {
@@ -122,8 +137,8 @@ async function bootstrapSocket(socket: Socket, userId: string): Promise<void> {
 }
 
 /** Последний сокет пользователя отключился — пишем lastSeenAt и оповещаем совместные чаты (секция 3). */
-async function teardownSocket(userId: string): Promise<void> {
-  const stillOnline = presenceStore.removeSocket(userId) > 0;
+async function teardownSocket(userId: string, socketId: string): Promise<void> {
+  const stillOnline = presenceStore.removeSocket(userId, socketId) > 0;
   if (stillOnline) return;
 
   const lastSeenAt = new Date();
@@ -261,9 +276,89 @@ async function handleMessageReact(
   }
 }
 
-export function createSocketServer(httpServer: HttpServer): SocketServer {
+async function handleMessageDeleteBatch(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageBatchAck) => void,
+): Promise<void> {
+  const parsed = messageDeleteBatchSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректный запрос' } });
+    return;
+  }
+
+  try {
+    const messages = await deleteMessagesBatch({ ...parsed.data, userId });
+    const event: MessageDeletedBatchEvent = { chatId: parsed.data.chatId, messages };
+    io?.to(parsed.data.chatId).emit(SocketEvent.MessageDeletedBatch, event);
+    ack?.({ ok: true, messages });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleMessageForward(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageBatchAck) => void,
+): Promise<void> {
+  const parsed = messageForwardSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректный запрос' } });
+    return;
+  }
+
+  if (!env.isTest && !messageRateLimiter.tryConsume(userId)) {
+    const err = rateLimited('Слишком много сообщений, подождите немного');
+    ack?.({ ok: false, error: { code: err.code, message: err.message } });
+    return;
+  }
+
+  try {
+    const messages = await forwardMessages({ ...parsed.data, userId });
+    for (const message of messages) io?.to(parsed.data.toChatId).emit(SocketEvent.MessageNew, message);
+    ack?.({ ok: true, messages });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleChatPin(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MessageActionAck) => void,
+): Promise<void> {
+  const parsed = chatPinSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректный запрос' } });
+    return;
+  }
+
+  try {
+    const { chatId, message } = await pinMessage(parsed.data.chatId, userId, parsed.data.messageId);
+    const event: ChatPinnedEvent = { chatId, message };
+    io?.to(chatId).emit(SocketEvent.ChatPinned, event);
+    ack?.({ ok: true, message: message ?? undefined });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
+}
+
+export function createSocketServer(httpServer: HttpServer | HttpsServer): SocketServer {
   io = new SocketServer(httpServer, {
-    cors: { origin: env.clientOrigins, credentials: true },
+    cors: { origin: (origin, callback) => callback(null, isAllowedClientOrigin(origin)), credentials: true },
   });
 
   // Access-токен передаётся в handshake.auth — та же проверка, что и на HTTP (секция 3).
@@ -308,6 +403,24 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       });
     });
 
+    socket.on(SocketEvent.MessageDeleteBatch, (payload, ack?: (response: MessageBatchAck) => void) => {
+      handleMessageDeleteBatch(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки message:deleteBatch');
+      });
+    });
+
+    socket.on(SocketEvent.MessageForward, (payload, ack?: (response: MessageBatchAck) => void) => {
+      handleMessageForward(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки message:forward');
+      });
+    });
+
+    socket.on(SocketEvent.ChatPin, (payload, ack?: (response: MessageActionAck) => void) => {
+      handleChatPin(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки chat:pin');
+      });
+    });
+
     socket.on(SocketEvent.MessageReact, (payload, ack?: (response: MessageActionAck) => void) => {
       handleMessageReact(userId, payload, ack).catch((error: unknown) => {
         logger.error({ err: error, userId }, 'Ошибка обработки message:react');
@@ -332,9 +445,13 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       });
     });
 
+    socket.on(SocketEvent.VisibilityChange, (payload: VisibilityPayload) => {
+      presenceStore.setVisibility(userId, socket.id, payload?.visible === true);
+    });
+
     socket.on('disconnect', (reason) => {
       logger.debug({ socketId: socket.id, reason }, 'Сокет отключён');
-      teardownSocket(userId).catch((error: unknown) => {
+      teardownSocket(userId, socket.id).catch((error: unknown) => {
         logger.error({ err: error, userId }, 'Не удалось обработать отключение сокета');
       });
     });

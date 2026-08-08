@@ -9,6 +9,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from './constants.js';
+import type { AvatarColor } from './user.js';
 
 /** `@username` неизменяем после регистрации — хранится и сравнивается в нижнем регистре (секция 2). */
 const usernameSchema = z
@@ -54,6 +55,7 @@ export interface PublicUser {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarColor: AvatarColor;
   theme: string;
   createdAt: string;
   lastSeenAt: string;

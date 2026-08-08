@@ -1,0 +1,13 @@
+/* Цветная скруглённая плитка под иконку в списках настроек. Тон приходит переменной
+   --tile-tint, а не классом: тонов восемь, и заводить восемь классов ради заливки нечестно. */
+
+.tile {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--icon-tile);
+  height: var(--icon-tile);
+  border-radius: var(--radius-tile);
+  background: var(--tile-tint);
+  color: var(--text-on-primary);
+}

@@ -1,0 +1,52 @@
+/* Sticky-потомок самого скроллера: top:0 держит трек у видимого верха контейнера при любой
+   прокрутке, без измерения через getBoundingClientRect. Высота 0 — трек не влияет на layout,
+   ползунок внутри него позиционируется абсолютно и двигается только через translateY. */
+
+.track {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 0;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 0;
+  right: var(--scrollbar-edge);
+  width: var(--scrollbar-w);
+  border-radius: var(--radius-pill);
+  background: var(--scrollbar-thumb);
+  opacity: 0;
+  transition: opacity var(--dur-scrollbar) ease;
+  pointer-events: none;
+}
+
+.visible {
+  opacity: 1;
+}
+
+.interactive {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+/* Увеличенная невидимая тап-зона (правило CLAUDE.md — не меньше 44×44) вокруг тонкого
+   овала: сам овал остаётся тонким (1.5×20), а перетаскивать его можно из более широкой
+   полосы у края — -12px/-22px добирают обе стороны хотя бы до 44px. */
+.interactive::before {
+  content: '';
+  position: absolute;
+  inset: -12px -22px;
+}
+
+.interactive:active {
+  cursor: grabbing;
+  background: var(--scrollbar-thumb-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb {
+    transition-duration: 1ms;
+  }
+}

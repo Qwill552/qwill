@@ -1,7 +1,15 @@
+import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
 
 // Список файлов для прекэша подставляет vite-plugin-pwa при сборке (self.__WB_MANIFEST).
 precacheAndRoute(self.__WB_MANIFEST);
+
+// Без этих двух строк новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный
+// билд всем уже открытым вкладкам, пока их не закрыть все разом, — на активной разработке это
+// выглядит так, будто правки не применяются вообще. skipWaiting активирует новый SW сразу же
+// после установки, clientsClaim забирает под его контроль уже открытые вкладки без reload.
+self.skipWaiting();
+clientsClaim();
 
 /** Пуш приходит даже когда вкладка закрыта — SW сам показывает нативное уведомление (этап 9). */
 self.addEventListener('push', (event) => {

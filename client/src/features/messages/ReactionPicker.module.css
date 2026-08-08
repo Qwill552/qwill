@@ -1,0 +1,76 @@
+.row {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid var(--menu-border);
+  border-radius: var(--radius-pill);
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  -webkit-backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+}
+
+.scroll {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.button {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background var(--dur-menu) var(--ease-screen),
+    transform var(--dur-menu) var(--ease-screen);
+}
+
+.button:hover {
+  background: var(--primary-soft);
+  transform: scale(1.12);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.mine {
+  background: var(--primary-soft);
+}
+
+.expand {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-left: 4px;
+  border: none;
+  border-left: 1px solid var(--menu-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen);
+}
+
+.expand:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.expand:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

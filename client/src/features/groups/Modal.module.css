@@ -38,8 +38,9 @@
 .title {
   margin: 0;
   color: var(--text-primary);
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: var(--font-screen-title);
+  font-weight: 600;
 }
 
 .closeButton {

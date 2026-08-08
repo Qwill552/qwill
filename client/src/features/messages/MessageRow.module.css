@@ -1,0 +1,184 @@
+/* Строка сообщения — буквально строка 331 референса: `display:flex;justify-content:{{m.align}}`,
+   без резерва пустой зоны напротив пузыря. Анимация появления — буквально bubIn (строка 27
+   исходника). Этап 6 достроил вокруг неё жесты: свайп-ответ, чекбокс мультивыбора, подсветку
+   выбранной строки на всю ширину экрана. */
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Пустая зона напротив пузыря (слева от своего, справа от чужого) — часть активной зоны
+     тапа/long-press (ux-ui/gestures.md): растягиваем строку на всю ширину контентной области. */
+  min-height: 44px;
+  /* touch-action: pan-y — жест свайпа-ответа берёт горизонтальную ось на себя через JS
+     (useSwipeAction), но вертикальный скролл ленты должен продолжать работать нативно. */
+  touch-action: pan-y;
+  animation: bubIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* --swipe-x/--swipe-progress задаются useSwipeAction императивно на этом элементе и
+     наследуются потомками (.swipeContent — transform, .swipeIcon — прозрачность/поворот). */
+  --swipe-x: 0px;
+  --swipe-progress: 0;
+}
+
+@keyframes bubIn {
+  from {
+    transform: translateY(12px) scale(0.94);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Подсветка выбранной строки — на всю ширину экрана, а не только под пузырём: бежит за
+   границы паддинга ленты (12px, MessageList.module.css). */
+.highlight {
+  position: absolute;
+  top: 0;
+  right: -12px;
+  bottom: 0;
+  left: -12px;
+  z-index: -1;
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  opacity: 0;
+  transition: opacity 140ms var(--ease-screen);
+}
+
+.selected .highlight {
+  opacity: 1;
+}
+
+/* Слот чекбокса всегда в DOM (иначе появление 140 мс не от чего анимировать) — ширина
+   схлопнута в ноль вне мультивыбора, содержимое рендерится только в режиме выбора. */
+.checkboxSlot {
+  overflow: hidden;
+  width: 0;
+  flex-shrink: 0;
+  transition: width 140ms var(--ease-screen);
+}
+
+.checkboxActive {
+  width: 44px;
+}
+
+.checkbox {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-on-primary);
+  transition: background 140ms var(--ease-screen), border-color 140ms var(--ease-screen);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+/* Контент строки (аватар + пузырь) — то, что реально сдвигается свайпом-ответом. */
+.swipeContent {
+  display: flex;
+  overflow: visible;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: flex-start;
+  transform: translateX(var(--swipe-x));
+}
+
+.own .swipeContent {
+  justify-content: flex-end;
+}
+
+/* Иконка ответа — вне транслируемого контента: остаётся на месте, пока строка уезжает
+   из-под неё (ux-ui/gestures.md, «Свайп для ответа»: иконка проявляется и доворачивается
+   по мере движения). Видимость и поворот — чистый CSS от того же --swipe-x. */
+.swipeIcon {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  opacity: var(--swipe-progress);
+  transform: translateY(-50%) rotate(calc(var(--swipe-progress) * -16deg));
+  transition: background 140ms var(--ease-screen);
+}
+
+.row[data-swipe-armed] .swipeIcon {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+/* Место под аватар держится всю серию — иначе пузыри скачут по горизонтали, когда
+   аватар появляется только у последнего. В личном чате колонки нет вовсе. */
+.avatarSlot {
+  flex-shrink: 0;
+  width: 36px;
+  align-self: flex-end;
+}
+
+/* Реакция «вылетает» из точки касания — 320 мс, пружина scale 0 → 1.25 → 1
+   (ux-ui/design-system.md, «Движение»). Фиксированное позиционирование — портал в body. */
+.reactionFly {
+  position: fixed;
+  z-index: 400;
+  transform: translate(-50%, -50%);
+  animation: reactionFly 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  font-size: 32px;
+  pointer-events: none;
+}
+
+@keyframes reactionFly {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+
+  60% {
+    transform: translate(-50%, -70%) scale(1.25);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -84%) scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    animation-duration: 1ms;
+  }
+
+  .reactionFly {
+    animation-duration: 1ms;
+  }
+
+  .highlight,
+  .checkboxSlot,
+  .checkbox,
+  .swipeIcon {
+    transition-duration: 1ms;
+  }
+}
+
+/* Обёртка вокруг пузыря — не шире самого пузыря (max-width буквально из референса,
+   строка 332): на ней держится якорь клона контекстного меню (position:relative). */
+.bubbleCol {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: var(--bubble-max-w);
+  flex-direction: column;
+}

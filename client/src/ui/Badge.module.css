@@ -1,20 +1,33 @@
+/* Буквально из референса (строка 127): min-width/height 22, radius 11, шрифт 12/700,
+ * заливка — тот же градиент, что у FAB и кнопки отправки. */
 .badge {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--unread-badge);
-  color: var(--text-on-primary);
-  font-size: var(--font-time);
-  font-weight: 600;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: linear-gradient(140deg, #4d8dff, #8b5cf6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-/* Приглушённый: чат замьючен — счётчик виден, но внимания не требует. */
+/* Приглушённый: чат замьючен — счётчик виден, но внимания не требует. За пределами
+ * референса (там нет понятия «замьючен») — гасим той же заливкой через opacity. */
 .muted {
-  background: var(--text-secondary);
+  background: rgba(var(--pulse-ink), 0.35);
+}
+
+/* Маленький: бейдж на иконке таб-бара — там нет референсного аналога (в референсе таб-бар
+ * без бейджей), подгоняем под ту же капсулу: кайма цветом дока, чтобы бейдж «вырезался». */
+.small {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid rgb(var(--pulse-dock));
+  font-size: 10px;
 }

@@ -2,6 +2,7 @@ import type { GroupMemberDTO, UpdateRoleDTO } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
+import { toAvatarColor } from '../lib/avatarColor.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { assertMember } from './chat.js';
@@ -14,6 +15,7 @@ function toGroupMemberDto(member: ChatMember & { user: User }): GroupMemberDTO {
     username: member.user.username,
     displayName: member.user.displayName,
     avatarUrl: fileUrl(member.user.avatarFileId),
+    avatarColor: toAvatarColor(member.user.avatarColor),
     role: member.role,
     joinedAt: member.joinedAt.toISOString(),
   };

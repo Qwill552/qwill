@@ -1,0 +1,164 @@
+/* Контекстное меню сообщения (ux-ui/06-message-interaction.md, секция 2): фон размывается
+   скримом, сам пузырь — клон в портале поверх него, резкий и приподнятый (scale 1.03).
+   Реакции и список пунктов — отдельная плавающая панель, раскрывается в сторону, где
+   больше места, и прижата к тому краю экрана, к какому прижат сам пузырь (own → справа). */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  animation: scrimIn var(--dur-menu) var(--ease-screen);
+}
+
+/* Появление 200 мс / закрытие 160 мс (ux-ui/06, секция 2) — те же токены длительности,
+   что у Sheet.module.css: exit-анимация проигрывается, пока JS ждёт --dur-close перед unmount. */
+.scrimClosing {
+  animation: scrimOut var(--dur-close) ease-in both;
+}
+
+.bubbleClone {
+  position: fixed;
+  z-index: 301;
+  pointer-events: none;
+  animation: bubbleUp var(--dur-menu) var(--ease-screen) both;
+}
+
+.bubbleCloneClosing {
+  animation: bubbleDown var(--dur-close) ease-in both;
+}
+
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes scrimOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleUp {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes bubbleDown {
+  from {
+    transform: scale(1.03);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+.panel {
+  position: fixed;
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(280px, calc(100vw - 2 * var(--space-4)));
+  animation: panelIn var(--dur-menu) var(--ease-screen) both;
+  transform-origin: var(--menu-origin, top left);
+}
+
+.panelClosing {
+  animation: panelOut var(--dur-close) ease-in both;
+}
+
+@keyframes panelIn {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+@keyframes panelOut {
+  to {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+.list {
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 18px;
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  -webkit-backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+}
+
+.status {
+  padding: 10px 14px 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 13px;
+  min-height: var(--tap-min);
+  padding: 11px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-menu) var(--ease-screen);
+}
+
+.item:hover {
+  background: var(--primary-soft);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.glyph {
+  flex-shrink: 0;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .scrimClosing,
+  .bubbleClone,
+  .bubbleCloneClosing,
+  .panel,
+  .panelClosing {
+    animation-duration: 1ms;
+  }
+}

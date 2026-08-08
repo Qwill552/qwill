@@ -1,0 +1,42 @@
+/* Обои чата — буквально строки 282-284 референса: фотография (день/ночь), тёмная
+   виньетка у левого края, фиолетовое пятно за шапкой. Зафиксированы относительно
+   экрана и не скроллятся вместе с лентой. */
+
+.wallpaper {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background-image: url('/wallpaper/wall-night.png');
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+:global(:root[data-theme='light']) .wallpaper {
+  background-image: url('/wallpaper/wall-day.jpg');
+}
+
+.edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: 22px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent);
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  top: 6px;
+  left: 18%;
+  z-index: 1;
+  width: 230px;
+  height: 156px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 58%, rgba(152, 118, 255, 0.55), rgba(88, 140, 255, 0.24) 46%, transparent 70%);
+  filter: blur(34px);
+  pointer-events: none;
+}

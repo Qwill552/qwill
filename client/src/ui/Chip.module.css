@@ -1,0 +1,39 @@
+/* Буквально из референса (строка 104): активный чипс — фирменный градиент, неактивный —
+ * почти прозрачное стекло. Счётчик живёт внутри чипса, а не рядом — иначе ряд рвётся
+ * при горизонтальной прокрутке. */
+
+.chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--pulse-glass), 0.07);
+  background: rgba(var(--pulse-glass), 0.05);
+  color: rgba(var(--pulse-ink), 0.55);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.active {
+  border-color: rgba(150, 180, 255, 0.45);
+  background: linear-gradient(140deg, rgba(77, 141, 255, 0.92), rgba(160, 90, 255, 0.88));
+  box-shadow: 0 8px 22px -12px rgba(90, 120, 255, 0.9);
+  color: #fff;
+}
+
+.count {
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: 0.65;
+}

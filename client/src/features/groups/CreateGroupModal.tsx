@@ -2,6 +2,8 @@ import { CHAT_TITLE_MAX_LENGTH } from '@messenger/shared';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
 
 import { ApiError } from '../../api/client';
+import { Icon } from '../../ui/Icon';
+import { IconButton } from '../../ui/IconButton';
 import { useChatStore } from '../../stores/chatStore';
 import styles from './CreateGroupModal.module.css';
 import { Modal } from './Modal';
@@ -98,9 +100,14 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
               onKeyDown={handleUsernameKeyDown}
               placeholder="@username"
             />
-            <button className={styles.addButton} type="button" onClick={handleAddUsername} disabled={!usernameInput.trim()}>
-              Добавить
-            </button>
+            <IconButton
+              icon="user-plus"
+              label="Добавить участника"
+              variant="primary"
+              type="button"
+              onClick={handleAddUsername}
+              disabled={!usernameInput.trim()}
+            />
           </div>
           {usernames.length > 0 && (
             <div className={styles.chips}>
@@ -113,7 +120,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                     onClick={() => setUsernames((prev) => prev.filter((u) => u !== username))}
                     aria-label={`Убрать @${username}`}
                   >
-                    ✕
+                    <Icon name="close" size={12} />
                   </button>
                 </span>
               ))}

@@ -1,0 +1,28 @@
+/* Шапка режима мультивыбора — подменяет обычные back/pill/more той же капсульной хромы
+   (ux-ui/06-message-interaction.md, секция 3): те же GlassButton/GlassPill, другой набор. */
+
+.count {
+  display: inline-block;
+  /* Счётчик анимируется при изменении (ux-ui/06, «Готово когда») — смена key перезапускает
+     анимацию на каждое число, длительность — токеном, prefers-reduced-motion гасит её ниже. */
+  animation: countIn var(--dur-tab) var(--ease-screen);
+}
+
+@keyframes countIn {
+  from {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .count {
+    animation-duration: 1ms;
+  }
+}

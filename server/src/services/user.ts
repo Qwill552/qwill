@@ -2,6 +2,7 @@ import type { PublicUser, UpdateProfileDTO, UpdateSettingsInput, UserSearchResul
 import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES, USER_SEARCH_PAGE_SIZE } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
+import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
 import { AppError } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
@@ -15,6 +16,7 @@ export function toPublicUser(user: User): PublicUser {
     username: user.username,
     displayName: user.displayName,
     avatarUrl: fileUrl(user.avatarFileId),
+    avatarColor: toAvatarColor(user.avatarColor),
     theme: user.theme,
     createdAt: user.createdAt.toISOString(),
     lastSeenAt: user.lastSeenAt.toISOString(),
@@ -37,6 +39,7 @@ export async function createUser(input: {
       username: input.username,
       passwordHash,
       displayName: input.displayName,
+      avatarColor: randomAvatarColor(),
     },
   });
 }
@@ -130,6 +133,7 @@ export async function searchUsers(query: string, requesterId: string): Promise<U
     username: candidate.username,
     displayName: candidate.displayName,
     avatarUrl: fileUrl(candidate.avatarFileId),
+    avatarColor: toAvatarColor(candidate.avatarColor),
     isContact: existingPairKeys.has(pairKeyFor(requesterId, candidate.id)),
   }));
 }

@@ -2,17 +2,23 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f6f4fb" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#eef1f6" />
     <title>Qwill</title>
+    <!-- Кириллические подмножества: без них первый кадр интерфейса рисуется системным шрифтом
+         и вся вёрстка на нём дёргается при подмене. Латиница догрузится обычным порядком. -->
+    <link rel="preload" href="/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/golos-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
     <script>
-      // Тема и режим оформления применяются до первого кадра, иначе моргнёт чужое (UI-1).
+      // Тема применяется до первого кадра, иначе моргнёт чужая (UI-1).
       // Значения должны совпадать с --bg из tokens.css.
       (function () {
-        var BG = { light: '#f6f4fb', dark: '#131020' };
+        var BG = { light: '#eef1f6', dark: '#0a0c12' };
         var root = document.documentElement;
         var theme = 'light';
-        var surface = 'glass';
         try {
           var storedTheme = localStorage.getItem('messenger.theme');
           theme =
@@ -21,13 +27,10 @@
               : window.matchMedia('(prefers-color-scheme: dark)').matches
                 ? 'dark'
                 : 'light';
-          var storedSurface = localStorage.getItem('messenger.surface');
-          if (storedSurface === 'glass' || storedSurface === 'solid') surface = storedSurface;
         } catch (e) {
           /* приватный режим без localStorage — остаются значения по умолчанию */
         }
         root.dataset.theme = theme;
-        root.dataset.surface = surface;
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', BG[theme]);
       })();

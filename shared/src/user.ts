@@ -28,6 +28,13 @@ export type FontSize = (typeof FONT_SIZE_VALUES)[number];
 export const SURFACE_VALUES = ['glass', 'solid'] as const;
 export type SurfaceMode = (typeof SURFACE_VALUES)[number];
 
+/** Цвет буквенного аватара — назначается один раз при регистрации (server/src/services/user.ts,
+ *  randomAvatarColor) и хранится на пользователе, а не пересчитывается хешем на клиенте, иначе
+ *  один и тот же человек красится по-разному в разных местах интерфейса. Порядок и состав
+ *  буквально совпадают с client/src/ui/tint.ts (AVATAR_GRADIENTS). */
+export const AVATAR_COLOR_VALUES = ['blue', 'violet', 'teal', 'orange', 'pink', 'green'] as const;
+export type AvatarColor = (typeof AVATAR_COLOR_VALUES)[number];
+
 export const updateSettingsSchema = z.object({
   theme: z.enum(THEME_VALUES).optional(),
   fontSize: z.enum(FONT_SIZE_VALUES).optional(),
@@ -53,5 +60,6 @@ export interface UserSearchResult {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarColor: AvatarColor;
   isContact: boolean;
 }

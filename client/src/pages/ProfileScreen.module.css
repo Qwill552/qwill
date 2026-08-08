@@ -1,0 +1,162 @@
+/* Буквально из референса (строки 218-263): свой скроллер без общей шапки вкладки,
+   как у «Настроек» — заголовка экрана у «Профиля» в источнике тоже нет. */
+
+.screen {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.scroller {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(8px + var(--safe-top)) calc(14px + var(--safe-right)) calc(96px + var(--safe-bottom))
+    calc(14px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cardReset {
+  margin: 0;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 0 2px;
+}
+
+/* Кольцо-градиент вокруг аватара — тот же градиент, что в референсе (строка 222; не
+   токен темы, три акцентных тона по кругу не входят в набор, который меняет
+   applyTheme), но по указанию пользователя вдвое тоньше исходной обводки (3px → 1.5px). */
+.avatarRing {
+  width: 110px;
+  height: 110px;
+  padding: 1.5px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #4d8dff, #a05aff, #00c8b4, #4d8dff);
+}
+
+.name {
+  margin-top: 8px;
+  color: rgb(var(--pulse-ink));
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.status {
+  color: var(--online);
+  font-size: 13.5px;
+}
+
+/* Инлайн-правка имени: в референсе своего вида нет (кнопка «Изменить» в источнике
+   никуда не ведёт), поэтому оформлена тем же стеклянным языком, что и остальной экран. */
+.nameEditRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.nameInput {
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid rgba(var(--pulse-glass), 0.14);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--pulse-glass), 0.06);
+  color: rgb(var(--pulse-ink));
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  outline: none;
+}
+
+.nameInput:focus {
+  border-color: var(--primary);
+}
+
+.saveButton {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  cursor: pointer;
+}
+
+.saveButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Ряд капсул-действий — буквально из референса (строка 231): стекло, поднимается
+   и подсвечивается при наведении. */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px 6px;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  border-radius: 20px;
+  background: rgba(var(--pulse-glass), 0.06);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  color: var(--primary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+@media (hover: hover) {
+  .action:not(:disabled):hover {
+    background: rgba(var(--pulse-glass), 0.12);
+    transform: translateY(-3px);
+  }
+}
+
+.action:not(:disabled):active {
+  background: rgba(var(--pulse-glass), 0.12);
+}
+
+.accent {
+  color: var(--primary);
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--card-radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-caption);
+}
+
+.hiddenInput {
+  display: none;
+}

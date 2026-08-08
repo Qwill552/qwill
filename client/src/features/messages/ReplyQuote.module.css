@@ -1,25 +1,41 @@
+/* Цитата ответа внутри пузыря: полоса слева, имя, обрезанный текст. */
+
 .quote {
   display: flex;
+  overflow: hidden;
   flex-direction: column;
   gap: 1px;
-  margin-bottom: 6px;
-  padding: 4px 8px;
-  border-left: 3px solid var(--primary);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  overflow: hidden;
+  margin-bottom: var(--space-1);
+  padding: 3px var(--space-2);
+  border-left: 3px solid var(--quote-bar, var(--primary));
+  border-radius: var(--radius-sm);
+  background: var(--quote-bg, color-mix(in srgb, var(--primary) 10%, transparent));
+}
+
+/* На исходящем пузыре и полоса, и подложка берутся от белого: акцентный фиолетовый
+   там сливается с градиентом. */
+.onOut {
+  --quote-bar: var(--text-on-out);
+  --quote-bg: color-mix(in srgb, var(--lift) 16%, transparent);
 }
 
 .name {
-  color: var(--primary);
-  font-size: 12px;
+  overflow: hidden;
+  color: var(--quote-bar, var(--primary));
+  font-size: var(--font-caption);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .text {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.onOut .text {
+  color: color-mix(in srgb, var(--text-on-out) 82%, transparent);
 }

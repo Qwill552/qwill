@@ -88,7 +88,7 @@ export function UserSearch({ onClose, onOpenChat }: UserSearchProps) {
             disabled={openingId === user.id}
             onClick={() => void handleSelect(user)}
           >
-            <Avatar label={user.displayName} avatarUrl={user.avatarUrl} size={40} />
+            <Avatar label={user.displayName} avatarUrl={user.avatarUrl} size={40} color={user.avatarColor} />
             <div className={styles.resultBody}>
               <span className={styles.resultName}>{user.displayName}</span>
               <span className={styles.resultUsername}>

@@ -38,6 +38,7 @@ export interface AttachmentDto {
   width: number | null;
   height: number | null;
   duration: number | null;
+  peaks: number[] | null;
 }
 
 /**
@@ -63,5 +64,6 @@ export const messageAttachmentInputSchema = z.object({
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   duration: z.number().int().positive().optional(),
+  peaks: z.array(z.number().min(0).max(1)).min(1).max(256).optional(),
 });
 export type MessageAttachmentInput = z.infer<typeof messageAttachmentInputSchema>;

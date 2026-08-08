@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 import { ApiError } from '../../api/client';
 import { uploadFile } from '../../api/files';
 import { Avatar } from '../../ui/Avatar';
+import { Icon } from '../../ui/Icon';
+import { IconButton } from '../../ui/IconButton';
 import { useChatStore } from '../../stores/chatStore';
 import styles from './GroupPanel.module.css';
 import { Modal } from './Modal';
@@ -13,7 +15,17 @@ interface GroupPanelProps {
   onClose: () => void;
 }
 
-/** Панель управления группой — участники/роли, название/аватар, выход, передача владения (этап 7). */
+/** «N участников» с русским склонением числительного. */
+function membersLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? 'участник' : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'участника' : 'участников';
+  return `${count} ${word}`;
+}
+
+/** Панель управления группой — участники/роли, название/аватар, выход, передача владения.
+ *  Своего экрана в референсе нет (CLAUDE.md, этап 6): расширение стеклянного языка,
+ *  утверждённого на этапах 0-5, а не буквальный перенос. */
 export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const members = useChatStore((s) => s.membersByChat[chatId]) ?? [];
@@ -159,7 +171,7 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
 
   return (
     <Modal title="Информация о группе" onClose={onClose}>
-      <div className={styles.avatarRow}>
+      <div className={styles.hero}>
         <button
           className={styles.avatarButton}
           type="button"
@@ -168,7 +180,12 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
           title={canManage ? 'Сменить аватар группы' : undefined}
           aria-label={canManage ? 'Сменить аватар группы' : undefined}
         >
-          <Avatar label={chat?.title ?? '?'} avatarUrl={chat?.avatarUrl} size={56} />
+          <Avatar label={chat?.title ?? '?'} avatarUrl={chat?.avatarUrl} size={88} colorKey={chatId} />
+          {canManage && (
+            <span className={styles.avatarEdit}>
+              <Icon name="camera" size={16} />
+            </span>
+          )}
         </button>
         {canManage && (
           <input
@@ -189,27 +206,36 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
               onChange={(e) => setTitleDraft(e.target.value)}
               autoFocus
             />
-            <button className={styles.saveButton} type="button" onClick={() => void handleTitleSave()} disabled={pendingAction === 'title'}>
-              Сохранить
+            <button
+              className={styles.saveButton}
+              type="button"
+              onClick={() => void handleTitleSave()}
+              disabled={pendingAction === 'title'}
+              aria-label="Сохранить название"
+            >
+              <Icon name="check" size={16} />
             </button>
           </div>
         ) : (
-          <span
-            className={styles.titleText}
+          <button
+            type="button"
+            className={styles.titleButton}
             onClick={() => canManage && setTitleEditing(true)}
-            style={canManage ? { cursor: 'pointer' } : undefined}
-            title={canManage ? 'Изменить название' : undefined}
+            disabled={!canManage}
           >
-            {chat?.title}
-          </span>
+            <span className={styles.titleText}>{chat?.title}</span>
+            {canManage && <Icon name="edit" size={14} className={styles.titleEditIcon} />}
+          </button>
         )}
+
+        <span className={styles.memberCount}>{membersLabel(members.length)}</span>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
 
       {canManage && (
-        <>
-          <p className={styles.sectionTitle}>Добавить участника</p>
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Добавить участника</h3>
           <form className={styles.addRow} onSubmit={(e) => void handleAddMember(e)}>
             <input
               className={styles.input}
@@ -217,81 +243,79 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
               value={usernameInput}
               onChange={(e) => setUsernameInput(e.target.value)}
             />
-            <button className={styles.addButton} type="submit" disabled={!usernameInput.trim() || pendingAction === 'add'}>
-              Добавить
-            </button>
+            <IconButton
+              icon="user-plus"
+              label="Добавить участника"
+              variant="primary"
+              type="submit"
+              disabled={!usernameInput.trim() || pendingAction === 'add'}
+            />
           </form>
-        </>
+        </section>
       )}
 
-      <p className={styles.sectionTitle}>Участники ({members.length})</p>
-      <div className={styles.members}>
-        {members.map((member) => {
-          const isSelf = member.userId === myUserId;
-          const canRemove = canManage && !isSelf && member.role !== 'OWNER';
-          const canToggleRole = isOwner && !isSelf && member.role !== 'OWNER';
-          const canTransfer = isOwner && !isSelf;
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Участники ({members.length})</h3>
+        <div className={styles.card}>
+          {members.map((member) => {
+            const isSelf = member.userId === myUserId;
+            const canRemove = canManage && !isSelf && member.role !== 'OWNER';
+            const canToggleRole = isOwner && !isSelf && member.role !== 'OWNER';
+            const canTransfer = isOwner && !isSelf;
 
-          return (
-            <div key={member.userId} className={styles.member}>
-              <Avatar label={member.displayName} avatarUrl={member.avatarUrl} size={40} />
-              <div className={styles.memberBody}>
-                <div className={styles.memberName}>
-                  {member.displayName}
-                  {isSelf && ' (вы)'}
+            return (
+              <div key={member.userId} className={styles.member}>
+                <Avatar label={member.displayName} avatarUrl={member.avatarUrl} size={40} color={member.avatarColor} />
+                <div className={styles.memberBody}>
+                  <span className={styles.memberName}>
+                    {member.displayName}
+                    {isSelf && ' (вы)'}
+                  </span>
+                  <span className={styles.memberRole}>
+                    {member.role === 'OWNER' ? 'Владелец' : member.role === 'ADMIN' ? 'Администратор' : 'Участник'}
+                  </span>
                 </div>
-                <div className={styles.memberRole}>
-                  {member.role === 'OWNER' ? 'Владелец' : member.role === 'ADMIN' ? 'Администратор' : 'Участник'}
+                <div className={styles.memberActions}>
+                  {canToggleRole && (
+                    <IconButton
+                      icon="shield"
+                      label={member.role === 'ADMIN' ? 'Снять администратора' : 'Назначить администратором'}
+                      size={18}
+                      className={member.role === 'ADMIN' ? styles.actionActive : undefined}
+                      disabled={pendingAction === member.userId}
+                      onClick={() => void handleToggleRole(member.userId, member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
+                    />
+                  )}
+                  {canTransfer && (
+                    <IconButton
+                      icon="crown"
+                      label="Передать права владельца"
+                      size={18}
+                      disabled={pendingAction === member.userId}
+                      onClick={() => void handleTransferOwnership(member.userId, member.username)}
+                    />
+                  )}
+                  {canRemove && (
+                    <IconButton
+                      icon={confirmRemove === member.userId ? 'check' : 'user-minus'}
+                      label={confirmRemove === member.userId ? 'Нажмите ещё раз, чтобы исключить' : 'Исключить'}
+                      variant="danger"
+                      size={18}
+                      disabled={pendingAction === member.userId}
+                      onClick={() => void handleRemove(member.userId)}
+                    />
+                  )}
                 </div>
               </div>
-              <div className={styles.memberActions}>
-                {canToggleRole && (
-                  <button
-                    className={styles.iconButton}
-                    type="button"
-                    title={member.role === 'ADMIN' ? 'Снять администратора' : 'Назначить администратором'}
-                    aria-label={member.role === 'ADMIN' ? 'Снять администратора' : 'Назначить администратором'}
-                    disabled={pendingAction === member.userId}
-                    onClick={() => void handleToggleRole(member.userId, member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
-                  >
-                    {member.role === 'ADMIN' ? '⭣' : '⭡'}
-                  </button>
-                )}
-                {canTransfer && (
-                  <button
-                    className={styles.iconButton}
-                    type="button"
-                    title="Передать права владельца"
-                    aria-label="Передать права владельца"
-                    disabled={pendingAction === member.userId}
-                    onClick={() => void handleTransferOwnership(member.userId, member.username)}
-                  >
-                    👑
-                  </button>
-                )}
-                {canRemove && (
-                  <button
-                    className={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                    type="button"
-                    title={confirmRemove === member.userId ? 'Нажмите ещё раз, чтобы исключить' : 'Исключить'}
-                    aria-label="Исключить"
-                    disabled={pendingAction === member.userId}
-                    onClick={() => void handleRemove(member.userId)}
-                  >
-                    {confirmRemove === member.userId ? '✓' : '✕'}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </section>
 
-      <div className={styles.footer}>
-        <button className={styles.leaveButton} type="button" onClick={() => void handleLeave()} disabled={pendingAction === 'leave'}>
-          {confirmLeave ? 'Точно покинуть группу?' : 'Покинуть группу'}
-        </button>
-      </div>
+      <button className={styles.leaveButton} type="button" onClick={() => void handleLeave()} disabled={pendingAction === 'leave'}>
+        <Icon name="logout" size={18} />
+        {confirmLeave ? 'Точно покинуть группу?' : 'Покинуть группу'}
+      </button>
     </Modal>
   );
 }

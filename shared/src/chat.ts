@@ -1,12 +1,9 @@
 import { z } from 'zod';
 
-import {
-  CHAT_TITLE_MAX_LENGTH,
-  MESSAGE_MAX_LENGTH,
-  MESSAGES_PAGE_SIZE,
-  REACTION_EMOJIS,
-} from './constants.js';
+import { CHAT_TITLE_MAX_LENGTH, MESSAGE_BATCH_LIMIT, MESSAGE_MAX_LENGTH, MESSAGES_PAGE_SIZE } from './constants.js';
+import { isSingleEmoji } from './emoji.js';
 import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto } from './files.js';
+import type { AvatarColor } from './user.js';
 
 export const createPrivateChatSchema = z.object({
   username: z.string().trim().toLowerCase().min(1, 'Укажите имя пользователя'),
@@ -51,13 +48,36 @@ export const messageDeleteSchema = z.object({
 });
 export type MessageDeleteInput = z.infer<typeof messageDeleteSchema>;
 
-/** Реакция — фиксированный набор эмодзи, повтор того же эмодзи снимает реакцию (тоггл). */
+/** Реакция — любой одиночный эмодзи из панели (этап 8), повтор того же снимает реакцию (тоггл). */
 export const messageReactSchema = z.object({
   chatId: z.string().min(1),
   messageId: z.number().int().positive(),
-  emoji: z.enum(REACTION_EMOJIS),
+  emoji: z.string().refine(isSingleEmoji, 'Недопустимый эмодзи'),
 });
 export type MessageReactInput = z.infer<typeof messageReactSchema>;
+
+/** Групповое удаление — мультивыбор, один запрос вместо цикла (этап 6, ux-ui/06). */
+export const messageDeleteBatchSchema = z.object({
+  chatId: z.string().min(1),
+  messageIds: z.array(z.number().int().positive()).min(1).max(MESSAGE_BATCH_LIMIT),
+});
+export type MessageDeleteBatchInput = z.infer<typeof messageDeleteBatchSchema>;
+
+/** Пересылка — одним запросом в один целевой чат, из мультивыбора или контекстного меню
+ *  одного сообщения (этап 6). */
+export const messageForwardSchema = z.object({
+  fromChatId: z.string().min(1),
+  toChatId: z.string().min(1),
+  messageIds: z.array(z.number().int().positive()).min(1).max(MESSAGE_BATCH_LIMIT),
+});
+export type MessageForwardInput = z.infer<typeof messageForwardSchema>;
+
+/** Закрепление — messageId=null снимает закреп. Одно закреплённое сообщение на чат (этап 6). */
+export const chatPinSchema = z.object({
+  chatId: z.string().min(1),
+  messageId: z.number().int().positive().nullable(),
+});
+export type ChatPinInput = z.infer<typeof chatPinSchema>;
 
 /** Создание группы — создатель становится OWNER, остальные резолвятся по @username в MEMBER
  *  (поиска пользователей по /users/search в этапе 7 ещё нет — только точное имя, как в приватном чате). */
@@ -107,6 +127,7 @@ export interface ChatMemberSummary {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarColor: AvatarColor;
   /** Онлайн-статус — не хранится здесь, вычисляется клиентом из user:presence поверх этого значения. */
   lastSeenAt: string;
 }
@@ -118,6 +139,7 @@ export interface GroupMemberDTO {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarColor: AvatarColor;
   role: GroupRole;
   joinedAt: string;
 }
@@ -146,6 +168,14 @@ export interface MessageReactionDto {
   userIds: string[];
 }
 
+/** Снимок оригинала при пересылке — только имя автора, содержимое показывает само
+ *  пересланное сообщение (этап 6). Тот же приём снимка, что и у MessageReplyPreviewDto:
+ *  переживает удаление оригинала. */
+export interface MessageForwardPreviewDto {
+  id: number;
+  senderName: string;
+}
+
 export interface MessageDto {
   id: number;
   chatId: string;
@@ -156,6 +186,7 @@ export interface MessageDto {
   attachment: AttachmentDto | null;
   replyToId: number | null;
   replyTo: MessageReplyPreviewDto | null;
+  forwardedFrom: MessageForwardPreviewDto | null;
   reactions: MessageReactionDto[];
   editedAt: string | null;
   deletedAt: string | null;
@@ -180,6 +211,9 @@ export interface ChatDto extends ChatListItemDto {
   members: ChatMemberSummary[];
   /** lastReadMessageId каждого участника — по нему клиент красит галочки прочтения на своих сообщениях. */
   readCursors: Record<string, number | null>;
+  /** Закреплённое сообщение чата, если есть (этап 6). Полный DTO, а не превью — баннер
+   *  показывает содержимое так же, как лента. */
+  pinnedMessage: MessageDto | null;
 }
 
 export interface ChatListResponse {

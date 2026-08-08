@@ -27,11 +27,12 @@ interface ChunkResult {
   file?: FileDto;
 }
 
-async function uploadChunk(sessionId: string, offset: number, chunk: Blob): Promise<ChunkResult> {
+async function uploadChunk(sessionId: string, offset: number, chunk: Blob, signal?: AbortSignal): Promise<ChunkResult> {
   const res = await apiFetch(`/api/files/upload/${sessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/octet-stream', [UPLOAD_OFFSET_HEADER]: String(offset) },
     body: chunk,
+    signal,
   });
   const data: unknown = await res.json().catch(() => null);
 
@@ -60,6 +61,7 @@ export async function uploadFile(
   file: File,
   purpose: UploadPurpose,
   onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadedFile> {
   const sha256Hex = await hashFile(file);
   const mimeType = file.type || 'application/octet-stream';
@@ -83,9 +85,10 @@ export async function uploadFile(
 
   let stuckStreak = 0;
   while (true) {
+    signal?.throwIfAborted();
     const end = Math.min(offset + chunkSize, file.size);
     const chunk = file.slice(offset, end);
-    const result = await uploadChunk(sessionId, offset, chunk);
+    const result = await uploadChunk(sessionId, offset, chunk, signal);
 
     stuckStreak = result.receivedBytes === offset ? stuckStreak + 1 : 0;
     if (stuckStreak > 3) throw new Error('Не удаётся синхронизировать загрузку с сервером');

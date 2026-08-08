@@ -37,6 +37,8 @@ export const ALLOWED_MIME_TYPES = [
   'audio/mpeg',
   'audio/ogg',
   'audio/wav',
+  'audio/webm',
+  'audio/mp4',
   'application/pdf',
   'application/zip',
   'text/plain',
@@ -57,6 +59,13 @@ export const UPLOAD_OFFSET_HEADER = 'x-upload-offset';
 /** Не больше стольки пикселей по длинной стороне у превью, снятого клиентом через canvas (секция 7). */
 export const THUMBNAIL_MAX_DIMENSION = 320;
 
-/** Быстрые реакции на сообщение — фиксированный набор, без произвольных emoji (этап 6). */
-export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
-export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+/** Дефолты быстрой панели реакций и двойного тапа (этап 8, ux-ui/08-emoji.md). Реакция
+ *  сама по себе больше не ограничена этим набором — любой эмодзи из панели годится
+ *  (см. messageReactSchema); это только первые 8 кнопок быстрой панели и клиентский
+ *  дефолт до появления своей настройки в UserSettingsDTO на этапе 11. */
+export const DEFAULT_QUICK_REACTIONS = ['❤️', '👍', '🔥', '😁', '😢', '🙏', '👏', '😱'] as const;
+export const DEFAULT_DOUBLE_TAP_REACTION = '❤️';
+
+/** Максимум сообщений в одной групповой операции (удалить/переслать разом, этап 6) —
+ *  тот же порядок величины, что и страница ленты. */
+export const MESSAGE_BATCH_LIMIT = MESSAGES_PAGE_SIZE;

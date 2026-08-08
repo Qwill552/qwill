@@ -1,8 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Icon, type IconName } from './Icon';
-import { Ripple } from './Ripple';
 import styles from './Menu.module.css';
 
 export interface MenuItem {
@@ -10,7 +9,10 @@ export interface MenuItem {
   label: string;
   icon?: IconName;
   danger?: boolean;
-  onSelect: () => void;
+  /** Не закрывать меню после выбора — например, чтобы сравнить несколько состояний подряд,
+   *  не открывая меню заново каждый раз. */
+  keepOpen?: boolean;
+  onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 interface MenuProps {
@@ -70,14 +72,13 @@ export function Menu({ anchor, items, onClose }: MenuProps) {
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.danger ? styles.danger : ''}`}
-            onClick={() => {
-              item.onSelect();
-              onClose();
+            onClick={(e) => {
+              item.onSelect(e);
+              if (!item.keepOpen) onClose();
             }}
           >
-            {item.icon && <Icon name={item.icon} size={20} className={styles.glyph} />}
+            {item.icon && <Icon name={item.icon} size={22} className={styles.glyph} />}
             <span className={styles.label}>{item.label}</span>
-            <Ripple />
           </button>
         ))}
       </div>

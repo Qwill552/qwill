@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "emoji-regex": "^10.3.0",
     "zod": "^4.4.3"
   }
 }

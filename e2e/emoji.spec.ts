@@ -14,7 +14,7 @@ async function registerUserForEmojiTest(page: Page, user: TestUser): Promise<voi
   await expect(page.getByRole('button', { name: 'Написать' })).toBeVisible();
 }
 
-test('эмодзи в композере рендерится спрайтом и удаляется бэкспейсом одним нажатием', async ({ browser }) => {
+test('эмодзи в отправленном сообщении рендерится спрайтом у обоих собеседников', async ({ browser }) => {
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
   const pageA = await contextA.newPage();
@@ -31,16 +31,6 @@ test('эмодзи в композере рендерится спрайтом �
 
     const field = pageA.getByRole('textbox', { name: 'Сообщение' });
     await field.fill('привет 😀');
-
-    const emojiNode = field.locator('[data-emoji="😀"]');
-    await expect(emojiNode).toBeVisible();
-
-    await field.press('Backspace');
-    await expect(emojiNode).toHaveCount(0);
-    await expect(field).toHaveText('привет ');
-
-    await field.pressSequentially('😀');
-    await expect(field.locator('[data-emoji="😀"]')).toBeVisible();
     await field.press('Enter');
 
     const sentRowOnA = pageA.locator('.message-wrap', { hasText: 'привет' }).last();

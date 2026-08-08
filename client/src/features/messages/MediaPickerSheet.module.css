@@ -1,0 +1,115 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.item {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fileTile {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  text-align: center;
+}
+
+.fileName {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-primary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--lift);
+  cursor: pointer;
+}
+
+.remove::before {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--scrim-bg);
+  content: '';
+}
+
+.remove svg {
+  position: relative;
+}
+
+.captionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.captionInput {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.captionInput:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.send {
+  display: grid;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--accent-from), var(--accent-to));
+  color: var(--lift);
+  cursor: pointer;
+}
+
+.send:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

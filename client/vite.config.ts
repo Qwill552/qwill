@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import mkcert from 'vite-plugin-mkcert';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +13,7 @@ export default defineConfig(() => {
   return {
     plugins: [
       react(),
+      mkcert(),
       VitePWA({
         // generateSW не даёт добавить свои push/notificationclick хендлеры — нужен свой sw.js (этап 9).
         strategies: 'injectManifest',
@@ -54,9 +56,12 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // Явный IPv4: на Windows `localhost` резолвится в ::1, и часть инструментов
-      // (и Capacitor-эмулятор) до dev-сервера не достучится.
-      host: '127.0.0.1',
+      // true = биндинг на все IPv4-интерфейсы (0.0.0.0), а не только на localhost/::1 —
+      // так же снимает старую проблему Windows (`localhost` резолвится в ::1, часть
+      // инструментов и Capacitor-эмулятор до дев-сервера не достучится: 127.0.0.1 как раз
+      // среди адресов, на которые слушает 0.0.0.0), и вдобавок открывает доступ с телефона
+      // и других устройств в той же LAN (см. CLAUDE.md, «Среда разработки (Windows)»).
+      host: true,
       port: 5173,
       strictPort: true,
     },

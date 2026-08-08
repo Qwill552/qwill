@@ -1,28 +1,41 @@
+/* Буквально из референса (строки 80-88): скрим — только зона клика-закрытия, ничего не
+ * затемняет и не размывает. Меню — стеклянная пластинка дока, не карточная поверхность
+ * старой системы токенов. */
+
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 300;
-  background: var(--scrim-bg);
-  backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
-  animation: fade var(--dur-menu) var(--ease-screen);
 }
 
 .menu {
   position: fixed;
   z-index: 301;
-  min-width: 180px;
-  max-width: min(280px, calc(100vw - var(--space-4) * 2));
-  padding: var(--space-1);
-  border: 1px solid var(--menu-border);
-  border-radius: var(--radius-md);
-  background: var(--menu-bg);
-  backdrop-filter: var(--menu-blur);
-  -webkit-backdrop-filter: var(--menu-blur);
-  box-shadow: var(--menu-shadow);
-  animation: pop var(--dur-menu) var(--ease-screen);
+  min-width: 198px;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--pulse-glass), 0.14);
+  background: rgb(var(--pulse-dock));
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  box-shadow:
+    0 24px 52px -18px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.16);
+  /* forwards обязателен: без него по окончании анимации все её свойства (opacity/transform/
+     pointer-events) откатываются к «авторским» значениям этого блока, а не к тем, что задал
+     последний ключевой кадр — pointer-events навсегда остался бы в 'none' из строки ниже. */
+  animation: menuIn 0.28s cubic-bezier(0.34, 1.4, 0.5, 1) forwards;
   /* Раскрывается от того угла, которым прижато к якорю. */
   transform-origin: var(--menu-origin, top left);
+  /* Пункт нажат до того, как transform выше долетел до состояния покоя — getBoundingClientRect()
+     пункта в этот момент возвращает координаты «в полёте» (translateY(-10px) scale(0.92) и
+     промежуточные точки), а не итоговые. Палец успевает долететь от кнопки-⋮ до пункта меню
+     быстрее, чем длится сам поп-ин (0.28s) — на практике это самый частый способ поймать
+     неверную точку кругового раскрытия темы (см. viewTransition.ts). pointer-events здесь —
+     единственный способ гарантировать, что клик по пункту произойдёт только тогда, когда его
+     геометрия уже равна финальной; наследуется всеми .item без отдельного правила на них. */
+  pointer-events: none;
 }
 
 .item {
@@ -30,60 +43,63 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--tap-min);
-  padding: 0 var(--space-3);
+  gap: 13px;
+  min-height: 44px;
+  padding: 11px 12px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 13px;
   background: transparent;
-  color: var(--text-primary);
+  color: rgb(var(--pulse-ink));
   font-family: inherit;
-  font-size: var(--font-name);
+  font-size: 14.5px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
+  transition: background 0.18s;
 }
 
 .item:hover {
-  background: var(--primary-soft);
+  background: rgba(var(--pulse-glass), 0.09);
 }
 
 .item:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid #4faaff;
   outline-offset: -2px;
 }
 
 .danger {
-  color: var(--danger);
+  color: #ff5d73;
 }
 
 .danger:hover {
-  background: var(--danger-soft);
+  background: rgba(255, 93, 115, 0.12);
 }
 
 .label {
-  position: relative;
-  z-index: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .glyph {
-  position: relative;
-  z-index: 1;
   flex-shrink: 0;
 }
 
-@keyframes fade {
+@keyframes menuIn {
   from {
     opacity: 0;
+    transform: translateY(-10px) scale(0.92);
+    pointer-events: none;
   }
-}
-
-@keyframes pop {
-  from {
-    transform: scale(0.92);
-    opacity: 0;
+  /* pointer-events нельзя интерполировать — браузер переключает его ровно посередине между
+     соседними ключевыми кадрами. 92%/100% держат «none» почти всю длительность анимации:
+     клик становится возможным только в последние ~4% (около 11ms из 280ms), когда transform
+     уже практически долетел до покоя. */
+  92% {
+    pointer-events: none;
+  }
+  to {
+    pointer-events: auto;
   }
 }

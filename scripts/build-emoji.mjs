@@ -1,0 +1,113 @@
+import { createRequire } from 'node:module';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import sharp from 'sharp';
+
+const require = createRequire(import.meta.url);
+
+const CELL = 64;
+const COLS = 32;
+
+const CATEGORY_LABELS = {
+  'Smileys & People': 'Смайлы и люди',
+  'Smileys & Emotion': 'Смайлы и люди',
+  'People & Body': 'Смайлы и люди',
+  'Animals & Nature': 'Животные',
+  'Food & Drink': 'Еда',
+  Activities: 'Активность',
+  Activity: 'Активность',
+  'Travel & Places': 'Путешествия',
+  Objects: 'Объекты',
+  Symbols: 'Символы',
+  Flags: 'Флаги',
+};
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const outDir = path.join(scriptDir, '..', 'client', 'public', 'emoji');
+
+function resolvePackageRoot() {
+  const packageJsonPath = require.resolve('emoji-datasource-apple/package.json');
+  return path.dirname(packageJsonPath);
+}
+
+function codepointsToChar(unified) {
+  const codepoints = unified.split('-').map((hex) => Number.parseInt(hex, 16));
+  return String.fromCodePoint(...codepoints);
+}
+
+async function main() {
+  const packageRoot = resolvePackageRoot();
+  const emojiJsonPath = path.join(packageRoot, 'emoji.json');
+  const imageDir = path.join(packageRoot, 'img', 'apple', String(CELL));
+
+  const raw = JSON.parse(await readFile(emojiJsonPath, 'utf8'));
+
+  const entries = raw
+    .filter((record) => record.has_img_apple && !record.obsoleted_by && record.category !== 'Component')
+    .map((record) => ({
+      unified: record.unified,
+      category: record.category,
+      sortOrder: record.sort_order,
+      keywords: Array.from(
+        new Set(
+          [record.short_name, ...(record.short_names ?? []), record.name]
+            .filter((v) => typeof v === 'string' && v.length > 0)
+            .map((v) => v.toLowerCase()),
+        ),
+      ),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (entries.length === 0) {
+    throw new Error('emoji.json не дал ни одной записи с has_img_apple — проверь версию emoji-datasource-apple');
+  }
+
+  const rows = Math.ceil(entries.length / COLS);
+  const categoryOrder = [];
+  const categoryIndex = new Map();
+  const composites = [];
+  const indexEmoji = [];
+
+  entries.forEach((entry, i) => {
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    composites.push({ input: path.join(imageDir, `${entry.unified.toLowerCase()}.png`), left: col * CELL, top: row * CELL });
+
+    const categoryLabel = CATEGORY_LABELS[entry.category] ?? entry.category ?? 'Прочее';
+    if (!categoryIndex.has(categoryLabel)) {
+      categoryIndex.set(categoryLabel, categoryOrder.length);
+      categoryOrder.push(categoryLabel);
+    }
+
+    indexEmoji.push({
+      e: codepointsToChar(entry.unified),
+      x: col,
+      y: row,
+      c: categoryIndex.get(categoryLabel),
+      k: entry.keywords,
+    });
+  });
+
+  await mkdir(outDir, { recursive: true });
+
+  await sharp({
+    create: { width: COLS * CELL, height: rows * CELL, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite(composites)
+    .webp({ quality: 92 })
+    .toFile(path.join(outDir, 'sheet.webp'));
+
+  const index = { cell: CELL, cols: COLS, rows, categories: categoryOrder, emoji: indexEmoji };
+  await writeFile(path.join(outDir, 'index.json'), JSON.stringify(index));
+
+  console.log(`Готово: ${entries.length} эмодзи, лист ${COLS}×${rows} ячеек по ${CELL}px → ${outDir}`);
+}
+
+main().catch((error) => {
+  console.error('Сборка эмодзи не удалась:', error);
+  console.error('Проверь, что npm install подтянул emoji-datasource-apple, и что структура');
+  console.error('img/apple/64/*.png и emoji.json в пакете совпадает с той, на которую рассчитан скрипт.');
+  process.exitCode = 1;
+});

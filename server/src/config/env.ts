@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,3 +70,32 @@ export const env = {
 } as const;
 
 export type Env = typeof env;
+
+const MKCERT_DIR = path.join(homedir(), '.vite-plugin-mkcert');
+const MKCERT_KEY_FILE = path.join(MKCERT_DIR, 'dev.pem');
+const MKCERT_CERT_FILE = path.join(MKCERT_DIR, 'cert.pem');
+
+export const devHttpsCredentials =
+  env.isDev && existsSync(MKCERT_KEY_FILE) && existsSync(MKCERT_CERT_FILE)
+    ? { key: readFileSync(MKCERT_KEY_FILE), cert: readFileSync(MKCERT_CERT_FILE) }
+    : null;
+
+/** Любой приватный LAN-адрес (192.168.*, 10.*, 172.16-31.*) на порту клиентского dev-сервера —
+ *  открыть dev-сайт с телефона в той же сети (см. CLAUDE.md, «Среда разработки (Windows)»).
+ *  Только для CLIENT_PORT из .env (дефолт 5173 в vite.config.ts), IP меняется по DHCP —
+ *  фиксировать его в CLIENT_ORIGIN пришлось бы вручную при каждой смене сети. */
+const PRIVATE_LAN_ORIGIN =
+  /^https?:\/\/(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):5173$/;
+
+/**
+ * Разрешён ли origin для CORS/Socket.io (`server/src/app.ts`, `server/src/realtime/index.ts`).
+ * Прод: точный список `clientOrigins`, без исключений. Dev: тот же список плюс любой origin
+ * из приватного LAN-диапазона — не нужно вручную дописывать CLIENT_ORIGIN при каждой смене IP.
+ * `origin === undefined` — запрос без заголовка Origin (curl, health-check, тот же origin) —
+ * пропускаем, как и раньше пропускал `cors()` с массивом (браузер CORS тут вообще не применяет).
+ */
+export function isAllowedClientOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (env.clientOrigins.includes(origin)) return true;
+  return env.isDev && PRIVATE_LAN_ORIGIN.test(origin);
+}

@@ -1,0 +1,106 @@
+/* Буквально из референса (карточки-группы на вкладках «Контакты»/«Настройки»/«Профиль»,
+   строки 151/167/199/238): стекло, размывает подложку, не едет вместе с ней. */
+
+.section {
+  margin: 0 var(--card-inset) var(--space-4);
+}
+
+.caption {
+  padding: 0 0 var(--space-2);
+  margin: 0;
+  color: var(--primary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+}
+
+.card {
+  overflow: hidden;
+  border: 1px solid rgba(var(--pulse-glass), 0.08);
+  border-radius: 22px;
+  background: rgba(var(--pulse-glass), 0.055);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--pulse-ink));
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+/* Разделитель между строками начинается там же, где текст, а не от края карточки —
+   иначе колонка иконок разрезается пополам. */
+.row + .row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--row-divider-inset, var(--space-3));
+  height: 1px;
+  background: rgba(var(--pulse-glass), 0.06);
+}
+
+.withIcon {
+  --row-divider-inset: calc(var(--space-3) + var(--icon-tile) + var(--space-3));
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.title {
+  overflow: hidden;
+  font-size: var(--font-name);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.danger .title {
+  color: var(--danger);
+}
+
+.subtitle {
+  overflow: hidden;
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  flex-shrink: 0;
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-meta);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: rgba(var(--pulse-ink), 0.3);
+}
+
+@media (hover: hover) {
+  .interactive:hover {
+    background: rgba(var(--pulse-glass), 0.05);
+  }
+}
+
+.interactive:active {
+  background: rgba(var(--pulse-glass), 0.05);
+}

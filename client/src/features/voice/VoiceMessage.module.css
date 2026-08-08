@@ -1,0 +1,87 @@
+.head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+  margin: -8px -12px 4px;
+  padding: 10px 14px;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+
+.playButton {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--text-on-out);
+  cursor: pointer;
+}
+
+.head.own .playButton {
+  background: var(--text-on-out);
+  color: var(--primary);
+}
+
+.wave {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.bar {
+  flex: 1;
+  min-width: 2px;
+  max-width: 3px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  transition: opacity var(--transition);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.duration {
+  flex-shrink: 0;
+  color: inherit;
+  font-feature-settings: 'tnum' 1;
+  font-size: 0.78em;
+  opacity: 0.75;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.dot.dotUnheard {
+  background: var(--primary);
+}
+
+.speedBtn {
+  flex-shrink: 0;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.75;
+}

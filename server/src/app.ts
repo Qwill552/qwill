@@ -4,7 +4,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 
-import { env } from './config/env.js';
+import { isAllowedClientOrigin } from './config/env.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
 import { generalLimiter } from './http/middleware/rateLimit.js';
 import { authRouter } from './http/routes/auth.js';
@@ -35,7 +35,7 @@ export function createApp(): Express {
   );
   app.use(
     cors({
-      origin: env.clientOrigins,
+      origin: (origin, callback) => callback(null, isAllowedClientOrigin(origin)),
       credentials: true,
     }),
   );

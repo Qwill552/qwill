@@ -1,133 +1,119 @@
-import type { ChatListItemDto } from '@messenger/shared';
-import { ApiError } from '../../api/client';
-import { type FormEvent, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 
-import { CreateGroupModal } from '../groups/CreateGroupModal';
 import { useChatStore } from '../../stores/chatStore';
-import { UserSearch } from '../users/UserSearch';
-import { Avatar } from '../../ui/Avatar';
+import { ScrollIndicator } from '../../ui/ScrollIndicator';
+import { Skeleton } from '../../ui/Skeleton';
+import { ChatRow } from './ChatRow';
+import type { ChatFilter } from './ChatFilters';
 import styles from './ChatList.module.css';
 import { EmptyState } from './EmptyState';
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+export interface ChatListHandle {
+  /** Тап по активной вкладке «Сообщения» в таб-баре — первый раз наверх (этап 2). */
+  scrollToTop: () => void;
+  /** Тап по активной вкладке второй раз подряд — к первому непрочитанному (этап 2). */
+  scrollToFirstUnread: () => void;
+  restoreScrollTop: (top: number) => void;
 }
 
-function lastMessagePreview(lastMessage: ChatListItemDto['lastMessage']): string {
-  if (!lastMessage) return 'Нет сообщений';
-  if (lastMessage.deletedAt) return 'Сообщение удалено';
-  if (lastMessage.content) return lastMessage.content;
-  if (lastMessage.attachment) return '📎 Вложение';
-  return 'Нет сообщений';
+interface ChatListProps {
+  /** Живой колбэк скролла — на unmount React уже обнуляет ref потомка раньше, чем
+   *  успевает отработать cleanup родительского эффекта, поэтому читать позицию
+   *  «в момент ухода» через ref ненадёжно; вызывающий обязан копить её сам (этап 2). */
+  onScroll?: (top: number) => void;
+  filter?: ChatFilter;
 }
 
-export function ChatList() {
+/** Буквально из референса (строка 112): сам список — отдельный скроллер под шапкой
+ *  (аватар/поиск/чипсы), а не общая прокрутка со всем экраном — шапка в нём не едет. */
+export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatList(
+  { onScroll, filter = 'all' },
+  ref,
+) {
   const chats = useChatStore((s) => s.chats);
-  const startPrivateChat = useChatStore((s) => s.startPrivateChat);
+  const chatsLoaded = useChatStore((s) => s.chatsLoaded);
+  const chatError = useChatStore((s) => s.chatError);
+  const loadChats = useChatStore((s) => s.loadChats);
   const presenceByUser = useChatStore((s) => s.presenceByUser);
-  const navigate = useNavigate();
+  const typingByChat = useChatStore((s) => s.typingByChat);
+  const myUserId = useChatStore((s) => s.myUserId);
+  const listRef = useRef<HTMLElement>(null);
 
-  const [username, setUsername] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [createGroupOpen, setCreateGroupOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  useImperativeHandle(ref, () => ({
+    scrollToTop() {
+      listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    scrollToFirstUnread() {
+      listRef.current?.querySelector<HTMLElement>('[data-unread="true"]')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    },
+    restoreScrollTop(top) {
+      if (listRef.current) listRef.current.scrollTop = top;
+    },
+  }));
 
-  async function handleStartChat(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    const value = username.trim();
-    if (!value) return;
+  const visible = useMemo(() => {
+    if (filter === 'unread') return chats.filter((c) => c.unreadCount > 0);
+    if (filter === 'private') return chats.filter((c) => c.type === 'PRIVATE');
+    if (filter === 'groups') return chats.filter((c) => c.type === 'GROUP');
+    return chats;
+  }, [chats, filter]);
 
-    setPending(true);
-    setError(null);
-    try {
-      const chat = await startPrivateChat(value);
-      setUsername('');
-      navigate(`/chats/${chat.id}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось начать чат');
-    } finally {
-      setPending(false);
-    }
-  }
+  const loading = !chatsLoaded && chats.length === 0;
 
   return (
-    <div className={styles.sidebar}>
-      <form className={styles.newChat} onSubmit={(e) => void handleStartChat(e)}>
-        <input
-          className={styles.input}
-          placeholder="@username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <button className={styles.newChatButton} type="submit" disabled={pending}>
-          Написать
-        </button>
-      </form>
-      <div className={styles.actionsRow}>
-        <button className={styles.newGroupButton} type="button" onClick={() => setCreateGroupOpen(true)}>
-          + Новая группа
-        </button>
-        <button className={styles.newGroupButton} type="button" onClick={() => setSearchOpen(true)}>
-          🔍 Найти
-        </button>
-      </div>
-      {error && <p className={styles.error}>{error}</p>}
+    <nav
+      className={`${styles.list} hide-native-scrollbar`}
+      ref={listRef}
+      onScroll={onScroll ? (e) => onScroll(e.currentTarget.scrollTop) : undefined}
+    >
+      <ScrollIndicator target={listRef} />
 
-      {createGroupOpen && (
-        <CreateGroupModal
-          onClose={() => setCreateGroupOpen(false)}
-          onCreated={(chatId) => {
-            setCreateGroupOpen(false);
-            navigate(`/chats/${chatId}`);
-          }}
-        />
+      {chatError && (
+        <div className={styles.error} role="alert">
+          <span>{chatError}</span>
+          <button type="button" className={styles.retry} onClick={() => void loadChats()}>
+            Повторить
+          </button>
+        </div>
       )}
 
-      {searchOpen && (
-        <UserSearch
-          onClose={() => setSearchOpen(false)}
-          onOpenChat={(chatId) => {
-            setSearchOpen(false);
-            navigate(`/chats/${chatId}`);
-          }}
-        />
+      {loading &&
+        Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className={styles.skeletonRow}>
+            <Skeleton width={54} height={54} circle />
+            <div className={styles.skeletonBody}>
+              <Skeleton width="45%" height={14} />
+              <Skeleton width="70%" height={12} />
+            </div>
+          </div>
+        ))}
+
+      {!loading && visible.length === 0 && (
+        <div className={styles.empty}>
+          {chats.length === 0 ? (
+            <EmptyState
+              title="Пока нет чатов"
+              subtitle="Нажмите «Написать», чтобы найти человека и начать переписку"
+            />
+          ) : (
+            <EmptyState title="Ничего не подходит" subtitle="В этом фильтре пока пусто" />
+          )}
+        </div>
       )}
 
-      <nav className={styles.list}>
-        {chats.length === 0 && (
-          <EmptyState
-            title="Пока нет чатов"
-            subtitle="Введите @username выше, чтобы написать первому и начать переписку"
-          />
-        )}
-        {chats.map((chat) => {
-          const online = chat.otherMember ? (presenceByUser[chat.otherMember.id]?.online ?? false) : false;
-
-          return (
-            <NavLink
-              key={chat.id}
-              to={`/chats/${chat.id}`}
-              className={({ isActive }) => `${styles.item} ${isActive ? styles.itemActive : ''}`}
-            >
-              <Avatar label={chat.title} avatarUrl={chat.avatarUrl} size={52} online={online} />
-              <div className={styles.itemBody}>
-                <div className={styles.itemTop}>
-                  <span className={styles.itemTitle}>{chat.title}</span>
-                  {chat.lastMessage && (
-                    <span className={styles.itemTime}>{formatTime(chat.lastMessage.createdAt)}</span>
-                  )}
-                </div>
-                <div className={styles.itemBottom}>
-                  <p className={styles.itemPreview}>{lastMessagePreview(chat.lastMessage)}</p>
-                  {chat.unreadCount > 0 && <span className={styles.badge}>{chat.unreadCount}</span>}
-                </div>
-              </div>
-            </NavLink>
-          );
-        })}
-      </nav>
-    </div>
+      {visible.map((chat, index) => (
+        <ChatRow
+          key={chat.id}
+          chat={chat}
+          myUserId={myUserId}
+          online={chat.otherMember ? (presenceByUser[chat.otherMember.id]?.online ?? false) : false}
+          typingNames={(typingByChat[chat.id] ?? []).map((u) => u.displayName)}
+          index={index}
+        />
+      ))}
+    </nav>
   );
-}
+});

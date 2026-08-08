@@ -1,0 +1,68 @@
+/* Прозрачны нарочно: канвас (сплошная заливка + анимированные «капли») рисует
+   AmbientBlobs один раз под стеком в AppShell — экраны едут по нему полупрозрачными
+   слоями, а не перекрывают его каждый своей заливкой. */
+
+.stack {
+  position: absolute;
+  overflow: hidden;
+  inset: 0;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* Буквально slideR/slideL из референса: переключение вкладки — вход новой вкладки с
+   отступом 76px, без анимации уходящей (референс её вообще не рисует — sc-if размонтирует
+   мгновенно). */
+.tabForward {
+  animation: tabSlideForward 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tabBack {
+  animation: tabSlideBack 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes tabSlideForward {
+  from {
+    transform: translateX(76px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes tabSlideBack {
+  from {
+    transform: translateX(-76px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Притемнение корня под открытым вложенным экраном — непрозрачный слой поверх контента,
+   а не `filter:brightness()` на самом слое (см. комментарий у scrimStyle в ScreenStack.tsx):
+   так не расплющивает на каждый кадр вложенные compositing-слои с backdrop-filter. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  /* Выше любой хромы внутри экрана (шапка/композер — z-index 4) — притемнение обязано
+     закрывать весь корень целиком, как и прежний filter:brightness() на всём слое. */
+  z-index: 10;
+  background: #000;
+  pointer-events: none;
+}
+
+.edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 5;
+  width: 32px;
+  touch-action: pan-y;
+}

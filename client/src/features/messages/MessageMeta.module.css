@@ -1,0 +1,38 @@
+/* Время, «изм.» и галочки — буквально строка 333 референса: абсолютом в правом нижнем
+   углу текста, а не обтеканием. Якорь — .textRow в MessageBubble (высотой по тексту,
+   а не по всему пузырю — см. её комментарий), поэтому 0/0, а не 12px/7px буквально:
+   те смещения в референсе считаны от пузыря, здесь их уже даёт padding пузыря. */
+
+.meta {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* На исходящем пузыре вторичный цвет утонул бы в градиенте. */
+.onOut {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.edited {
+  font-style: italic;
+}
+
+.check {
+  margin-left: 1px;
+}
+
+.pending {
+  opacity: 0.7;
+}
+
+.failed {
+  color: var(--danger);
+}
