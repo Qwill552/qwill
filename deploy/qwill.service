@@ -1,0 +1,19 @@
+[Unit]
+Description=Qwill server
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=qwill
+Group=qwill
+WorkingDirectory=/var/www/message/current
+EnvironmentFile=/var/www/message/shared/.env
+ExecStart=/usr/bin/node server/dist/index.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
