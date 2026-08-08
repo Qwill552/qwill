@@ -53,7 +53,7 @@ interface VoiceMessageProps {
 }
 
 export function VoiceMessage({ attachment, own, createdAt, edited, status, read }: VoiceMessageProps) {
-  const src = useFileSrc(attachment.file.id);
+  const src = useFileSrc(attachment.file.id, 'full');
   const audioRef = useRef<HTMLAudioElement>(null);
   const waveRef = useRef<HTMLDivElement>(null);
 

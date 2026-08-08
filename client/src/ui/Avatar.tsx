@@ -43,7 +43,7 @@ export function Avatar({
   className,
 }: AvatarProps) {
   const fileId = avatarUrl ? fileIdFromUrl(avatarUrl) : null;
-  const src = useFileSrc(fileId);
+  const src = useFileSrc(fileId, 'thumb');
 
   return (
     <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>

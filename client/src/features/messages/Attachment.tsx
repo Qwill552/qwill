@@ -26,8 +26,8 @@ export function AttachmentView({ attachment }: { attachment: AttachmentDto }) {
   const isVideo = attachment.file.mimeType.startsWith('video/');
 
   const thumbFileId = attachment.thumbnail?.id ?? (isImage ? attachment.file.id : null);
-  const thumbSrc = useFileSrc(thumbFileId);
-  const fileSrc = useFileSrc(isImage ? null : attachment.file.id);
+  const thumbSrc = useFileSrc(thumbFileId, 'thumb');
+  const fileSrc = useFileSrc(isImage ? null : attachment.file.id, 'stream');
 
   const aspectRatio = attachment.width && attachment.height ? `${attachment.width} / ${attachment.height}` : undefined;
 

@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
 
+import { resolveMedia } from '../cache/mediaCache';
 import { buildFileSrc, fetchFileToken } from './files';
 
-// Токен живёт час на сервере — кэш на вкладку, чтобы не дёргать /token на каждый ре-рендер (секция 7).
+export type FileSrcTier = 'thumb' | 'full' | 'stream';
+
 const tokenCache = new Map<string, string>();
 
-/** Резолвит fileId в src для <img>/<video> через короткоживущий токен — Bearer-заголовок им не передать. */
-export function useFileSrc(fileId: string | null | undefined): string | undefined {
-  const [src, setSrc] = useState<string | undefined>(() => {
-    if (!fileId) return undefined;
-    const cached = tokenCache.get(fileId);
-    return cached ? buildFileSrc(fileId, cached) : undefined;
-  });
+async function resolveStreamUrl(fileId: string): Promise<string | undefined> {
+  const cached = tokenCache.get(fileId);
+  if (cached) return buildFileSrc(fileId, cached);
+
+  try {
+    const token = await fetchFileToken(fileId);
+    tokenCache.set(fileId, token);
+    return buildFileSrc(fileId, token);
+  } catch {
+    return undefined;
+  }
+}
+
+export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier = 'full'): string | undefined {
+  const [src, setSrc] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!fileId) {
@@ -19,25 +29,26 @@ export function useFileSrc(fileId: string | null | undefined): string | undefine
       return;
     }
 
-    const cached = tokenCache.get(fileId);
-    if (cached) {
-      setSrc(buildFileSrc(fileId, cached));
-      return;
-    }
-
     let cancelled = false;
-    fetchFileToken(fileId)
-      .then((token) => {
-        if (cancelled) return;
-        tokenCache.set(fileId, token);
-        setSrc(buildFileSrc(fileId, token));
-      })
-      .catch(() => undefined);
+    let objectUrl: string | undefined;
+
+    if (tier === 'stream') {
+      void resolveStreamUrl(fileId).then((url) => {
+        if (!cancelled) setSrc(url);
+      });
+    } else {
+      void resolveMedia(fileId, tier).then((blob) => {
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      });
+    }
 
     return () => {
       cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [fileId]);
+  }, [fileId, tier]);
 
   return src;
 }

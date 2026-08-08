@@ -16,7 +16,7 @@ import styles from './ChatInfoScreen.module.css';
 
 function MediaThumb({ attachment }: { attachment: AttachmentDto }) {
   const thumbId = attachment.thumbnail?.id ?? attachment.file.id;
-  const src = useFileSrc(thumbId);
+  const src = useFileSrc(thumbId, 'thumb');
   return <img className={styles.mediaThumb} src={src} alt={attachment.originalName} loading="lazy" />;
 }
 
