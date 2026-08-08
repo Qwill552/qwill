@@ -46,6 +46,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Без ключей push.ts отключает уведомления и тесты пушей падают. Произвольную строку
+      # подставить нельзя: тесты без мока web-push поднимают настоящий setVapidDetails,
+      # который отвергнет ключ неправильной длины и уронит весь прогон.
+      - name: Generate throwaway VAPID keys
+        run: |
+          node -e "const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey)" >> "$GITHUB_ENV"
+
       # server и client резолвят @messenger/shared через dist/ (package.json "main"/"exports") —
       # без сборки типы и рантайм-импорты не находятся (секция 1 project-design.md).
       - name: Build shared package
