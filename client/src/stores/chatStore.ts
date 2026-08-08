@@ -39,6 +39,7 @@ import {
 } from '../api/chats';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
+import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { getSocket } from '../realtime/socket';
 
 export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
@@ -102,6 +103,7 @@ interface ChatState {
   openChat: (chatId: string) => Promise<void>;
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
+  syncChatMessages: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
   loadMembers: (chatId: string) => Promise<void>;
@@ -291,6 +293,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messagesByChat: { ...state.messagesByChat, [chatId]: [...page.messages, ...current] },
       hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
     }));
+  },
+
+  async syncChatMessages(chatId) {
+    const result = await syncChat(chatId);
+    if (!result) return;
+
+    set((state) => {
+      const current = state.messagesByChat[chatId];
+      if (!current) return {};
+      return {
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: mergeSyncedMessages(current, result.created, result.changed) as LocalMessage[],
+        },
+      };
+    });
   },
 
   async startPrivateChat(username) {
@@ -805,6 +823,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [event.userId]: { online: event.online, lastSeenAt: event.lastSeenAt },
         },
       }));
+    });
+
+    socket.off('connect').on('connect', () => {
+      socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
+      const activeChatId = get().activeChatId;
+      void syncAllCachedChats().then(() => {
+        if (activeChatId) void get().syncChatMessages(activeChatId);
+      });
     });
   },
 

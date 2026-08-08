@@ -6,6 +6,7 @@ import type {
   CreatePrivateChatInput,
   GroupMemberDTO,
   MessagesPage,
+  MessagesSyncResponse,
   UpdateGroupInput,
   UpdateRoleInput,
 } from '@messenger/shared';
@@ -31,6 +32,16 @@ export function createGroupRequest(input: CreateGroupInput): Promise<ChatDto> {
 export function getMessagesRequest(chatId: string, before?: number): Promise<MessagesPage> {
   const query = before !== undefined ? `?before=${before}` : '';
   return apiRequest<MessagesPage>(`/api/chats/${chatId}/messages${query}`);
+}
+
+export function syncMessagesRequest(
+  chatId: string,
+  sinceId: number,
+  sinceUpdatedAt: string | null,
+): Promise<MessagesSyncResponse> {
+  const params = new URLSearchParams({ sinceId: String(sinceId) });
+  if (sinceUpdatedAt) params.set('sinceUpdatedAt', sinceUpdatedAt);
+  return apiRequest<MessagesSyncResponse>(`/api/chats/${chatId}/sync?${params.toString()}`);
 }
 
 export function updateGroupRequest(chatId: string, input: UpdateGroupInput): Promise<ChatUpdatedEvent> {
