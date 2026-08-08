@@ -12,7 +12,7 @@ ln -sfn "$ROOT/shared/storage" "$RELEASE/storage"
 
 cd "$RELEASE"
 npm ci
-npx prisma migrate deploy --schema server/prisma/schema.prisma
+npm run db:deploy -w @messenger/server
 
 chown -R qwill:qwill "$RELEASE"
 
