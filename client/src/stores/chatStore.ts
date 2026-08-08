@@ -38,6 +38,7 @@ import {
   updateMemberRoleRequest,
 } from '../api/chats';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
+import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import { getSocket } from '../realtime/socket';
 
 export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
@@ -222,6 +223,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedIds: new Set(),
 
   async loadChats() {
+    if (!get().chatsLoaded) {
+      const cached = await readCachedChats();
+      if (cached.length > 0 && !get().chatsLoaded) {
+        set((state) => {
+          let presenceByUser = state.presenceByUser;
+          for (const chat of cached) {
+            if (chat.otherMember) presenceByUser = seedPresence(presenceByUser, [chat.otherMember]);
+          }
+          return { chats: cached, presenceByUser };
+        });
+      }
+    }
+
     const { chats } = await listChatsRequest();
     set((state) => {
       let presenceByUser = state.presenceByUser;
@@ -230,6 +244,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return { chats, chatsLoaded: true, presenceByUser };
     });
+    void writeCachedChats(chats);
   },
 
   async openChat(chatId) {
@@ -244,11 +259,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     if (!get().messagesByChat[chatId]) {
+      const cached = await readCachedMessages(chatId);
+      if (cached.length > 0 && !get().messagesByChat[chatId]) {
+        set((state) => ({ messagesByChat: { ...state.messagesByChat, [chatId]: cached } }));
+      }
+
       const page = await getMessagesRequest(chatId);
       set((state) => ({
         messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
       }));
+      void writeCachedMessages(page.messages);
     }
 
     const messages = get().messagesByChat[chatId] ?? [];
@@ -852,6 +873,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
       return { ...state, chats: upsertChat(state.chats, updatedChat) };
     });
+
+    void writeCachedMessages([message]);
 
     const state = get();
     if (state.activeChatId === message.chatId && message.sender?.id !== state.myUserId && message.id > 0) {
