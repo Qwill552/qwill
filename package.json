@@ -16,9 +16,10 @@
     "predev": "npm run build -w @messenger/shared",
     "dev": "concurrently -k -n shared,server,client -c gray,magenta,cyan \"npm run dev -w @messenger/shared\" \"npm run dev -w @messenger/server\" \"npm run dev -w @messenger/client\"",
     "build": "npm run build -w @messenger/shared && npm run build -w @messenger/server && npm run build -w @messenger/client",
+    "build:emoji": "node scripts/build-emoji.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -30,7 +31,9 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "concurrently": "^10.0.4",
+    "emoji-datasource-apple": "^15.1.2",
     "eslint": "^10.8.0",
+    "sharp": "^0.34.5",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
@@ -38,6 +41,7 @@
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
     "esbuild@0.28.1": true,
-    "prisma@7.9.1": true
+    "prisma@7.9.1": true,
+    "sharp@0.34.5": true
   }
 }

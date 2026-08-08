@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/coverage/**',
       'server/src/generated/**',
       'legacy/**',
+      'design-archive/**',
     ],
   },
   js.configs.recommended,
@@ -27,6 +28,12 @@ export default tseslint.config(
     files: ['client/src/sw.js'],
     languageOptions: {
       globals: { self: 'readonly' },
+    },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly' },
     },
   },
 );
