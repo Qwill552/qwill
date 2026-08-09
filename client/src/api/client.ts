@@ -19,6 +19,13 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  constructor() {
+    super('Нет соединения с сервером');
+    this.name = 'NetworkError';
+  }
+}
+
 /** Токен живёт только в памяти вкладки — не в localStorage (секция 4). */
 let accessToken: string | null = null;
 export function setAccessToken(token: string | null): void {
@@ -39,15 +46,20 @@ interface RequestOptions {
 }
 
 async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? 'GET',
-    credentials: 'include',
-    headers: {
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? 'GET',
+      credentials: 'include',
+      headers: {
+        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new NetworkError();
+  }
 
   if (res.status === 204) return undefined as T;
 
