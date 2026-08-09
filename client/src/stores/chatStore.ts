@@ -39,7 +39,7 @@ import {
 } from '../api/chats';
 import { NetworkError } from '../api/client';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
-import { openCacheDb } from '../cache/db';
+import { openCacheDb, type OutboxAttachment } from '../cache/db';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import {
   bumpAttempts,
@@ -209,6 +209,24 @@ const uploadAbortControllers = new Map<string, AbortController>();
 
 function typingKey(chatId: string, userId: string): string {
   return `${chatId}:${userId}`;
+}
+
+function attachmentKind(mimeType: string, hasPeaks: boolean): LocalAttachmentKind {
+  if (hasPeaks) return 'voice';
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  return 'file';
+}
+
+function outboxAttachmentToLocalAttachment(attachment: OutboxAttachment): LocalAttachmentState {
+  const kind = attachmentKind(attachment.mimeType, attachment.peaks !== null);
+  return {
+    kind,
+    previewUrl: kind === 'image' || kind === 'video' ? URL.createObjectURL(attachment.blob) : undefined,
+    name: attachment.fileName,
+    size: attachment.blob.size,
+    progress: 0,
+  };
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -462,13 +480,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket) return;
 
     const clientId = crypto.randomUUID();
-    const kind: LocalAttachmentKind = options.peaks
-      ? 'voice'
-      : file.type.startsWith('image/')
-        ? 'image'
-        : file.type.startsWith('video/')
-          ? 'video'
-          : 'file';
+    const kind = attachmentKind(file.type, Boolean(options.peaks));
     const previewUrl = kind === 'image' || kind === 'video' ? URL.createObjectURL(file) : undefined;
     const replyTo = options.replyTo;
 
@@ -613,6 +625,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       uploadAbortControllers.delete(clientId);
       if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof NetworkError) return;
       get().updateLocalAttachment(chatId, clientId, {
         error: error instanceof Error ? error.message : 'Не удалось загрузить файл',
       });
@@ -712,6 +725,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const list = get().messagesByChat[entry.chatId];
       if (!list || list.some((m) => m.clientId === entry.clientId)) continue;
 
+      const localAttachment = entry.attachment ? outboxAttachmentToLocalAttachment(entry.attachment) : undefined;
+
       const restored: LocalMessage = {
         id: -entry.createdAt,
         chatId: entry.chatId,
@@ -728,6 +743,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         deletedAt: null,
         createdAt: new Date(entry.createdAt).toISOString(),
         status: 'sending',
+        localAttachment,
       };
 
       set((state) => ({

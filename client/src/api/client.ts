@@ -88,7 +88,12 @@ export async function apiFetch(
   const headers = new Headers(rest.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
-  const res = await fetch(`${API_URL}${path}`, { ...rest, credentials: 'include', headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...rest, credentials: 'include', headers });
+  } catch {
+    throw new NetworkError();
+  }
 
   if (res.status === 401 && !skipAuthRetry && refreshHandler) {
     const refreshed = await refreshHandler();

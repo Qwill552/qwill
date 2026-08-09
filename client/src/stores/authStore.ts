@@ -132,3 +132,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 window.addEventListener('online', () => {
   void useAuthStore.getState().refreshWhenOnline();
 });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void useAuthStore.getState().refreshWhenOnline();
+});
