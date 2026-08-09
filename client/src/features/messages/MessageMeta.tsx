@@ -29,6 +29,7 @@ export function MessageMeta({ createdAt, own, edited, status, read }: MessageMet
     <span className={classes}>
       {edited && <span className={styles.edited}>изм.</span>}
       {status === 'failed' ? 'не отправлено' : formatTime(createdAt)}
+      {own && status === 'sending' && <Icon name="clock" size={13} className={styles.check} />}
       {own && status === 'sent' && (
         <Icon name={read ? 'check-double' : 'check'} size={13} className={styles.check} />
       )}
