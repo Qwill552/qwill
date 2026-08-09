@@ -39,8 +39,16 @@ import {
 } from '../api/chats';
 import { NetworkError } from '../api/client';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
+import { openCacheDb } from '../cache/db';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
-import { bumpAttempts, dequeueOutbox, enqueueOutbox, MAX_OUTBOX_ATTEMPTS, readOutbox } from '../cache/outbox';
+import {
+  bumpAttempts,
+  dequeueOutbox,
+  enqueueOutbox,
+  MAX_OUTBOX_ATTEMPTS,
+  outboxAttachmentToFile,
+  readOutbox,
+} from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { getSocket } from '../realtime/socket';
 
@@ -58,12 +66,6 @@ export interface LocalAttachmentState {
 /** Локальное расширение сообщения статусом оптимистичной отправки и черновиком вложения
  *  до подтверждения сервером — на сервер не уходит (этап 7, ux-ui/07-composer.md). */
 export type LocalMessage = MessageDto & { status?: 'sending' | 'failed'; localAttachment?: LocalAttachmentState };
-
-interface PendingUpload {
-  file: File;
-  duration?: number;
-  peaks?: number[];
-}
 
 interface PresenceInfo {
   online: boolean;
@@ -152,6 +154,7 @@ interface ChatState {
   stopTyping: (chatId: string) => void;
   subscribeToSocket: (myUserId: string) => void;
   drainOutbox: () => Promise<void>;
+  restoreOutboxMessages: () => Promise<void>;
   reset: () => void;
   /** Внутренний метод: применяет message:new и ack от message:send по одной логике реконсиляции. */
   applyIncomingMessage: (message: MessageDto) => void;
@@ -202,8 +205,6 @@ function seedPresence(
 // Таймеры автогашения «печатает» — вне стора, ключ `${chatId}:${userId}` (секция 3: TYPING_TIMEOUT_MS).
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-// File нельзя держать в сериализуемом состоянии стора — только вне него, ключ clientId (этап 7).
-const pendingUploads = new Map<string, PendingUpload>();
 const uploadAbortControllers = new Map<string, AbortController>();
 
 function typingKey(chatId: string, userId: string): string {
@@ -257,6 +258,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { chats, chatsLoaded: true, presenceByUser };
     });
     void writeCachedChats(chats);
+    void get().restoreOutboxMessages();
   },
 
   async openChat(chatId) {
@@ -276,6 +278,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const cached = await readCachedMessages(chatId);
       if (cached.length > 0 && !get().messagesByChat[chatId]) {
         set((state) => ({ messagesByChat: { ...state.messagesByChat, [chatId]: cached } }));
+        void get().restoreOutboxMessages();
       }
 
       try {
@@ -285,6 +288,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
         }));
         void writeCachedMessages(page.messages);
+        void get().restoreOutboxMessages();
       } catch (error) {
         if (!(error instanceof NetworkError)) throw error;
         return;
@@ -495,8 +499,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       localAttachment: { kind, previewUrl, name: file.name, size: file.size, progress: 0 },
     };
 
-    pendingUploads.set(clientId, { file, duration: options.duration, peaks: options.peaks });
-
     set((state) => ({
       messagesByChat: {
         ...state.messagesByChat,
@@ -504,12 +506,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    void get().runAttachmentUpload(chatId, clientId);
+    void enqueueOutbox({
+      clientId,
+      chatId,
+      content: options.caption || null,
+      replyToId: replyTo?.id ?? null,
+      attachment: {
+        blob: file,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        duration: options.duration ?? null,
+        peaks: options.peaks ?? null,
+      },
+      createdAt: Date.now(),
+      attempts: 0,
+    }).then(() => get().runAttachmentUpload(chatId, clientId));
   },
 
   async runAttachmentUpload(chatId, clientId) {
-    const pending = pendingUploads.get(clientId);
-    if (!pending) return;
+    const db = await openCacheDb();
+    const entry = await db?.get('outbox', clientId);
+    if (!entry?.attachment) return;
+
+    const file = outboxAttachmentToFile(entry.attachment);
+    const duration = entry.attachment.duration ?? undefined;
+    const peaks = entry.attachment.peaks ?? undefined;
 
     const controller = new AbortController();
     uploadAbortControllers.set(clientId, controller);
@@ -524,7 +545,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
-      const { file, duration, peaks } = pending;
       const isImage = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
 
@@ -582,7 +602,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         (ack: MessageSendAck) => {
           uploadAbortControllers.delete(clientId);
           if (ack.ok && ack.message) {
-            pendingUploads.delete(clientId);
+            void dequeueOutbox(clientId);
             get().applyIncomingMessage(ack.message);
             return;
           }
@@ -603,7 +623,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   cancelAttachmentUpload(chatId, clientId) {
     uploadAbortControllers.get(clientId)?.abort();
     uploadAbortControllers.delete(clientId);
-    pendingUploads.delete(clientId);
+    void dequeueOutbox(clientId);
 
     set((state) => {
       const list = state.messagesByChat[chatId];
@@ -619,7 +639,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!message || message.status !== 'failed') return;
 
     if (message.localAttachment) {
-      if (pendingUploads.has(clientId)) void get().runAttachmentUpload(chatId, clientId);
+      void get().runAttachmentUpload(chatId, clientId);
       return;
     }
 
@@ -653,7 +673,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket?.connected) return;
 
     for (const entry of await readOutbox()) {
-      if (entry.attachment) continue;
+      if (entry.attachment) {
+        const attempts = await bumpAttempts(entry.clientId);
+        if (attempts > MAX_OUTBOX_ATTEMPTS) {
+          get().setMessageFailed(entry.chatId, entry.clientId);
+          continue;
+        }
+        void get().runAttachmentUpload(entry.chatId, entry.clientId);
+        continue;
+      }
 
       const attempts = await bumpAttempts(entry.clientId);
       if (attempts > MAX_OUTBOX_ATTEMPTS) {
@@ -676,6 +704,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         },
       );
+    }
+  },
+
+  async restoreOutboxMessages() {
+    for (const entry of await readOutbox()) {
+      const list = get().messagesByChat[entry.chatId];
+      if (!list || list.some((m) => m.clientId === entry.clientId)) continue;
+
+      const restored: LocalMessage = {
+        id: -entry.createdAt,
+        chatId: entry.chatId,
+        clientId: entry.clientId,
+        sender: null,
+        type: entry.attachment ? 'MEDIA' : 'TEXT',
+        content: entry.content,
+        attachment: null,
+        replyToId: entry.replyToId,
+        replyTo: null,
+        forwardedFrom: null,
+        reactions: [],
+        editedAt: null,
+        deletedAt: null,
+        createdAt: new Date(entry.createdAt).toISOString(),
+        status: 'sending',
+      };
+
+      set((state) => ({
+        messagesByChat: {
+          ...state.messagesByChat,
+          [entry.chatId]: [...(state.messagesByChat[entry.chatId] ?? []), restored],
+        },
+      }));
     }
   },
 
@@ -899,7 +959,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     typingTimers.clear();
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
-    pendingUploads.clear();
     for (const list of Object.values(get().messagesByChat)) {
       for (const message of list) {
         if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);

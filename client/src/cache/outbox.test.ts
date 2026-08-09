@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clearAllCache, type OutboxEntry } from './db';
-import { bumpAttempts, dequeueOutbox, enqueueOutbox, nextRetryDelayMs, readOutbox } from './outbox';
+import { bumpAttempts, dequeueOutbox, enqueueOutbox, nextRetryDelayMs, outboxAttachmentToFile, readOutbox } from './outbox';
 
 function entry(clientId: string, createdAt: number): OutboxEntry {
   return {
@@ -45,5 +45,19 @@ describe('outbox', () => {
   it('наращивает паузу между повторами и упирается в потолок', () => {
     expect(nextRetryDelayMs(1)).toBeLessThan(nextRetryDelayMs(3));
     expect(nextRetryDelayMs(99)).toBe(nextRetryDelayMs(100));
+  });
+
+  it('восстанавливает File из записи очереди', () => {
+    const file = outboxAttachmentToFile({
+      blob: new Blob(['данные']),
+      fileName: 'voice.webm',
+      mimeType: 'audio/webm',
+      duration: 1200,
+      peaks: [1, 2, 3],
+    });
+
+    expect(file.name).toBe('voice.webm');
+    expect(file.type).toBe('audio/webm');
+    expect(file.size).toBeGreaterThan(0);
   });
 });

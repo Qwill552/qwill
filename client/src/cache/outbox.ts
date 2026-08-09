@@ -1,4 +1,4 @@
-import { openCacheDb, type OutboxEntry } from './db';
+import { openCacheDb, type OutboxAttachment, type OutboxEntry } from './db';
 
 export const MAX_OUTBOX_ATTEMPTS = 8;
 
@@ -40,4 +40,8 @@ export async function bumpAttempts(clientId: string): Promise<number> {
   const attempts = entry.attempts + 1;
   await db.put('outbox', { ...entry, attempts });
   return attempts;
+}
+
+export function outboxAttachmentToFile(attachment: OutboxAttachment): File {
+  return new File([attachment.blob], attachment.fileName, { type: attachment.mimeType });
 }
