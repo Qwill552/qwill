@@ -37,6 +37,7 @@ import {
   updateGroupRequest,
   updateMemberRoleRequest,
 } from '../api/chats';
+import { NetworkError } from '../api/client';
 import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import { bumpAttempts, dequeueOutbox, enqueueOutbox, MAX_OUTBOX_ATTEMPTS, readOutbox } from '../cache/outbox';
@@ -240,7 +241,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
-    const { chats } = await listChatsRequest();
+    let chats: ChatListItemDto[];
+    try {
+      ({ chats } = await listChatsRequest());
+    } catch (error) {
+      if (error instanceof NetworkError) return;
+      throw error;
+    }
+
     set((state) => {
       let presenceByUser = state.presenceByUser;
       for (const chat of chats) {
@@ -257,9 +265,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const chat = await getChatRequest(chatId);
       get().applyChatDetail(chat);
-    } catch {
-      set({ chatError: 'Чат не найден или недоступен' });
-      return;
+    } catch (error) {
+      if (!(error instanceof NetworkError)) {
+        set({ chatError: 'Чат не найден или недоступен' });
+        return;
+      }
     }
 
     if (!get().messagesByChat[chatId]) {
@@ -268,12 +278,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((state) => ({ messagesByChat: { ...state.messagesByChat, [chatId]: cached } }));
       }
 
-      const page = await getMessagesRequest(chatId);
-      set((state) => ({
-        messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
-        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-      }));
-      void writeCachedMessages(page.messages);
+      try {
+        const page = await getMessagesRequest(chatId);
+        set((state) => ({
+          messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
+          hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
+        }));
+        void writeCachedMessages(page.messages);
+      } catch (error) {
+        if (!(error instanceof NetworkError)) throw error;
+        return;
+      }
     }
 
     const messages = get().messagesByChat[chatId] ?? [];
