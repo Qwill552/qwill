@@ -1,8 +1,11 @@
 import { clientsClaim } from 'workbox-core';
-import { precacheAndRoute } from 'workbox-precaching';
+import { createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
 
 // Список файлов для прекэша подставляет vite-plugin-pwa при сборке (self.__WB_MANIFEST).
 precacheAndRoute(self.__WB_MANIFEST);
+
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
 
 // В dev новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный билд всем
 // уже открытым вкладкам, пока их не закрыть все разом, — выглядит так, будто правки не
