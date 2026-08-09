@@ -51,6 +51,7 @@ import {
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { getSocket } from '../realtime/socket';
+import { useAuthStore } from './authStore';
 
 export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
 
@@ -721,6 +722,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async restoreOutboxMessages() {
+    const me = useAuthStore.getState().user;
+
     for (const entry of await readOutbox()) {
       const list = get().messagesByChat[entry.chatId];
       if (!list || list.some((m) => m.clientId === entry.clientId)) continue;
@@ -731,7 +734,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: -entry.createdAt,
         chatId: entry.chatId,
         clientId: entry.clientId,
-        sender: null,
+        sender: me,
         type: entry.attachment ? 'MEDIA' : 'TEXT',
         content: entry.content,
         attachment: null,
