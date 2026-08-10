@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
+import { countPendingOutbox } from '../cache/outbox';
+import { Modal } from '../features/groups/Modal';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -51,6 +53,8 @@ export function SettingsScreen() {
   const nameRef = useRef<HTMLSpanElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingOutboxCount, setPendingOutboxCount] = useState<number | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
@@ -70,6 +74,17 @@ export function SettingsScreen() {
   }
 
   async function handleLogout(): Promise<void> {
+    const pending = await countPendingOutbox();
+    if (pending > 0) {
+      setPendingOutboxCount(pending);
+      return;
+    }
+    await confirmLogout();
+  }
+
+  async function confirmLogout(): Promise<void> {
+    setLoggingOut(true);
+    setPendingOutboxCount(null);
     await logout();
     navigate('/login', { replace: true });
   }
@@ -182,9 +197,41 @@ export function SettingsScreen() {
         </Card>
 
         <Card className={styles.cardReset}>
-          <Card.Row icon="logout" tint="red" title="Выйти из аккаунта" danger onClick={() => void handleLogout()} />
+          <Card.Row
+            icon="logout"
+            tint="red"
+            title="Выйти из аккаунта"
+            danger
+            onClick={() => !loggingOut && void handleLogout()}
+          />
         </Card>
       </div>
+
+      {pendingOutboxCount != null && (
+        <Modal title="Выйти из аккаунта" onClose={() => setPendingOutboxCount(null)}>
+          <p className={styles.confirmText}>
+            В очереди осталось неотправленных сообщений: {pendingOutboxCount}. Если выйти, они будут удалены.
+          </p>
+          <div className={styles.confirmActions}>
+            <button
+              className={styles.stayButton}
+              type="button"
+              onClick={() => setPendingOutboxCount(null)}
+              disabled={loggingOut}
+            >
+              Остаться
+            </button>
+            <button
+              className={styles.discardButton}
+              type="button"
+              onClick={() => void confirmLogout()}
+              disabled={loggingOut}
+            >
+              Выйти и удалить
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clearAllCache, type OutboxEntry } from './db';
-import { bumpAttempts, dequeueOutbox, enqueueOutbox, nextRetryDelayMs, outboxAttachmentToFile, readOutbox } from './outbox';
+import {
+  bumpAttempts,
+  countPendingOutbox,
+  dequeueOutbox,
+  enqueueOutbox,
+  nextRetryDelayMs,
+  outboxAttachmentToFile,
+  readOutbox,
+} from './outbox';
 
 function entry(clientId: string, createdAt: number): OutboxEntry {
   return {
@@ -40,6 +48,14 @@ describe('outbox', () => {
 
     expect(await bumpAttempts('a')).toBe(1);
     expect(await bumpAttempts('a')).toBe(2);
+  });
+
+  it('считает неотправленное в очереди', async () => {
+    expect(await countPendingOutbox()).toBe(0);
+
+    await enqueueOutbox(entry('a', 100));
+
+    expect(await countPendingOutbox()).toBe(1);
   });
 
   it('наращивает паузу между повторами и упирается в потолок', () => {

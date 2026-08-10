@@ -30,6 +30,13 @@ export async function readOutbox(): Promise<OutboxEntry[]> {
   return await db.getAllFromIndex('outbox', 'byCreatedAt');
 }
 
+export async function countPendingOutbox(): Promise<number> {
+  const db = await openCacheDb();
+  if (!db) return 0;
+
+  return await db.count('outbox');
+}
+
 export async function bumpAttempts(clientId: string): Promise<number> {
   const db = await openCacheDb();
   if (!db) return 0;

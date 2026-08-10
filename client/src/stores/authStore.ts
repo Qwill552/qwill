@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
 import { NetworkError, setAccessToken, setRefreshHandler } from '../api/client';
 import { getSettingsRequest } from '../api/users';
+import { clearAllCache } from '../cache/db';
 import { clearOfflineProfile, readOfflineProfile, saveOfflineProfile } from '../cache/offlineProfile';
 import { subscribeToPush, unsubscribePush } from '../realtime/push';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
@@ -49,10 +50,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
     subscribeToPush().catch(() => undefined);
   }
 
-  function clearAuth(): void {
+  async function clearAuth(): Promise<void> {
     setAccessToken(null);
     clearOfflineProfile();
     disconnectSocket();
+    await clearAllCache();
     useChatStore.getState().reset();
     set({ user: null, status: 'anonymous', isOfflineSession: false });
     // Иначе следующий пользователь на этом же устройстве получал бы пуши по чужой подписке (этап 9).
@@ -75,7 +77,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       return true;
     } catch (error) {
       if (error instanceof NetworkError && applyOfflineProfile()) return true;
-      clearAuth();
+      await clearAuth();
       return false;
     }
   });
@@ -95,7 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     async logout() {
       await logoutRequest().catch(() => undefined);
-      clearAuth();
+      await clearAuth();
     },
 
     bootstrap() {
@@ -106,7 +108,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             applyAuth(await refreshRequest());
           } catch (error) {
             if (error instanceof NetworkError && applyOfflineProfile()) return;
-            clearAuth();
+            await clearAuth();
           }
         })();
       }
@@ -119,7 +121,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         applyAuth(await refreshRequest());
       } catch (error) {
-        if (!(error instanceof NetworkError)) clearAuth();
+        if (!(error instanceof NetworkError)) await clearAuth();
       }
     },
 

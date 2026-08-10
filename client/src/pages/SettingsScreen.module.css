@@ -97,3 +97,49 @@
     background: rgba(var(--pulse-glass), 0.05);
   }
 }
+
+.confirmText {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+  line-height: 1.4;
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.stayButton,
+.discardButton {
+  flex: 1;
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+.stayButton {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.discardButton {
+  background: var(--danger);
+  color: var(--text-on-primary);
+}
+
+.stayButton:disabled,
+.discardButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.stayButton:focus-visible,
+.discardButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
