@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
 import { AppRouter } from './app/AppRouter';
+import { registerServiceWorker } from './app/serviceWorker';
 import { useAuthStore } from './stores/authStore';
 
 /**
@@ -14,6 +15,7 @@ export function App() {
 
   useEffect(() => {
     void bootstrap();
+    void registerServiceWorker();
   }, [bootstrap]);
 
   if (status === 'idle' || status === 'loading') {

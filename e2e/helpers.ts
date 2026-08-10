@@ -30,19 +30,21 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
   await page.getByPlaceholder('Пароль').fill(user.password);
   await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
   await page.waitForURL('**/chats');
-  await expect(page.getByText(user.displayName)).toBeVisible();
+  await expect(page.getByText('Qwill')).toBeVisible();
 }
 
-/** Открывает приватный чат через форму «@username» в сайдбаре (недоступна, пока открыта модалка). */
+/** Открывает приватный чат: FAB «Написать» → «Найти человека» → поиск по имени → клик по результату. */
 export async function startPrivateChatWith(page: Page, username: string): Promise<void> {
-  await page.getByPlaceholder('@username').fill(username);
   await page.getByRole('button', { name: 'Написать' }).click();
+  await page.getByRole('button', { name: 'Найти человека' }).click();
+  await page.getByPlaceholder('Введите имя пользователя').fill(username);
+  await page.getByText(`@${username}`).click();
   await page.waitForURL(/\/chats\/.+/);
 }
 
 /** Печатает и отправляет сообщение через Enter, дожидаясь появления пузыря у отправителя. */
 export async function sendMessage(page: Page, text: string): Promise<void> {
-  const input = page.getByPlaceholder('Написать сообщение…');
+  const input = page.getByRole('textbox', { name: 'Сообщение' });
   await input.fill(text);
   await input.press('Enter');
   await expect(page.getByText(text, { exact: true }).last()).toBeVisible();

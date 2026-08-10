@@ -2,20 +2,25 @@ import { clientsClaim } from 'workbox-core';
 import { createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 
-// Список файлов для прекэша подставляет vite-plugin-pwa при сборке (self.__WB_MANIFEST).
+// Режим определяется по URL регистрации (serviceWorker.ts ставит /dev-sw.js?dev-sw в dev), а не по
+// import.meta.env.DEV: service worker собирается отдельным проходом, в котором DEV истинен
+// и в продакшен-сборке.
+const isDevServiceWorker = self.location.search.includes('dev-sw');
+
+// Список файлов для прекэша подставляет vite-plugin-pwa при сборке (self.__WB_MANIFEST) — в dev
+// он всегда пуст, поэтому createHandlerBoundToURL('index.html') там упал бы на несуществующей
+// прекэш-записи. Офлайн на dev-сервере не поддерживается в принципе (CLAUDE.md: не hot-reload,
+// не unbundled-модули Vite), так что в dev маршрут навигации просто не регистрируется.
 precacheAndRoute(self.__WB_MANIFEST);
 
-registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
+if (!isDevServiceWorker) {
+  registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
+}
 
 // В dev новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный билд всем
 // уже открытым вкладкам, пока их не закрыть все разом, — выглядит так, будто правки не
 // применяются вообще. В проде ожидание нужно: именно оно даёт возможность спросить
 // пользователя, а обновление применяется по команде из UpdateBanner.
-// Режим определяется по URL регистрации (push.ts ставит /dev-sw.js?dev-sw в dev), а не по
-// import.meta.env.DEV: service worker собирается отдельным проходом, в котором DEV истинен
-// и в продакшен-сборке.
-const isDevServiceWorker = self.location.search.includes('dev-sw');
-
 if (isDevServiceWorker) {
   self.skipWaiting();
   clientsClaim();

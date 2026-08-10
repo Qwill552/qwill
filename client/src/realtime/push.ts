@@ -1,4 +1,5 @@
 import { subscribePushRequest, unsubscribePushRequest } from '../api/push';
+import { registerServiceWorker } from '../app/serviceWorker';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
@@ -29,11 +30,7 @@ export async function subscribeToPush(): Promise<void> {
     const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
     if (permission !== 'granted') return;
 
-    // В dev vite-plugin-pwa (injectManifest) не собирает /sw.js — self.__WB_MANIFEST некуда подставить
-    // без реальной сборки, поэтому в dev он отдаёт shim /dev-sw.js?dev-sw, который сам импортирует src/sw.js.
-    // register() идемпотентен — повторный вызов при каждом логине переиспользует уже установленный SW.
-    const swUrl = import.meta.env.DEV ? '/dev-sw.js?dev-sw' : '/sw.js';
-    await navigator.serviceWorker.register(swUrl, { type: import.meta.env.DEV ? 'module' : 'classic' });
+    await registerServiceWorker();
     const registration = await navigator.serviceWorker.ready;
     const existing = await registration.pushManager.getSubscription();
     const subscription =

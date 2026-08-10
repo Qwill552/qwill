@@ -125,7 +125,7 @@ interface ChatState {
     sender: PublicUser,
     attachment?: MessageAttachmentInput,
     replyTo?: MessageDto,
-  ) => void;
+  ) => Promise<void>;
   /** Вложение — оптимистичный пузырь с локальным превью появляется сразу, а не после ack
    *  (этап 7): file уходит на загрузку в фоне, прогресс и ошибка живут в localAttachment. */
   sendAttachmentMessage: (
@@ -133,7 +133,7 @@ interface ChatState {
     sender: PublicUser,
     file: File,
     options?: { caption?: string; replyTo?: MessageDto; duration?: number; peaks?: number[] },
-  ) => void;
+  ) => Promise<void>;
   /** Отмена во время загрузки — убирает оптимистичный пузырь целиком, а не переводит в failed. */
   cancelAttachmentUpload: (chatId: string, clientId: string) => void;
   /** Повтор после обрыва сети — тот же clientId, сервер дедуплицирует (секция 3). */
@@ -405,7 +405,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ kickedChatId: null });
   },
 
-  sendMessage(chatId, content, sender, attachment, replyTo) {
+  async sendMessage(chatId, content, sender, attachment, replyTo) {
     const socket = getSocket();
     const clientId = crypto.randomUUID();
     const optimistic: LocalMessage = {
@@ -436,14 +436,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       status: 'sending',
     };
 
-    set((state) => ({
-      messagesByChat: {
-        ...state.messagesByChat,
-        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
-      },
-    }));
-
-    void enqueueOutbox({
+    await enqueueOutbox({
       clientId,
       chatId,
       content: content || null,
@@ -452,6 +445,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       createdAt: Date.now(),
       attempts: 0,
     });
+
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
+      },
+    }));
 
     if (!socket) return;
 
@@ -476,7 +476,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     );
   },
 
-  sendAttachmentMessage(chatId, sender, file, options = {}) {
+  async sendAttachmentMessage(chatId, sender, file, options = {}) {
     const socket = getSocket();
     if (!socket) return;
 
@@ -512,14 +512,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       localAttachment: { kind, previewUrl, name: file.name, size: file.size, progress: 0 },
     };
 
-    set((state) => ({
-      messagesByChat: {
-        ...state.messagesByChat,
-        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
-      },
-    }));
-
-    void enqueueOutbox({
+    await enqueueOutbox({
       clientId,
       chatId,
       content: options.caption || null,
@@ -533,7 +526,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
       createdAt: Date.now(),
       attempts: 0,
-    }).then(() => get().runAttachmentUpload(chatId, clientId));
+    });
+
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
+      },
+    }));
+
+    void get().runAttachmentUpload(chatId, clientId);
   },
 
   async runAttachmentUpload(chatId, clientId) {

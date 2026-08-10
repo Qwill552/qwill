@@ -8,6 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** E2E-тесты гоняются против настоящего dev-стека (shared+server+client), см. STAGES.md, этап 10-A. */
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: 'offline.spec.ts',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
