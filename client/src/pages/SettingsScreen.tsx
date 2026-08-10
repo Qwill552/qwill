@@ -208,7 +208,7 @@ export function SettingsScreen() {
       </div>
 
       {pendingOutboxCount != null && (
-        <Modal title="Выйти из аккаунта" onClose={() => setPendingOutboxCount(null)}>
+        <Modal title="Выйти из аккаунта" onClose={() => setPendingOutboxCount(null)} opaque>
           <p className={styles.confirmText}>
             В очереди осталось неотправленных сообщений: {pendingOutboxCount}. Если выйти, они будут удалены.
           </p>

@@ -10,10 +10,11 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  opaque?: boolean;
 }
 
 /** Общая карточка-оверлей для модалок группы (создание, панель управления) — своего reusable-модала в проекте ещё не было. */
-export function Modal({ title, onClose, children }: ModalProps) {
+export function Modal({ title, onClose, children, opaque }: ModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   useBackHandler(true, onClose);
 
@@ -31,7 +32,13 @@ export function Modal({ title, onClose, children }: ModalProps) {
 
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>
-      <div ref={cardRef} className={`${styles.card} hide-native-scrollbar`} role="dialog" aria-modal="true" aria-label={title}>
+      <div
+        ref={cardRef}
+        className={`${styles.card} ${opaque ? styles.opaque : ''} hide-native-scrollbar`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <ScrollIndicator target={cardRef} />
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>

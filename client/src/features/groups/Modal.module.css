@@ -27,6 +27,12 @@
   animation: popIn var(--transition);
 }
 
+.opaque {
+  background: var(--card-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .header {
   display: flex;
   align-items: center;
