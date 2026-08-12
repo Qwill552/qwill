@@ -123,9 +123,16 @@ export const updateGroupSchema = z.object({
 });
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 
+export const startCallSchema = z.object({
+  kind: z.enum(['AUDIO', 'VIDEO']),
+});
+export type StartCallInput = z.infer<typeof startCallSchema>;
+
 export type ChatType = 'PRIVATE' | 'GROUP';
-export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM';
+export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM' | 'CALL';
 export type GroupRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+export type CallKind = 'AUDIO' | 'VIDEO';
+export type CallStatus = 'RINGING' | 'ACTIVE' | 'ENDED' | 'MISSED' | 'DECLINED';
 
 /** Участник чата — облегчённая проекция User, без приватных полей. */
 export interface ChatMemberSummary {
@@ -243,4 +250,27 @@ export interface MessageSendAck {
   ok: boolean;
   message?: MessageDto;
   error?: { code: string; message: string };
+}
+
+export interface CallParticipantDto {
+  user: ChatMemberSummary;
+  joinedAt: string | null;
+  leftAt: string | null;
+}
+
+export interface CallDto {
+  id: string;
+  chatId: string;
+  initiator: ChatMemberSummary | null;
+  kind: CallKind;
+  status: CallStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  participants: CallParticipantDto[];
+}
+
+export interface CallAccessDto {
+  call: CallDto;
+  token: string;
+  url: string;
 }

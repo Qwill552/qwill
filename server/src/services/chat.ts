@@ -14,7 +14,7 @@ type ChatWithRelations = Chat & {
   messages: MessageWithRelations[];
 };
 
-function toMemberSummary(
+export function toMemberSummary(
   user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'avatarColor' | 'lastSeenAt'>,
 ): ChatMemberSummary {
   return {

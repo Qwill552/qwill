@@ -41,6 +41,10 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:admin@messenger.local'),
+
+  LIVEKIT_URL: z.string().min(1, 'LIVEKIT_URL обязателен'),
+  LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
+  LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),
 });
 
 const parsed = envSchema.safeParse(process.env);

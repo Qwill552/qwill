@@ -26,6 +26,20 @@ enum MessageType {
   TEXT
   MEDIA
   SYSTEM
+  CALL
+}
+
+enum CallKind {
+  AUDIO
+  VIDEO
+}
+
+enum CallStatus {
+  RINGING
+  ACTIVE
+  ENDED
+  MISSED
+  DECLINED
 }
 
 model User {
@@ -52,14 +66,16 @@ model User {
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
-  sessions          Session[]
-  memberships       ChatMember[]
-  messages          Message[]
-  reactions         Reaction[]
-  createdChats      Chat[]             @relation("ChatCreatedBy")
-  pushSubscriptions PushSubscription[]
-  uploadSessions    UploadSession[]
-  uploadedFiles     File[]             @relation("FileUploadedBy")
+  sessions           Session[]
+  memberships        ChatMember[]
+  messages           Message[]
+  reactions          Reaction[]
+  createdChats       Chat[]             @relation("ChatCreatedBy")
+  pushSubscriptions  PushSubscription[]
+  uploadSessions     UploadSession[]
+  uploadedFiles      File[]             @relation("FileUploadedBy")
+  calls              Call[]
+  callParticipations CallParticipant[]
 }
 
 model Session {
@@ -106,6 +122,7 @@ model Chat {
 
   members  ChatMember[]
   messages Message[]
+  calls    Call[]
 }
 
 model ChatMember {
@@ -145,6 +162,9 @@ model Message {
   type    MessageType @default(TEXT)
   content String?
 
+  callId String?
+  call   Call?   @relation(fields: [callId], references: [id], onDelete: SetNull)
+
   replyToId Int?
   replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[] @relation("MessageReply")
@@ -161,9 +181,9 @@ model Message {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
 
-  attachments Attachment[]
-  reactions   Reaction[]
-  pinnedInChats Chat[] @relation("ChatPinnedMessage")
+  attachments   Attachment[]
+  reactions     Reaction[]
+  pinnedInChats Chat[]       @relation("ChatPinnedMessage")
 
   @@index([chatId, id])
   @@index([senderId])
@@ -274,4 +294,41 @@ model UploadSession {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Call {
+  id String @id @default(cuid(2))
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  initiatorId String?
+  initiator   User?   @relation(fields: [initiatorId], references: [id], onDelete: SetNull)
+
+  kind   CallKind   @default(AUDIO)
+  status CallStatus @default(RINGING)
+
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  participants CallParticipant[]
+  messages     Message[]
+
+  @@index([chatId, status])
+}
+
+model CallParticipant {
+  id String @id @default(cuid(2))
+
+  callId String
+  call   Call   @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime?
+  leftAt   DateTime?
+
+  @@unique([callId, userId])
 }
