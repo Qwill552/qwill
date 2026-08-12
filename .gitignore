@@ -14,6 +14,9 @@ legacy/uploads/
 storage/
 uploads/
 
+infra/livekit/certs/
+infra/livekit/.env
+
 server/src/generated/
 
 .vite/
