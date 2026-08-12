@@ -1,4 +1,4 @@
-import type { GroupMemberDTO, GroupRole, MessageDto, MessageReactionDto } from './chat.js';
+import type { CallAccessDto, CallDto, CallKind, GroupMemberDTO, GroupRole, MessageDto, MessageReactionDto } from './chat.js';
 
 /** Имена socket-событий — общий словарь для сервера и клиента (секция 3). */
 export const SocketEvent = {
@@ -24,6 +24,13 @@ export const SocketEvent = {
   ChatUpdated: 'chat:updated',
   MemberChanged: 'member:changed',
   VisibilityChange: 'visibility:change',
+  CallStart: 'call:start',
+  CallInvite: 'call:invite',
+  CallAccept: 'call:accept',
+  CallDecline: 'call:decline',
+  CallLeave: 'call:leave',
+  CallEnded: 'call:ended',
+  CallParticipantChanged: 'call:participantChanged',
 } as const;
 
 export type SocketEvent = (typeof SocketEvent)[keyof typeof SocketEvent];
@@ -120,3 +127,32 @@ export type MemberChangedEvent =
   | { type: 'removed'; chatId: string; userId: string }
   | { type: 'role'; chatId: string; userId: string; role: GroupRole }
   | { type: 'left'; chatId: string; userId: string };
+
+export interface CallStartPayload {
+  chatId: string;
+  kind: CallKind;
+}
+
+export interface CallActionPayload {
+  callId: string;
+}
+
+export interface CallStartAck {
+  ok: boolean;
+  access?: CallAccessDto;
+  error?: { code: string; message: string };
+}
+
+export type CallAcceptAck = CallStartAck;
+
+export interface CallInviteEvent {
+  call: CallDto;
+}
+
+export interface CallEndedEvent {
+  call: CallDto;
+}
+
+export interface CallParticipantChangedEvent {
+  call: CallDto;
+}

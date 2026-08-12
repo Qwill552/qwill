@@ -41,6 +41,7 @@ import {
   sendMessage,
 } from '../services/message.js';
 import { getUserById } from '../services/user.js';
+import { registerCallHandlers } from './call-handlers.js';
 import { presenceStore } from './presence.js';
 import { messageRateLimiter } from './rateLimit.js';
 
@@ -76,6 +77,10 @@ export async function unsubscribeUserFromChat(userId: string, chatId: string): P
 
 export function emitToUser(userId: string, event: string, payload: unknown): void {
   io?.to(userRoom(userId)).emit(event, payload);
+}
+
+export function emitToChatExcept(chatId: string, userId: string, event: string, payload: unknown): void {
+  io?.to(chatId).except(userRoom(userId)).emit(event, payload);
 }
 
 /**
@@ -448,6 +453,8 @@ export function createSocketServer(httpServer: HttpServer | HttpsServer): Socket
     socket.on(SocketEvent.VisibilityChange, (payload: VisibilityPayload) => {
       presenceStore.setVisibility(userId, socket.id, payload?.visible === true);
     });
+
+    registerCallHandlers(socket, userId);
 
     socket.on('disconnect', (reason) => {
       logger.debug({ socketId: socket.id, reason }, 'Сокет отключён');

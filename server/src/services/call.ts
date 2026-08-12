@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { notFound } from '../lib/errors.js';
 import { assertMember, toMemberSummary } from './chat.js';
+import { messageInclude } from './message.js';
 import type { Call, CallParticipant, User } from '../generated/prisma/client.js';
 
 const TOKEN_TTL = '6h';
@@ -124,6 +125,8 @@ export async function endCall(input: { callId: string; userId: string; status: C
   const call = await getCallOrThrow(input.callId);
   await assertMember(call.chatId, input.userId);
 
+  if (!ACTIVE_STATUSES.includes(call.status)) return toCallDto(call);
+
   const now = new Date();
   const updated = await prisma.call.update({
     where: { id: call.id },
@@ -133,6 +136,17 @@ export async function endCall(input: { callId: string; userId: string; status: C
       participants: { updateMany: { where: { leftAt: null }, data: { leftAt: now } } },
     },
     include: callWithRelations,
+  });
+
+  await prisma.message.create({
+    data: {
+      chatId: updated.chatId,
+      senderId: updated.initiatorId,
+      type: 'CALL',
+      callId: updated.id,
+      clientId: `call:${updated.id}`,
+    },
+    include: messageInclude,
   });
 
   return toCallDto(updated);
@@ -146,4 +160,16 @@ export async function getActiveCall(chatId: string, userId: string): Promise<Cal
     include: callWithRelations,
   });
   return call ? toCallDto(call) : null;
+}
+
+export async function getCall(callId: string): Promise<CallDto> {
+  return toCallDto(await getCallOrThrow(callId));
+}
+
+export async function getLiveCallsForParticipant(userId: string): Promise<CallDto[]> {
+  const calls = await prisma.call.findMany({
+    where: { status: { in: ACTIVE_STATUSES }, participants: { some: { userId, leftAt: null } } },
+    include: callWithRelations,
+  });
+  return calls.map(toCallDto);
 }
