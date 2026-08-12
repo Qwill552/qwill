@@ -1,4 +1,7 @@
 import type {
+  CallEndedEvent,
+  CallInviteEvent,
+  CallParticipantChangedEvent,
   ChatDto,
   ChatListItemDto,
   ChatMemberSummary,
@@ -52,6 +55,7 @@ import {
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
+import { useCallStore } from './callStore';
 
 export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
 
@@ -964,6 +968,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     });
+
+    socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
+      useCallStore.getState().applyInvite(event.call);
+    });
+
+    socket.off(SocketEvent.CallEnded).on(SocketEvent.CallEnded, (event: CallEndedEvent) => {
+      useCallStore.getState().applyEnded(event.call);
+    });
+
+    socket
+      .off(SocketEvent.CallParticipantChanged)
+      .on(SocketEvent.CallParticipantChanged, (event: CallParticipantChangedEvent) => {
+        useCallStore.getState().applyCallUpdate(event.call);
+      });
 
     socket.off('connect').on('connect', () => {
       socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
