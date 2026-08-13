@@ -33,6 +33,11 @@ jobs:
       # Только для CI — не используется нигде за пределами этого job'а.
       JWT_SECRET: ci-secret-not-used-anywhere-else-please-do-not-reuse-it
       CLIENT_ORIGIN: http://localhost:5173
+      # AccessToken подписывается локально (server/src/services/call.ts), сетевых вызовов
+      # к LiveKit в тестах нет — реальные значения не нужны.
+      LIVEKIT_URL: wss://ci-not-used-anywhere-else.invalid
+      LIVEKIT_API_KEY: ci-livekit-key-not-used-anywhere-else
+      LIVEKIT_API_SECRET: ci-livekit-secret-not-used-anywhere-else
 
     steps:
       - name: Checkout
