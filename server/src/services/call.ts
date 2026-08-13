@@ -5,8 +5,10 @@ import { AccessToken } from 'livekit-server-sdk';
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { notFound } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 import { assertMember, toMemberSummary } from './chat.js';
 import { messageInclude } from './message.js';
+import * as pushService from './push.js';
 import type { Call, CallParticipant, User } from '../generated/prisma/client.js';
 
 const TOKEN_TTL = '6h';
@@ -83,6 +85,13 @@ export async function startCall(input: { chatId: string; userId: string; kind: C
       },
       include: callWithRelations,
     }));
+
+  if (!existing) {
+    const initiatorName = call.initiator?.displayName ?? 'Кто-то';
+    pushService.notifyOfflineMembersOfCall(call.chatId, input.userId, initiatorName, call.kind).catch((error: unknown) => {
+      logger.error({ err: error, chatId: call.chatId }, 'Не удалось отправить push-уведомления о звонке');
+    });
+  }
 
   const token = await issueAccessToken(call.id, input.userId);
   return { call: toCallDto(call), token, url: env.LIVEKIT_URL };

@@ -1,10 +1,11 @@
 import webpush from 'web-push';
 
-import type { PushNotificationPayload } from '@messenger/shared';
+import type { CallKind, PushNotificationPayload } from '@messenger/shared';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { logger } from '../lib/logger.js';
+import { presenceStore } from '../realtime/presence.js';
 
 const vapidConfigured = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
 if (vapidConfigured) {
@@ -55,5 +56,28 @@ export async function sendToUser(userId: string, notification: PushNotificationP
         }
       }
     }),
+  );
+}
+
+export async function notifyOfflineMembersOfCall(
+  chatId: string,
+  initiatorId: string,
+  initiatorName: string,
+  kind: CallKind,
+): Promise<void> {
+  if (!vapidConfigured) return;
+
+  const members = await prisma.chatMember.findMany({
+    where: { chatId, userId: { not: initiatorId } },
+    select: { userId: true },
+  });
+  const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.hasVisibleClient(userId));
+  if (offlineMemberIds.length === 0) return;
+
+  const title = `Входящий звонок от ${initiatorName}`;
+  const body = kind === 'VIDEO' ? 'Видеозвонок' : 'Аудиозвонок';
+
+  await Promise.all(
+    offlineMemberIds.map((userId) => sendToUser(userId, { title, body, chatId, kind: 'call' })),
   );
 }

@@ -1,0 +1,152 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  animation: fade var(--dur-menu) var(--ease-screen);
+}
+
+.card {
+  display: flex;
+  width: min(320px, 100%);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  text-align: center;
+  animation: pop var(--dur-menu) var(--ease-spring);
+}
+
+.name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-display-title);
+  font-weight: 800;
+}
+
+.status {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+}
+
+.button {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  flex-shrink: 0;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--text-on-primary);
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.accept {
+  background: var(--online);
+}
+
+.decline {
+  background: var(--danger);
+}
+
+.declineGlyph {
+  transform: rotate(135deg);
+}
+
+.inline {
+  position: fixed;
+  z-index: 450;
+  top: calc(var(--chrome-space-top) + var(--chrome-gap));
+  right: calc(var(--safe-right) + var(--chrome-inset));
+  left: calc(var(--safe-left) + var(--chrome-inset));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  animation: rise var(--dur-menu) var(--ease-spring) both;
+}
+
+.inlineName {
+  overflow: hidden;
+  flex: 1;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inlineActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.buttonSmall {
+  width: var(--tap-min);
+  height: var(--tap-min);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .card,
+  .inline {
+    animation: none;
+  }
+}

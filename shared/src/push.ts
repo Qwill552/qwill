@@ -20,4 +20,5 @@ export interface PushNotificationPayload {
   title: string;
   body: string;
   chatId: string;
+  kind?: 'message' | 'call';
 }

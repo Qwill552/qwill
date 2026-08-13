@@ -41,11 +41,16 @@ self.addEventListener('push', (event) => {
     return;
   }
 
+  const isCall = payload.kind === 'call';
+
   event.waitUntil(
     self.registration.showNotification(payload.title ?? 'Messenger', {
       body: payload.body ?? '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
+      tag: isCall ? `call-${payload.chatId}` : undefined,
+      requireInteraction: isCall,
+      vibrate: isCall ? [1000, 500, 1000, 500] : undefined,
       data: { chatId: payload.chatId },
     }),
   );
