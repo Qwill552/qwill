@@ -155,6 +155,27 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
     expect(changed.call.id).toBe(callId);
   });
 
+  it('call:leave в активном 1:1-звонке завершает его для обеих сторон', async () => {
+    const a = await registerUser('cs3b_a');
+    const b = await registerUser('cs3b_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+
+    const socketA = await connectSocket(a.accessToken);
+    const socketB = await connectSocket(b.accessToken);
+
+    const startAck = await emitWithAck<CallStartAck>(socketA, SocketEvent.CallStart, { chatId, kind: 'AUDIO' });
+    const callId = startAck.access!.call.id;
+    await emitWithAck<CallAcceptAck>(socketB, SocketEvent.CallAccept, { callId });
+
+    const endedForA = waitForEvent<CallEndedEvent>(socketA, SocketEvent.CallEnded);
+    const endedForB = waitForEvent<CallEndedEvent>(socketB, SocketEvent.CallEnded);
+    socketA.emit(SocketEvent.CallLeave, { callId });
+
+    const [endedA, endedB] = await Promise.all([endedForA, endedForB]);
+    expect(endedA.call.status).toBe('ENDED');
+    expect(endedB.call.status).toBe('ENDED');
+  });
+
   it('после завершения в ленте чата появляется ровно одно сообщение типа CALL со ссылкой на звонок', async () => {
     const a = await registerUser('cs4_a');
     const b = await registerUser('cs4_b');

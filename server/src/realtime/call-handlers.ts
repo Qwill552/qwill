@@ -115,9 +115,9 @@ export function registerCallHandlers(socket: Socket, userId: string): void {
 
 async function handleLeave(callId: string, userId: string): Promise<void> {
   const call = await callService.leaveCall({ callId, userId });
-  const stillActive = call.participants.some((participant) => participant.leftAt === null);
+  const activeParticipants = call.participants.filter((participant) => participant.leftAt === null);
 
-  if (stillActive) {
+  if (activeParticipants.length >= 2) {
     getIo()?.to(call.chatId).emit(SocketEvent.CallParticipantChanged, { call } satisfies CallParticipantChangedEvent);
     return;
   }

@@ -1,9 +1,8 @@
 .banner {
   position: fixed;
   z-index: 450;
-  top: calc(var(--safe-top) + var(--chrome-inset));
-  right: calc(var(--safe-right) + var(--chrome-inset));
-  left: calc(var(--safe-left) + var(--chrome-inset));
+  top: calc(var(--chrome-space-top) + var(--chrome-gap));
+  left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16,6 +15,7 @@
   font: inherit;
   cursor: pointer;
   gap: var(--space-2);
+  transform: translateX(-50%);
   animation: rise var(--dur-menu) var(--ease-spring) both;
 }
 
@@ -31,6 +31,7 @@
 
 .label {
   overflow: hidden;
+  max-width: 40vw;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
