@@ -1,3 +1,4 @@
+import { CallOverlay } from '../features/calls/CallOverlay';
 import { AmbientBlobs } from './AmbientBlobs';
 import { ScreenStack } from './ScreenStack';
 import styles from './AppShell.module.css';
@@ -14,6 +15,7 @@ export function AppShell() {
       <ScreenStack />
       <TabBar />
       <UpdateBanner />
+      <CallOverlay />
     </div>
   );
 }

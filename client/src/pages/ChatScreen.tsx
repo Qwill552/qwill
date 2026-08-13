@@ -14,6 +14,7 @@ import { MessageList } from '../features/messages/MessageList';
 import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
 import { useAuthStore } from '../stores/authStore';
+import { useCallStore } from '../stores/callStore';
 import { useChatStore } from '../stores/chatStore';
 import { formatLastSeen } from '../utils/presence';
 import styles from './ChatScreen.module.css';
@@ -70,6 +71,7 @@ export function ChatScreen() {
    *  сюда он лишь порталится, чтобы не оказаться под блюром шапки (см. ниже, pinnedSlot). */
   const pinnedMessage = useChatStore((s) => (chatId ? s.pinnedByChat[chatId] : undefined)) ?? null;
   const myId = useAuthStore((s) => s.user?.id) ?? null;
+  const startCall = useCallStore((s) => s.startCall);
 
   const selectedMessages = messages.filter((m) => selectedIds.has(m.id));
 
@@ -270,6 +272,7 @@ export function ChatScreen() {
               }
               onClick={() => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))}
             />
+            {!isGroup && <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />}
             <GlassButton
               icon="more"
               label="Ещё"

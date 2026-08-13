@@ -1,0 +1,68 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.control,
+.placeholder,
+.hangup {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  flex-shrink: 0;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen);
+}
+
+.control:focus-visible,
+.placeholder:focus-visible,
+.hangup:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.control.active {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.placeholder {
+  width: 48px;
+  height: 48px;
+  color: var(--text-tertiary);
+}
+
+.placeholder:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.hangup {
+  border-color: transparent;
+  background: var(--danger);
+  color: var(--text-on-primary);
+}
+
+.hangupGlyph {
+  transform: rotate(135deg);
+}

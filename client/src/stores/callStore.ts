@@ -64,6 +64,7 @@ const initialState: CallState = {
   micEnabled: true,
   cameraEnabled: false,
   screenShareEnabled: false,
+  speakerEnabled: true,
   connectionQuality: 'good',
   startedAt: null,
   error: null,
@@ -77,6 +78,7 @@ interface CallStoreState extends CallState {
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
+  toggleSpeaker: () => void;
   attachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
   detachParticipantVideo: (userId: string) => void;
   applyInvite: (call: CallDto) => void;
@@ -185,6 +187,12 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       const next = !get().screenShareEnabled;
       set({ screenShareEnabled: next });
       await transport.setScreenShareEnabled(next);
+    },
+
+    toggleSpeaker() {
+      const next = !get().speakerEnabled;
+      set({ speakerEnabled: next });
+      transport.setSpeakerEnabled(next);
     },
 
     attachParticipantVideo(userId, element) {

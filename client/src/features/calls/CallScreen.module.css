@@ -1,0 +1,86 @@
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+.top {
+  display: flex;
+  padding: var(--space-2);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: 0 var(--screen-pad-x);
+  text-align: center;
+}
+
+.avatarRing {
+  padding: 4px;
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+}
+
+.ringPoor {
+  border-color: var(--text-tertiary);
+}
+
+.ringLost {
+  border-color: var(--danger);
+  animation: pulse var(--dur-pulse) ease-in-out infinite;
+}
+
+.name {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-display-title);
+  font-weight: 800;
+}
+
+.status {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.statusError {
+  color: var(--danger);
+}
+
+.bottom {
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--screen-pad-x) var(--space-5);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringLost {
+    animation: none;
+  }
+}

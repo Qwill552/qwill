@@ -20,6 +20,7 @@ export interface CallState {
   micEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
+  speakerEnabled: boolean;
   connectionQuality: 'good' | 'poor' | 'lost';
   startedAt: number | null;
   error: string | null;
@@ -38,6 +39,7 @@ export interface CallTransport {
   setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
   setCameraEnabled: (enabled: boolean) => Promise<void>;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
+  setSpeakerEnabled: (enabled: boolean) => void;
   attachVideo: (userId: string, element: HTMLVideoElement) => void;
   detachVideo: (userId: string) => void;
 }

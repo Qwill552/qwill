@@ -1,0 +1,61 @@
+.banner {
+  position: fixed;
+  z-index: 450;
+  top: calc(var(--safe-top) + var(--chrome-inset));
+  right: calc(var(--safe-right) + var(--chrome-inset));
+  left: calc(var(--safe-left) + var(--chrome-inset));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  gap: var(--space-2);
+  animation: rise var(--dur-menu) var(--ease-spring) both;
+}
+
+.banner:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.icon {
+  flex: none;
+  color: var(--online);
+}
+
+.label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}

@@ -7,12 +7,16 @@ import {
   type LocalAudioTrack,
   type LocalVideoTrack,
   type Participant,
+  type RemoteTrack,
+  type RemoteTrackPublication,
   type RemoteVideoTrack,
 } from 'livekit-client';
 
 import type { CallParticipantState, CallTransport, CallTransportCallbacks } from './types';
 
 let room: Room | null = null;
+let speakerEnabled = true;
+const audioElements = new Map<string, HTMLAudioElement>();
 
 function mapConnectionQuality(quality: ConnectionQuality): 'good' | 'poor' | 'lost' {
   if (quality === ConnectionQuality.Excellent || quality === ConnectionQuality.Good) return 'good';
@@ -40,14 +44,35 @@ function collectParticipants(activeRoom: Room): CallParticipantState[] {
   return participants;
 }
 
+function attachRemoteAudio(track: RemoteTrack, publication: RemoteTrackPublication): void {
+  if (track.kind !== Track.Kind.Audio) return;
+  const element = track.attach() as HTMLAudioElement;
+  element.autoplay = true;
+  element.muted = !speakerEnabled;
+  document.body.appendChild(element);
+  audioElements.set(publication.trackSid, element);
+}
+
+function detachRemoteAudio(track: RemoteTrack, publication: RemoteTrackPublication): void {
+  if (track.kind !== Track.Kind.Audio) return;
+  track.detach().forEach((element) => element.remove());
+  audioElements.delete(publication.trackSid);
+}
+
 function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks): void {
   const notifyParticipants = (): void => callbacks.onParticipantsChanged(collectParticipants(activeRoom));
 
   activeRoom
     .on(RoomEvent.ParticipantConnected, notifyParticipants)
     .on(RoomEvent.ParticipantDisconnected, notifyParticipants)
-    .on(RoomEvent.TrackSubscribed, notifyParticipants)
-    .on(RoomEvent.TrackUnsubscribed, notifyParticipants)
+    .on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication) => {
+      attachRemoteAudio(track, publication);
+      notifyParticipants();
+    })
+    .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication: RemoteTrackPublication) => {
+      detachRemoteAudio(track, publication);
+      notifyParticipants();
+    })
     .on(RoomEvent.TrackMuted, notifyParticipants)
     .on(RoomEvent.TrackUnmuted, notifyParticipants)
     .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
@@ -99,6 +124,8 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
 async function disconnect(): Promise<void> {
   const activeRoom = room;
   room = null;
+  audioElements.forEach((element) => element.remove());
+  audioElements.clear();
   await activeRoom?.disconnect();
 }
 
@@ -112,6 +139,13 @@ async function setCameraEnabled(enabled: boolean): Promise<void> {
 
 async function setScreenShareEnabled(enabled: boolean): Promise<void> {
   await room?.localParticipant.setScreenShareEnabled(enabled);
+}
+
+function setSpeakerEnabled(enabled: boolean): void {
+  speakerEnabled = enabled;
+  audioElements.forEach((element) => {
+    element.muted = !enabled;
+  });
 }
 
 function findParticipant(userId: string): Participant | undefined {
@@ -143,6 +177,7 @@ export const liveKitTransport: CallTransport = {
   connect,
   disconnect,
   setMicrophoneEnabled,
+  setSpeakerEnabled,
   setCameraEnabled,
   setScreenShareEnabled,
   attachVideo,
