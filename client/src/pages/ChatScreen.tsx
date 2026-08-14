@@ -286,7 +286,7 @@ export function ChatScreen() {
               }
               onClick={() => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))}
             />
-            {!isGroup && <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />}
+            <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />
             <GlassButton
               icon="more"
               label="Ещё"
