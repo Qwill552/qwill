@@ -53,6 +53,31 @@ function nativeVibrate(pattern: number[] | number): boolean {
 let ringtonePlaying = false;
 let ringtoneTimer: ReturnType<typeof setTimeout> | null = null;
 let ringtoneVibrateTimer: ReturnType<typeof setInterval> | null = null;
+let detachGestureRetry: (() => void) | null = null;
+
+function pulseVibration(): void {
+  if (!ringtonePlaying) return;
+  nativeVibrate(VIBRATE_PATTERN);
+}
+
+function retryOnFirstGesture(): void {
+  if (typeof window === 'undefined' || detachGestureRetry) return;
+
+  const onGesture = () => {
+    detachGestureRetry?.();
+    getAudioContext()?.resume().catch(() => undefined);
+    pulseVibration();
+  };
+
+  detachGestureRetry = () => {
+    window.removeEventListener('pointerdown', onGesture);
+    window.removeEventListener('keydown', onGesture);
+    detachGestureRetry = null;
+  };
+
+  window.addEventListener('pointerdown', onGesture);
+  window.addEventListener('keydown', onGesture);
+}
 
 function scheduleRingtoneLoop(): void {
   if (!ringtonePlaying) return;
@@ -71,9 +96,9 @@ export function startRingtone(): void {
   if (ringtonePlaying) return;
   ringtonePlaying = true;
   scheduleRingtoneLoop();
-  if (nativeVibrate(VIBRATE_PATTERN)) {
-    ringtoneVibrateTimer = setInterval(() => navigator.vibrate(VIBRATE_PATTERN), RINGTONE_PATTERN_MS);
-  }
+  pulseVibration();
+  ringtoneVibrateTimer = setInterval(pulseVibration, RINGTONE_PATTERN_MS);
+  retryOnFirstGesture();
 }
 
 export function stopRingtone(): void {
@@ -86,6 +111,7 @@ export function stopRingtone(): void {
     clearInterval(ringtoneVibrateTimer);
     ringtoneVibrateTimer = null;
   }
+  detachGestureRetry?.();
   if (canVibrate()) navigator.vibrate(0);
 }
 
