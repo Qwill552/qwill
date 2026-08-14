@@ -49,6 +49,7 @@ function resetStore(): void {
     connectionQuality: 'good',
     startedAt: null,
     error: null,
+    cameraError: null,
   });
 }
 
@@ -120,6 +121,32 @@ describe('callStore', () => {
     expect(useCallStore.getState().micEnabled).toBe(false);
     expect(transport.setMicrophoneEnabled).toHaveBeenCalledTimes(1);
     expect(transport.setMicrophoneEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it('toggleCamera инвертирует cameraEnabled и зовёт транспорт ровно один раз', async () => {
+    const transport = stubTransport();
+    setCallTransport(transport);
+    expect(useCallStore.getState().cameraEnabled).toBe(false);
+
+    await useCallStore.getState().toggleCamera();
+
+    expect(useCallStore.getState().cameraEnabled).toBe(true);
+    expect(transport.setCameraEnabled).toHaveBeenCalledTimes(1);
+    expect(transport.setCameraEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('отказ в доступе к камере не включает её и выставляет cameraError, который сам сбрасывается', async () => {
+    vi.useFakeTimers();
+    const transport = stubTransport({ setCameraEnabled: vi.fn().mockRejectedValue(new Error('denied')) });
+    setCallTransport(transport);
+
+    await useCallStore.getState().toggleCamera();
+
+    expect(useCallStore.getState().cameraEnabled).toBe(false);
+    expect(useCallStore.getState().cameraError).toBe('Нет доступа к камере');
+
+    vi.runAllTimers();
+    expect(useCallStore.getState().cameraError).toBeNull();
   });
 
   it('приглашение во время активного звонка игнорируется, phase не меняется', () => {

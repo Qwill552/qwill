@@ -1,0 +1,67 @@
+.selfView {
+  position: absolute;
+  z-index: 5;
+  overflow: hidden;
+  width: 96px;
+  height: 128px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  cursor: grab;
+  touch-action: none;
+  transition:
+    width var(--dur-menu) var(--ease-screen),
+    height var(--dur-menu) var(--ease-screen),
+    top var(--dur-menu) var(--ease-screen),
+    left var(--dur-menu) var(--ease-screen),
+    right var(--dur-menu) var(--ease-screen),
+    bottom var(--dur-menu) var(--ease-screen),
+    border-radius var(--dur-menu) var(--ease-screen);
+}
+
+.selfView[data-dragging='true'] {
+  transition: none;
+}
+
+.selfView:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.selfView[data-corner='top-left'] {
+  top: calc(var(--safe-top) + var(--space-4));
+  left: calc(var(--safe-left) + var(--space-4));
+}
+
+.selfView[data-corner='top-right'] {
+  top: calc(var(--safe-top) + var(--space-4));
+  right: calc(var(--safe-right) + var(--space-4));
+}
+
+.selfView[data-corner='bottom-left'] {
+  bottom: calc(var(--safe-bottom) + var(--space-4));
+  left: calc(var(--safe-left) + var(--space-4));
+}
+
+.selfView[data-corner='bottom-right'] {
+  bottom: calc(var(--safe-bottom) + var(--space-4));
+  right: calc(var(--safe-right) + var(--space-4));
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collapsed {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selfView {
+    transition: none;
+  }
+}

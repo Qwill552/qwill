@@ -1,5 +1,7 @@
 import type { AvatarColor } from '@messenger/shared';
 
+import { useParticipantVideo } from '../../calls/useParticipantVideo';
+import { useAuthStore } from '../../stores/authStore';
 import { Avatar } from '../../ui/Avatar';
 import { Icon } from '../../ui/Icon';
 import styles from './ParticipantTile.module.css';
@@ -13,6 +15,7 @@ interface ParticipantTileProps {
   avatarColor?: AvatarColor;
   micEnabled: boolean;
   isSpeaking: boolean;
+  cameraEnabled: boolean;
   variant: ParticipantTileVariant;
 }
 
@@ -22,11 +25,40 @@ const AVATAR_SIZE: Record<ParticipantTileVariant, number> = {
   compact: 40,
 };
 
-export function ParticipantTile({ userId, displayName, avatarUrl, avatarColor, micEnabled, isSpeaking, variant }: ParticipantTileProps) {
+export function ParticipantTile({
+  userId,
+  displayName,
+  avatarUrl,
+  avatarColor,
+  micEnabled,
+  isSpeaking,
+  cameraEnabled,
+  variant,
+}: ParticipantTileProps) {
+  const isLocal = useAuthStore((s) => s.user?.id === userId);
+  const videoRef = useParticipantVideo(userId, cameraEnabled);
+  const size = AVATAR_SIZE[variant];
+
   return (
     <div className={`${styles.tile} ${styles[variant]} ${isSpeaking ? styles.speaking : ''}`}>
       <div className={styles.avatarWrap}>
-        <Avatar label={displayName} avatarUrl={avatarUrl} color={avatarColor} colorKey={userId} size={AVATAR_SIZE[variant]} />
+        <div className={styles.mediaWrap} style={{ width: size, height: size }}>
+          <Avatar
+            className={`${styles.media} ${cameraEnabled ? styles.mediaHidden : ''}`}
+            label={displayName}
+            avatarUrl={avatarUrl}
+            color={avatarColor}
+            colorKey={userId}
+            size={size}
+          />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isLocal}
+            className={`${styles.media} ${styles.video} ${cameraEnabled ? '' : styles.mediaHidden}`}
+          />
+        </div>
         {!micEnabled && (
           <span className={styles.micBadge} title="Микрофон выключен">
             <Icon name="mic-off" size={12} />

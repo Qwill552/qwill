@@ -29,6 +29,7 @@ export interface CallState {
   connectionQuality: 'good' | 'poor' | 'lost';
   startedAt: number | null;
   error: string | null;
+  cameraError: string | null;
 }
 
 export interface CallTransportCallbacks {

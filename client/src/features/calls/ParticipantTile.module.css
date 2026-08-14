@@ -28,6 +28,27 @@
   border-color: var(--primary);
 }
 
+.mediaWrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  transition: opacity var(--dur-menu) var(--ease-screen);
+}
+
+.video {
+  object-fit: cover;
+}
+
+.mediaHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .micBadge {
   position: absolute;
   right: -2px;
@@ -60,7 +81,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatarWrap {
+  .avatarWrap,
+  .media {
     transition: none;
   }
 }

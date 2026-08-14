@@ -17,6 +17,7 @@ import type { CallParticipantState, CallState, CallTransport } from '../calls/ty
 import { getSocket } from '../realtime/socket';
 
 const CALL_ENDED_RESET_DELAY_MS = 2000;
+const CAMERA_ERROR_DISPLAY_MS = 3000;
 
 let transport: CallTransport = liveKitTransport;
 
@@ -68,6 +69,7 @@ const initialState: CallState = {
   connectionQuality: 'good',
   startedAt: null,
   error: null,
+  cameraError: null,
 };
 
 interface CallStoreState extends CallState {
@@ -89,6 +91,7 @@ interface CallStoreState extends CallState {
 
 export const useCallStore = create<CallStoreState>((set, get) => {
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
+  let cameraErrorTimer: ReturnType<typeof setTimeout> | null = null;
 
   function scheduleReset(): void {
     if (resetTimer) clearTimeout(resetTimer);
@@ -96,6 +99,14 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       resetTimer = null;
       if (get().phase === 'ended') set(initialState);
     }, CALL_ENDED_RESET_DELAY_MS);
+  }
+
+  function scheduleCameraErrorClear(): void {
+    if (cameraErrorTimer) clearTimeout(cameraErrorTimer);
+    cameraErrorTimer = setTimeout(() => {
+      cameraErrorTimer = null;
+      set({ cameraError: null });
+    }, CAMERA_ERROR_DISPLAY_MS);
   }
 
   async function connectToRoom(access: CallAccessDto): Promise<boolean> {
@@ -198,8 +209,13 @@ export const useCallStore = create<CallStoreState>((set, get) => {
 
     async toggleCamera() {
       const next = !get().cameraEnabled;
-      set({ cameraEnabled: next });
-      await transport.setCameraEnabled(next);
+      try {
+        await transport.setCameraEnabled(next);
+        set({ cameraEnabled: next });
+      } catch {
+        set({ cameraError: 'Нет доступа к камере' });
+        scheduleCameraErrorClear();
+      }
     },
 
     async toggleScreenShare() {

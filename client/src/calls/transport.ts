@@ -78,6 +78,8 @@ function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks
     })
     .on(RoomEvent.TrackMuted, notifyParticipants)
     .on(RoomEvent.TrackUnmuted, notifyParticipants)
+    .on(RoomEvent.LocalTrackPublished, notifyParticipants)
+    .on(RoomEvent.LocalTrackUnpublished, notifyParticipants)
     .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       callbacks.onActiveSpeakerChanged(speakers[0]?.identity ?? null);
       notifyParticipants();

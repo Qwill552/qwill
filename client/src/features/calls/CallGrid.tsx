@@ -18,6 +18,7 @@ interface GridParticipant {
   avatarColor?: AvatarColor;
   micEnabled: boolean;
   isSpeaking: boolean;
+  cameraEnabled: boolean;
 }
 
 function toGridParticipants(participants: CallParticipantState[], call: CallDto | null): GridParticipant[] {
@@ -31,6 +32,7 @@ function toGridParticipants(participants: CallParticipantState[], call: CallDto 
       avatarColor: member?.avatarColor,
       micEnabled: p.micEnabled,
       isSpeaking: p.isSpeaking,
+      cameraEnabled: p.cameraEnabled,
     };
   });
 }
@@ -60,6 +62,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
               avatarColor={speaker.avatarColor}
               micEnabled={speaker.micEnabled}
               isSpeaking={speaker.isSpeaking}
+              cameraEnabled={speaker.cameraEnabled}
               variant="featured"
             />
           </div>
@@ -74,6 +77,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
                 avatarColor={p.avatarColor}
                 micEnabled={p.micEnabled}
                 isSpeaking={p.isSpeaking}
+                cameraEnabled={p.cameraEnabled}
                 variant="compact"
               />
             </div>
@@ -97,6 +101,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
                 avatarColor={p.avatarColor}
                 micEnabled={p.micEnabled}
                 isSpeaking={p.isSpeaking}
+                cameraEnabled={p.cameraEnabled}
                 variant="tile"
               />
             </div>

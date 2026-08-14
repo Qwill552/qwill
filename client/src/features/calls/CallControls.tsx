@@ -6,21 +6,52 @@ import styles from './CallControls.module.css';
 interface CallControlsProps {
   micEnabled: boolean;
   onToggleMic: () => void;
+  cameraEnabled?: boolean;
+  onToggleCamera?: () => void;
   audioRoute: AudioRoute;
   onToggleAudioRoute: () => void;
   onHangUp: () => void;
 }
 
-export function CallControls({ micEnabled, onToggleMic, audioRoute, onToggleAudioRoute, onHangUp }: CallControlsProps) {
+export function CallControls({
+  micEnabled,
+  onToggleMic,
+  cameraEnabled = false,
+  onToggleCamera,
+  audioRoute,
+  onToggleAudioRoute,
+  onHangUp,
+}: CallControlsProps) {
   const speakerOn = audioRoute === 'speaker';
   const speakerLabel = speakerOn ? 'Выключить громкую связь' : 'Включить громкую связь';
+  const cameraLabel = cameraEnabled ? 'Выключить камеру' : 'Включить камеру';
 
   return (
     <div className={styles.controls}>
       <div className={styles.row}>
-        <button type="button" className={styles.placeholder} disabled aria-label="Камера — появится позже" title="Камера — появится позже">
-          <Icon name="camera" size={22} />
-        </button>
+        {onToggleCamera ? (
+          <button
+            type="button"
+            className={`${styles.control} ${styles.compact} ${cameraEnabled ? styles.active : ''}`}
+            aria-label={cameraLabel}
+            aria-pressed={cameraEnabled}
+            title={cameraLabel}
+            onClick={onToggleCamera}
+          >
+            <Icon name="camera" size={20} />
+            <Ripple />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={styles.placeholder}
+            disabled
+            aria-label="Камера — появится позже"
+            title="Камера — появится позже"
+          >
+            <Icon name="camera" size={22} />
+          </button>
+        )}
         <button
           type="button"
           className={styles.placeholder}
