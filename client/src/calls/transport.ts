@@ -7,15 +7,16 @@ import {
   type LocalAudioTrack,
   type LocalVideoTrack,
   type Participant,
+  type RemoteAudioTrack,
   type RemoteTrack,
   type RemoteTrackPublication,
   type RemoteVideoTrack,
 } from 'livekit-client';
 
+import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
 import type { CallParticipantState, CallTransport, CallTransportCallbacks } from './types';
 
 let room: Room | null = null;
-let speakerEnabled = true;
 const audioElements = new Map<string, HTMLAudioElement>();
 
 function mapConnectionQuality(quality: ConnectionQuality): 'good' | 'poor' | 'lost' {
@@ -46,15 +47,17 @@ function collectParticipants(activeRoom: Room): CallParticipantState[] {
 
 function attachRemoteAudio(track: RemoteTrack, publication: RemoteTrackPublication): void {
   if (track.kind !== Track.Kind.Audio) return;
-  const element = track.attach() as HTMLAudioElement;
+  const audioTrack = track as RemoteAudioTrack;
+  const element = audioTrack.attach() as HTMLAudioElement;
   element.autoplay = true;
-  element.muted = !speakerEnabled;
   document.body.appendChild(element);
   audioElements.set(publication.trackSid, element);
+  registerAudioTrack(audioTrack);
 }
 
 function detachRemoteAudio(track: RemoteTrack, publication: RemoteTrackPublication): void {
   if (track.kind !== Track.Kind.Audio) return;
+  unregisterAudioTrack(track as RemoteAudioTrack);
   track.detach().forEach((element) => element.remove());
   audioElements.delete(publication.trackSid);
 }
@@ -124,6 +127,7 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
 async function disconnect(): Promise<void> {
   const activeRoom = room;
   room = null;
+  resetAudioRouting();
   audioElements.forEach((element) => element.remove());
   audioElements.clear();
   await activeRoom?.disconnect();
@@ -139,13 +143,6 @@ async function setCameraEnabled(enabled: boolean): Promise<void> {
 
 async function setScreenShareEnabled(enabled: boolean): Promise<void> {
   await room?.localParticipant.setScreenShareEnabled(enabled);
-}
-
-function setSpeakerEnabled(enabled: boolean): void {
-  speakerEnabled = enabled;
-  audioElements.forEach((element) => {
-    element.muted = !enabled;
-  });
 }
 
 function findParticipant(userId: string): Participant | undefined {
@@ -177,7 +174,7 @@ export const liveKitTransport: CallTransport = {
   connect,
   disconnect,
   setMicrophoneEnabled,
-  setSpeakerEnabled,
+  setAudioRoute,
   setCameraEnabled,
   setScreenShareEnabled,
   attachVideo,

@@ -2,6 +2,8 @@ import type { CallDto } from '@messenger/shared';
 
 export type CallPhase = 'idle' | 'incoming' | 'outgoing' | 'active' | 'ended';
 
+export type AudioRoute = 'earpiece' | 'speaker';
+
 export interface CallParticipantState {
   userId: string;
   displayName: string;
@@ -20,7 +22,7 @@ export interface CallState {
   micEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
-  speakerEnabled: boolean;
+  audioRoute: AudioRoute;
   connectionQuality: 'good' | 'poor' | 'lost';
   startedAt: number | null;
   error: string | null;
@@ -39,7 +41,7 @@ export interface CallTransport {
   setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
   setCameraEnabled: (enabled: boolean) => Promise<void>;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
-  setSpeakerEnabled: (enabled: boolean) => void;
+  setAudioRoute: (route: AudioRoute) => void;
   attachVideo: (userId: string, element: HTMLVideoElement) => void;
   detachVideo: (userId: string) => void;
 }

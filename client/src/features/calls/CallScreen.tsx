@@ -20,13 +20,13 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const phase = useCallStore((s) => s.phase);
   const call = useCallStore((s) => s.call);
   const micEnabled = useCallStore((s) => s.micEnabled);
-  const speakerEnabled = useCallStore((s) => s.speakerEnabled);
+  const audioRoute = useCallStore((s) => s.audioRoute);
   const connectionQuality = useCallStore((s) => s.connectionQuality);
   const startedAt = useCallStore((s) => s.startedAt);
   const error = useCallStore((s) => s.error);
   const hangUp = useCallStore((s) => s.hangUp);
   const toggleMic = useCallStore((s) => s.toggleMic);
-  const toggleSpeaker = useCallStore((s) => s.toggleSpeaker);
+  const toggleAudioRoute = useCallStore((s) => s.toggleAudioRoute);
 
   const myId = useAuthStore((s) => s.user?.id) ?? null;
   const duration = useCallDuration(startedAt);
@@ -59,8 +59,8 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
         <CallControls
           micEnabled={micEnabled}
           onToggleMic={() => void toggleMic()}
-          speakerEnabled={speakerEnabled}
-          onToggleSpeaker={toggleSpeaker}
+          audioRoute={audioRoute}
+          onToggleAudioRoute={toggleAudioRoute}
           onHangUp={() => void hangUp()}
         />
       </div>

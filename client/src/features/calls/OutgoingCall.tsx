@@ -16,12 +16,12 @@ const QUALITY_RING_CLASS: Record<'good' | 'poor' | 'lost', string | undefined> =
 export function OutgoingCall() {
   const call = useCallStore((s) => s.call);
   const micEnabled = useCallStore((s) => s.micEnabled);
-  const speakerEnabled = useCallStore((s) => s.speakerEnabled);
+  const audioRoute = useCallStore((s) => s.audioRoute);
   const connectionQuality = useCallStore((s) => s.connectionQuality);
   const error = useCallStore((s) => s.error);
   const hangUp = useCallStore((s) => s.hangUp);
   const toggleMic = useCallStore((s) => s.toggleMic);
-  const toggleSpeaker = useCallStore((s) => s.toggleSpeaker);
+  const toggleAudioRoute = useCallStore((s) => s.toggleAudioRoute);
 
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
@@ -47,8 +47,8 @@ export function OutgoingCall() {
         <CallControls
           micEnabled={micEnabled}
           onToggleMic={() => void toggleMic()}
-          speakerEnabled={speakerEnabled}
-          onToggleSpeaker={toggleSpeaker}
+          audioRoute={audioRoute}
+          onToggleAudioRoute={toggleAudioRoute}
           onHangUp={() => void hangUp()}
         />
       </div>

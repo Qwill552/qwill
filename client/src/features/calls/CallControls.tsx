@@ -1,3 +1,4 @@
+import type { AudioRoute } from '../../calls/types';
 import { Icon } from '../../ui/Icon';
 import { Ripple } from '../../ui/Ripple';
 import styles from './CallControls.module.css';
@@ -5,12 +6,15 @@ import styles from './CallControls.module.css';
 interface CallControlsProps {
   micEnabled: boolean;
   onToggleMic: () => void;
-  speakerEnabled: boolean;
-  onToggleSpeaker: () => void;
+  audioRoute: AudioRoute;
+  onToggleAudioRoute: () => void;
   onHangUp: () => void;
 }
 
-export function CallControls({ micEnabled, onToggleMic, speakerEnabled, onToggleSpeaker, onHangUp }: CallControlsProps) {
+export function CallControls({ micEnabled, onToggleMic, audioRoute, onToggleAudioRoute, onHangUp }: CallControlsProps) {
+  const speakerOn = audioRoute === 'speaker';
+  const speakerLabel = speakerOn ? 'Выключить громкую связь' : 'Включить громкую связь';
+
   return (
     <div className={styles.controls}>
       <div className={styles.row}>
@@ -42,12 +46,13 @@ export function CallControls({ micEnabled, onToggleMic, speakerEnabled, onToggle
 
         <button
           type="button"
-          className={`${styles.control} ${!speakerEnabled ? styles.active : ''}`}
-          aria-label={speakerEnabled ? 'Выключить динамик' : 'Включить динамик'}
-          title={speakerEnabled ? 'Выключить динамик' : 'Включить динамик'}
-          onClick={onToggleSpeaker}
+          className={`${styles.control} ${speakerOn ? styles.active : ''}`}
+          aria-label={speakerLabel}
+          aria-pressed={speakerOn}
+          title={speakerLabel}
+          onClick={onToggleAudioRoute}
         >
-          <Icon name={speakerEnabled ? 'speaker' : 'speaker-off'} size={24} />
+          <Icon name="speaker" size={24} />
           <Ripple />
         </button>
 
