@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка вибрации</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #17131f; color: #eee; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  button { display: block; width: 100%; min-height: 56px; margin: 10px 0; font-size: 16px;
+           border-radius: 12px; border: 1px solid #6b4ea8; background: #2a2138; color: #eee; }
+  button:active { background: #3a2f4d; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #0f0c15; padding: 12px;
+        border-radius: 12px; font-size: 13px; line-height: 1.5; }
+  .log { margin-top: 16px; }
+</style>
+</head>
+<body>
+<h1>Проверка вибрации</h1>
+<pre id="env"></pre>
+
+<button id="b1">1. Вибрация 200 мс (по касанию)</button>
+<button id="b2">2. Паттерн звонка [1000,500,1000,500] (по касанию)</button>
+<button id="b3">3. Тот же паттерн через 5 с — НЕ КАСАТЬСЯ экрана эти 5 с</button>
+<button id="b4">4. Отмена вибрации: vibrate(0)</button>
+
+<div class="log"><pre id="log">—</pre></div>
+
+<script>
+  var logEl = document.getElementById('log');
+  var lines = [];
+
+  function activationState() {
+    var ua = navigator.userActivation;
+    if (!ua) return 'userActivation: нет в этом браузере';
+    return 'userActivation.hasBeenActive=' + ua.hasBeenActive + ' isActive=' + ua.isActive;
+  }
+
+  function log(text) {
+    lines.unshift(new Date().toLocaleTimeString() + '  ' + text);
+    logEl.textContent = lines.slice(0, 20).join('\n');
+  }
+
+  document.getElementById('env').textContent = [
+    'typeof navigator.vibrate: ' + (typeof navigator.vibrate),
+    'visibilityState: ' + document.visibilityState,
+    'standalone (установлен как PWA): ' + (window.matchMedia('(display-mode: standalone)').matches),
+    activationState(),
+    'userAgent: ' + navigator.userAgent
+  ].join('\n');
+
+  function tryVibrate(label, pattern) {
+    if (typeof navigator.vibrate !== 'function') {
+      log(label + ' → navigator.vibrate ОТСУТСТВУЕТ');
+      return;
+    }
+    var result;
+    try {
+      result = navigator.vibrate(pattern);
+    } catch (e) {
+      log(label + ' → исключение: ' + e);
+      return;
+    }
+    log(label + ' → вернул ' + result + ' | ' + activationState() + ' | visibility=' + document.visibilityState);
+  }
+
+  document.getElementById('b1').onclick = function () { tryVibrate('200 мс', 200); };
+  document.getElementById('b2').onclick = function () { tryVibrate('паттерн', [1000, 500, 1000, 500]); };
+  document.getElementById('b4').onclick = function () { tryVibrate('vibrate(0)', 0); };
+
+  document.getElementById('b3').onclick = function () {
+    log('отсчёт 5 с — не касайтесь экрана');
+    setTimeout(function () { tryVibrate('паттерн через 5 с', [1000, 500, 1000, 500]); }, 5000);
+  };
+</script>
+</body>
+</html>
