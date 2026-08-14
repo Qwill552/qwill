@@ -9,15 +9,11 @@
   background: var(--card-bg);
   cursor: grab;
   touch-action: none;
-  transition:
-    top var(--dur-menu) var(--ease-screen),
-    left var(--dur-menu) var(--ease-screen),
-    right var(--dur-menu) var(--ease-screen),
-    bottom var(--dur-menu) var(--ease-screen);
+  will-change: transform;
 }
 
 .pip[data-dragging='true'] {
-  transition: none;
+  cursor: grabbing;
 }
 
 .pip:focus-visible {
@@ -58,10 +54,4 @@
   right: var(--space-2);
   color: var(--text-on-primary);
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pip {
-    transition: none;
-  }
 }
