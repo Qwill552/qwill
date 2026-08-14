@@ -80,6 +80,7 @@ interface CallStoreState extends CallState {
   hangUp: () => Promise<void>;
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
+  flipCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
   toggleAudioRoute: () => void;
   attachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
@@ -214,6 +215,16 @@ export const useCallStore = create<CallStoreState>((set, get) => {
         set({ cameraEnabled: next });
       } catch {
         set({ cameraError: 'Нет доступа к камере' });
+        scheduleCameraErrorClear();
+      }
+    },
+
+    async flipCamera() {
+      if (!get().cameraEnabled) return;
+      try {
+        await transport.flipCamera();
+      } catch {
+        set({ cameraError: 'Вторая камера недоступна' });
         scheduleCameraErrorClear();
       }
     },

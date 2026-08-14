@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useBackHandler } from '../../app/useBackHandler';
 import { useCallStore } from '../../stores/callStore';
 import { CallBanner } from './CallBanner';
+import { CallPip } from './CallPip';
 import { CallScreen } from './CallScreen';
 import { IncomingCall } from './IncomingCall';
 import { OutgoingCall } from './OutgoingCall';
@@ -23,6 +24,13 @@ export function CallOverlay() {
   if (phase === 'idle') return null;
   if (phase === 'incoming') return <IncomingCall />;
   if (phase === 'outgoing') return <OutgoingCall />;
-  if (isCollapsible && collapsed) return <CallBanner onExpand={() => setCollapsed(false)} />;
+  if (isCollapsible && collapsed) {
+    return (
+      <>
+        <CallBanner onExpand={() => setCollapsed(false)} />
+        <CallPip onExpand={() => setCollapsed(false)} />
+      </>
+    );
+  }
   return <CallScreen onCollapse={isCollapsible ? () => setCollapsed(true) : undefined} />;
 }

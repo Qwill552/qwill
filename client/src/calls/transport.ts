@@ -17,6 +17,7 @@ import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTr
 import type { CallParticipantState, CallTransport, CallTransportCallbacks } from './types';
 
 let room: Room | null = null;
+let cameraFacingMode: 'user' | 'environment' = 'user';
 const audioElements = new Map<string, HTMLAudioElement>();
 
 function mapConnectionQuality(quality: ConnectionQuality): 'good' | 'poor' | 'lost' {
@@ -129,6 +130,7 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
 async function disconnect(): Promise<void> {
   const activeRoom = room;
   room = null;
+  cameraFacingMode = 'user';
   resetAudioRouting();
   audioElements.forEach((element) => element.remove());
   audioElements.clear();
@@ -141,6 +143,16 @@ async function setMicrophoneEnabled(enabled: boolean): Promise<void> {
 
 async function setCameraEnabled(enabled: boolean): Promise<void> {
   await room?.localParticipant.setCameraEnabled(enabled);
+}
+
+async function flipCamera(): Promise<void> {
+  const activeRoom = room;
+  if (!activeRoom) return;
+  const cameraTrack = activeRoom.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack;
+  if (!cameraTrack) return;
+  const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+  await (cameraTrack as LocalVideoTrack).restartTrack({ facingMode: nextFacingMode });
+  cameraFacingMode = nextFacingMode;
 }
 
 async function setScreenShareEnabled(enabled: boolean): Promise<void> {
@@ -178,6 +190,7 @@ export const liveKitTransport: CallTransport = {
   setMicrophoneEnabled,
   setAudioRoute,
   setCameraEnabled,
+  flipCamera,
   setScreenShareEnabled,
   attachVideo,
   detachVideo,

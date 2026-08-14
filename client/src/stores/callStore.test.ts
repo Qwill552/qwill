@@ -28,6 +28,7 @@ function stubTransport(overrides: Partial<CallTransport> = {}): CallTransport {
     disconnect: vi.fn().mockResolvedValue(undefined),
     setMicrophoneEnabled: vi.fn().mockResolvedValue(undefined),
     setCameraEnabled: vi.fn().mockResolvedValue(undefined),
+    flipCamera: vi.fn().mockResolvedValue(undefined),
     setScreenShareEnabled: vi.fn().mockResolvedValue(undefined),
     setAudioRoute: vi.fn(),
     attachVideo: vi.fn(),
@@ -144,6 +145,31 @@ describe('callStore', () => {
 
     expect(useCallStore.getState().cameraEnabled).toBe(false);
     expect(useCallStore.getState().cameraError).toBe('Нет доступа к камере');
+
+    vi.runAllTimers();
+    expect(useCallStore.getState().cameraError).toBeNull();
+  });
+
+  it('flipCamera при выключенной камере не трогает транспорт', async () => {
+    const transport = stubTransport();
+    setCallTransport(transport);
+
+    await useCallStore.getState().flipCamera();
+
+    expect(transport.flipCamera).not.toHaveBeenCalled();
+  });
+
+  it('недоступная вторая камера показывает cameraError и не роняет звонок', async () => {
+    vi.useFakeTimers();
+    const transport = stubTransport({ flipCamera: vi.fn().mockRejectedValue(new Error('overconstrained')) });
+    setCallTransport(transport);
+    useCallStore.setState({ phase: 'active', cameraEnabled: true });
+
+    await useCallStore.getState().flipCamera();
+
+    expect(useCallStore.getState().phase).toBe('active');
+    expect(useCallStore.getState().cameraEnabled).toBe(true);
+    expect(useCallStore.getState().cameraError).toBe('Вторая камера недоступна');
 
     vi.runAllTimers();
     expect(useCallStore.getState().cameraError).toBeNull();

@@ -44,6 +44,7 @@ export interface CallTransport {
   disconnect: () => Promise<void>;
   setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
   setCameraEnabled: (enabled: boolean) => Promise<void>;
+  flipCamera: () => Promise<void>;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
   setAudioRoute: (route: AudioRoute) => void;
   attachVideo: (userId: string, element: HTMLVideoElement) => void;
