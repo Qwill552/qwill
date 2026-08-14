@@ -50,6 +50,8 @@ self.addEventListener('push', (event) => {
       badge: '/icon-192.png',
       tag: isCall ? `call-${payload.chatId}` : undefined,
       requireInteraction: isCall,
+      renotify: isCall,
+      silent: false,
       vibrate: isCall ? [1000, 500, 1000, 500] : undefined,
       data: { chatId: payload.chatId },
     }),

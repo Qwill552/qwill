@@ -15,7 +15,7 @@ const RINGBACK_FREQ = 425;
 const RINGBACK_TONE_MS = 1200;
 
 type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
-type NotificationOptionsWithVibrate = NotificationOptions & { vibrate?: number[] };
+type NotificationOptionsWithVibrate = NotificationOptions & { vibrate?: number[]; renotify?: boolean };
 
 let audioContext: AudioContext | null = null;
 
@@ -59,6 +59,8 @@ async function showVibrationFallback(): Promise<void> {
     const options: NotificationOptionsWithVibrate = {
       tag: CALL_VIBRATION_NOTIFICATION_TAG,
       requireInteraction: false,
+      renotify: true,
+      silent: false,
       vibrate: VIBRATE_PATTERN,
     };
     await registration.showNotification('Входящий звонок', options);
