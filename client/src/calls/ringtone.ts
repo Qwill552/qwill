@@ -1,19 +1,21 @@
-const RINGTONE_PATTERN_MS = 3000;
+const RINGTONE_PATTERN_MS = 4200;
 const RINGTONE_NOTES: { freq: number; offsetMs: number; durationMs: number }[] = [
-  { freq: 523.25, offsetMs: 0, durationMs: 140 },
-  { freq: 659.25, offsetMs: 160, durationMs: 140 },
-  { freq: 783.99, offsetMs: 320, durationMs: 140 },
-  { freq: 1046.5, offsetMs: 480, durationMs: 220 },
+  { freq: 659.25, offsetMs: 0, durationMs: 500 },
+  { freq: 880.0, offsetMs: 520, durationMs: 500 },
+  { freq: 659.25, offsetMs: 1300, durationMs: 500 },
+  { freq: 880.0, offsetMs: 1820, durationMs: 500 },
 ];
 const RINGTONE_GAIN = 0.4;
 const VIBRATE_PATTERN = [1000, 500, 1000, 500];
+const CALL_VIBRATION_NOTIFICATION_TAG = 'incoming-call-vibration';
 
-const RINGBACK_PATTERN_MS = 2000;
+const RINGBACK_PATTERN_MS = 4000;
 const RINGBACK_GAIN = 0.22;
 const RINGBACK_FREQ = 425;
-const RINGBACK_TONE_MS = 600;
+const RINGBACK_TONE_MS = 1200;
 
 type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
+type NotificationOptionsWithVibrate = NotificationOptions & { vibrate?: number[] };
 
 let audioContext: AudioContext | null = null;
 
@@ -45,6 +47,37 @@ function canVibrate(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 }
 
+function nativeVibrate(pattern: number[] | number): boolean {
+  if (!canVibrate()) return false;
+  return navigator.vibrate(pattern);
+}
+
+async function showVibrationFallback(): Promise<void> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const options: NotificationOptionsWithVibrate = {
+      tag: CALL_VIBRATION_NOTIFICATION_TAG,
+      requireInteraction: false,
+      vibrate: VIBRATE_PATTERN,
+    };
+    await registration.showNotification('Входящий звонок', options);
+  } catch {
+    return;
+  }
+}
+
+async function hideVibrationFallback(): Promise<void> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const notifications = (await registration?.getNotifications({ tag: CALL_VIBRATION_NOTIFICATION_TAG })) ?? [];
+    for (const notification of notifications) notification.close();
+  } catch {
+    return;
+  }
+}
+
 let ringtonePlaying = false;
 let ringtoneTimer: ReturnType<typeof setTimeout> | null = null;
 let ringtoneVibrateTimer: ReturnType<typeof setInterval> | null = null;
@@ -66,9 +99,10 @@ export function startRingtone(): void {
   if (ringtonePlaying) return;
   ringtonePlaying = true;
   scheduleRingtoneLoop();
-  if (canVibrate()) {
-    navigator.vibrate(VIBRATE_PATTERN);
+  if (nativeVibrate(VIBRATE_PATTERN)) {
     ringtoneVibrateTimer = setInterval(() => navigator.vibrate(VIBRATE_PATTERN), RINGTONE_PATTERN_MS);
+  } else {
+    void showVibrationFallback();
   }
 }
 
@@ -83,6 +117,7 @@ export function stopRingtone(): void {
     ringtoneVibrateTimer = null;
   }
   if (canVibrate()) navigator.vibrate(0);
+  void hideVibrationFallback();
 }
 
 let ringbackPlaying = false;

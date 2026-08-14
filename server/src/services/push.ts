@@ -33,8 +33,17 @@ export async function unsubscribe(userId: string, endpoint: string): Promise<voi
   await prisma.pushSubscription.deleteMany({ where: { userId, endpoint } });
 }
 
+export interface PushSendOptions {
+  ttl?: number;
+  urgency?: 'very-low' | 'low' | 'normal' | 'high';
+}
+
 /** Шлёт уведомление на все подписки пользователя; мёртвые (410/404) удаляет из БД (этап 9). */
-export async function sendToUser(userId: string, notification: PushNotificationPayload): Promise<void> {
+export async function sendToUser(
+  userId: string,
+  notification: PushNotificationPayload,
+  options?: PushSendOptions,
+): Promise<void> {
   if (!vapidConfigured) return;
 
   const subscriptions = await prisma.pushSubscription.findMany({ where: { userId } });
@@ -46,6 +55,7 @@ export async function sendToUser(userId: string, notification: PushNotificationP
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           JSON.stringify(notification),
+          options ? { TTL: options.ttl, urgency: options.urgency } : undefined,
         );
       } catch (error) {
         const statusCode = (error as { statusCode?: number }).statusCode;
@@ -78,6 +88,8 @@ export async function notifyOfflineMembersOfCall(
   const body = kind === 'VIDEO' ? 'Видеозвонок' : 'Аудиозвонок';
 
   await Promise.all(
-    offlineMemberIds.map((userId) => sendToUser(userId, { title, body, chatId, kind: 'call' })),
+    offlineMemberIds.map((userId) =>
+      sendToUser(userId, { title, body, chatId, kind: 'call' }, { ttl: 45, urgency: 'high' }),
+    ),
   );
 }

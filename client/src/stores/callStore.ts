@@ -209,8 +209,13 @@ export const useCallStore = create<CallStoreState>((set, get) => {
     },
 
     applyEnded(call) {
-      if (get().call?.id !== call.id) return;
+      const state = get();
+      if (state.call?.id !== call.id) return;
       void transport.disconnect();
+      if (state.phase !== 'active') {
+        set(initialState);
+        return;
+      }
       set({ phase: 'ended', call });
       scheduleReset();
     },
