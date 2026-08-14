@@ -3,6 +3,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPresets,
   createLocalAudioTrack,
   type LocalAudioTrack,
   type LocalVideoTrack,
@@ -16,9 +17,16 @@ import {
 import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
 import type { CallParticipantState, CallTransport, CallTransportCallbacks } from './types';
 
+const CAMERA_MAX_BITRATE = 3_000_000;
+const CAMERA_MAX_FRAMERATE = 30;
+
 let room: Room | null = null;
 let cameraFacingMode: 'user' | 'environment' = 'user';
 const audioElements = new Map<string, HTMLAudioElement>();
+
+export function getActiveRoom(): Room | null {
+  return room;
+}
 
 function mapConnectionQuality(quality: ConnectionQuality): 'good' | 'poor' | 'lost' {
   if (quality === ConnectionQuality.Excellent || quality === ConnectionQuality.Good) return 'good';
@@ -105,9 +113,18 @@ async function captureMicrophoneTrack(): Promise<LocalAudioTrack | null> {
 
 async function connect(url: string, token: string, callbacks: CallTransportCallbacks): Promise<void> {
   const activeRoom = new Room({
-    adaptiveStream: true,
+    adaptiveStream: { pixelDensity: 'screen' },
     dynacast: true,
     audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true },
+    videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    publishDefaults: {
+      videoEncoding: {
+        maxBitrate: CAMERA_MAX_BITRATE,
+        maxFramerate: CAMERA_MAX_FRAMERATE,
+        priority: 'high',
+      },
+      degradationPreference: 'maintain-framerate',
+    },
   });
   attachRoomListeners(activeRoom, callbacks);
 
@@ -178,10 +195,10 @@ function attachVideo(userId: string, element: HTMLVideoElement): void {
   findVideoTrack(participant)?.attach(element);
 }
 
-function detachVideo(userId: string): void {
+function detachVideo(userId: string, element: HTMLVideoElement): void {
   const participant = findParticipant(userId);
   if (!participant) return;
-  findVideoTrack(participant)?.detach();
+  findVideoTrack(participant)?.detach(element);
 }
 
 export const liveKitTransport: CallTransport = {

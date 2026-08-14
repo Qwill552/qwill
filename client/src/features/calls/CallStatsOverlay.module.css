@@ -1,0 +1,40 @@
+.overlay {
+  position: absolute;
+  z-index: 3;
+  top: var(--chrome-space-top);
+  left: calc(var(--safe-left) + var(--space-2));
+  max-width: 78vw;
+  padding: var(--space-2);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.label {
+  min-width: 62px;
+  color: var(--text-secondary);
+}
+
+.value {
+  color: var(--text-primary);
+}
+
+.warn {
+  color: var(--danger);
+}
+
+.section {
+  margin-top: var(--space-1);
+  color: var(--text-tertiary);
+}

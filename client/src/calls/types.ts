@@ -48,5 +48,5 @@ export interface CallTransport {
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
   setAudioRoute: (route: AudioRoute) => void;
   attachVideo: (userId: string, element: HTMLVideoElement) => void;
-  detachVideo: (userId: string) => void;
+  detachVideo: (userId: string, element: HTMLVideoElement) => void;
 }

@@ -1,3 +1,6 @@
+import { useCallback, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+
 import { useCallStore } from '../../stores/callStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -7,8 +10,10 @@ import { ChromeBar } from '../../ui/chrome/ChromeBar';
 import { GlassButton } from '../../ui/chrome/GlassButton';
 import { GlassPill } from '../../ui/chrome/GlassPill';
 import { IconButton } from '../../ui/IconButton';
+import { useLongPress } from '../../ui/gestures/useLongPress';
 import { CallControls } from './CallControls';
 import { CallGrid } from './CallGrid';
+import { CallStatsOverlay } from './CallStatsOverlay';
 import { SelfView } from './SelfView';
 import styles from './CallScreen.module.css';
 import { useCallDuration } from './useCallDuration';
@@ -22,6 +27,24 @@ const QUALITY_RING_CLASS: Record<'good' | 'poor' | 'lost', string | undefined> =
   poor: styles.ringPoor,
   lost: styles.ringLost,
 };
+
+const STATS_STORAGE_KEY = 'qwill:call-stats';
+
+function readStatsPreference(): boolean {
+  try {
+    return localStorage.getItem(STATS_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeStatsPreference(enabled: boolean): void {
+  try {
+    localStorage.setItem(STATS_STORAGE_KEY, enabled ? '1' : '0');
+  } catch {
+    return;
+  }
+}
 
 export function CallScreen({ onCollapse }: CallScreenProps) {
   const phase = useCallStore((s) => s.phase);
@@ -53,6 +76,19 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const peerCameraOn = !isGroup && (peerState?.cameraEnabled ?? false);
   const peerVideoRef = useParticipantVideo(otherMember?.id ?? '', peerCameraOn);
 
+  const [statsVisible, setStatsVisible] = useState(readStatsPreference);
+  const toggleStats = useCallback(() => {
+    setStatsVisible((visible) => {
+      writeStatsPreference(!visible);
+      return !visible;
+    });
+  }, []);
+  const longPress = useLongPress({ onLongPress: toggleStats });
+  const onScreenPointerDown = (event: ReactPointerEvent): void => {
+    if ((event.target as HTMLElement).closest('button, a, input')) return;
+    longPress.onPointerDown(event);
+  };
+
   let statusText = '';
   if (error) statusText = error;
   else if (cameraError) statusText = cameraError;
@@ -60,7 +96,15 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   else if (phase === 'active') statusText = duration ?? '00:00';
 
   return (
-    <div className={styles.screen}>
+    <div
+      className={styles.screen}
+      onPointerDown={onScreenPointerDown}
+      onPointerMove={longPress.onPointerMove}
+      onPointerUp={longPress.onPointerUp}
+      onPointerCancel={longPress.onPointerCancel}
+    >
+      {phase === 'active' && statsVisible && <CallStatsOverlay />}
+
       {!isGroup && (
         <video
           ref={peerVideoRef}

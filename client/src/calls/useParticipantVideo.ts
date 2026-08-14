@@ -12,7 +12,7 @@ export function useParticipantVideo(userId: string, active: boolean) {
     const element = videoRef.current;
     if (!element) return undefined;
     attachParticipantVideo(userId, element);
-    return () => detachParticipantVideo(userId);
+    return () => detachParticipantVideo(userId, element);
   }, [active, userId, attachParticipantVideo, detachParticipantVideo]);
 
   return videoRef;

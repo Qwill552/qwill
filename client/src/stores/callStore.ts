@@ -84,7 +84,7 @@ interface CallStoreState extends CallState {
   toggleScreenShare: () => Promise<void>;
   toggleAudioRoute: () => void;
   attachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
-  detachParticipantVideo: (userId: string) => void;
+  detachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
   applyInvite: (call: CallDto) => void;
   applyEnded: (call: CallDto) => void;
   applyCallUpdate: (call: CallDto) => void;
@@ -245,8 +245,8 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       transport.attachVideo(userId, element);
     },
 
-    detachParticipantVideo(userId) {
-      transport.detachVideo(userId);
+    detachParticipantVideo(userId, element) {
+      transport.detachVideo(userId, element);
     },
 
     applyInvite(call) {
