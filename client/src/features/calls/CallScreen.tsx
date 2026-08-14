@@ -1,10 +1,14 @@
 import { useCallStore } from '../../stores/callStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useParticipantVideo } from '../../calls/useParticipantVideo';
+import { Avatar } from '../../ui/Avatar';
+import { ChromeBar } from '../../ui/chrome/ChromeBar';
+import { GlassButton } from '../../ui/chrome/GlassButton';
+import { GlassPill } from '../../ui/chrome/GlassPill';
 import { IconButton } from '../../ui/IconButton';
 import { CallControls } from './CallControls';
 import { CallGrid } from './CallGrid';
-import { ParticipantTile } from './ParticipantTile';
 import { SelfView } from './SelfView';
 import styles from './CallScreen.module.css';
 import { useCallDuration } from './useCallDuration';
@@ -46,6 +50,8 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const otherMember = call?.participants.find((p) => p.user.id !== myId)?.user ?? null;
   const displayName = isGroup ? (chat?.title ?? '…') : (otherMember?.displayName ?? '…');
   const peerState = participants.find((p) => p.userId === otherMember?.id) ?? null;
+  const peerCameraOn = !isGroup && (peerState?.cameraEnabled ?? false);
+  const peerVideoRef = useParticipantVideo(otherMember?.id ?? '', peerCameraOn);
 
   let statusText = '';
   if (error) statusText = error;
@@ -55,11 +61,26 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
 
   return (
     <div className={styles.screen}>
-      {onCollapse && (
-        <div className={styles.top}>
-          <IconButton icon="chevron-down" label="Свернуть звонок" variant="plain" onClick={onCollapse} />
-        </div>
+      {!isGroup && (
+        <video
+          ref={peerVideoRef}
+          autoPlay
+          playsInline
+          className={`${styles.peerVideo} ${peerCameraOn ? styles.peerVideoVisible : ''}`}
+        />
       )}
+
+      {onCollapse &&
+        (peerCameraOn ? (
+          <ChromeBar>
+            <GlassButton icon="chevron-down" label="Свернуть звонок" onClick={onCollapse} />
+            <GlassPill title={displayName} subtitle={statusText} />
+          </ChromeBar>
+        ) : (
+          <div className={styles.top}>
+            <IconButton icon="chevron-down" label="Свернуть звонок" variant="plain" onClick={onCollapse} />
+          </div>
+        ))}
 
       {isGroup ? (
         <div className={styles.groupBody}>
@@ -67,18 +88,9 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
           <CallGrid participants={participants} call={call} activeSpeakerId={activeSpeakerId} />
         </div>
       ) : (
-        <div className={styles.body}>
+        <div className={`${styles.body} ${peerCameraOn ? styles.bodyHidden : ''}`}>
           <div className={`${styles.avatarRing} ${QUALITY_RING_CLASS[connectionQuality] ?? ''}`}>
-            <ParticipantTile
-              userId={otherMember?.id ?? ''}
-              displayName={displayName}
-              avatarUrl={otherMember?.avatarUrl ?? null}
-              avatarColor={otherMember?.avatarColor}
-              micEnabled={peerState?.micEnabled ?? true}
-              isSpeaking={peerState?.isSpeaking ?? false}
-              cameraEnabled={peerState?.cameraEnabled ?? false}
-              variant="featured"
-            />
+            <Avatar label={displayName} avatarUrl={otherMember?.avatarUrl} size={128} color={otherMember?.avatarColor} colorKey={otherMember?.id} />
           </div>
           <h1 className={styles.name}>{displayName}</h1>
           <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
@@ -87,17 +99,32 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
 
       {!isGroup && cameraEnabled && <SelfView />}
 
-      <div className={styles.bottom}>
-        <CallControls
-          micEnabled={micEnabled}
-          onToggleMic={() => void toggleMic()}
-          cameraEnabled={cameraEnabled}
-          onToggleCamera={() => void toggleCamera()}
-          audioRoute={audioRoute}
-          onToggleAudioRoute={toggleAudioRoute}
-          onHangUp={() => void hangUp()}
-        />
-      </div>
+      {peerCameraOn ? (
+        <ChromeBar side="bottom">
+          <CallControls
+            glass
+            micEnabled={micEnabled}
+            onToggleMic={() => void toggleMic()}
+            cameraEnabled={cameraEnabled}
+            onToggleCamera={() => void toggleCamera()}
+            audioRoute={audioRoute}
+            onToggleAudioRoute={toggleAudioRoute}
+            onHangUp={() => void hangUp()}
+          />
+        </ChromeBar>
+      ) : (
+        <div className={styles.bottom}>
+          <CallControls
+            micEnabled={micEnabled}
+            onToggleMic={() => void toggleMic()}
+            cameraEnabled={cameraEnabled}
+            onToggleCamera={() => void toggleCamera()}
+            audioRoute={audioRoute}
+            onToggleAudioRoute={toggleAudioRoute}
+            onHangUp={() => void hangUp()}
+          />
+        </div>
+      )}
     </div>
   );
 }

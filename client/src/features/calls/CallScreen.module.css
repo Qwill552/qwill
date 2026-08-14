@@ -16,7 +16,25 @@
   padding: var(--space-2);
 }
 
+.peerVideo {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--dur-menu) var(--ease-screen);
+  pointer-events: none;
+}
+
+.peerVideoVisible {
+  opacity: 1;
+}
+
 .body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -25,6 +43,13 @@
   gap: var(--space-3);
   padding: 0 var(--screen-pad-x);
   text-align: center;
+  opacity: 1;
+  transition: opacity var(--dur-menu) var(--ease-screen);
+}
+
+.bodyHidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .groupBody {
@@ -94,5 +119,10 @@
 @media (prefers-reduced-motion: reduce) {
   .ringLost {
     animation: none;
+  }
+
+  .peerVideo,
+  .body {
+    transition: none;
   }
 }

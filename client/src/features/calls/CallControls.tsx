@@ -11,6 +11,7 @@ interface CallControlsProps {
   audioRoute: AudioRoute;
   onToggleAudioRoute: () => void;
   onHangUp: () => void;
+  glass?: boolean;
 }
 
 export function CallControls({
@@ -21,10 +22,12 @@ export function CallControls({
   audioRoute,
   onToggleAudioRoute,
   onHangUp,
+  glass = false,
 }: CallControlsProps) {
   const speakerOn = audioRoute === 'speaker';
   const speakerLabel = speakerOn ? 'Выключить громкую связь' : 'Включить громкую связь';
   const cameraLabel = cameraEnabled ? 'Выключить камеру' : 'Включить камеру';
+  const surface = glass ? styles.glass : '';
 
   return (
     <div className={styles.controls}>
@@ -32,7 +35,7 @@ export function CallControls({
         {onToggleCamera ? (
           <button
             type="button"
-            className={`${styles.control} ${styles.compact} ${cameraEnabled ? styles.active : ''}`}
+            className={`${styles.control} ${styles.compact} ${surface} ${cameraEnabled ? styles.active : ''}`}
             aria-label={cameraLabel}
             aria-pressed={cameraEnabled}
             title={cameraLabel}
@@ -44,7 +47,7 @@ export function CallControls({
         ) : (
           <button
             type="button"
-            className={styles.placeholder}
+            className={`${styles.placeholder} ${surface}`}
             disabled
             aria-label="Камера — появится позже"
             title="Камера — появится позже"
@@ -54,7 +57,7 @@ export function CallControls({
         )}
         <button
           type="button"
-          className={styles.placeholder}
+          className={`${styles.placeholder} ${surface}`}
           disabled
           aria-label="Демонстрация экрана — появится позже"
           title="Демонстрация экрана — появится позже"
@@ -66,7 +69,7 @@ export function CallControls({
       <div className={styles.row}>
         <button
           type="button"
-          className={`${styles.control} ${!micEnabled ? styles.active : ''}`}
+          className={`${styles.control} ${surface} ${!micEnabled ? styles.active : ''}`}
           aria-label={micEnabled ? 'Выключить микрофон' : 'Включить микрофон'}
           title={micEnabled ? 'Выключить микрофон' : 'Включить микрофон'}
           onClick={onToggleMic}
@@ -77,7 +80,7 @@ export function CallControls({
 
         <button
           type="button"
-          className={`${styles.control} ${speakerOn ? styles.active : ''}`}
+          className={`${styles.control} ${surface} ${speakerOn ? styles.active : ''}`}
           aria-label={speakerLabel}
           aria-pressed={speakerOn}
           title={speakerLabel}
