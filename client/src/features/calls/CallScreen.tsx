@@ -73,8 +73,15 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
       {onCollapse &&
         (peerCameraOn ? (
           <ChromeBar>
-            <GlassButton icon="chevron-down" label="Свернуть звонок" onClick={onCollapse} />
-            <GlassPill title={displayName} subtitle={statusText} />
+            <GlassButton icon="chevron-down" label="Свернуть звонок" variant="chrome" onClick={onCollapse} />
+            <GlassPill
+              title={
+                <span className={styles.pillRow}>
+                  <span className={styles.pillName}>{displayName}</span>
+                  <span className={`${styles.pillStatus} ${error ? styles.pillStatusError : ''}`}>{statusText}</span>
+                </span>
+              }
+            />
           </ChromeBar>
         ) : (
           <div className={styles.top}>
@@ -100,7 +107,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
       {!isGroup && cameraEnabled && <SelfView />}
 
       {peerCameraOn ? (
-        <ChromeBar side="bottom">
+        <ChromeBar side="bottom" className={styles.bottomBar}>
           <CallControls
             glass
             micEnabled={micEnabled}

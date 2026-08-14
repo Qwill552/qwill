@@ -44,6 +44,21 @@
   color: var(--danger);
 }
 
+.chrome {
+  border-color: var(--chrome-border);
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--chrome-shadow);
+  color: var(--text-primary);
+}
+
+@media (hover: hover) {
+  .chrome:hover:not(:disabled) {
+    background: var(--chrome-bg);
+  }
+}
+
 .glyph {
   pointer-events: none;
 }

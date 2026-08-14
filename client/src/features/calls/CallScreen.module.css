@@ -97,6 +97,37 @@
   color: var(--danger);
 }
 
+.pillRow {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.pillName {
+  overflow: hidden;
+  max-width: 50%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pillStatus {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pillStatusError {
+  color: var(--danger);
+}
+
+.bottomBar {
+  justify-content: center;
+}
+
 .bottom {
   display: flex;
   justify-content: center;
