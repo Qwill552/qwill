@@ -182,3 +182,15 @@ export async function getLiveCallsForParticipant(userId: string): Promise<CallDt
   });
   return calls.map(toCallDto);
 }
+
+export async function getPendingInvites(userId: string): Promise<CallDto[]> {
+  const calls = await prisma.call.findMany({
+    where: {
+      status: 'RINGING',
+      chat: { members: { some: { userId } } },
+      participants: { none: { userId } },
+    },
+    include: callWithRelations,
+  });
+  return calls.map(toCallDto);
+}

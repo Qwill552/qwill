@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
-import { endCall, getActiveCall, joinCall, startCall } from '../src/services/call.js';
+import { endCall, getActiveCall, getPendingInvites, joinCall, startCall } from '../src/services/call.js';
 
 const app = createApp();
 const request = supertest(app);
@@ -124,5 +124,35 @@ describe('call.service (этап ЗВОНКИ-2)', () => {
     await endCall({ callId: started.call.id, userId: a.userId, status: 'ENDED' });
 
     expect(await getActiveCall(chatId, a.userId)).toBeNull();
+  });
+
+  it('getPendingInvites видит RINGING-звонок у приглашённого, но не у инициатора', async () => {
+    const a = await registerUser('pi1_a');
+    const b = await registerUser('pi1_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+    const started = await startCall({ chatId, userId: a.userId, kind: 'AUDIO' });
+
+    const invitesForB = await getPendingInvites(b.userId);
+    const invitesForA = await getPendingInvites(a.userId);
+
+    expect(invitesForB.map((c) => c.id)).toContain(started.call.id);
+    expect(invitesForA.map((c) => c.id)).not.toContain(started.call.id);
+  });
+
+  it('getPendingInvites пуст после joinCall и после завершения звонка', async () => {
+    const a = await registerUser('pi2_a');
+    const b = await registerUser('pi2_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+    const started = await startCall({ chatId, userId: a.userId, kind: 'AUDIO' });
+
+    await joinCall({ callId: started.call.id, userId: b.userId });
+    expect((await getPendingInvites(b.userId)).map((c) => c.id)).not.toContain(started.call.id);
+
+    const c = await registerUser('pi2_c');
+    const outsiderChatId = await createPrivateChat(a.userId, c.username);
+    const secondCall = await startCall({ chatId: outsiderChatId, userId: a.userId, kind: 'AUDIO' });
+    await endCall({ callId: secondCall.call.id, userId: a.userId, status: 'DECLINED' });
+
+    expect((await getPendingInvites(c.userId)).map((call) => call.id)).not.toContain(secondCall.call.id);
   });
 });

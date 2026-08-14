@@ -10,6 +10,7 @@ import {
   messageReactSchema,
   messageSendSchema,
   SocketEvent,
+  type CallInviteEvent,
   type ChatPinnedEvent,
   type ChatReadEvent,
   type ChatReadPayload,
@@ -40,6 +41,7 @@ import {
   reactToMessage,
   sendMessage,
 } from '../services/message.js';
+import * as callService from '../services/call.js';
 import { getUserById } from '../services/user.js';
 import { registerCallHandlers } from './call-handlers.js';
 import { presenceStore } from './presence.js';
@@ -138,6 +140,11 @@ async function bootstrapSocket(socket: Socket, userId: string): Promise<void> {
   if (wasOffline) {
     const event: UserPresenceEvent = { userId, online: true, lastSeenAt: new Date().toISOString() };
     for (const coMemberId of coMemberIds) emitToUser(coMemberId, SocketEvent.UserPresence, event);
+  }
+
+  const pendingInvites = await callService.getPendingInvites(userId);
+  for (const call of pendingInvites) {
+    socket.emit(SocketEvent.CallInvite, { call } satisfies CallInviteEvent);
   }
 }
 
