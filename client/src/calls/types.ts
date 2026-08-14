@@ -2,6 +2,9 @@ import type { CallDto } from '@messenger/shared';
 
 export type CallPhase = 'idle' | 'incoming' | 'outgoing' | 'active' | 'ended';
 
+export const GROUP_CALL_GRID_MAX_PARTICIPANTS = 8;
+export const GROUP_CALL_GRID_ROW_MAX = 3;
+
 export type AudioRoute = 'earpiece' | 'speaker';
 
 export interface CallParticipantState {

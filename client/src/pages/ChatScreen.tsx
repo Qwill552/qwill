@@ -7,6 +7,7 @@ import { ChatWallpaper } from '../features/chat/ChatWallpaper';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
+import { GroupCallBanner } from '../features/calls/GroupCallBanner';
 import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
@@ -72,6 +73,9 @@ export function ChatScreen() {
   const pinnedMessage = useChatStore((s) => (chatId ? s.pinnedByChat[chatId] : undefined)) ?? null;
   const myId = useAuthStore((s) => s.user?.id) ?? null;
   const startCall = useCallStore((s) => s.startCall);
+  const joinCall = useCallStore((s) => s.joinCall);
+  const myCallId = useCallStore((s) => s.call?.id ?? null);
+  const activeCallByChat = useChatStore((s) => s.activeCallByChat);
 
   const selectedMessages = messages.filter((m) => selectedIds.has(m.id));
 
@@ -138,6 +142,9 @@ export function ChatScreen() {
   const activeChat = chats.find((c) => c.id === chatId);
   const isGroup = activeChat?.type === 'GROUP';
   const isTyping = typingUsers.length > 0;
+
+  const activeGroupCall = chatId ? (activeCallByChat[chatId] ?? null) : null;
+  const showCallBanner = isGroup && !!activeGroupCall && activeGroupCall.id !== myCallId;
 
   let subtitle: string | null = null;
   let subtitleTone: 'default' | 'online' | 'accent' = 'default';
@@ -211,9 +218,10 @@ export function ChatScreen() {
         ['--composer-inset-bottom' as string]: emojiPanelOpen
           ? 'calc(var(--emoji-panel-h) + var(--safe-bottom) + var(--chrome-gap))'
           : 'calc(20px + var(--safe-bottom))',
+        ['--call-banner-h' as string]: showCallBanner ? 'calc(52px + var(--chrome-gap))' : '0px',
         // 8px зазор (--chrome-gap, см. ChatScreen.module.css → .pinnedSlot) + 48px сам баннер
         // (PinnedBanner.module.css → .banner) — держать в синхроне при правке любого из трёх мест.
-        ['--pinned-h' as string]: pinnedMessage ? '56px' : '0px',
+        ['--pinned-h' as string]: `calc(${pinnedMessage ? '56px' : '0px'} + var(--call-banner-h))`,
       }}
     >
       <ChatWallpaper />
@@ -237,6 +245,12 @@ export function ChatScreen() {
         onForwardRequest={setForwardRequest}
         pinnedSlot={pinnedSlot}
       />
+
+      {showCallBanner && activeGroupCall && (
+        <div className={styles.callBannerSlot}>
+          <GroupCallBanner call={activeGroupCall} onJoin={() => void joinCall(activeGroupCall.id)} />
+        </div>
+      )}
 
       {/* Крепится поверх .headerFade (z-index 4, между блюром и самой шапкой) — баннер
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}

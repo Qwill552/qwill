@@ -1,0 +1,52 @@
+.grid {
+  display: flex;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-4) var(--screen-pad-x);
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.cell {
+  flex: 0 0 calc((100% - 2 * var(--space-3)) / 3);
+  max-width: calc((100% - 2 * var(--space-3)) / 3);
+  min-width: 44px;
+  aspect-ratio: 1;
+}
+
+.speakerLayout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  min-height: 0;
+  padding: var(--space-4) var(--screen-pad-x);
+}
+
+.speakerSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.strip {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+}
+
+.stripCell {
+  flex: 0 0 auto;
+}

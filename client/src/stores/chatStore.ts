@@ -1,4 +1,5 @@
 import type {
+  CallDto,
   CallEndedEvent,
   CallInviteEvent,
   CallParticipantChangedEvent,
@@ -104,6 +105,7 @@ interface ChatState {
   kickedChatId: string | null;
   /** Закреплённое сообщение открытого чата — обновляется из ChatDto и chat:pinned (этап 6). */
   pinnedByChat: Record<string, MessageDto | null>;
+  activeCallByChat: Record<string, CallDto>;
   /** Режим мультивыбора ленты — общий на всё приложение, так как открыт ровно один чат за раз (этап 6). */
   selectionMode: boolean;
   selectedIds: Set<number>;
@@ -248,6 +250,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   membersByChat: {},
   kickedChatId: null,
   pinnedByChat: {},
+  activeCallByChat: {},
   selectionMode: false,
   selectedIds: new Set(),
 
@@ -971,16 +974,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
       useCallStore.getState().applyInvite(event.call);
+      set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
     });
 
     socket.off(SocketEvent.CallEnded).on(SocketEvent.CallEnded, (event: CallEndedEvent) => {
       useCallStore.getState().applyEnded(event.call);
+      set((state) => {
+        const activeCallByChat = { ...state.activeCallByChat };
+        delete activeCallByChat[event.call.chatId];
+        return { activeCallByChat };
+      });
     });
 
     socket
       .off(SocketEvent.CallParticipantChanged)
       .on(SocketEvent.CallParticipantChanged, (event: CallParticipantChangedEvent) => {
         useCallStore.getState().applyCallUpdate(event.call);
+        set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
       });
 
     socket.off('connect').on('connect', () => {
@@ -1017,6 +1027,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       membersByChat: {},
       kickedChatId: null,
       pinnedByChat: {},
+  activeCallByChat: {},
       selectionMode: false,
       selectedIds: new Set(),
     });

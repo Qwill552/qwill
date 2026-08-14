@@ -1,0 +1,72 @@
+.banner {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  gap: var(--space-2);
+  animation: rise var(--dur-menu) var(--ease-spring) both;
+}
+
+.avatars {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.avatarItem {
+  border: 2px solid var(--card-bg);
+  border-radius: var(--radius-pill);
+}
+
+.avatarItem:not(:first-child) {
+  margin-left: -10px;
+}
+
+.label {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join {
+  display: grid;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--online);
+  color: var(--text-on-primary);
+  cursor: pointer;
+}
+
+.join:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}

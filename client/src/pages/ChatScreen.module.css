@@ -40,6 +40,15 @@
    плавающей хромы (design-system.md, «Отступ хромы от краёв / зазор между кусками»). */
 .pinnedSlot {
   position: absolute;
+  top: calc(var(--chat-header-h) + var(--chrome-gap) + var(--call-banner-h, 0px));
+  right: 0;
+  left: 0;
+  z-index: 4;
+  padding: 0 12px;
+}
+
+.callBannerSlot {
+  position: absolute;
   top: calc(var(--chat-header-h) + var(--chrome-gap));
   right: 0;
   left: 0;

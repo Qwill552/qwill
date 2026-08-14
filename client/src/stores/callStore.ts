@@ -72,6 +72,7 @@ const initialState: CallState = {
 
 interface CallStoreState extends CallState {
   startCall: (chatId: string, kind: CallKind) => Promise<void>;
+  joinCall: (callId: string) => Promise<void>;
   acceptCall: () => Promise<void>;
   declineCall: () => Promise<void>;
   hangUp: () => Promise<void>;
@@ -135,6 +136,24 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       }
       set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
       await connectToRoom(ack.access);
+    },
+
+    async joinCall(callId) {
+      if (get().phase !== 'idle') return;
+      const socket = getSocket();
+      if (!socket) {
+        set({ error: 'Нет соединения' });
+        return;
+      }
+      const payload: CallActionPayload = { callId };
+      const ack = await emitWithAck<CallAcceptAck>(socket, SocketEvent.CallAccept, payload);
+      if (!ack.ok || !ack.access) {
+        set({ error: ack.error?.message ?? 'Не удалось присоединиться к звонку' });
+        return;
+      }
+      set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
+      const connected = await connectToRoom(ack.access);
+      if (connected) set({ phase: 'active', startedAt: Date.now() });
     },
 
     async acceptCall() {

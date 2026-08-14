@@ -1,8 +1,10 @@
 import { useCallStore } from '../../stores/callStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from '../../ui/Avatar';
 import { IconButton } from '../../ui/IconButton';
 import { CallControls } from './CallControls';
+import { CallGrid } from './CallGrid';
 import styles from './CallScreen.module.css';
 import { useCallDuration } from './useCallDuration';
 
@@ -19,6 +21,8 @@ const QUALITY_RING_CLASS: Record<'good' | 'poor' | 'lost', string | undefined> =
 export function CallScreen({ onCollapse }: CallScreenProps) {
   const phase = useCallStore((s) => s.phase);
   const call = useCallStore((s) => s.call);
+  const participants = useCallStore((s) => s.participants);
+  const activeSpeakerId = useCallStore((s) => s.activeSpeakerId);
   const micEnabled = useCallStore((s) => s.micEnabled);
   const audioRoute = useCallStore((s) => s.audioRoute);
   const connectionQuality = useCallStore((s) => s.connectionQuality);
@@ -29,10 +33,14 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const toggleAudioRoute = useCallStore((s) => s.toggleAudioRoute);
 
   const myId = useAuthStore((s) => s.user?.id) ?? null;
+  const chats = useChatStore((s) => s.chats);
   const duration = useCallDuration(startedAt);
 
+  const chat = chats.find((c) => c.id === call?.chatId);
+  const isGroup = chat?.type === 'GROUP';
+
   const otherMember = call?.participants.find((p) => p.user.id !== myId)?.user ?? null;
-  const displayName = otherMember?.displayName ?? '…';
+  const displayName = isGroup ? (chat?.title ?? '…') : (otherMember?.displayName ?? '…');
 
   let statusText = '';
   if (error) statusText = error;
@@ -47,13 +55,20 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
         </div>
       )}
 
-      <div className={styles.body}>
-        <div className={`${styles.avatarRing} ${QUALITY_RING_CLASS[connectionQuality] ?? ''}`}>
-          <Avatar label={displayName} avatarUrl={otherMember?.avatarUrl} size={128} color={otherMember?.avatarColor} colorKey={otherMember?.id} />
+      {isGroup ? (
+        <div className={styles.groupBody}>
+          <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
+          <CallGrid participants={participants} call={call} activeSpeakerId={activeSpeakerId} />
         </div>
-        <h1 className={styles.name}>{displayName}</h1>
-        <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
-      </div>
+      ) : (
+        <div className={styles.body}>
+          <div className={`${styles.avatarRing} ${QUALITY_RING_CLASS[connectionQuality] ?? ''}`}>
+            <Avatar label={displayName} avatarUrl={otherMember?.avatarUrl} size={128} color={otherMember?.avatarColor} colorKey={otherMember?.id} />
+          </div>
+          <h1 className={styles.name}>{displayName}</h1>
+          <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
+        </div>
+      )}
 
       <div className={styles.bottom}>
         <CallControls

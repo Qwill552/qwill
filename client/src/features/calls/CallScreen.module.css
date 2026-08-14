@@ -27,6 +27,18 @@
   text-align: center;
 }
 
+.groupBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  text-align: center;
+}
+
+.groupBody > .status {
+  padding: var(--space-2) var(--screen-pad-x) 0;
+}
+
 .avatarRing {
   padding: 4px;
   border: 3px solid transparent;
