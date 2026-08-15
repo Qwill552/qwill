@@ -254,6 +254,18 @@ async function setScreenShareEnabled(enabled: boolean): Promise<void> {
   await room?.localParticipant.setScreenShareEnabled(enabled, SCREEN_SHARE_CAPTURE_OPTIONS, SCREEN_SHARE_PUBLISH_OPTIONS);
 }
 
+async function renegotiateCaptureRate(track: MediaStreamTrack): Promise<void> {
+  try {
+    await track.applyConstraints({
+      width: SCREEN_SHARE_RESOLUTION.width,
+      height: SCREEN_SHARE_RESOLUTION.height,
+      frameRate: SCREEN_SHARE_MAX_FRAMERATE,
+    });
+  } catch {
+    return;
+  }
+}
+
 async function changeScreenShareSource(): Promise<void> {
   const participant = room?.localParticipant;
   const screenTrack = participant?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
@@ -262,6 +274,7 @@ async function changeScreenShareSource(): Promise<void> {
   const nextTrack = captured.find((track) => track.kind === Track.Kind.Video)?.mediaStreamTrack;
   if (!nextTrack) return;
   await (screenTrack as LocalVideoTrack).replaceTrack(nextTrack, { userProvidedTrack: false });
+  await renegotiateCaptureRate(nextTrack);
 }
 
 function findParticipant(userId: string): Participant | undefined {
