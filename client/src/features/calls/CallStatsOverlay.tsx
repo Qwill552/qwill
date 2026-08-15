@@ -55,6 +55,7 @@ export function CallStatsOverlay() {
   return (
     <div className={styles.overlay}>
       <Row label="захват" value={`${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`} />
+      <Row label="максимум" value={snapshot.captureMax} />
       <Row label="кодек" value={snapshot.codec} />
 
       {transport && (

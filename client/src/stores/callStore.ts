@@ -40,6 +40,7 @@ function toParticipantState(participant: CallParticipantDto): CallParticipantSta
     micEnabled: true,
     cameraEnabled: false,
     screenShareEnabled: false,
+    mirrored: true,
   };
 }
 

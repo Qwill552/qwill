@@ -16,6 +16,7 @@ interface ParticipantTileProps {
   micEnabled: boolean;
   isSpeaking: boolean;
   cameraEnabled: boolean;
+  mirrored: boolean;
   variant: ParticipantTileVariant;
 }
 
@@ -33,6 +34,7 @@ export function ParticipantTile({
   micEnabled,
   isSpeaking,
   cameraEnabled,
+  mirrored,
   variant,
 }: ParticipantTileProps) {
   const isLocal = useAuthStore((s) => s.user?.id === userId);
@@ -56,7 +58,7 @@ export function ParticipantTile({
             autoPlay
             playsInline
             muted={isLocal}
-            className={`${styles.media} ${styles.video} ${cameraEnabled ? '' : styles.mediaHidden}`}
+            className={`${styles.media} ${styles.video} ${mirrored ? styles.mirrored : ''} ${cameraEnabled ? '' : styles.mediaHidden}`}
           />
         </div>
         {!micEnabled && (

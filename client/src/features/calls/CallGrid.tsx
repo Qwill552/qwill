@@ -19,6 +19,7 @@ interface GridParticipant {
   micEnabled: boolean;
   isSpeaking: boolean;
   cameraEnabled: boolean;
+  mirrored: boolean;
 }
 
 function toGridParticipants(participants: CallParticipantState[], call: CallDto | null): GridParticipant[] {
@@ -33,6 +34,7 @@ function toGridParticipants(participants: CallParticipantState[], call: CallDto 
       micEnabled: p.micEnabled,
       isSpeaking: p.isSpeaking,
       cameraEnabled: p.cameraEnabled,
+      mirrored: p.mirrored,
     };
   });
 }
@@ -63,6 +65,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
               micEnabled={speaker.micEnabled}
               isSpeaking={speaker.isSpeaking}
               cameraEnabled={speaker.cameraEnabled}
+              mirrored={speaker.mirrored}
               variant="featured"
             />
           </div>
@@ -78,6 +81,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
                 micEnabled={p.micEnabled}
                 isSpeaking={p.isSpeaking}
                 cameraEnabled={p.cameraEnabled}
+                mirrored={p.mirrored}
                 variant="compact"
               />
             </div>
@@ -102,6 +106,7 @@ export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps)
                 micEnabled={p.micEnabled}
                 isSpeaking={p.isSpeaking}
                 cameraEnabled={p.cameraEnabled}
+                mirrored={p.mirrored}
                 variant="tile"
               />
             </div>

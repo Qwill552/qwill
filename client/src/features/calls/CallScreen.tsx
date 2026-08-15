@@ -74,6 +74,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const displayName = isGroup ? (chat?.title ?? '…') : (otherMember?.displayName ?? '…');
   const peerState = participants.find((p) => p.userId === otherMember?.id) ?? null;
   const peerCameraOn = !isGroup && (peerState?.cameraEnabled ?? false);
+  const peerMirrored = peerState?.mirrored ?? true;
   const peerVideoRef = useParticipantVideo(otherMember?.id ?? '', peerCameraOn);
 
   const [statsVisible, setStatsVisible] = useState(readStatsPreference);
@@ -110,7 +111,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
           ref={peerVideoRef}
           autoPlay
           playsInline
-          className={`${styles.peerVideo} ${peerCameraOn ? styles.peerVideoVisible : ''}`}
+          className={`${styles.peerVideo} ${peerMirrored ? styles.mirrored : ''} ${peerCameraOn ? styles.peerVideoVisible : ''}`}
         />
       )}
 

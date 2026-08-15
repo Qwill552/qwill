@@ -55,6 +55,7 @@ async function issueAccessToken(callId: string, userId: string): Promise<string>
     roomJoin: true,
     canPublish: true,
     canSubscribe: true,
+    canUpdateOwnMetadata: true,
   });
   return await token.toJwt();
 }

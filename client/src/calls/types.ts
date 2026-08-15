@@ -15,6 +15,7 @@ export interface CallParticipantState {
   micEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
+  mirrored: boolean;
 }
 
 export interface CallState {

@@ -21,13 +21,16 @@ export function CallPip({ onExpand }: CallPipProps) {
   const peerCameraEnabled = participants.find((participant) => participant.userId === peerId)?.cameraEnabled ?? false;
   const showsPeer = peerCameraEnabled;
   const hasVideo = !isGroup && (peerCameraEnabled || myCameraEnabled);
-  const videoRef = useParticipantVideo(showsPeer ? peerId : myId, hasVideo);
+  const shownId = showsPeer ? peerId : myId;
+  const mirrored = participants.find((participant) => participant.userId === shownId)?.mirrored ?? true;
+  const videoRef = useParticipantVideo(shownId, hasVideo);
 
   if (!hasVideo) return null;
 
   return (
     <PipWindow
       videoRef={videoRef}
+      mirrored={mirrored}
       corner="bottom-right"
       label={showsPeer ? 'Видео собеседника, нажмите чтобы развернуть звонок' : 'Своё видео, нажмите чтобы переключить камеру'}
       showFlipHint={!showsPeer}

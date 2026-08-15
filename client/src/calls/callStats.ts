@@ -35,6 +35,7 @@ export interface CallStatsSnapshot {
   captureWidth: number;
   captureHeight: number;
   captureFps: number;
+  captureMax: string;
   codec: string;
   outbound: OutboundVideoStats[];
   inbound: InboundVideoStats[];
@@ -151,6 +152,14 @@ function remoteVideoTracks(): (LocalVideoTrack | RemoteVideoTrack)[] {
   return tracks;
 }
 
+function captureCapability(): string {
+  const track = localVideoTrack()?.mediaStreamTrack;
+  if (!track || typeof track.getCapabilities !== 'function') return '—';
+  const capabilities = track.getCapabilities();
+  if (!capabilities.width?.max || !capabilities.height?.max) return '—';
+  return `${capabilities.width.max}×${capabilities.height.max}`;
+}
+
 async function localAudioReport(): Promise<RTCStatsReport | undefined> {
   const track = getActiveRoom()?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
   return track?.getRTCStatsReport();
@@ -164,6 +173,7 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
     captureWidth: 0,
     captureHeight: 0,
     captureFps: 0,
+    captureMax: captureCapability(),
     codec: '—',
     outbound: [],
     inbound: [],

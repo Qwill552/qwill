@@ -42,7 +42,6 @@
 
 .video {
   object-fit: cover;
-  transform: scaleX(-1);
 }
 
 .mediaHidden {
@@ -86,4 +85,8 @@
   .media {
     transition: none;
   }
+}
+
+.mirrored {
+  transform: scaleX(-1);
 }

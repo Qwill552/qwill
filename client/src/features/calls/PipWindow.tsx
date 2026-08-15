@@ -48,11 +48,12 @@ interface PipWindowProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   label: string;
   corner?: Corner;
+  mirrored: boolean;
   showFlipHint?: boolean;
   onTap: () => void;
 }
 
-export function PipWindow({ videoRef, label, corner = 'top-right', showFlipHint = false, onTap }: PipWindowProps) {
+export function PipWindow({ videoRef, label, corner = 'top-right', mirrored, showFlipHint = false, onTap }: PipWindowProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef({
     dragging: false,
@@ -180,7 +181,7 @@ export function PipWindow({ videoRef, label, corner = 'top-right', showFlipHint 
       onPointerCancel={onPointerUp}
       onKeyDown={onKeyDown}
     >
-      <video ref={videoRef} autoPlay playsInline muted className={styles.video} />
+      <video ref={videoRef} autoPlay playsInline muted className={`${styles.video} ${mirrored ? styles.mirrored : ''}`} />
       {showFlipHint && <Icon name="camera-flip" size={16} className={styles.flipHint} />}
     </div>
   );

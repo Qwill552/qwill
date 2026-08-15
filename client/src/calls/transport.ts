@@ -20,7 +20,10 @@ import type { CallParticipantState, CallTransport, CallTransportCallbacks } from
 const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
 
+const FACING_MODE_ATTRIBUTE = 'facingMode';
+
 let room: Room | null = null;
+let activeCallbacks: CallTransportCallbacks | null = null;
 let cameraFacingMode: 'user' | 'environment' = 'user';
 const audioElements = new Map<string, HTMLAudioElement>();
 
@@ -34,6 +37,11 @@ function mapConnectionQuality(quality: ConnectionQuality): 'good' | 'poor' | 'lo
   return 'lost';
 }
 
+function isMirrored(participant: Participant): boolean {
+  if (participant.isLocal) return cameraFacingMode === 'user';
+  return participant.attributes[FACING_MODE_ATTRIBUTE] !== 'environment';
+}
+
 function toParticipantState(participant: Participant): CallParticipantState {
   return {
     userId: participant.identity,
@@ -43,6 +51,7 @@ function toParticipantState(participant: Participant): CallParticipantState {
     micEnabled: participant.isMicrophoneEnabled,
     cameraEnabled: participant.isCameraEnabled,
     screenShareEnabled: participant.isScreenShareEnabled,
+    mirrored: isMirrored(participant),
   };
 }
 
@@ -85,6 +94,7 @@ function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks
       detachRemoteAudio(track, publication);
       notifyParticipants();
     })
+    .on(RoomEvent.ParticipantAttributesChanged, notifyParticipants)
     .on(RoomEvent.TrackMuted, notifyParticipants)
     .on(RoomEvent.TrackUnmuted, notifyParticipants)
     .on(RoomEvent.LocalTrackPublished, notifyParticipants)
@@ -111,6 +121,14 @@ async function captureMicrophoneTrack(): Promise<LocalAudioTrack | null> {
   }
 }
 
+async function publishFacingMode(activeRoom: Room): Promise<void> {
+  try {
+    await activeRoom.localParticipant.setAttributes({ [FACING_MODE_ATTRIBUTE]: cameraFacingMode });
+  } catch {
+    return;
+  }
+}
+
 async function connect(url: string, token: string, callbacks: CallTransportCallbacks): Promise<void> {
   const activeRoom = new Room({
     adaptiveStream: { pixelDensity: 'screen' },
@@ -134,6 +152,8 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
 
   await activeRoom.connect(url, token);
   room = activeRoom;
+  activeCallbacks = callbacks;
+  await publishFacingMode(activeRoom);
 
   if (micTrack) {
     try {
@@ -149,6 +169,7 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
 async function disconnect(): Promise<void> {
   const activeRoom = room;
   room = null;
+  activeCallbacks = null;
   cameraFacingMode = 'user';
   resetAudioRouting();
   audioElements.forEach((element) => element.remove());
@@ -172,6 +193,8 @@ async function flipCamera(): Promise<void> {
   const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
   await (cameraTrack as LocalVideoTrack).restartTrack({ facingMode: nextFacingMode });
   cameraFacingMode = nextFacingMode;
+  activeCallbacks?.onParticipantsChanged(collectParticipants(activeRoom));
+  await publishFacingMode(activeRoom);
 }
 
 async function setScreenShareEnabled(enabled: boolean): Promise<void> {
