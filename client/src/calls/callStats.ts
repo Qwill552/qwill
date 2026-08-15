@@ -9,6 +9,7 @@ export interface OutboundVideoStats {
   height: number;
   fps: number;
   kbps: number;
+  qp: number;
   limitation: string;
   encoder: string;
 }
@@ -54,6 +55,8 @@ interface RtpStatsEntry {
   framesPerSecond?: number;
   qualityLimitationReason?: string;
   encoderImplementation?: string;
+  qpSum?: number;
+  framesEncoded?: number;
   freezeCount?: number;
   packetsLost?: number;
   width?: number;
@@ -71,12 +74,20 @@ interface RtpStatsEntry {
 }
 
 const byteHistory = new Map<string, { bytes: number; timestamp: number }>();
+const qpHistory = new Map<string, { qpSum: number; frames: number }>();
 
 function kbpsFor(key: string, bytes: number, timestamp: number): number {
   const previous = byteHistory.get(key);
   byteHistory.set(key, { bytes, timestamp });
   if (!previous || timestamp <= previous.timestamp) return 0;
   return Math.round(((bytes - previous.bytes) * 8) / (timestamp - previous.timestamp));
+}
+
+function averageQpFor(key: string, qpSum: number, frames: number): number {
+  const previous = qpHistory.get(key);
+  qpHistory.set(key, { qpSum, frames });
+  if (!previous || frames <= previous.frames) return 0;
+  return Math.round((qpSum - previous.qpSum) / (frames - previous.frames));
 }
 
 function entriesOf(report: RTCStatsReport): RtpStatsEntry[] {
@@ -91,11 +102,19 @@ function codecOf(entries: RtpStatsEntry[], codecId: string | undefined): string 
   return codec?.mimeType?.replace('video/', '') ?? '—';
 }
 
-function candidateLabel(entries: RtpStatsEntry[], candidateId: string | undefined): string {
+interface CandidateInfo {
+  label: string;
+  protocol: string;
+}
+
+function candidateInfo(entries: RtpStatsEntry[], candidateId: string | undefined): CandidateInfo {
   const candidate = entries.find((entry) => entry.id === candidateId);
-  if (!candidate) return '?';
+  if (!candidate) return { label: '?', protocol: '?' };
   const relay = candidate.relayProtocol ? `/${candidate.relayProtocol}` : '';
-  return `${candidate.candidateType ?? '?'}${relay}`;
+  return {
+    label: `${candidate.candidateType ?? '?'}${relay}`,
+    protocol: (candidate.relayProtocol ?? candidate.protocol ?? '?').toUpperCase(),
+  };
 }
 
 function selectedPair(entries: RtpStatsEntry[]): RtpStatsEntry | undefined {
@@ -106,10 +125,12 @@ function selectedPair(entries: RtpStatsEntry[]): RtpStatsEntry | undefined {
 function readTransport(entries: RtpStatsEntry[]): TransportStats | null {
   const pair = selectedPair(entries);
   if (!pair) return null;
+  const local = candidateInfo(entries, pair.localCandidateId);
+  const remote = candidateInfo(entries, pair.remoteCandidateId);
   return {
-    protocol: pair.protocol?.toUpperCase() ?? '?',
-    localCandidate: candidateLabel(entries, pair.localCandidateId),
-    remoteCandidate: candidateLabel(entries, pair.remoteCandidateId),
+    protocol: local.protocol,
+    localCandidate: local.label,
+    remoteCandidate: remote.label,
     rttMs: Math.round((pair.currentRoundTripTime ?? 0) * 1000),
     availableOutgoingKbps: Math.round((pair.availableOutgoingBitrate ?? 0) / 1000),
   };
@@ -170,6 +191,7 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
         height: entry.frameHeight ?? 0,
         fps: Math.round(entry.framesPerSecond ?? 0),
         kbps: kbpsFor(`out:${entry.id}`, entry.bytesSent ?? 0, entry.timestamp),
+        qp: averageQpFor(`out:${entry.id}`, entry.qpSum ?? 0, entry.framesEncoded ?? 0),
         limitation: entry.qualityLimitationReason ?? '—',
         encoder: entry.encoderImplementation ?? '—',
       });
@@ -200,4 +222,5 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
 
 export function resetCallStats(): void {
   byteHistory.clear();
+  qpHistory.clear();
 }

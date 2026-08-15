@@ -4,6 +4,7 @@ import { collectCallStats, resetCallStats, type CallStatsSnapshot } from '../../
 import styles from './CallStatsOverlay.module.css';
 
 const REFRESH_MS = 1000;
+const QP_MUSH_THRESHOLD = 60;
 
 function Row({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
@@ -63,8 +64,8 @@ export function CallStatsOverlay() {
         <Row
           key={layer.layer}
           label={layer.layer}
-          value={`${layer.width}×${layer.height} ${layer.fps}fps ${layer.kbps}k ${layer.limitation}`}
-          warn={layer.limitation !== 'none' && layer.limitation !== '—'}
+          value={`${layer.width}×${layer.height} ${layer.fps}fps ${layer.kbps}k qp${layer.qp} ${layer.limitation}`}
+          warn={(layer.limitation !== 'none' && layer.limitation !== '—') || layer.qp > QP_MUSH_THRESHOLD}
         />
       ))}
       {snapshot.outbound[0] && <Row label="энкодер" value={snapshot.outbound[0].encoder} />}
