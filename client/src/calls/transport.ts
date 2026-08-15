@@ -26,9 +26,9 @@ const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
 const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = { resolution: VideoPresets.h720.resolution };
 
-const SCREEN_SHARE_MAX_BITRATE = 10_000_000;
+const SCREEN_SHARE_MAX_BITRATE = 12_000_000;
 const SCREEN_SHARE_MAX_FRAMERATE = 60;
-const SCREEN_SHARE_RESOLUTION: VideoResolution = { width: 1920, height: 1080, frameRate: SCREEN_SHARE_MAX_FRAMERATE };
+const SCREEN_SHARE_RESOLUTION: VideoResolution = { width: 2560, height: 1440, frameRate: SCREEN_SHARE_MAX_FRAMERATE };
 
 const SCREEN_SHARE_CAPTURE_OPTIONS: ScreenShareCaptureOptions = {
   audio: false,
