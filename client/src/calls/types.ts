@@ -51,6 +51,7 @@ export interface CallTransport {
   flipCamera: () => Promise<void>;
   isScreenShareSupported: () => boolean;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
+  changeScreenShareSource: () => Promise<void>;
   setAudioRoute: (route: AudioRoute) => void;
   attachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
   detachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;

@@ -48,6 +48,10 @@ export function ParticipantTile({
   const videoRef = useParticipantVideo(userId, showsScreen || cameraEnabled, showsScreen ? 'screen' : 'camera');
   const size = AVATAR_SIZE[variant];
 
+  if (variant === 'stage') {
+    return <video ref={videoRef} autoPlay playsInline muted className={styles.stageVideo} />;
+  }
+
   if (showsScreen) {
     return (
       <div className={`${styles.tile} ${styles[variant]}`}>

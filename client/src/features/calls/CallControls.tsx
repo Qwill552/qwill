@@ -13,6 +13,7 @@ interface CallControlsProps {
   screenShareSupported?: boolean;
   screenShareEnabled?: boolean;
   onToggleScreenShare?: () => void;
+  onChangeScreenShareSource?: () => void;
   audioRoute: AudioRoute;
   onToggleAudioRoute: () => void;
   onHangUp: () => void;
@@ -30,6 +31,7 @@ export function CallControls({
   screenShareSupported = false,
   screenShareEnabled = false,
   onToggleScreenShare,
+  onChangeScreenShareSource,
   audioRoute,
   onToggleAudioRoute,
   onHangUp,
@@ -94,17 +96,32 @@ export function CallControls({
         )}
 
         {onToggleScreenShare && screenShareSupported && (
-          <button
-            type="button"
-            className={`${styles.control} ${styles.compact} ${surface} ${screenShareEnabled ? styles.active : ''}`}
-            aria-label={screenLabel}
-            aria-pressed={screenShareEnabled}
-            title={screenLabel}
-            onClick={onToggleScreenShare}
-          >
-            <Icon name="monitor" size={20} />
-            <Ripple />
-          </button>
+          <span className={styles.shareAnchor}>
+            <button
+              type="button"
+              className={`${styles.control} ${styles.compact} ${surface} ${screenShareEnabled ? styles.active : ''}`}
+              aria-label={screenLabel}
+              aria-pressed={screenShareEnabled}
+              title={screenLabel}
+              onClick={onToggleScreenShare}
+            >
+              <Icon name="monitor" size={20} />
+              <Ripple />
+            </button>
+            {screenShareEnabled && onChangeScreenShareSource && (
+              <button
+                type="button"
+                className={styles.sourceBadge}
+                aria-label="Сменить источник демонстрации"
+                title="Сменить источник демонстрации"
+                onClick={onChangeScreenShareSource}
+              >
+                <span className={styles.sourceBadgeDot}>
+                  <Icon name="chevron-down" size={14} />
+                </span>
+              </button>
+            )}
+          </span>
         )}
 
         {onToggleScreenShare && !screenShareSupported && (

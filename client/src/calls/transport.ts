@@ -115,6 +115,8 @@ function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks
       detachRemoteAudio(track, publication);
       notifyParticipants();
     })
+    .on(RoomEvent.TrackPublished, notifyParticipants)
+    .on(RoomEvent.TrackUnpublished, notifyParticipants)
     .on(RoomEvent.ParticipantAttributesChanged, notifyParticipants)
     .on(RoomEvent.TrackMuted, notifyParticipants)
     .on(RoomEvent.TrackUnmuted, notifyParticipants)
@@ -232,6 +234,16 @@ async function setScreenShareEnabled(enabled: boolean): Promise<void> {
   await room?.localParticipant.setScreenShareEnabled(enabled, SCREEN_SHARE_CAPTURE_OPTIONS, SCREEN_SHARE_PUBLISH_OPTIONS);
 }
 
+async function changeScreenShareSource(): Promise<void> {
+  const screenTrack = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+  if (!screenTrack) return;
+  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  const [nextTrack] = stream.getVideoTracks();
+  if (!nextTrack) return;
+  nextTrack.contentHint = 'detail';
+  await (screenTrack as LocalVideoTrack).replaceTrack(nextTrack, { userProvidedTrack: false });
+}
+
 function findParticipant(userId: string): Participant | undefined {
   if (!room) return undefined;
   if (room.localParticipant.identity === userId) return room.localParticipant;
@@ -264,6 +276,7 @@ export const liveKitTransport: CallTransport = {
   flipCamera,
   isScreenShareSupported,
   setScreenShareEnabled,
+  changeScreenShareSource,
   attachVideo,
   detachVideo,
 };

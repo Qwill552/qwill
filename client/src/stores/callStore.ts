@@ -83,6 +83,7 @@ interface CallStoreState extends CallState {
   toggleCamera: () => Promise<void>;
   flipCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
+  changeScreenShareSource: () => Promise<void>;
   toggleAudioRoute: () => void;
   isScreenShareSupported: () => boolean;
   attachParticipantVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
@@ -243,6 +244,14 @@ export const useCallStore = create<CallStoreState>((set, get) => {
         set({ screenShareEnabled: next });
       } catch {
         set({ screenShareEnabled: false });
+      }
+    },
+
+    async changeScreenShareSource() {
+      try {
+        await transport.changeScreenShareSource();
+      } catch {
+        return;
       }
     },
 

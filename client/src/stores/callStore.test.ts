@@ -31,6 +31,7 @@ function stubTransport(overrides: Partial<CallTransport> = {}): CallTransport {
     flipCamera: vi.fn().mockResolvedValue(undefined),
     isScreenShareSupported: vi.fn().mockReturnValue(true),
     setScreenShareEnabled: vi.fn().mockResolvedValue(undefined),
+    changeScreenShareSource: vi.fn().mockResolvedValue(undefined),
     setAudioRoute: vi.fn(),
     attachVideo: vi.fn(),
     detachVideo: vi.fn(),

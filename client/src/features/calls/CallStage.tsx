@@ -21,6 +21,8 @@ export function CallStage({ participants, call }: CallStageProps) {
 
   return (
     <div className={styles.stage}>
+      {accent && <p className={styles.accentName}>Экран: {accent.displayName}</p>}
+
       <div className={styles.accent}>
         {accent && (
           <ParticipantTile

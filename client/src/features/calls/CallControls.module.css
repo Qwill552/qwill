@@ -76,9 +76,44 @@
   opacity: 0.5;
 }
 
-.hintAnchor {
+.hintAnchor,
+.shareAnchor {
   position: relative;
   display: inline-flex;
+}
+
+.sourceBadge {
+  position: absolute;
+  right: -22px;
+  bottom: -22px;
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.sourceBadgeDot {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--bg);
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.sourceBadge:focus-visible {
+  outline: none;
+}
+
+.sourceBadge:focus-visible .sourceBadgeDot {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .hint {

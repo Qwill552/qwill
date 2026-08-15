@@ -64,6 +64,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const toggleMic = useCallStore((s) => s.toggleMic);
   const toggleCamera = useCallStore((s) => s.toggleCamera);
   const toggleScreenShare = useCallStore((s) => s.toggleScreenShare);
+  const changeScreenShareSource = useCallStore((s) => s.changeScreenShareSource);
   const isScreenShareSupported = useCallStore((s) => s.isScreenShareSupported);
   const toggleAudioRoute = useCallStore((s) => s.toggleAudioRoute);
 
@@ -173,6 +174,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
             screenShareSupported={screenShareSupported}
             screenShareEnabled={screenShareEnabled}
             onToggleScreenShare={() => void toggleScreenShare()}
+            onChangeScreenShareSource={() => void changeScreenShareSource()}
             audioRoute={audioRoute}
             onToggleAudioRoute={toggleAudioRoute}
             onHangUp={() => void hangUp()}
@@ -188,6 +190,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
             screenShareSupported={screenShareSupported}
             screenShareEnabled={screenShareEnabled}
             onToggleScreenShare={() => void toggleScreenShare()}
+            onChangeScreenShareSource={() => void changeScreenShareSource()}
             audioRoute={audioRoute}
             onToggleAudioRoute={toggleAudioRoute}
             onHangUp={() => void hangUp()}
