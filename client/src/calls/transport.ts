@@ -48,6 +48,14 @@ let activeCallbacks: CallTransportCallbacks | null = null;
 let cameraFacingMode: 'user' | 'environment' = 'user';
 const audioElements = new Map<string, HTMLAudioElement>();
 
+interface VideoBinding {
+  userId: string;
+  element: HTMLVideoElement;
+  source: CallVideoSource;
+}
+
+const videoBindings: VideoBinding[] = [];
+
 export function getActiveRoom(): Room | null {
   return room;
 }
@@ -102,7 +110,10 @@ function detachRemoteAudio(track: RemoteTrack, publication: RemoteTrackPublicati
 }
 
 function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks): void {
-  const notifyParticipants = (): void => callbacks.onParticipantsChanged(collectParticipants(activeRoom));
+  const notifyParticipants = (): void => {
+    reapplyVideoBindings();
+    callbacks.onParticipantsChanged(collectParticipants(activeRoom));
+  };
 
   activeRoom
     .on(RoomEvent.ParticipantConnected, notifyParticipants)
@@ -200,6 +211,7 @@ async function disconnect(): Promise<void> {
   room = null;
   activeCallbacks = null;
   cameraFacingMode = 'user';
+  videoBindings.length = 0;
   resetAudioRouting();
   audioElements.forEach((element) => element.remove());
   audioElements.clear();
@@ -255,13 +267,27 @@ function findVideoTrack(participant: Participant, source: CallVideoSource): Loca
   return participant.getTrackPublication(trackSource)?.videoTrack;
 }
 
-function attachVideo(userId: string, element: HTMLVideoElement, source: CallVideoSource): void {
-  const participant = findParticipant(userId);
+function applyVideoBinding(binding: VideoBinding): void {
+  const participant = findParticipant(binding.userId);
   if (!participant) return;
-  findVideoTrack(participant, source)?.attach(element);
+  const track = findVideoTrack(participant, binding.source);
+  if (!track || track.attachedElements.includes(binding.element)) return;
+  track.attach(binding.element);
+}
+
+function reapplyVideoBindings(): void {
+  videoBindings.forEach(applyVideoBinding);
+}
+
+function attachVideo(userId: string, element: HTMLVideoElement, source: CallVideoSource): void {
+  const binding = { userId, element, source };
+  videoBindings.push(binding);
+  applyVideoBinding(binding);
 }
 
 function detachVideo(userId: string, element: HTMLVideoElement, source: CallVideoSource): void {
+  const index = videoBindings.findIndex((b) => b.userId === userId && b.element === element && b.source === source);
+  if (index >= 0) videoBindings.splice(index, 1);
   const participant = findParticipant(userId);
   if (!participant) return;
   findVideoTrack(participant, source)?.detach(element);
