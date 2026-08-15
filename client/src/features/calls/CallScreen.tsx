@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { useCallStore } from '../../stores/callStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -92,9 +92,15 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
     });
   }, []);
   const longPress = useLongPress({ onLongPress: toggleStats });
+  const hitsControl = (target: EventTarget | null): boolean => Boolean((target as HTMLElement | null)?.closest('button, a, input'));
   const onScreenPointerDown = (event: ReactPointerEvent): void => {
-    if ((event.target as HTMLElement).closest('button, a, input')) return;
+    if (hitsControl(event.target)) return;
     longPress.onPointerDown(event);
+  };
+  const onScreenContextMenu = (event: ReactMouseEvent): void => {
+    if (hitsControl(event.target)) return;
+    event.preventDefault();
+    toggleStats();
   };
 
   let statusText = '';
@@ -110,6 +116,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
       onPointerMove={longPress.onPointerMove}
       onPointerUp={longPress.onPointerUp}
       onPointerCancel={longPress.onPointerCancel}
+      onContextMenu={onScreenContextMenu}
     >
       {phase === 'active' && statsVisible && <CallStatsOverlay />}
 
