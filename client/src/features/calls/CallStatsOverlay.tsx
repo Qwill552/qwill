@@ -4,7 +4,17 @@ import { collectCallStats, resetCallStats, type CallStatsSnapshot } from '../../
 import styles from './CallStatsOverlay.module.css';
 
 const REFRESH_MS = 1000;
-const QP_MUSH_THRESHOLD = 60;
+
+const QP_MUSH_THRESHOLD: Record<string, number> = {
+  h264: 36,
+  vp8: 60,
+  vp9: 140,
+  av1: 140,
+};
+
+function qpThresholdFor(codec: string): number {
+  return QP_MUSH_THRESHOLD[codec.toLowerCase()] ?? 60;
+}
 
 function Row({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
@@ -40,6 +50,7 @@ export function CallStatsOverlay() {
 
   const transport = snapshot.transport;
   const relayed = transport?.protocol === 'TCP' || transport?.localCandidate.startsWith('relay');
+  const qpLimit = qpThresholdFor(snapshot.codec);
 
   return (
     <div className={styles.overlay}>
@@ -65,7 +76,7 @@ export function CallStatsOverlay() {
           key={layer.layer}
           label={layer.layer}
           value={`${layer.width}×${layer.height} ${layer.fps}fps ${layer.kbps}k qp${layer.qp} ${layer.limitation}`}
-          warn={(layer.limitation !== 'none' && layer.limitation !== '—') || layer.qp > QP_MUSH_THRESHOLD}
+          warn={(layer.limitation !== 'none' && layer.limitation !== '—') || layer.qp > qpLimit}
         />
       ))}
       {snapshot.outbound[0] && <Row label="энкодер" value={snapshot.outbound[0].encoder} />}

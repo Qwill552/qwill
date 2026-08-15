@@ -118,6 +118,8 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
     audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true },
     videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
     publishDefaults: {
+      videoCodec: 'h264',
+      simulcast: false,
       videoEncoding: {
         maxBitrate: CAMERA_MAX_BITRATE,
         maxFramerate: CAMERA_MAX_FRAMERATE,
