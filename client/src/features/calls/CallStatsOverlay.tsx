@@ -54,7 +54,7 @@ export function CallStatsOverlay() {
 
   return (
     <div className={styles.overlay}>
-      <Row label="захват" value={`${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`} />
+      <Row label={`захват ${snapshot.captureLabel}`} value={`${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`} />
       <Row label="максимум" value={snapshot.captureMax} />
       <Row label="кодек" value={snapshot.codec} />
 
@@ -85,8 +85,8 @@ export function CallStatsOverlay() {
       {snapshot.inbound.length > 0 && <div className={styles.section}>приём</div>}
       {snapshot.inbound.map((stream, index) => (
         <Row
-          key={index}
-          label={`peer${index + 1}`}
+          key={`${stream.label}-${index}`}
+          label={stream.label}
           value={`${stream.width}×${stream.height} ${stream.fps}fps ${stream.kbps}k потерь ${stream.packetsLost} фризов ${stream.freezes}`}
           warn={stream.freezes > 0}
         />

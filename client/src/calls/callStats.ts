@@ -15,6 +15,7 @@ export interface OutboundVideoStats {
 }
 
 export interface InboundVideoStats {
+  label: string;
   width: number;
   height: number;
   fps: number;
@@ -32,6 +33,7 @@ export interface TransportStats {
 }
 
 export interface CallStatsSnapshot {
+  captureLabel: string;
   captureWidth: number;
   captureHeight: number;
   captureFps: number;
@@ -137,25 +139,41 @@ function readTransport(entries: RtpStatsEntry[]): TransportStats | null {
   };
 }
 
-function localVideoTrack(): LocalVideoTrack | undefined {
-  return getActiveRoom()?.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack;
+interface LabelledVideoTrack<T> {
+  label: string;
+  track: T;
 }
 
-function remoteVideoTracks(): (LocalVideoTrack | RemoteVideoTrack)[] {
+function localVideoTracks(): LabelledVideoTrack<LocalVideoTrack>[] {
+  const participant = getActiveRoom()?.localParticipant;
+  if (!participant) return [];
+  const screen = participant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+  const camera = participant.getTrackPublication(Track.Source.Camera)?.videoTrack;
+  const tracks: LabelledVideoTrack<LocalVideoTrack>[] = [];
+  if (screen) tracks.push({ label: 'экран', track: screen });
+  if (camera) tracks.push({ label: 'камера', track: camera });
+  return tracks;
+}
+
+function remoteVideoTracks(): LabelledVideoTrack<LocalVideoTrack | RemoteVideoTrack>[] {
   const room = getActiveRoom();
   if (!room) return [];
-  const tracks: (LocalVideoTrack | RemoteVideoTrack)[] = [];
+  const tracks: LabelledVideoTrack<LocalVideoTrack | RemoteVideoTrack>[] = [];
+  let index = 0;
   for (const participant of room.remoteParticipants.values()) {
-    const track = participant.getTrackPublication(Track.Source.Camera)?.videoTrack;
-    if (track) tracks.push(track);
+    index += 1;
+    const screen = participant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+    const camera = participant.getTrackPublication(Track.Source.Camera)?.videoTrack;
+    if (screen) tracks.push({ label: `peer${index} экран`, track: screen });
+    if (camera) tracks.push({ label: `peer${index} камера`, track: camera });
   }
   return tracks;
 }
 
-function captureCapability(): string {
-  const track = localVideoTrack()?.mediaStreamTrack;
-  if (!track || typeof track.getCapabilities !== 'function') return '—';
-  const capabilities = track.getCapabilities();
+function captureCapability(track: LocalVideoTrack | undefined): string {
+  const mediaStreamTrack = track?.mediaStreamTrack;
+  if (!mediaStreamTrack || typeof mediaStreamTrack.getCapabilities !== 'function') return '—';
+  const capabilities = mediaStreamTrack.getCapabilities();
   if (!capabilities.width?.max || !capabilities.height?.max) return '—';
   return `${capabilities.width.max}×${capabilities.height.max}`;
 }
@@ -169,24 +187,28 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
   const room = getActiveRoom();
   if (!room) return null;
 
+  const publishers = localVideoTracks();
   const snapshot: CallStatsSnapshot = {
+    captureLabel: publishers[0]?.label ?? '—',
     captureWidth: 0,
     captureHeight: 0,
     captureFps: 0,
-    captureMax: captureCapability(),
+    captureMax: captureCapability(publishers[0]?.track),
     codec: '—',
     outbound: [],
     inbound: [],
     transport: null,
   };
 
-  const publisherReport = (await localVideoTrack()?.getRTCStatsReport()) ?? (await localAudioReport());
-  if (publisherReport) {
-    const entries = entriesOf(publisherReport);
-    snapshot.transport = readTransport(entries);
+  for (const publisher of publishers) {
+    const report = await publisher.track.getRTCStatsReport();
+    if (!report) continue;
+    const entries = entriesOf(report);
+    if (!snapshot.transport) snapshot.transport = readTransport(entries);
 
+    const isPrimary = publisher === publishers[0];
     const source = entries.find((entry) => entry.type === 'media-source' && entry.kind === 'video');
-    if (source) {
+    if (source && isPrimary) {
       snapshot.captureWidth = source.width ?? 0;
       snapshot.captureHeight = source.height ?? 0;
       snapshot.captureFps = Math.round(source.framesPerSecond ?? 0);
@@ -194,9 +216,9 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
 
     for (const entry of entries) {
       if (entry.type !== 'outbound-rtp' || entry.kind !== 'video') continue;
-      snapshot.codec = codecOf(entries, entry.codecId);
+      if (isPrimary) snapshot.codec = codecOf(entries, entry.codecId);
       snapshot.outbound.push({
-        layer: entry.rid ?? 'single',
+        layer: entry.rid ? `${publisher.label}/${entry.rid}` : publisher.label,
         width: entry.frameWidth ?? 0,
         height: entry.frameHeight ?? 0,
         fps: Math.round(entry.framesPerSecond ?? 0),
@@ -206,17 +228,22 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
         encoder: entry.encoderImplementation ?? '—',
       });
     }
-    snapshot.outbound.sort((a, b) => a.height - b.height);
   }
 
-  for (const track of remoteVideoTracks()) {
-    const report = await track.getRTCStatsReport();
+  if (!snapshot.transport) {
+    const audioReport = await localAudioReport();
+    if (audioReport) snapshot.transport = readTransport(entriesOf(audioReport));
+  }
+
+  for (const subscription of remoteVideoTracks()) {
+    const report = await subscription.track.getRTCStatsReport();
     if (!report) continue;
     const entries = entriesOf(report);
     if (!snapshot.transport) snapshot.transport = readTransport(entries);
     for (const entry of entries) {
       if (entry.type !== 'inbound-rtp' || entry.kind !== 'video') continue;
       snapshot.inbound.push({
+        label: subscription.label,
         width: entry.frameWidth ?? 0,
         height: entry.frameHeight ?? 0,
         fps: Math.round(entry.framesPerSecond ?? 0),
