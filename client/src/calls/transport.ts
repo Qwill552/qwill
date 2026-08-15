@@ -2,7 +2,6 @@ import {
   ConnectionQuality,
   Room,
   RoomEvent,
-  ScreenSharePresets,
   Track,
   VideoPresets,
   createLocalAudioTrack,
@@ -17,6 +16,7 @@ import {
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
   type VideoCaptureOptions,
+  type VideoResolution,
 } from 'livekit-client';
 
 import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
@@ -26,10 +26,14 @@ const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
 const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = { resolution: VideoPresets.h720.resolution };
 
+const SCREEN_SHARE_MAX_BITRATE = 6_000_000;
+const SCREEN_SHARE_MAX_FRAMERATE = 60;
+const SCREEN_SHARE_RESOLUTION: VideoResolution = { width: 1920, height: 1080, frameRate: SCREEN_SHARE_MAX_FRAMERATE };
+
 const SCREEN_SHARE_CAPTURE_OPTIONS: ScreenShareCaptureOptions = {
   audio: false,
-  contentHint: 'detail',
-  resolution: ScreenSharePresets.h1080fps15.resolution,
+  contentHint: 'motion',
+  resolution: SCREEN_SHARE_RESOLUTION,
   selfBrowserSurface: 'include',
   surfaceSwitching: 'include',
 };
@@ -37,8 +41,12 @@ const SCREEN_SHARE_CAPTURE_OPTIONS: ScreenShareCaptureOptions = {
 const SCREEN_SHARE_PUBLISH_OPTIONS: TrackPublishOptions = {
   videoCodec: 'h264',
   simulcast: false,
-  screenShareEncoding: ScreenSharePresets.h1080fps15.encoding,
-  degradationPreference: 'maintain-resolution',
+  screenShareEncoding: {
+    maxBitrate: SCREEN_SHARE_MAX_BITRATE,
+    maxFramerate: SCREEN_SHARE_MAX_FRAMERATE,
+    priority: 'high',
+  },
+  degradationPreference: 'maintain-framerate',
 };
 
 const FACING_MODE_ATTRIBUTE = 'facingMode';
@@ -249,10 +257,17 @@ async function setScreenShareEnabled(enabled: boolean): Promise<void> {
 async function changeScreenShareSource(): Promise<void> {
   const screenTrack = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
   if (!screenTrack) return;
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      width: SCREEN_SHARE_RESOLUTION.width,
+      height: SCREEN_SHARE_RESOLUTION.height,
+      frameRate: SCREEN_SHARE_MAX_FRAMERATE,
+    },
+    audio: false,
+  });
   const [nextTrack] = stream.getVideoTracks();
   if (!nextTrack) return;
-  nextTrack.contentHint = 'detail';
+  nextTrack.contentHint = 'motion';
   await (screenTrack as LocalVideoTrack).replaceTrack(nextTrack, { userProvidedTrack: false });
 }
 
