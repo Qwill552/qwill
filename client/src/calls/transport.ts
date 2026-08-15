@@ -12,6 +12,7 @@ import {
   type RemoteTrack,
   type RemoteTrackPublication,
   type RemoteVideoTrack,
+  type VideoCaptureOptions,
 } from 'livekit-client';
 
 import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
@@ -19,6 +20,7 @@ import type { CallParticipantState, CallTransport, CallTransportCallbacks } from
 
 const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
+const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = { resolution: VideoPresets.h720.resolution };
 
 const FACING_MODE_ATTRIBUTE = 'facingMode';
 
@@ -134,7 +136,7 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
     adaptiveStream: { pixelDensity: 'screen' },
     dynacast: true,
     audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true },
-    videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    videoCaptureDefaults: CAMERA_CAPTURE_OPTIONS,
     publishDefaults: {
       videoCodec: 'h264',
       simulcast: false,
@@ -191,7 +193,7 @@ async function flipCamera(): Promise<void> {
   const cameraTrack = activeRoom.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack;
   if (!cameraTrack) return;
   const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
-  await (cameraTrack as LocalVideoTrack).restartTrack({ facingMode: nextFacingMode });
+  await (cameraTrack as LocalVideoTrack).restartTrack({ ...CAMERA_CAPTURE_OPTIONS, facingMode: nextFacingMode });
   cameraFacingMode = nextFacingMode;
   activeCallbacks?.onParticipantsChanged(collectParticipants(activeRoom));
   await publishFacingMode(activeRoom);
