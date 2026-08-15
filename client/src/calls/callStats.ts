@@ -39,6 +39,7 @@ export interface CallStatsSnapshot {
   captureFps: number;
   captureTrack: string;
   captureMax: string;
+  capturePaused: boolean;
   codec: string;
   outbound: OutboundVideoStats[];
   inbound: InboundVideoStats[];
@@ -204,6 +205,7 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
     captureFps: 0,
     captureTrack: captureSettings(publishers[0]?.track),
     captureMax: captureCapability(publishers[0]?.track),
+    capturePaused: publishers[0]?.track.isUpstreamPaused ?? false,
     codec: '—',
     outbound: [],
     inbound: [],
@@ -275,7 +277,7 @@ export function resetCallStats(): void {
 export function formatCallStats(snapshot: CallStatsSnapshot): string {
   const lines: string[] = [
     `захват ${snapshot.captureLabel}: ${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`,
-    `трек: ${snapshot.captureTrack}`,
+    `трек: ${snapshot.captureTrack}${snapshot.capturePaused ? ' (отдача на паузе)' : ''}`,
     `максимум: ${snapshot.captureMax}`,
     `кодек: ${snapshot.codec}`,
   ];
