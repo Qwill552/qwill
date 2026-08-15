@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import type { AudioRoute } from '../../calls/types';
 import { Icon } from '../../ui/Icon';
 import { Ripple } from '../../ui/Ripple';
@@ -8,17 +10,26 @@ interface CallControlsProps {
   onToggleMic: () => void;
   cameraEnabled?: boolean;
   onToggleCamera?: () => void;
+  screenShareSupported?: boolean;
+  screenShareEnabled?: boolean;
+  onToggleScreenShare?: () => void;
   audioRoute: AudioRoute;
   onToggleAudioRoute: () => void;
   onHangUp: () => void;
   glass?: boolean;
 }
 
+const SCREEN_SHARE_HINT = 'С телефона в браузере недоступно, появится в приложении для Android';
+const SCREEN_SHARE_HINT_MS = 4000;
+
 export function CallControls({
   micEnabled,
   onToggleMic,
   cameraEnabled = false,
   onToggleCamera,
+  screenShareSupported = false,
+  screenShareEnabled = false,
+  onToggleScreenShare,
   audioRoute,
   onToggleAudioRoute,
   onHangUp,
@@ -27,7 +38,21 @@ export function CallControls({
   const speakerOn = audioRoute === 'speaker';
   const speakerLabel = speakerOn ? 'Выключить громкую связь' : 'Включить громкую связь';
   const cameraLabel = cameraEnabled ? 'Выключить камеру' : 'Включить камеру';
+  const screenLabel = screenShareEnabled ? 'Остановить демонстрацию экрана' : 'Демонстрация экрана';
   const surface = glass ? styles.glass : '';
+
+  const [hintVisible, setHintVisible] = useState(false);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+  }, []);
+
+  const showHint = useCallback(() => {
+    setHintVisible(true);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHintVisible(false), SCREEN_SHARE_HINT_MS);
+  }, []);
 
   return (
     <div className={styles.controls}>
@@ -55,15 +80,52 @@ export function CallControls({
             <Icon name="camera" size={22} />
           </button>
         )}
-        <button
-          type="button"
-          className={`${styles.placeholder} ${surface}`}
-          disabled
-          aria-label="Демонстрация экрана — появится позже"
-          title="Демонстрация экрана — появится позже"
-        >
-          <Icon name="monitor" size={22} />
-        </button>
+
+        {!onToggleScreenShare && (
+          <button
+            type="button"
+            className={`${styles.placeholder} ${surface}`}
+            disabled
+            aria-label="Демонстрация экрана"
+            title="Демонстрация экрана"
+          >
+            <Icon name="monitor" size={22} />
+          </button>
+        )}
+
+        {onToggleScreenShare && screenShareSupported && (
+          <button
+            type="button"
+            className={`${styles.control} ${styles.compact} ${surface} ${screenShareEnabled ? styles.active : ''}`}
+            aria-label={screenLabel}
+            aria-pressed={screenShareEnabled}
+            title={screenLabel}
+            onClick={onToggleScreenShare}
+          >
+            <Icon name="monitor" size={20} />
+            <Ripple />
+          </button>
+        )}
+
+        {onToggleScreenShare && !screenShareSupported && (
+          <span className={styles.hintAnchor}>
+            <button
+              type="button"
+              className={`${styles.control} ${styles.compact} ${styles.unavailable} ${surface}`}
+              aria-disabled="true"
+              aria-label={`Демонстрация экрана. ${SCREEN_SHARE_HINT}`}
+              title={SCREEN_SHARE_HINT}
+              onClick={showHint}
+            >
+              <Icon name="monitor" size={20} />
+            </button>
+            {hintVisible && (
+              <span className={styles.hint} role="status">
+                {SCREEN_SHARE_HINT}
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       <div className={styles.row}>

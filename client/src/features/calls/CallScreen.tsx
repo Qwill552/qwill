@@ -13,6 +13,7 @@ import { IconButton } from '../../ui/IconButton';
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { CallControls } from './CallControls';
 import { CallGrid } from './CallGrid';
+import { CallStage } from './CallStage';
 import { CallStatsOverlay } from './CallStatsOverlay';
 import { SelfView } from './SelfView';
 import styles from './CallScreen.module.css';
@@ -53,6 +54,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const activeSpeakerId = useCallStore((s) => s.activeSpeakerId);
   const micEnabled = useCallStore((s) => s.micEnabled);
   const cameraEnabled = useCallStore((s) => s.cameraEnabled);
+  const screenShareEnabled = useCallStore((s) => s.screenShareEnabled);
   const audioRoute = useCallStore((s) => s.audioRoute);
   const connectionQuality = useCallStore((s) => s.connectionQuality);
   const startedAt = useCallStore((s) => s.startedAt);
@@ -61,6 +63,8 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const hangUp = useCallStore((s) => s.hangUp);
   const toggleMic = useCallStore((s) => s.toggleMic);
   const toggleCamera = useCallStore((s) => s.toggleCamera);
+  const toggleScreenShare = useCallStore((s) => s.toggleScreenShare);
+  const isScreenShareSupported = useCallStore((s) => s.isScreenShareSupported);
   const toggleAudioRoute = useCallStore((s) => s.toggleAudioRoute);
 
   const myId = useAuthStore((s) => s.user?.id) ?? null;
@@ -73,7 +77,9 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const otherMember = call?.participants.find((p) => p.user.id !== myId)?.user ?? null;
   const displayName = isGroup ? (chat?.title ?? '…') : (otherMember?.displayName ?? '…');
   const peerState = participants.find((p) => p.userId === otherMember?.id) ?? null;
-  const peerCameraOn = !isGroup && (peerState?.cameraEnabled ?? false);
+  const stageActive = participants.some((p) => p.screenShareEnabled);
+  const peerCameraOn = !isGroup && !stageActive && (peerState?.cameraEnabled ?? false);
+  const screenShareSupported = isScreenShareSupported();
   const peerMirrored = peerState?.mirrored ?? true;
   const peerVideoRef = useParticipantVideo(otherMember?.id ?? '', peerCameraOn);
 
@@ -134,7 +140,12 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
           </div>
         ))}
 
-      {isGroup ? (
+      {stageActive ? (
+        <div className={styles.groupBody}>
+          <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
+          <CallStage participants={participants} call={call} />
+        </div>
+      ) : isGroup ? (
         <div className={styles.groupBody}>
           <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{statusText}</p>
           <CallGrid participants={participants} call={call} activeSpeakerId={activeSpeakerId} />
@@ -149,7 +160,7 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
         </div>
       )}
 
-      {!isGroup && cameraEnabled && <SelfView />}
+      {!isGroup && cameraEnabled && !stageActive && <SelfView />}
 
       {peerCameraOn ? (
         <ChromeBar side="bottom" className={styles.bottomBar}>
@@ -159,6 +170,9 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
             onToggleMic={() => void toggleMic()}
             cameraEnabled={cameraEnabled}
             onToggleCamera={() => void toggleCamera()}
+            screenShareSupported={screenShareSupported}
+            screenShareEnabled={screenShareEnabled}
+            onToggleScreenShare={() => void toggleScreenShare()}
             audioRoute={audioRoute}
             onToggleAudioRoute={toggleAudioRoute}
             onHangUp={() => void hangUp()}
@@ -171,6 +185,9 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
             onToggleMic={() => void toggleMic()}
             cameraEnabled={cameraEnabled}
             onToggleCamera={() => void toggleCamera()}
+            screenShareSupported={screenShareSupported}
+            screenShareEnabled={screenShareEnabled}
+            onToggleScreenShare={() => void toggleScreenShare()}
             audioRoute={audioRoute}
             onToggleAudioRoute={toggleAudioRoute}
             onHangUp={() => void hangUp()}

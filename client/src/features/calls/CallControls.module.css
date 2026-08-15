@@ -70,6 +70,34 @@
   opacity: 0.5;
 }
 
+.unavailable {
+  color: var(--text-tertiary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.hintAnchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.hint {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  width: max-content;
+  max-width: 220px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--menu-border);
+  border-radius: var(--radius-sm);
+  background: var(--menu-bg);
+  color: var(--text-primary);
+  font-size: var(--font-caption);
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .hangup {
   border-color: transparent;
   background: var(--danger);

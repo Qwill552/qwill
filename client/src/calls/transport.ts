@@ -2,25 +2,44 @@ import {
   ConnectionQuality,
   Room,
   RoomEvent,
+  ScreenSharePresets,
   Track,
   VideoPresets,
   createLocalAudioTrack,
   type LocalAudioTrack,
+  type LocalTrackPublication,
   type LocalVideoTrack,
   type Participant,
   type RemoteAudioTrack,
   type RemoteTrack,
   type RemoteTrackPublication,
   type RemoteVideoTrack,
+  type ScreenShareCaptureOptions,
+  type TrackPublishOptions,
   type VideoCaptureOptions,
 } from 'livekit-client';
 
 import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
-import type { CallParticipantState, CallTransport, CallTransportCallbacks } from './types';
+import type { CallParticipantState, CallTransport, CallTransportCallbacks, CallVideoSource } from './types';
 
 const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
 const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = { resolution: VideoPresets.h720.resolution };
+
+const SCREEN_SHARE_CAPTURE_OPTIONS: ScreenShareCaptureOptions = {
+  audio: false,
+  contentHint: 'detail',
+  resolution: ScreenSharePresets.h1080fps15.resolution,
+  selfBrowserSurface: 'include',
+  surfaceSwitching: 'include',
+};
+
+const SCREEN_SHARE_PUBLISH_OPTIONS: TrackPublishOptions = {
+  videoCodec: 'h264',
+  simulcast: false,
+  screenShareEncoding: ScreenSharePresets.h1080fps15.encoding,
+  degradationPreference: 'maintain-resolution',
+};
 
 const FACING_MODE_ATTRIBUTE = 'facingMode';
 
@@ -99,8 +118,14 @@ function attachRoomListeners(activeRoom: Room, callbacks: CallTransportCallbacks
     .on(RoomEvent.ParticipantAttributesChanged, notifyParticipants)
     .on(RoomEvent.TrackMuted, notifyParticipants)
     .on(RoomEvent.TrackUnmuted, notifyParticipants)
-    .on(RoomEvent.LocalTrackPublished, notifyParticipants)
-    .on(RoomEvent.LocalTrackUnpublished, notifyParticipants)
+    .on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
+      if (publication.source === Track.Source.ScreenShare) callbacks.onScreenShareChanged(true);
+      notifyParticipants();
+    })
+    .on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
+      if (publication.source === Track.Source.ScreenShare) callbacks.onScreenShareChanged(false);
+      notifyParticipants();
+    })
     .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       callbacks.onActiveSpeakerChanged(speakers[0]?.identity ?? null);
       notifyParticipants();
@@ -199,8 +224,12 @@ async function flipCamera(): Promise<void> {
   await publishFacingMode(activeRoom);
 }
 
+function isScreenShareSupported(): boolean {
+  return typeof navigator?.mediaDevices?.getDisplayMedia === 'function';
+}
+
 async function setScreenShareEnabled(enabled: boolean): Promise<void> {
-  await room?.localParticipant.setScreenShareEnabled(enabled);
+  await room?.localParticipant.setScreenShareEnabled(enabled, SCREEN_SHARE_CAPTURE_OPTIONS, SCREEN_SHARE_PUBLISH_OPTIONS);
 }
 
 function findParticipant(userId: string): Participant | undefined {
@@ -209,23 +238,21 @@ function findParticipant(userId: string): Participant | undefined {
   return room.remoteParticipants.get(userId);
 }
 
-function findVideoTrack(participant: Participant): LocalVideoTrack | RemoteVideoTrack | undefined {
-  return (
-    participant.getTrackPublication(Track.Source.Camera)?.videoTrack ??
-    participant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack
-  );
+function findVideoTrack(participant: Participant, source: CallVideoSource): LocalVideoTrack | RemoteVideoTrack | undefined {
+  const trackSource = source === 'screen' ? Track.Source.ScreenShare : Track.Source.Camera;
+  return participant.getTrackPublication(trackSource)?.videoTrack;
 }
 
-function attachVideo(userId: string, element: HTMLVideoElement): void {
+function attachVideo(userId: string, element: HTMLVideoElement, source: CallVideoSource): void {
   const participant = findParticipant(userId);
   if (!participant) return;
-  findVideoTrack(participant)?.attach(element);
+  findVideoTrack(participant, source)?.attach(element);
 }
 
-function detachVideo(userId: string, element: HTMLVideoElement): void {
+function detachVideo(userId: string, element: HTMLVideoElement, source: CallVideoSource): void {
   const participant = findParticipant(userId);
   if (!participant) return;
-  findVideoTrack(participant)?.detach(element);
+  findVideoTrack(participant, source)?.detach(element);
 }
 
 export const liveKitTransport: CallTransport = {
@@ -235,6 +262,7 @@ export const liveKitTransport: CallTransport = {
   setAudioRoute,
   setCameraEnabled,
   flipCamera,
+  isScreenShareSupported,
   setScreenShareEnabled,
   attachVideo,
   detachVideo,

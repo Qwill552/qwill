@@ -6,7 +6,7 @@ import { Avatar } from '../../ui/Avatar';
 import { Icon } from '../../ui/Icon';
 import styles from './ParticipantTile.module.css';
 
-type ParticipantTileVariant = 'tile' | 'featured' | 'compact';
+type ParticipantTileVariant = 'tile' | 'featured' | 'compact' | 'screen' | 'stage';
 
 interface ParticipantTileProps {
   userId: string;
@@ -24,7 +24,13 @@ const AVATAR_SIZE: Record<ParticipantTileVariant, number> = {
   tile: 64,
   featured: 128,
   compact: 40,
+  screen: 0,
+  stage: 0,
 };
+
+function isScreenVariant(variant: ParticipantTileVariant): boolean {
+  return variant === 'screen' || variant === 'stage';
+}
 
 export function ParticipantTile({
   userId,
@@ -38,8 +44,23 @@ export function ParticipantTile({
   variant,
 }: ParticipantTileProps) {
   const isLocal = useAuthStore((s) => s.user?.id === userId);
-  const videoRef = useParticipantVideo(userId, cameraEnabled);
+  const showsScreen = isScreenVariant(variant);
+  const videoRef = useParticipantVideo(userId, showsScreen || cameraEnabled, showsScreen ? 'screen' : 'camera');
   const size = AVATAR_SIZE[variant];
+
+  if (showsScreen) {
+    return (
+      <div className={`${styles.tile} ${styles[variant]}`}>
+        <div className={styles.screenFrame}>
+          <video ref={videoRef} autoPlay playsInline muted className={styles.screenVideo} />
+          <span className={styles.screenLabel}>
+            <Icon name="monitor" size={12} />
+            {displayName}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.tile} ${styles[variant]} ${isSpeaking ? styles.speaking : ''}`}>

@@ -7,6 +7,8 @@ export const GROUP_CALL_GRID_ROW_MAX = 3;
 
 export type AudioRoute = 'earpiece' | 'speaker';
 
+export type CallVideoSource = 'camera' | 'screen';
+
 export interface CallParticipantState {
   userId: string;
   displayName: string;
@@ -37,6 +39,7 @@ export interface CallTransportCallbacks {
   onParticipantsChanged: (participants: CallParticipantState[]) => void;
   onActiveSpeakerChanged: (userId: string | null) => void;
   onConnectionQualityChanged: (quality: 'good' | 'poor' | 'lost') => void;
+  onScreenShareChanged: (enabled: boolean) => void;
   onDisconnected: () => void;
 }
 
@@ -46,8 +49,9 @@ export interface CallTransport {
   setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
   setCameraEnabled: (enabled: boolean) => Promise<void>;
   flipCamera: () => Promise<void>;
+  isScreenShareSupported: () => boolean;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
   setAudioRoute: (route: AudioRoute) => void;
-  attachVideo: (userId: string, element: HTMLVideoElement) => void;
-  detachVideo: (userId: string, element: HTMLVideoElement) => void;
+  attachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
+  detachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
 }

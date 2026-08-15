@@ -13,7 +13,7 @@ import type { Socket } from 'socket.io-client';
 import { create } from 'zustand';
 
 import { liveKitTransport } from '../calls/transport';
-import type { CallParticipantState, CallState, CallTransport } from '../calls/types';
+import type { CallParticipantState, CallState, CallTransport, CallVideoSource } from '../calls/types';
 import { getSocket } from '../realtime/socket';
 
 const CALL_ENDED_RESET_DELAY_MS = 2000;
@@ -84,8 +84,9 @@ interface CallStoreState extends CallState {
   flipCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
   toggleAudioRoute: () => void;
-  attachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
-  detachParticipantVideo: (userId: string, element: HTMLVideoElement) => void;
+  isScreenShareSupported: () => boolean;
+  attachParticipantVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
+  detachParticipantVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
   applyInvite: (call: CallDto) => void;
   applyEnded: (call: CallDto) => void;
   applyCallUpdate: (call: CallDto) => void;
@@ -117,6 +118,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
         onParticipantsChanged: (participants) => set({ participants }),
         onActiveSpeakerChanged: (activeSpeakerId) => set({ activeSpeakerId }),
         onConnectionQualityChanged: (connectionQuality) => set({ connectionQuality }),
+        onScreenShareChanged: (screenShareEnabled) => set({ screenShareEnabled }),
         onDisconnected: () => {
           if (get().phase === 'idle' || get().phase === 'ended') return;
           set({ phase: 'ended' });
@@ -230,10 +232,18 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       }
     },
 
+    isScreenShareSupported() {
+      return transport.isScreenShareSupported();
+    },
+
     async toggleScreenShare() {
       const next = !get().screenShareEnabled;
-      set({ screenShareEnabled: next });
-      await transport.setScreenShareEnabled(next);
+      try {
+        await transport.setScreenShareEnabled(next);
+        set({ screenShareEnabled: next });
+      } catch {
+        set({ screenShareEnabled: false });
+      }
     },
 
     toggleAudioRoute() {
@@ -242,12 +252,12 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       transport.setAudioRoute(next);
     },
 
-    attachParticipantVideo(userId, element) {
-      transport.attachVideo(userId, element);
+    attachParticipantVideo(userId, element, source) {
+      transport.attachVideo(userId, element, source);
     },
 
-    detachParticipantVideo(userId, element) {
-      transport.detachVideo(userId, element);
+    detachParticipantVideo(userId, element, source) {
+      transport.detachVideo(userId, element, source);
     },
 
     applyInvite(call) {

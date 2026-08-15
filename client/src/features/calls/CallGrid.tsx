@@ -1,7 +1,9 @@
-import type { AvatarColor, CallDto } from '@messenger/shared';
+import type { CallDto } from '@messenger/shared';
 
 import { GROUP_CALL_GRID_MAX_PARTICIPANTS, GROUP_CALL_GRID_ROW_MAX } from '../../calls/types';
 import type { CallParticipantState } from '../../calls/types';
+import { withDirectory } from './callParticipants';
+import type { NamedCallParticipant } from './callParticipants';
 import { ParticipantTile } from './ParticipantTile';
 import styles from './CallGrid.module.css';
 
@@ -11,36 +13,8 @@ interface CallGridProps {
   activeSpeakerId: string | null;
 }
 
-interface GridParticipant {
-  userId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  avatarColor?: AvatarColor;
-  micEnabled: boolean;
-  isSpeaking: boolean;
-  cameraEnabled: boolean;
-  mirrored: boolean;
-}
-
-function toGridParticipants(participants: CallParticipantState[], call: CallDto | null): GridParticipant[] {
-  const directory = new Map(call?.participants.map((p) => [p.user.id, p.user] as const));
-  return participants.map((p) => {
-    const member = directory.get(p.userId);
-    return {
-      userId: p.userId,
-      displayName: member?.displayName ?? p.displayName,
-      avatarUrl: member?.avatarUrl ?? p.avatarUrl,
-      avatarColor: member?.avatarColor,
-      micEnabled: p.micEnabled,
-      isSpeaking: p.isSpeaking,
-      cameraEnabled: p.cameraEnabled,
-      mirrored: p.mirrored,
-    };
-  });
-}
-
-function chunkRows(participants: GridParticipant[]): GridParticipant[][] {
-  const rows: GridParticipant[][] = [];
+function chunkRows(participants: NamedCallParticipant[]): NamedCallParticipant[][] {
+  const rows: NamedCallParticipant[][] = [];
   for (let i = 0; i < participants.length; i += GROUP_CALL_GRID_ROW_MAX) {
     rows.push(participants.slice(i, i + GROUP_CALL_GRID_ROW_MAX));
   }
@@ -48,7 +22,7 @@ function chunkRows(participants: GridParticipant[]): GridParticipant[][] {
 }
 
 export function CallGrid({ participants, call, activeSpeakerId }: CallGridProps) {
-  const grid = toGridParticipants(participants, call);
+  const grid = withDirectory(participants, call);
 
   if (grid.length > GROUP_CALL_GRID_MAX_PARTICIPANTS) {
     const speaker = grid.find((p) => p.userId === activeSpeakerId) ?? grid[0] ?? null;
