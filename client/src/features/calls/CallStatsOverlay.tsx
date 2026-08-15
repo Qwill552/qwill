@@ -68,6 +68,7 @@ export function CallStatsOverlay() {
   return (
     <button type="button" className={styles.overlay} title="Скопировать статистику" onClick={() => void copyStats()}>
       <Row label={`захват ${snapshot.captureLabel}`} value={`${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`} />
+      <Row label="трек" value={snapshot.captureTrack} />
       <Row label="максимум" value={snapshot.captureMax} />
       <Row label="кодек" value={snapshot.codec} />
 

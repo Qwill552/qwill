@@ -37,6 +37,7 @@ export interface CallStatsSnapshot {
   captureWidth: number;
   captureHeight: number;
   captureFps: number;
+  captureTrack: string;
   captureMax: string;
   codec: string;
   outbound: OutboundVideoStats[];
@@ -170,6 +171,14 @@ function remoteVideoTracks(): LabelledVideoTrack<LocalVideoTrack | RemoteVideoTr
   return tracks;
 }
 
+function captureSettings(track: LocalVideoTrack | undefined): string {
+  const mediaStreamTrack = track?.mediaStreamTrack;
+  if (!mediaStreamTrack) return '—';
+  const settings = mediaStreamTrack.getSettings();
+  if (!settings.width || !settings.height) return '—';
+  return `${settings.width}×${settings.height} @${Math.round(settings.frameRate ?? 0)}`;
+}
+
 function captureCapability(track: LocalVideoTrack | undefined): string {
   const mediaStreamTrack = track?.mediaStreamTrack;
   if (!mediaStreamTrack || typeof mediaStreamTrack.getCapabilities !== 'function') return '—';
@@ -193,6 +202,7 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
     captureWidth: 0,
     captureHeight: 0,
     captureFps: 0,
+    captureTrack: captureSettings(publishers[0]?.track),
     captureMax: captureCapability(publishers[0]?.track),
     codec: '—',
     outbound: [],
@@ -265,6 +275,7 @@ export function resetCallStats(): void {
 export function formatCallStats(snapshot: CallStatsSnapshot): string {
   const lines: string[] = [
     `захват ${snapshot.captureLabel}: ${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`,
+    `трек: ${snapshot.captureTrack}`,
     `максимум: ${snapshot.captureMax}`,
     `кодек: ${snapshot.codec}`,
   ];
