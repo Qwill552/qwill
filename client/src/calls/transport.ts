@@ -26,7 +26,7 @@ const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
 const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = { resolution: VideoPresets.h720.resolution };
 
-const SCREEN_SHARE_MAX_BITRATE = 6_000_000;
+const SCREEN_SHARE_MAX_BITRATE = 10_000_000;
 const SCREEN_SHARE_MAX_FRAMERATE = 60;
 const SCREEN_SHARE_RESOLUTION: VideoResolution = { width: 1920, height: 1080, frameRate: SCREEN_SHARE_MAX_FRAMERATE };
 
@@ -255,19 +255,12 @@ async function setScreenShareEnabled(enabled: boolean): Promise<void> {
 }
 
 async function changeScreenShareSource(): Promise<void> {
-  const screenTrack = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
-  if (!screenTrack) return;
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: {
-      width: SCREEN_SHARE_RESOLUTION.width,
-      height: SCREEN_SHARE_RESOLUTION.height,
-      frameRate: SCREEN_SHARE_MAX_FRAMERATE,
-    },
-    audio: false,
-  });
-  const [nextTrack] = stream.getVideoTracks();
+  const participant = room?.localParticipant;
+  const screenTrack = participant?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+  if (!participant || !screenTrack) return;
+  const captured = await participant.createScreenTracks(SCREEN_SHARE_CAPTURE_OPTIONS);
+  const nextTrack = captured.find((track) => track.kind === Track.Kind.Video)?.mediaStreamTrack;
   if (!nextTrack) return;
-  nextTrack.contentHint = 'motion';
   await (screenTrack as LocalVideoTrack).replaceTrack(nextTrack, { userProvidedTrack: false });
 }
 

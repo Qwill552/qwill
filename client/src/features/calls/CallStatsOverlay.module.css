@@ -12,7 +12,13 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   line-height: 1.45;
-  pointer-events: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.overlay:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .row {
@@ -38,6 +44,7 @@
 }
 
 .section {
+  display: block;
   margin-top: var(--space-1);
   color: var(--text-tertiary);
 }

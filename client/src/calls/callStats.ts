@@ -261,3 +261,32 @@ export function resetCallStats(): void {
   byteHistory.clear();
   qpHistory.clear();
 }
+
+export function formatCallStats(snapshot: CallStatsSnapshot): string {
+  const lines: string[] = [
+    `захват ${snapshot.captureLabel}: ${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`,
+    `максимум: ${snapshot.captureMax}`,
+    `кодек: ${snapshot.codec}`,
+  ];
+
+  const transport = snapshot.transport;
+  if (transport) {
+    lines.push(
+      `сеть: ${transport.protocol} ${transport.localCandidate}→${transport.remoteCandidate}, rtt ${transport.rttMs} мс, полоса ${transport.availableOutgoingKbps} кбит/с`,
+    );
+  }
+
+  for (const layer of snapshot.outbound) {
+    lines.push(
+      `отдача ${layer.layer}: ${layer.width}×${layer.height} ${layer.fps}fps ${layer.kbps}k qp${layer.qp} ${layer.limitation} [${layer.encoder}]`,
+    );
+  }
+
+  for (const stream of snapshot.inbound) {
+    lines.push(
+      `приём ${stream.label}: ${stream.width}×${stream.height} ${stream.fps}fps ${stream.kbps}k потерь ${stream.packetsLost} фризов ${stream.freezes}`,
+    );
+  }
+
+  return lines.join('\n');
+}
