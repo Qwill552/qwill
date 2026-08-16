@@ -17,6 +17,10 @@
         font-size: 18px;
         margin: 0 0 8px;
       }
+      h2 {
+        font-size: 15px;
+        margin: 20px 0 6px;
+      }
       p,
       ol {
         max-width: 78ch;
@@ -80,6 +84,10 @@
         font: 12px/1.45 ui-monospace, monospace;
         white-space: pre-wrap;
       }
+      #timeline {
+        max-height: 40dvh;
+        overflow: auto;
+      }
     </style>
   </head>
   <body>
@@ -89,9 +97,10 @@
       падение кадров видно и здесь — виноват браузер и выбранная поверхность, а не приложение.
     </p>
     <ol>
+      <li>Один прогон — один захват. Перед новым прогоном жать «Начать заново»: состояние страницы обнуляется.</li>
       <li>Вкладку пробы держать видимой (свернутая вкладка тормозит счётчик отрисовки).</li>
       <li>На захватываемой поверхности нужно движение — иначе Chrome честно отдаёт меньше кадров.</li>
-      <li>«Реальные кадры (источник)» — главный показатель, он не зависит от отрисовки.</li>
+      <li>«Кадры источника» — главный показатель, он не зависит ни от отрисовки, ни от энкодера.</li>
     </ol>
     <div class="track"><div class="runner"></div></div>
 
@@ -103,10 +112,14 @@
       <button type="button" id="swapStopFirst">Сменить источник (сначала стоп)</button>
       <button type="button" id="second">Второй захват параллельно</button>
       <button type="button" id="stopAll">Стоп</button>
+      <button type="button" id="reset">Начать заново</button>
       <button type="button" id="copy">Скопировать отчёт</button>
     </div>
 
     <div class="slots" id="slots"></div>
+
+    <h2>Хронология</h2>
+    <pre id="timeline"></pre>
 
     <script>
       const APP_CONSTRAINTS = {
@@ -117,13 +130,33 @@
       };
       const RAW_CONSTRAINTS = { video: true, audio: false };
       const WINDOW_MS = 2000;
+      const SAMPLE_MS = 10000;
 
+      const pageStart = performance.now();
+      const timeline = [];
       const slots = [];
       const slotsRoot = document.getElementById('slots');
+      const timelineRoot = document.getElementById('timeline');
       const appConstraints = document.getElementById('appConstraints');
 
       function currentConstraints() {
         return appConstraints.checked ? APP_CONSTRAINTS : RAW_CONSTRAINTS;
+      }
+
+      function activeCount() {
+        return slots.filter((slot) => !slot.stopped).length;
+      }
+
+      function note(text) {
+        const seconds = ((performance.now() - pageStart) / 1000).toFixed(1);
+        timeline.push(`[${seconds}с, активно ${activeCount()}] ${text}`);
+        timelineRoot.textContent = timeline.join('\n');
+        timelineRoot.scrollTop = timelineRoot.scrollHeight;
+      }
+
+      function surfaceOf(track) {
+        const settings = track.getSettings();
+        return `${settings.displaySurface ?? '?'} «${track.label}» ${settings.width ?? 0}×${settings.height ?? 0}@${Math.round(settings.frameRate ?? 0)}`;
       }
 
       function rateOf(times, now) {
@@ -189,7 +222,9 @@
         startSourceMeter(slot);
         startRenderMeter(slot);
         track.addEventListener('ended', () => {
+          if (slot.stopped) return;
           slot.stopped = true;
+          note(`${slot.name}: остановлен системной кнопкой, последние ${slot.sourceFps.toFixed(1)}/с`);
           render();
         });
       }
@@ -204,9 +239,10 @@
         const info = document.createElement('pre');
         box.append(video, info);
         slotsRoot.append(box);
-        const slot = { name: String.fromCharCode(65 + slots.length), video, info, history: [] };
+        const slot = { name: String.fromCharCode(65 + slots.length), video, info };
         slots.push(slot);
         bindTrack(slot, track);
+        note(`${slot.name}: старт — ${surfaceOf(track)}`);
         return slot;
       }
 
@@ -221,22 +257,19 @@
             ` (максимум ${capabilities.width?.max ?? '?'}×${capabilities.height?.max ?? '?'} @${capabilities.frameRate?.max ?? '?'})`,
           `кадры источника: ${slot.sourceFps.toFixed(1)}/с, всего ${slot.sourceFrames} [${slot.sourceMeter}]`,
           `кадры отрисовки: ${slot.renderFps.toFixed(1)}/с, всего ${slot.renderFrames}`,
-          `живёт ${alive} с, захватов активно ${slots.filter((s) => !s.stopped).length}`,
-          slot.history.length > 0 ? `история: ${slot.history.join(' → ')}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n');
+          `текущий трек живёт ${alive} с, захватов активно ${activeCount()}`,
+        ].join('\n');
       }
 
       function render() {
         for (const slot of slots) slot.info.textContent = describe(slot);
       }
 
-      function noteHistory(slot, action) {
-        const settings = slot.track.getSettings();
-        slot.history.push(
-          `${action} [${settings.displaySurface ?? '?'} ${Math.round(slot.sourceFps)}/с]`,
-        );
+      function sample() {
+        for (const slot of slots) {
+          if (slot.stopped) continue;
+          note(`${slot.name}: ${slot.sourceFps.toFixed(1)}/с — ${surfaceOf(slot.track)}`);
+        }
       }
 
       async function capture() {
@@ -244,7 +277,13 @@
       }
 
       async function startCapture() {
-        const stream = await capture();
+        let stream;
+        try {
+          stream = await capture();
+        } catch {
+          note('диалог выбора отменён');
+          return;
+        }
         const [track] = stream.getVideoTracks();
         if (track) createSlot(track);
         render();
@@ -252,14 +291,23 @@
 
       async function swap(stopFirst) {
         const slot = slots.find((candidate) => !candidate.stopped);
-        if (!slot) return;
-        noteHistory(slot, stopFirst ? 'смена со стопом' : 'смена внахлёст');
+        if (!slot) {
+          note('менять нечего: активных захватов нет');
+          return;
+        }
+        const mode = stopFirst ? 'смена со стопом' : 'смена внахлёст';
+        note(`${slot.name}: ${mode}, перед сменой ${slot.sourceFps.toFixed(1)}/с — ${surfaceOf(slot.track)}`);
         const previous = slot.track;
-        if (stopFirst) previous.stop();
+        if (stopFirst) {
+          previous.stop();
+          slot.stopped = true;
+          slot.cancelSourceMeter?.();
+        }
         let stream;
         try {
           stream = await capture();
         } catch {
+          note(`${slot.name}: диалог выбора отменён${stopFirst ? ', старый захват уже остановлен' : ''}`);
           render();
           return;
         }
@@ -267,21 +315,24 @@
         if (!next) return;
         if (!stopFirst) previous.stop();
         bindTrack(slot, next);
+        note(`${slot.name}: новый источник — ${surfaceOf(next)}`);
         render();
       }
 
       function stopAll() {
         for (const slot of slots) {
+          if (slot.stopped) continue;
           slot.stopped = true;
           slot.cancelSourceMeter?.();
           slot.track.stop();
+          note(`${slot.name}: стоп, последние ${slot.sourceFps.toFixed(1)}/с`);
         }
         render();
       }
 
       function report() {
         const mode = appConstraints.checked ? '1920×1080@60 ideal' : 'video: true';
-        return [`constraints: ${mode}`, ...slots.map(describe)].join('\n\n');
+        return [`constraints: ${mode}`, ...slots.map(describe), 'хронология:', ...timeline].join('\n\n');
       }
 
       document.getElementById('start').addEventListener('click', () => void startCapture());
@@ -289,11 +340,16 @@
       document.getElementById('swapOverlap').addEventListener('click', () => void swap(false));
       document.getElementById('swapStopFirst').addEventListener('click', () => void swap(true));
       document.getElementById('stopAll').addEventListener('click', stopAll);
+      document.getElementById('reset').addEventListener('click', () => {
+        stopAll();
+        location.reload();
+      });
       document.getElementById('copy').addEventListener('click', () => {
         void navigator.clipboard.writeText(report()).catch(() => {});
       });
 
       setInterval(render, 500);
+      setInterval(sample, SAMPLE_MS);
     </script>
   </body>
 </html>
