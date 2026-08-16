@@ -50,7 +50,7 @@ async function handleMissedTimeout(callId: string, initiatorId: string): Promise
   await finishCall(callId, initiatorId, 'MISSED');
 }
 
-async function finishCall(callId: string, userId: string, status: CallStatus): Promise<void> {
+export async function finishCall(callId: string, userId: string, status: CallStatus): Promise<void> {
   clearMissedTimer(callId);
   const call = await callService.endCall({ callId, userId, status });
 

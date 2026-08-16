@@ -53,6 +53,12 @@ class CallPlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun callConnected(call: PluginCall) {
+        MainActivity.hideConnecting()
+        call.resolve()
+    }
+
     fun emitAction(action: CallRegistry.Action) {
         val payload = JSObject().put("callId", action.callId)
         notifyListeners(if (action.accepted) EVENT_ACCEPTED else EVENT_DECLINED, payload, true)

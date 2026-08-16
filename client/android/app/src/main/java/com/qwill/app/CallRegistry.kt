@@ -45,4 +45,14 @@ object CallRegistry {
         }
         target?.emitAction(action)
     }
+
+    /** Отклонение до сервера доходит своим каналом, вебу оно нужно только чтобы убрать
+     *  свой экран, — копить его для будущего запуска приложения незачем и вредно. */
+    fun notifyIfAttached(action: Action) {
+        val target: CallPlugin?
+        synchronized(this) {
+            target = plugin
+        }
+        target?.emitAction(action)
+    }
 }

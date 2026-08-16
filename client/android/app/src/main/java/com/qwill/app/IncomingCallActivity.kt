@@ -74,13 +74,10 @@ class IncomingCallActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
-    private fun finishResolved(accepted: Boolean) {
-        if (accepted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-            keyguard?.requestDismissKeyguard(this, null)
-        }
-        launchApp(this, callId, accepted)
-        finish()
+    private fun dismissKeyguard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        keyguard?.requestDismissKeyguard(this, null)
     }
 
     companion object {
@@ -102,13 +99,17 @@ class IncomingCallActivity : Activity() {
             putExtra(EXTRA_ANSWER_NOW, answerNow)
         }
 
-        fun resolve(context: Context, callId: String, accepted: Boolean) {
+        fun openApp(context: Context, callId: String, callerName: String) {
             val activity = current?.get()
             if (activity == null) {
-                launchApp(context, callId, accepted)
+                launchApp(context, callId, callerName)
                 return
             }
-            activity.runOnUiThread { activity.finishResolved(accepted) }
+            activity.runOnUiThread {
+                activity.dismissKeyguard()
+                launchApp(activity, callId, callerName)
+                activity.finish()
+            }
         }
 
         fun dismiss(callId: String) {
@@ -117,7 +118,7 @@ class IncomingCallActivity : Activity() {
             activity.runOnUiThread { activity.finish() }
         }
 
-        private fun launchApp(context: Context, callId: String, accepted: Boolean) {
+        private fun launchApp(context: Context, callId: String, callerName: String) {
             val intent = Intent(context, MainActivity::class.java).apply {
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -125,7 +126,8 @@ class IncomingCallActivity : Activity() {
                         Intent.FLAG_ACTIVITY_NO_ANIMATION,
                 )
                 putExtra(NativeCalls.EXTRA_CALL_ID, callId)
-                putExtra(NativeCalls.EXTRA_ACCEPTED, accepted)
+                putExtra(NativeCalls.EXTRA_CALLER_NAME, callerName)
+                putExtra(NativeCalls.EXTRA_ACCEPTED, true)
             }
             context.startActivity(intent)
         }

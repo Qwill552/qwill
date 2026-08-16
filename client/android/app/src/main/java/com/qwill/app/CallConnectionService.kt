@@ -36,17 +36,21 @@ class QwillConnection(
         Ringer.stop()
         CallNotifications.cancel(context)
         setActive()
-        IncomingCallActivity.resolve(context, callId, accepted = true)
+        IncomingCallActivity.openApp(context, callId, callerName)
     }
 
     override fun onReject() {
+        CallDecline.send(context, callId)
+        CallRegistry.notifyIfAttached(CallRegistry.Action(callId, accepted = false))
         settle(DisconnectCause(DisconnectCause.REJECTED))
-        IncomingCallActivity.resolve(context, callId, accepted = false)
+        IncomingCallActivity.dismiss(callId)
     }
 
     override fun onDisconnect() {
+        CallDecline.send(context, callId)
+        CallRegistry.notifyIfAttached(CallRegistry.Action(callId, accepted = false))
         settle(DisconnectCause(DisconnectCause.LOCAL))
-        IncomingCallActivity.resolve(context, callId, accepted = false)
+        IncomingCallActivity.dismiss(callId)
     }
 
     override fun onAbort() {

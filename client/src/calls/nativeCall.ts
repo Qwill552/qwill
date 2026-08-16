@@ -7,6 +7,7 @@ interface NativeCallPlugin {
   isNativeCallAvailable(): Promise<{ available: boolean }>;
   reportIncomingCall(options: { callId: string; callerName: string; callKind: CallKind }): Promise<void>;
   reportCallEnded(options: { callId: string }): Promise<void>;
+  callConnected(): Promise<void>;
   addListener(
     eventName: 'callAccepted' | 'callDeclined',
     listener: (event: { callId: string }) => void,
@@ -43,6 +44,12 @@ export async function initNativeCalls(): Promise<void> {
   });
   await plugin.addListener('callDeclined', (event) => {
     void handleDeclined(event.callId);
+  });
+
+  useCallStore.subscribe((state, previous) => {
+    if (state.phase === 'active' && previous.phase !== 'active') {
+      void plugin.callConnected().catch(() => undefined);
+    }
   });
 }
 
