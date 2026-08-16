@@ -8,6 +8,22 @@
 APK заново нужно только при изменениях нативного слоя (`client/android/`, плагины, манифест).
 Обоснование выбора — в журнале `calls.md` за 2026-08-16.
 
+## Уведомления в оболочке не работают до шага 11
+
+Веб-пуши, на которых держатся уведомления в PWA, в Android WebView недоступны: WebView не
+предоставляет ни `Notification`, ни `PushManager`, и не имеет собственной регистрации в
+push-сервисе — она есть у браузера Chrome, а не у встроенного WebView. Клиентский код это
+переживает молча: `subscribeToPush` (`client/src/realtime/push.ts`) выходит по проверке
+`!('PushManager' in window)` до запроса разрешения, поэтому Android показывает приложение
+как не отправляющее уведомлений.
+
+Это не регрессия от `server.url`: с интерфейсом внутри APK было бы ровно то же самое.
+Оболочка здесь временно **хуже PWA**, и разрыв закрывает шаг 11 — нативный FCM. Заготовка
+под него уже стоит в `app/build.gradle`: сборка ищет `google-services.json` и без него
+пишет в лог `Push Notifications won't work`. Разрешение `POST_NOTIFICATIONS` в манифест
+добавлено заранее (с Android 13 без него уведомления блокируются), но само по себе оно
+ничего не включает.
+
 ## Отладочная сборка
 
 ```bash
@@ -28,14 +44,20 @@ npm run android:open -w @messenger/client
 
 ## Сборка и установка без Android Studio
 
-Android Studio нужна только как источник JDK и как GUI. Тот же результат из терминала
-(проверено на Windows, Studio установлена в `D:\android`):
+Android Studio нужна только как источник JDK и как GUI. Тот же результат из терминала:
 
 ```powershell
-$env:JAVA_HOME = "D:\android\jbr"
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 client\android\gradlew.bat -p client\android installDebug
 ```
+
+**JDK берётся не из каталога Android Studio.** Встроенная в Studio JBR (`D:\android\jbr` на
+машине разработки) — Java 25, а Gradle 8.14.3 её не поддерживает и падает с
+`Unsupported class file major version 69` ещё на разборе `settings.gradle`. Нужна Java 21 —
+Studio держит её отдельно в `~/.jdks`, оттуда же берёт JDK для своего демона Gradle.
+Сборка из терминала при открытой Studio может пройти и с неверным `JAVA_HOME`, переиспользовав
+её демон, — это маскирует ошибку до момента, когда Studio закрыта.
 
 `installDebug` собирает отладочный APK и ставит его на подключённое по USB устройство.
 Список устройств — `platform-tools\adb.exe devices`, лог приложения — `adb logcat`.
