@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { useCallStore } from '../../stores/callStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useParticipantVideo } from '../../calls/useParticipantVideo';
+import { useScreenCaptureRate } from '../../calls/useScreenCaptureRate';
 import { Avatar } from '../../ui/Avatar';
 import { ChromeBar } from '../../ui/chrome/ChromeBar';
 import { GlassButton } from '../../ui/chrome/GlassButton';
@@ -83,6 +84,12 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
   const screenShareSupported = isScreenShareSupported();
   const peerMirrored = peerState?.mirrored ?? true;
   const peerVideoRef = useParticipantVideo(otherMember?.id ?? '', peerCameraOn);
+
+  const captureRate = useScreenCaptureRate(phase === 'active' && screenShareEnabled);
+  const [captureHintHidden, setCaptureHintHidden] = useState(false);
+  useEffect(() => {
+    if (!captureRate.slow) setCaptureHintHidden(false);
+  }, [captureRate.slow]);
 
   const [statsVisible, setStatsVisible] = useState(readStatsPreference);
   const toggleStats = useCallback(() => {
@@ -169,6 +176,16 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
       )}
 
       {!isGroup && cameraEnabled && !stageActive && <SelfView />}
+
+      {captureRate.slow && !captureHintHidden && (
+        <div className={styles.captureHint} role="status">
+          <span className={styles.captureHintText}>
+            Экран захватывается на {captureRate.fps} кадрах/с вместо {captureRate.nominalFps}. Так иногда делает браузер при
+            запуске показа — нажмите стрелку на кнопке показа и выберите экран заново.
+          </span>
+          <IconButton icon="close" label="Скрыть подсказку" variant="plain" onClick={() => setCaptureHintHidden(true)} />
+        </div>
+      )}
 
       {peerCameraOn ? (
         <ChromeBar side="bottom" className={styles.bottomBar}>

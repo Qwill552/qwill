@@ -124,6 +124,24 @@
   color: var(--danger);
 }
 
+.captureHint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--screen-pad-x) var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+}
+
+.captureHintText {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
 .bottomBar {
   justify-content: center;
 }
