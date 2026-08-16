@@ -73,6 +73,7 @@ export function CallStatsOverlay() {
         value={`${snapshot.captureTrack}${snapshot.capturePaused ? ' — отдача на паузе' : ''}`}
         warn={snapshot.capturePaused}
       />
+      <Row label="поверхность" value={snapshot.captureSurface} />
       <Row label="максимум" value={snapshot.captureMax} />
       <Row label="кодек" value={snapshot.codec} />
 

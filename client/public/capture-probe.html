@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Проба захвата экрана</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font: 14px/1.5 system-ui, sans-serif;
+        margin: 0;
+        padding: 16px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 8px;
+      }
+      p,
+      ol {
+        max-width: 78ch;
+        margin: 0 0 12px;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      button {
+        min-height: 44px;
+        padding: 0 14px;
+        font: inherit;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 44px;
+      }
+      .track {
+        height: 24px;
+        border: 1px solid currentColor;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+      .runner {
+        width: 12%;
+        height: 100%;
+        background: currentColor;
+        animation: slide 1.6s linear infinite alternate;
+      }
+      @keyframes slide {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(733%);
+        }
+      }
+      .slots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .slot {
+        border: 1px solid currentColor;
+        padding: 8px;
+      }
+      video {
+        width: 320px;
+        height: 180px;
+        object-fit: contain;
+        display: block;
+        background: #000;
+      }
+      pre {
+        margin: 8px 0 0;
+        font: 12px/1.45 ui-monospace, monospace;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Проба захвата экрана</h1>
+    <p>
+      Страница измеряет частоту захвата <code>getDisplayMedia</code> без WebRTC, LiveKit и энкодера: если
+      падение кадров видно и здесь — виноват браузер и выбранная поверхность, а не приложение.
+    </p>
+    <ol>
+      <li>Вкладку пробы держать видимой (свернутая вкладка тормозит счётчик отрисовки).</li>
+      <li>На захватываемой поверхности нужно движение — иначе Chrome честно отдаёт меньше кадров.</li>
+      <li>«Реальные кадры (источник)» — главный показатель, он не зависит от отрисовки.</li>
+    </ol>
+    <div class="track"><div class="runner"></div></div>
+
+    <label><input type="checkbox" id="appConstraints" checked /> constraints как в приложении: 1920×1080@60 ideal</label>
+
+    <div class="controls">
+      <button type="button" id="start">Начать захват</button>
+      <button type="button" id="swapOverlap">Сменить источник (как в приложении)</button>
+      <button type="button" id="swapStopFirst">Сменить источник (сначала стоп)</button>
+      <button type="button" id="second">Второй захват параллельно</button>
+      <button type="button" id="stopAll">Стоп</button>
+      <button type="button" id="copy">Скопировать отчёт</button>
+    </div>
+
+    <div class="slots" id="slots"></div>
+
+    <script>
+      const APP_CONSTRAINTS = {
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: 60 },
+        audio: false,
+        selfBrowserSurface: 'include',
+        surfaceSwitching: 'include',
+      };
+      const RAW_CONSTRAINTS = { video: true, audio: false };
+      const WINDOW_MS = 2000;
+
+      const slots = [];
+      const slotsRoot = document.getElementById('slots');
+      const appConstraints = document.getElementById('appConstraints');
+
+      function currentConstraints() {
+        return appConstraints.checked ? APP_CONSTRAINTS : RAW_CONSTRAINTS;
+      }
+
+      function rateOf(times, now) {
+        while (times.length > 1 && now - times[0] > WINDOW_MS) times.shift();
+        if (times.length < 2) return 0;
+        return ((times.length - 1) * 1000) / (now - times[0]);
+      }
+
+      function startSourceMeter(slot) {
+        if (typeof window.MediaStreamTrackProcessor !== 'function') {
+          slot.sourceMeter = 'нет MediaStreamTrackProcessor';
+          return;
+        }
+        const processor = new MediaStreamTrackProcessor({ track: slot.track });
+        const reader = processor.readable.getReader();
+        slot.cancelSourceMeter = () => void reader.cancel().catch(() => {});
+        slot.sourceMeter = 'MediaStreamTrackProcessor';
+        const pump = async () => {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) return;
+            const now = performance.now();
+            slot.sourceTimes.push(now);
+            slot.sourceFps = rateOf(slot.sourceTimes, now);
+            slot.sourceFrames += 1;
+            value.close();
+          }
+        };
+        void pump().catch(() => {});
+      }
+
+      function startRenderMeter(slot) {
+        if (typeof slot.video.requestVideoFrameCallback !== 'function') return;
+        const generation = slot.generation;
+        const step = (now) => {
+          if (slot.generation !== generation) return;
+          slot.renderTimes.push(now);
+          slot.renderFps = rateOf(slot.renderTimes, now);
+          slot.renderFrames += 1;
+          if (!slot.stopped) slot.video.requestVideoFrameCallback(step);
+        };
+        slot.video.requestVideoFrameCallback(step);
+      }
+
+      function resetMeters(slot) {
+        slot.cancelSourceMeter?.();
+        slot.sourceTimes = [];
+        slot.renderTimes = [];
+        slot.sourceFps = 0;
+        slot.renderFps = 0;
+        slot.sourceFrames = 0;
+        slot.renderFrames = 0;
+        slot.startedAt = performance.now();
+      }
+
+      function bindTrack(slot, track) {
+        slot.generation = (slot.generation ?? 0) + 1;
+        slot.track = track;
+        slot.stopped = false;
+        slot.video.srcObject = new MediaStream([track]);
+        void slot.video.play().catch(() => {});
+        resetMeters(slot);
+        startSourceMeter(slot);
+        startRenderMeter(slot);
+        track.addEventListener('ended', () => {
+          slot.stopped = true;
+          render();
+        });
+      }
+
+      function createSlot(track) {
+        const box = document.createElement('div');
+        box.className = 'slot';
+        const video = document.createElement('video');
+        video.muted = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        const info = document.createElement('pre');
+        box.append(video, info);
+        slotsRoot.append(box);
+        const slot = { name: String.fromCharCode(65 + slots.length), video, info, history: [] };
+        slots.push(slot);
+        bindTrack(slot, track);
+        return slot;
+      }
+
+      function describe(slot) {
+        const track = slot.track;
+        const settings = track.getSettings();
+        const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+        const alive = Math.round((performance.now() - slot.startedAt) / 100) / 10;
+        return [
+          `${slot.name}: ${settings.displaySurface ?? '?'} «${track.label}»${slot.stopped ? ' — остановлен' : ''}`,
+          `трек ${settings.width ?? 0}×${settings.height ?? 0} @${Math.round(settings.frameRate ?? 0)}` +
+            ` (максимум ${capabilities.width?.max ?? '?'}×${capabilities.height?.max ?? '?'} @${capabilities.frameRate?.max ?? '?'})`,
+          `кадры источника: ${slot.sourceFps.toFixed(1)}/с, всего ${slot.sourceFrames} [${slot.sourceMeter}]`,
+          `кадры отрисовки: ${slot.renderFps.toFixed(1)}/с, всего ${slot.renderFrames}`,
+          `живёт ${alive} с, захватов активно ${slots.filter((s) => !s.stopped).length}`,
+          slot.history.length > 0 ? `история: ${slot.history.join(' → ')}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n');
+      }
+
+      function render() {
+        for (const slot of slots) slot.info.textContent = describe(slot);
+      }
+
+      function noteHistory(slot, action) {
+        const settings = slot.track.getSettings();
+        slot.history.push(
+          `${action} [${settings.displaySurface ?? '?'} ${Math.round(slot.sourceFps)}/с]`,
+        );
+      }
+
+      async function capture() {
+        return navigator.mediaDevices.getDisplayMedia(currentConstraints());
+      }
+
+      async function startCapture() {
+        const stream = await capture();
+        const [track] = stream.getVideoTracks();
+        if (track) createSlot(track);
+        render();
+      }
+
+      async function swap(stopFirst) {
+        const slot = slots.find((candidate) => !candidate.stopped);
+        if (!slot) return;
+        noteHistory(slot, stopFirst ? 'смена со стопом' : 'смена внахлёст');
+        const previous = slot.track;
+        if (stopFirst) previous.stop();
+        let stream;
+        try {
+          stream = await capture();
+        } catch {
+          render();
+          return;
+        }
+        const [next] = stream.getVideoTracks();
+        if (!next) return;
+        if (!stopFirst) previous.stop();
+        bindTrack(slot, next);
+        render();
+      }
+
+      function stopAll() {
+        for (const slot of slots) {
+          slot.stopped = true;
+          slot.cancelSourceMeter?.();
+          slot.track.stop();
+        }
+        render();
+      }
+
+      function report() {
+        const mode = appConstraints.checked ? '1920×1080@60 ideal' : 'video: true';
+        return [`constraints: ${mode}`, ...slots.map(describe)].join('\n\n');
+      }
+
+      document.getElementById('start').addEventListener('click', () => void startCapture());
+      document.getElementById('second').addEventListener('click', () => void startCapture());
+      document.getElementById('swapOverlap').addEventListener('click', () => void swap(false));
+      document.getElementById('swapStopFirst').addEventListener('click', () => void swap(true));
+      document.getElementById('stopAll').addEventListener('click', stopAll);
+      document.getElementById('copy').addEventListener('click', () => {
+        void navigator.clipboard.writeText(report()).catch(() => {});
+      });
+
+      setInterval(render, 500);
+    </script>
+  </body>
+</html>

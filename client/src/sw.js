@@ -14,7 +14,7 @@ const isDevServiceWorker = self.location.search.includes('dev-sw');
 precacheAndRoute(self.__WB_MANIFEST);
 
 if (!isDevServiceWorker) {
-  registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
+  registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/capture-probe\.html$/] }));
 }
 
 // В dev новый SW встаёт в 'waiting' и продолжает отдавать старый закэшированный билд всем

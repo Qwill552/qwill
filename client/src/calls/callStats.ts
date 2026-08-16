@@ -38,6 +38,7 @@ export interface CallStatsSnapshot {
   captureHeight: number;
   captureFps: number;
   captureTrack: string;
+  captureSurface: string;
   captureMax: string;
   capturePaused: boolean;
   codec: string;
@@ -180,6 +181,14 @@ function captureSettings(track: LocalVideoTrack | undefined): string {
   return `${settings.width}×${settings.height} @${Math.round(settings.frameRate ?? 0)}`;
 }
 
+function captureSurface(track: LocalVideoTrack | undefined): string {
+  const mediaStreamTrack = track?.mediaStreamTrack;
+  if (!mediaStreamTrack) return '—';
+  const surface = mediaStreamTrack.getSettings().displaySurface;
+  const label = mediaStreamTrack.label || '—';
+  return surface ? `${surface} ${label}` : label;
+}
+
 function captureCapability(track: LocalVideoTrack | undefined): string {
   const mediaStreamTrack = track?.mediaStreamTrack;
   if (!mediaStreamTrack || typeof mediaStreamTrack.getCapabilities !== 'function') return '—';
@@ -204,6 +213,7 @@ export async function collectCallStats(): Promise<CallStatsSnapshot | null> {
     captureHeight: 0,
     captureFps: 0,
     captureTrack: captureSettings(publishers[0]?.track),
+    captureSurface: captureSurface(publishers[0]?.track),
     captureMax: captureCapability(publishers[0]?.track),
     capturePaused: publishers[0]?.track.isUpstreamPaused ?? false,
     codec: '—',
@@ -278,6 +288,7 @@ export function formatCallStats(snapshot: CallStatsSnapshot): string {
   const lines: string[] = [
     `захват ${snapshot.captureLabel}: ${snapshot.captureWidth}×${snapshot.captureHeight} @${snapshot.captureFps}`,
     `трек: ${snapshot.captureTrack}${snapshot.capturePaused ? ' (отдача на паузе)' : ''}`,
+    `поверхность: ${snapshot.captureSurface}`,
     `максимум: ${snapshot.captureMax}`,
     `кодек: ${snapshot.codec}`,
   ];
