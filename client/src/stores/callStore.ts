@@ -14,7 +14,7 @@ import { create } from 'zustand';
 
 import { liveKitTransport } from '../calls/transport';
 import type { CallParticipantState, CallState, CallTransport, CallVideoSource } from '../calls/types';
-import { getSocket } from '../realtime/socket';
+import { getSocket, waitForConnectedSocket } from '../realtime/socket';
 
 const CALL_ENDED_RESET_DELAY_MS = 2000;
 const CAMERA_ERROR_DISPLAY_MS = 3000;
@@ -78,6 +78,7 @@ interface CallStoreState extends CallState {
   joinCall: (callId: string) => Promise<void>;
   acceptCall: () => Promise<void>;
   declineCall: () => Promise<void>;
+  declineCallById: (callId: string) => Promise<void>;
   hangUp: () => Promise<void>;
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
@@ -194,6 +195,14 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       const payload: CallActionPayload = { callId: call.id };
       getSocket()?.emit(SocketEvent.CallDecline, payload);
       set(initialState);
+    },
+
+    async declineCallById(callId) {
+      const socket = await waitForConnectedSocket();
+      if (!socket) return;
+      const payload: CallActionPayload = { callId };
+      socket.emit(SocketEvent.CallDecline, payload);
+      if (get().call?.id === callId) set(initialState);
     },
 
     async hangUp() {

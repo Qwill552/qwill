@@ -90,14 +90,40 @@ async function sendViaWebPush(
   }
 }
 
-async function sendViaFcm(sub: { id: string; fcmToken: string | null }, notification: PushNotificationPayload): Promise<void> {
+function toFcmData(notification: PushNotificationPayload): Record<string, string> {
+  const data: Record<string, string> = {
+    chatId: notification.chatId,
+    kind: notification.kind ?? 'message',
+    title: notification.title,
+    body: notification.body,
+  };
+  if (notification.callId) data.callId = notification.callId;
+  if (notification.callerName) data.callerName = notification.callerName;
+  if (notification.callKind) data.callKind = notification.callKind;
+  return data;
+}
+
+/** Звонок уходит data-only и с priority high: блок notification система показала бы сама,
+ *  не запустив процесс приложения, а обычный приоритет она вправе отложить — к моменту
+ *  доставки звонить было бы уже некому (шаг ЗВОНКИ-11). */
+async function sendViaFcm(
+  sub: { id: string; fcmToken: string | null },
+  notification: PushNotificationPayload,
+  options?: PushSendOptions,
+): Promise<void> {
   if (!fcmReady || !sub.fcmToken) return;
+
+  const isCall = notification.kind === 'call';
 
   try {
     await getMessaging().send({
       token: sub.fcmToken,
-      notification: { title: notification.title, body: notification.body },
-      data: { chatId: notification.chatId, kind: notification.kind ?? 'message' },
+      data: toFcmData(notification),
+      ...(isCall ? {} : { notification: { title: notification.title, body: notification.body } }),
+      android: {
+        priority: isCall ? 'high' : 'normal',
+        ...(options?.ttl === undefined ? {} : { ttl: options.ttl * 1000 }),
+      },
     });
   } catch (error) {
     const code = (error as { code?: string }).code;
@@ -115,11 +141,14 @@ export async function sendToUser(userId: string, notification: PushNotificationP
   if (subscriptions.length === 0) return;
 
   await Promise.all(
-    subscriptions.map((sub) => (sub.provider === 'fcm' ? sendViaFcm(sub, notification) : sendViaWebPush(sub, notification, options))),
+    subscriptions.map((sub) =>
+      sub.provider === 'fcm' ? sendViaFcm(sub, notification, options) : sendViaWebPush(sub, notification, options),
+    ),
   );
 }
 
 export async function notifyOfflineMembersOfCall(
+  callId: string,
   chatId: string,
   initiatorId: string,
   initiatorName: string,
@@ -137,7 +166,11 @@ export async function notifyOfflineMembersOfCall(
 
   await Promise.all(
     offlineMemberIds.map((userId) =>
-      sendToUser(userId, { title, body, chatId, kind: 'call' }, { ttl: 45, urgency: 'high' }),
+      sendToUser(
+        userId,
+        { title, body, chatId, kind: 'call', callId, callerName: initiatorName, callKind: kind },
+        { ttl: 45, urgency: 'high' },
+      ),
     ),
   );
 }

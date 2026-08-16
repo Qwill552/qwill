@@ -32,3 +32,26 @@ export function disconnectSocket(): void {
 export function getSocket(): Socket | null {
   return socket;
 }
+
+const SOCKET_WAIT_POLL_MS = 200;
+
+/** Действие из системного интерфейса звонка приходит раньше, чем поднимается WebView и логин:
+ *  ждём живой сокет, а не теряем отклонение или приём (шаг ЗВОНКИ-11). */
+export function waitForConnectedSocket(timeoutMs = 20_000): Promise<Socket | null> {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const check = (): void => {
+      const current = getSocket();
+      if (current?.connected) {
+        resolve(current);
+        return;
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(null);
+        return;
+      }
+      setTimeout(check, SOCKET_WAIT_POLL_MS);
+    };
+    check();
+  });
+}

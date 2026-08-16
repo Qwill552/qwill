@@ -181,6 +181,69 @@ describe('push-уведомления (этап 9, секция 10А)', () => {
       expect(await prisma.pushSubscription.findUnique({ where: { fcmToken } })).toBeNull();
     });
 
+    it('звонок уходит в FCM data-only и с высоким приоритетом', async () => {
+      const { userId } = await registerUser('fcm_call');
+      const fcmToken = `fcm-token-${RUN_ID}_call`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'fcm', fcmToken } });
+
+      const sendMock = vi.mocked(getMessaging().send);
+      sendMock.mockClear();
+      sendMock.mockResolvedValueOnce('projects/test/messages/1');
+
+      await pushService.sendToUser(
+        userId,
+        { title: 'Входящий звонок от Аня', body: 'Аудиозвонок', chatId: 'chat1', kind: 'call', callId: 'call-1', callerName: 'Аня', callKind: 'AUDIO' },
+        { ttl: 45, urgency: 'high' },
+      );
+
+      const message = sendMock.mock.calls[0]?.[0] as {
+        notification?: unknown;
+        android?: { priority?: string; ttl?: number };
+        data?: Record<string, string>;
+      };
+      expect(message.notification).toBeUndefined();
+      expect(message.android?.priority).toBe('high');
+      expect(message.android?.ttl).toBe(45_000);
+      expect(message.data).toMatchObject({ kind: 'call', callId: 'call-1', callerName: 'Аня', callKind: 'AUDIO' });
+    });
+
+    it('обычное сообщение остаётся notification-пушем с обычным приоритетом', async () => {
+      const { userId } = await registerUser('fcm_msg');
+      const fcmToken = `fcm-token-${RUN_ID}_msg`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'fcm', fcmToken } });
+
+      const sendMock = vi.mocked(getMessaging().send);
+      sendMock.mockClear();
+      sendMock.mockResolvedValueOnce('projects/test/messages/1');
+
+      await pushService.sendToUser(userId, { title: 'Аня', body: 'Привет!', chatId: 'chat1' });
+
+      const message = sendMock.mock.calls[0]?.[0] as { notification?: unknown; android?: { priority?: string } };
+      expect(message.notification).toMatchObject({ title: 'Аня', body: 'Привет!' });
+      expect(message.android?.priority).toBe('normal');
+    });
+
+    it('подписчику webpush звонок приходит прежним web-push с urgency high', async () => {
+      const { userId } = await registerUser('web_call');
+      const endpoint = `https://push.example.test/${RUN_ID}_web_call`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'webpush', endpoint, p256dh: 'p', auth: 'a' } });
+
+      vi.mocked(webpush.sendNotification).mockClear();
+      vi.mocked(webpush.sendNotification).mockResolvedValueOnce({ statusCode: 201 } as never);
+
+      await pushService.sendToUser(
+        userId,
+        { title: 'Входящий звонок от Аня', body: 'Аудиозвонок', chatId: 'chat1', kind: 'call', callId: 'call-1' },
+        { ttl: 45, urgency: 'high' },
+      );
+
+      expect(webpush.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ endpoint }),
+        expect.stringContaining('call-1'),
+        expect.objectContaining({ urgency: 'high' }),
+      );
+    });
+
     it('оба канала работают одновременно для разных устройств одного пользователя', async () => {
       const { userId } = await registerUser('both');
       const endpoint = `https://push.example.test/${RUN_ID}_both`;

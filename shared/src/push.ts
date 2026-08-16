@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { CallKind } from './chat.js';
+
 /** Тело PushSubscription из browser PushManager — endpoint уникален и служит естественным ключом (этап 9). */
 export const pushSubscribeWebSchema = z.object({
   provider: z.literal('webpush'),
@@ -31,10 +33,15 @@ export const pushUnsubscribeFcmSchema = z.object({
 export const pushUnsubscribeSchema = z.discriminatedUnion('provider', [pushUnsubscribeWebSchema, pushUnsubscribeFcmSchema]);
 export type PushUnsubscribeInput = z.infer<typeof pushUnsubscribeSchema>;
 
-/** Полезная нагрузка push-уведомления — канал доставки решает, как её показать (SW для webpush, FCM data для нативного). */
+/** Полезная нагрузка push-уведомления — канал доставки решает, как её показать (SW для webpush, FCM data для нативного).
+ *  Поля звонка заполняются только при kind === 'call': по ним оболочка Android поднимает
+ *  системный входящий вызов, не дожидаясь загрузки WebView (шаг ЗВОНКИ-11). */
 export interface PushNotificationPayload {
   title: string;
   body: string;
   chatId: string;
   kind?: 'message' | 'call';
+  callId?: string;
+  callerName?: string;
+  callKind?: CallKind;
 }

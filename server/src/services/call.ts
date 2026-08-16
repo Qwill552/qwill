@@ -89,7 +89,7 @@ export async function startCall(input: { chatId: string; userId: string; kind: C
 
   if (!existing) {
     const initiatorName = call.initiator?.displayName ?? 'Кто-то';
-    pushService.notifyOfflineMembersOfCall(call.chatId, input.userId, initiatorName, call.kind).catch((error: unknown) => {
+    pushService.notifyOfflineMembersOfCall(call.id, call.chatId, input.userId, initiatorName, call.kind).catch((error: unknown) => {
       logger.error({ err: error, chatId: call.chatId }, 'Не удалось отправить push-уведомления о звонке');
     });
   }
