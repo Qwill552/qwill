@@ -33,3 +33,8 @@ Thumbs.db
 .claude/scheduled_tasks.lock
 
 release.tar.gz
+
+client/android/.gradle/
+client/android/local.properties
+*.keystore
+*.jks

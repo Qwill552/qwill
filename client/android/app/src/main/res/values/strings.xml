@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qwill</string>
+    <string name="title_activity_main">Qwill</string>
+    <string name="package_name">com.qwill.app</string>
+    <string name="custom_url_scheme">com.qwill.app</string>
+</resources>

@@ -10,6 +10,7 @@ export default tseslint.config(
       'server/src/generated/**',
       'legacy/**',
       'design-archive/**',
+      'client/android/**',
     ],
   },
   js.configs.recommended,

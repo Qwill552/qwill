@@ -8,9 +8,14 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:dev": "cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "@messenger/shared": "*",
     "@noble/hashes": "^1.8.0",
     "idb": "^7.1.1",
@@ -22,6 +27,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.5",
