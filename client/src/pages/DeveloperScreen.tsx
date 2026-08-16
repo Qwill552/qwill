@@ -1,0 +1,48 @@
+import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { AmbientBlobs } from '../app/AmbientBlobs';
+import { useDevPrefsStore } from '../stores/devPrefsStore';
+import { Card } from '../ui/Card';
+import { ChromeBar } from '../ui/chrome/ChromeBar';
+import { GlassButton } from '../ui/chrome/GlassButton';
+import { GlassPill } from '../ui/chrome/GlassPill';
+import { ScrollIndicator } from '../ui/ScrollIndicator';
+import { Switch } from '../ui/Switch';
+import styles from './DeveloperScreen.module.css';
+
+export function DeveloperScreen() {
+  const navigate = useNavigate();
+  const callStatsOverlayEnabled = useDevPrefsStore((s) => s.callStatsOverlayEnabled);
+  const setCallStatsOverlayEnabled = useDevPrefsStore((s) => s.setCallStatsOverlayEnabled);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className={styles.screen}>
+      <AmbientBlobs />
+      <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
+        <ScrollIndicator target={scrollerRef} />
+        <Card caption="Звонки">
+          <Card.Row
+            icon="monitor"
+            tint="teal"
+            title="Статистика звонка"
+            subtitle="Оверлей с частотой кадров, кодеком и сетью"
+            trailing={
+              <Switch
+                checked={callStatsOverlayEnabled}
+                onChange={setCallStatsOverlayEnabled}
+                label="Статистика звонка"
+              />
+            }
+          />
+        </Card>
+      </div>
+
+      <ChromeBar>
+        <GlassButton icon="back" label="Назад в настройки" onClick={() => navigate('/settings')} />
+        <GlassPill title="Для разработчиков" />
+      </ChromeBar>
+    </div>
+  );
+}

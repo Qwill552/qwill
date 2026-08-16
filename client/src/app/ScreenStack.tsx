@@ -6,6 +6,7 @@ import { ChatInfoScreen } from '../pages/ChatInfoScreen';
 import { ChatScreen } from '../pages/ChatScreen';
 import { ChatsScreen } from '../pages/ChatsScreen';
 import { ContactsScreen } from '../pages/ContactsScreen';
+import { DeveloperScreen } from '../pages/DeveloperScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StubScreen } from '../pages/StubScreen';
@@ -49,6 +50,7 @@ function RouteSwitch({ location }: { location: Location }) {
       <Route path="/contacts/:userId" element={<StubScreen title="Контакт" backTo="/contacts" />} />
       <Route path="/settings" element={<SettingsScreen />} />
       <Route path="/settings/appearance" element={<AppearanceScreen />} />
+      <Route path="/settings/developer" element={<DeveloperScreen />} />
       <Route path="/profile" element={<ProfileScreen />} />
       <Route path="*" element={<Navigate to="/chats" replace />} />
     </Routes>

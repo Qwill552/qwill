@@ -9,7 +9,6 @@ import { countPendingOutbox } from '../cache/outbox';
 import { Modal } from '../features/groups/Modal';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
-import { useDevPrefsStore } from '../stores/devPrefsStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
@@ -44,8 +43,6 @@ export function SettingsScreen() {
   const logout = useAuthStore((s) => s.logout);
   const folderTabsEnabled = useChatListPrefsStore((s) => s.folderTabsEnabled);
   const setFolderTabsEnabled = useChatListPrefsStore((s) => s.setFolderTabsEnabled);
-  const callStatsOverlayEnabled = useDevPrefsStore((s) => s.callStatsOverlayEnabled);
-  const setCallStatsOverlayEnabled = useDevPrefsStore((s) => s.setCallStatsOverlayEnabled);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -199,19 +196,13 @@ export function SettingsScreen() {
           />
         </Card>
 
-        <Card caption="Для разработчиков" className={styles.cardReset}>
+        <Card className={styles.cardReset}>
           <Card.Row
             icon="settings"
             tint="teal"
-            title="Статистика звонка"
-            subtitle="Оверлей с частотой кадров, кодеком и сетью"
-            trailing={
-              <Switch
-                checked={callStatsOverlayEnabled}
-                onChange={setCallStatsOverlayEnabled}
-                label="Статистика звонка"
-              />
-            }
+            title="Для разработчиков"
+            subtitle="Отладочные переключатели"
+            onClick={() => navigate('/settings/developer')}
           />
         </Card>
 

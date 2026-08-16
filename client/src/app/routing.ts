@@ -20,6 +20,7 @@ function normalize(pathname: string): string {
  *  из ux-ui/02-shell.md; экраны, которых ещё нет, всё равно должны здесь фигурировать. */
 function staticParent(pathname: string): string | null {
   if (pathname === '/settings/appearance') return '/settings';
+  if (pathname === '/settings/developer') return '/settings';
   return null;
 }
 
