@@ -99,7 +99,11 @@
     <ol>
       <li>Один прогон — один захват. Перед новым прогоном жать «Начать заново»: состояние страницы обнуляется.</li>
       <li>Вкладку пробы держать видимой (свернутая вкладка тормозит счётчик отрисовки).</li>
-      <li>На захватываемой поверхности нужно движение — иначе Chrome честно отдаёт меньше кадров.</li>
+      <li>
+        Захватывать <strong>тот экран, на котором лежит это окно</strong>, и держать окно видимым: полоса
+        ниже и живой текст дают гарантированное движение каждый кадр, поэтому «анимация самой страницы»
+        становится честным потолком — ниже него захват падать не обязан.
+      </li>
       <li>«Кадры источника» — главный показатель, он не зависит ни от отрисовки, ни от энкодера.</li>
     </ol>
     <div class="track"><div class="runner"></div></div>
@@ -131,6 +135,7 @@
       const RAW_CONSTRAINTS = { video: true, audio: false };
       const WINDOW_MS = 2000;
       const SAMPLE_MS = 10000;
+      const INTERVAL_LIMIT = 400;
 
       const pageStart = performance.now();
       const timeline = [];
@@ -152,6 +157,31 @@
         timeline.push(`[${seconds}с, активно ${activeCount()}] ${text}`);
         timelineRoot.textContent = timeline.join('\n');
         timelineRoot.scrollTop = timelineRoot.scrollHeight;
+      }
+
+      const pageTimes = [];
+      let pageFps = 0;
+
+      function pageTick(now) {
+        pageTimes.push(now);
+        pageFps = rateOf(pageTimes, now);
+        requestAnimationFrame(pageTick);
+      }
+
+      function percentile(values, share) {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * share))];
+      }
+
+      function intervalProfile(slot) {
+        const intervals = slot.intervals;
+        if (intervals.length < 10) return 'мало данных';
+        const fast = intervals.filter((value) => value < 20).length;
+        const half = intervals.filter((value) => value >= 20 && value < 45).length;
+        const slow = intervals.length - fast - half;
+        const share = (count) => Math.round((count * 100) / intervals.length);
+        return `p50 ${percentile(intervals, 0.5).toFixed(1)} мс | до 20 мс ${share(fast)}% | 20–45 мс ${share(half)}% | дольше ${share(slow)}%`;
       }
 
       function surfaceOf(track) {
@@ -179,6 +209,11 @@
             const { value, done } = await reader.read();
             if (done) return;
             const now = performance.now();
+            if (slot.lastSourceFrame > 0) {
+              slot.intervals.push(now - slot.lastSourceFrame);
+              if (slot.intervals.length > INTERVAL_LIMIT) slot.intervals.shift();
+            }
+            slot.lastSourceFrame = now;
             slot.sourceTimes.push(now);
             slot.sourceFps = rateOf(slot.sourceTimes, now);
             slot.sourceFrames += 1;
@@ -209,6 +244,8 @@
         slot.renderFps = 0;
         slot.sourceFrames = 0;
         slot.renderFrames = 0;
+        slot.intervals = [];
+        slot.lastSourceFrame = 0;
         slot.startedAt = performance.now();
       }
 
@@ -257,6 +294,8 @@
             ` (максимум ${capabilities.width?.max ?? '?'}×${capabilities.height?.max ?? '?'} @${capabilities.frameRate?.max ?? '?'})`,
           `кадры источника: ${slot.sourceFps.toFixed(1)}/с, всего ${slot.sourceFrames} [${slot.sourceMeter}]`,
           `кадры отрисовки: ${slot.renderFps.toFixed(1)}/с, всего ${slot.renderFrames}`,
+          `интервалы между кадрами: ${intervalProfile(slot)}`,
+          `анимация самой страницы: ${pageFps.toFixed(1)}/с`,
           `текущий трек живёт ${alive} с, захватов активно ${activeCount()}`,
         ].join('\n');
       }
@@ -268,7 +307,9 @@
       function sample() {
         for (const slot of slots) {
           if (slot.stopped) continue;
-          note(`${slot.name}: ${slot.sourceFps.toFixed(1)}/с — ${surfaceOf(slot.track)}`);
+          note(
+            `${slot.name}: ${slot.sourceFps.toFixed(1)}/с при ${pageFps.toFixed(1)}/с у страницы — ${surfaceOf(slot.track)} — ${intervalProfile(slot)}`,
+          );
         }
       }
 
@@ -348,6 +389,7 @@
         void navigator.clipboard.writeText(report()).catch(() => {});
       });
 
+      requestAnimationFrame(pageTick);
       setInterval(render, 500);
       setInterval(sample, SAMPLE_MS);
     </script>
