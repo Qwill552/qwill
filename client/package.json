@@ -16,6 +16,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/push-notifications": "^8.1.2",
     "@messenger/shared": "*",
     "@noble/hashes": "^1.8.0",
     "idb": "^7.1.1",

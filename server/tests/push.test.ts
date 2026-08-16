@@ -8,7 +8,19 @@ vi.mock('web-push', () => ({
   },
 }));
 
+vi.mock('firebase-admin/app', () => ({
+  cert: vi.fn(() => ({})),
+  initializeApp: vi.fn(() => ({})),
+  getApps: vi.fn(() => [{}]),
+}));
+
+vi.mock('firebase-admin/messaging', () => {
+  const messaging = { send: vi.fn() };
+  return { getMessaging: vi.fn(() => messaging) };
+});
+
 import webpush from 'web-push';
+import { getMessaging } from 'firebase-admin/messaging';
 
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
@@ -33,7 +45,7 @@ async function registerUser(suffix: string): Promise<{ token: string; userId: st
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };
 }
 
-describe('push-уведомления (этап 9)', () => {
+describe('push-уведомления (этап 9, секция 10А)', () => {
   afterAll(async () => {
     await prisma.chat.deleteMany({ where: { id: { in: createdChatIds } } });
     await prisma.pushSubscription.deleteMany({ where: { userId: { in: createdUserIds } } });
@@ -41,7 +53,7 @@ describe('push-уведомления (этап 9)', () => {
     await prisma.$disconnect();
   });
 
-  describe('POST/DELETE /push/subscribe', () => {
+  describe('POST/DELETE /push/subscribe — webpush', () => {
     it('создаёт подписку и удаляет её по endpoint', async () => {
       const { token, userId } = await registerUser('sub');
       const endpoint = `https://push.example.test/${RUN_ID}_sub`;
@@ -49,16 +61,17 @@ describe('push-уведомления (этап 9)', () => {
       const created = await request
         .post('/api/push/subscribe')
         .set('Authorization', `Bearer ${token}`)
-        .send({ endpoint, keys: { p256dh: 'p256dh-value', auth: 'auth-value' } });
+        .send({ provider: 'webpush', endpoint, keys: { p256dh: 'p256dh-value', auth: 'auth-value' } });
       expect(created.status).toBe(201);
 
       const stored = await prisma.pushSubscription.findUnique({ where: { endpoint } });
       expect(stored?.userId).toBe(userId);
+      expect(stored?.provider).toBe('webpush');
 
       const removed = await request
         .delete('/api/push/subscribe')
         .set('Authorization', `Bearer ${token}`)
-        .send({ endpoint });
+        .send({ provider: 'webpush', endpoint });
       expect(removed.status).toBe(204);
 
       expect(await prisma.pushSubscription.findUnique({ where: { endpoint } })).toBeNull();
@@ -67,7 +80,7 @@ describe('push-уведомления (этап 9)', () => {
     it('требует авторизацию', async () => {
       const res = await request
         .post('/api/push/subscribe')
-        .send({ endpoint: 'https://push.example.test/anon', keys: { p256dh: 'a', auth: 'b' } });
+        .send({ provider: 'webpush', endpoint: 'https://push.example.test/anon', keys: { p256dh: 'a', auth: 'b' } });
       expect(res.status).toBe(401);
     });
 
@@ -76,7 +89,41 @@ describe('push-уведомления (этап 9)', () => {
       const res = await request
         .post('/api/push/subscribe')
         .set('Authorization', `Bearer ${token}`)
-        .send({ endpoint: 'https://push.example.test/bad' });
+        .send({ provider: 'webpush', endpoint: 'https://push.example.test/bad' });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST/DELETE /push/subscribe — fcm', () => {
+    it('создаёт подписку по токену и удаляет её', async () => {
+      const { token, userId } = await registerUser('fcm_sub');
+      const fcmToken = `fcm-token-${RUN_ID}`;
+
+      const created = await request
+        .post('/api/push/subscribe')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ provider: 'fcm', token: fcmToken });
+      expect(created.status).toBe(201);
+
+      const stored = await prisma.pushSubscription.findUnique({ where: { fcmToken } });
+      expect(stored?.userId).toBe(userId);
+      expect(stored?.provider).toBe('fcm');
+
+      const removed = await request
+        .delete('/api/push/subscribe')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ provider: 'fcm', token: fcmToken });
+      expect(removed.status).toBe(204);
+
+      expect(await prisma.pushSubscription.findUnique({ where: { fcmToken } })).toBeNull();
+    });
+
+    it('отклоняет тело без токена', async () => {
+      const { token } = await registerUser('fcm_sub_bad');
+      const res = await request
+        .post('/api/push/subscribe')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ provider: 'fcm' });
       expect(res.status).toBe(400);
     });
   });
@@ -85,7 +132,7 @@ describe('push-уведомления (этап 9)', () => {
     it('шлёт уведомление на каждую подписку пользователя', async () => {
       const { userId } = await registerUser('send');
       const endpoint = `https://push.example.test/${RUN_ID}_send`;
-      await prisma.pushSubscription.create({ data: { userId, endpoint, p256dh: 'p', auth: 'a' } });
+      await prisma.pushSubscription.create({ data: { userId, provider: 'webpush', endpoint, p256dh: 'p', auth: 'a' } });
 
       vi.mocked(webpush.sendNotification).mockResolvedValueOnce({ statusCode: 201 } as never);
 
@@ -97,13 +144,60 @@ describe('push-уведомления (этап 9)', () => {
     it('удаляет мёртвую подписку при 410 Gone', async () => {
       const { userId } = await registerUser('gone');
       const endpoint = `https://push.example.test/${RUN_ID}_gone`;
-      await prisma.pushSubscription.create({ data: { userId, endpoint, p256dh: 'p', auth: 'a' } });
+      await prisma.pushSubscription.create({ data: { userId, provider: 'webpush', endpoint, p256dh: 'p', auth: 'a' } });
 
       vi.mocked(webpush.sendNotification).mockRejectedValueOnce(Object.assign(new Error('Gone'), { statusCode: 410 }));
 
       await pushService.sendToUser(userId, { title: 'т', body: 'б', chatId: 'chat1' });
 
       expect(await prisma.pushSubscription.findUnique({ where: { endpoint } })).toBeNull();
+    });
+
+    it('шлёт FCM-подписке через firebase-admin', async () => {
+      const { userId } = await registerUser('fcm_send');
+      const fcmToken = `fcm-token-${RUN_ID}_send`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'fcm', fcmToken } });
+
+      const sendMock = vi.mocked(getMessaging().send);
+      sendMock.mockClear();
+      sendMock.mockResolvedValueOnce('projects/test/messages/1');
+
+      await pushService.sendToUser(userId, { title: 'Заголовок', body: 'Текст', chatId: 'chat1' });
+
+      expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ token: fcmToken }));
+    });
+
+    it('удаляет FCM-подписку с невалидным токеном', async () => {
+      const { userId } = await registerUser('fcm_gone');
+      const fcmToken = `fcm-token-${RUN_ID}_gone`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'fcm', fcmToken } });
+
+      const sendMock = vi.mocked(getMessaging().send);
+      sendMock.mockClear();
+      sendMock.mockRejectedValueOnce(Object.assign(new Error('not registered'), { code: 'messaging/registration-token-not-registered' }));
+
+      await pushService.sendToUser(userId, { title: 'т', body: 'б', chatId: 'chat1' });
+
+      expect(await prisma.pushSubscription.findUnique({ where: { fcmToken } })).toBeNull();
+    });
+
+    it('оба канала работают одновременно для разных устройств одного пользователя', async () => {
+      const { userId } = await registerUser('both');
+      const endpoint = `https://push.example.test/${RUN_ID}_both`;
+      const fcmToken = `fcm-token-${RUN_ID}_both`;
+      await prisma.pushSubscription.create({ data: { userId, provider: 'webpush', endpoint, p256dh: 'p', auth: 'a' } });
+      await prisma.pushSubscription.create({ data: { userId, provider: 'fcm', fcmToken } });
+
+      vi.mocked(webpush.sendNotification).mockClear();
+      vi.mocked(webpush.sendNotification).mockResolvedValueOnce({ statusCode: 201 } as never);
+      const sendMock = vi.mocked(getMessaging().send);
+      sendMock.mockClear();
+      sendMock.mockResolvedValueOnce('projects/test/messages/1');
+
+      await pushService.sendToUser(userId, { title: 'Заголовок', body: 'Текст', chatId: 'chat1' });
+
+      expect(webpush.sendNotification).toHaveBeenCalledTimes(1);
+      expect(sendMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -116,7 +210,7 @@ describe('push-уведомления (этап 9)', () => {
       createdChatIds.push(chatId);
 
       const endpoint = `https://push.example.test/${RUN_ID}_msg`;
-      await prisma.pushSubscription.create({ data: { userId: recipient.userId, endpoint, p256dh: 'p', auth: 'a' } });
+      await prisma.pushSubscription.create({ data: { userId: recipient.userId, provider: 'webpush', endpoint, p256dh: 'p', auth: 'a' } });
 
       vi.mocked(webpush.sendNotification).mockResolvedValue({ statusCode: 201 } as never);
 

@@ -42,6 +42,10 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default('mailto:admin@messenger.local'),
 
+  /// Опционален по той же причине, что VAPID выше: без него FCM-канал просто не отправляет.
+  /// JSON ключа сервисного аккаунта Firebase одной строкой (секция 10А).
+  FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
+
   LIVEKIT_URL: z.string().min(1, 'LIVEKIT_URL обязателен'),
   LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
   LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),

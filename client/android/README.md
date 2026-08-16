@@ -8,21 +8,35 @@
 APK заново нужно только при изменениях нативного слоя (`client/android/`, плагины, манифест).
 Обоснование выбора — в журнале `calls.md` за 2026-08-16.
 
-## Уведомления в оболочке не работают до шага 11
+## Уведомления в оболочке — через FCM (шаг 10А)
 
 Веб-пуши, на которых держатся уведомления в PWA, в Android WebView недоступны: WebView не
 предоставляет ни `Notification`, ни `PushManager`, и не имеет собственной регистрации в
-push-сервисе — она есть у браузера Chrome, а не у встроенного WebView. Клиентский код это
-переживает молча: `subscribeToPush` (`client/src/realtime/push.ts`) выходит по проверке
-`!('PushManager' in window)` до запроса разрешения, поэтому Android показывает приложение
-как не отправляющее уведомлений.
+push-сервисе — она есть у браузера Chrome, а не у встроенного WebView. `subscribeToPush`
+(`client/src/realtime/push.ts`) это учитывает: в оболочке (`isNativePushAvailable()` из
+`client/src/realtime/nativePush.ts`) подписка уходит по нативному каналу через
+`@capacitor/push-notifications` и Firebase Cloud Messaging, а не через `PushManager`.
 
-Это не регрессия от `server.url`: с интерфейсом внутри APK было бы ровно то же самое.
-Оболочка здесь временно **хуже PWA**, и разрыв закрывает шаг 11 — нативный FCM. Заготовка
-под него уже стоит в `app/build.gradle`: сборка ищет `google-services.json` и без него
-пишет в лог `Push Notifications won't work`. Разрешение `POST_NOTIFICATIONS` в манифест
-добавлено заранее (с Android 13 без него уведомления блокируются), но само по себе оно
-ничего не включает.
+Без `google-services.json` (см. ниже) push-плагин на Android не инициализируется — сборка
+пишет в лог `Push Notifications won't work`, приложение работает дальше как обычно, просто
+без уведомлений. Разрешение `POST_NOTIFICATIONS` в манифесте — с Android 13 без него
+уведомления блокируются в принципе, но само по себе оно ничего не включает.
+
+### Откуда взять `google-services.json`
+
+1. [Firebase Console](https://console.firebase.google.com/) → создать проект (или использовать
+   существующий).
+2. Добавить Android-приложение с `applicationId` **`com.qwill.app`** (см. `app/build.gradle`).
+3. Скачать `google-services.json` и положить в `client/android/app/google-services.json`.
+   Файл не коммитится (`client/android/.gitignore`) — при потере или на новой машине сборки
+   повторить эти шаги заново, ключи и `project_id` возьмутся из того же проекта Firebase.
+4. Серверу отдельно нужен ключ сервисного аккаунта того же проекта — Firebase Console →
+   Project settings → Service accounts → Generate new private key, JSON целиком в
+   `FCM_SERVICE_ACCOUNT_JSON` в `.env` на сервере (см. `.env.example`), в репозиторий не
+   попадает.
+5. Пересобрать: `npm run android:sync -w @messenger/client` подхватывает файл автоматически
+   (блок в `app/build.gradle` применяет `com.google.gms.google-services`, только если файл
+   существует).
 
 ## Отладочная сборка
 

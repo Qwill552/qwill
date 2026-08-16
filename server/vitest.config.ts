@@ -9,6 +9,9 @@ export default defineConfig({
     fileParallelism: false,
     // dotenv в config/env.ts не переопределяет уже заданные переменные — этим глушим pino-http
     // (у самого pino нет уровня тише 'fatal' в схеме env.ts).
-    env: { LOG_LEVEL: 'fatal' },
+    env: {
+      LOG_LEVEL: 'fatal',
+      FCM_SERVICE_ACCOUNT_JSON: '{"project_id":"test","client_email":"test@test.iam.gserviceaccount.com","private_key":"test"}',
+    },
   },
 });

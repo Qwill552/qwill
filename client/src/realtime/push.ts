@@ -1,5 +1,6 @@
 import { subscribePushRequest, unsubscribePushRequest } from '../api/push';
 import { registerServiceWorker } from '../app/serviceWorker';
+import { isNativePushAvailable, registerNativePush, unregisterNativePush } from './nativePush';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
@@ -21,8 +22,14 @@ function subscriptionToDto(subscription: PushSubscription): { endpoint: string; 
   };
 }
 
-/** Вызывается после логина — если разрешение уже дано или ещё не спрошено (не 'denied'), см. authStore (этап 9). */
+/** Вызывается после логина — если разрешение уже дано или ещё не спрошено (не 'denied'), см. authStore (этап 9).
+ *  В оболочке Capacitor уходит по нативному каналу (FCM) — web push там недоступен в принципе (секция 10А). */
 export async function subscribeToPush(): Promise<void> {
+  if (isNativePushAvailable()) {
+    await registerNativePush().catch((error) => console.error('registerNativePush failed', error));
+    return;
+  }
+
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !VAPID_PUBLIC_KEY) return;
   if (Notification.permission === 'denied') return;
 
@@ -41,7 +48,7 @@ export async function subscribeToPush(): Promise<void> {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
       }));
 
-    await subscribePushRequest(subscriptionToDto(subscription));
+    await subscribePushRequest({ provider: 'webpush', ...subscriptionToDto(subscription) });
   } catch (error) {
     // Пуши — не критичная функция: не бросаем дальше, но логируем причину для диагностики.
     console.error('subscribeToPush failed', error);
@@ -49,6 +56,11 @@ export async function subscribeToPush(): Promise<void> {
 }
 
 export async function unsubscribePush(): Promise<void> {
+  if (isNativePushAvailable()) {
+    await unregisterNativePush().catch(() => undefined);
+    return;
+  }
+
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
   try {
@@ -58,7 +70,7 @@ export async function unsubscribePush(): Promise<void> {
 
     const endpoint = subscription.endpoint;
     await subscription.unsubscribe();
-    await unsubscribePushRequest(endpoint);
+    await unsubscribePushRequest({ provider: 'webpush', endpoint });
   } catch {
     // Не критично — сервер сам подчистит мёртвую подписку при следующей отправке (410 Gone).
   }
