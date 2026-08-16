@@ -1,7 +1,12 @@
 # Qwill — сборка Android
 
-Обёртка Capacitor вокруг веб-клиента `client/`. WebView грузит собранный `dist/`,
-никакого дев-сервера в релизных сборках. `applicationId`: `com.qwill.app`.
+Обёртка Capacitor вокруг веб-клиента `client/`. WebView грузит интерфейс с
+`https://qwill.mooo.com` (`server.url` в `client/capacitor.config.ts`), а не из собранного
+`dist/` внутри APK. `applicationId`: `com.qwill.app`.
+
+Следствие: правки клиента приезжают на телефон сами после деплоя, пересобирать и раздавать
+APK заново нужно только при изменениях нативного слоя (`client/android/`, плагины, манифест).
+Обоснование выбора — в журнале `calls.md` за 2026-08-16.
 
 ## Отладочная сборка
 
@@ -13,10 +18,29 @@ npm run android:open -w @messenger/client
 Откроется Android Studio с проектом `client/android`. Запустить на подключённом по USB
 телефоне (отладка по USB включена) или на эмуляторе — кнопка Run.
 
-`android:sync` пересобирает `client/dist` и копирует его в
-`android/app/src/main/assets/public`, `android:open` открывает проект в Android Studio.
-После правок в `client/src` нужно заново прогнать `android:sync`, иначе WebView покажет
-старую версию.
+`android:sync` пересобирает `client/dist`, копирует его в
+`android/app/src/main/assets/public` и обновляет `capacitor.config.json` внутри APK;
+`android:open` открывает проект в Android Studio. Скопированный `dist` при заданном
+`server.url` не используется — он остаётся в APK как побочный результат `cap sync`.
+После правок в `client/src` пересобирать APK не нужно: телефон возьмёт новую версию с
+`qwill.mooo.com` после деплоя. Прогнать `android:sync` нужно, только если менялся
+`capacitor.config.ts` или нативная часть.
+
+## Сборка и установка без Android Studio
+
+Android Studio нужна только как источник JDK и как GUI. Тот же результат из терминала
+(проверено на Windows, Studio установлена в `D:\android`):
+
+```powershell
+$env:JAVA_HOME = "D:\android\jbr"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+client\android\gradlew.bat -p client\android installDebug
+```
+
+`installDebug` собирает отладочный APK и ставит его на подключённое по USB устройство.
+Список устройств — `platform-tools\adb.exe devices`, лог приложения — `adb logcat`.
+Строка `D Capacitor: Loading app at https://qwill.mooo.com` в логе подтверждает, что
+оболочка взяла интерфейс с прода.
 
 ## Релизная сборка
 

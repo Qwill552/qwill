@@ -9,6 +9,7 @@ const config: CapacitorConfig = {
   },
   server: {
     androidScheme: 'https',
+    url: 'https://qwill.mooo.com',
   },
 };
 
