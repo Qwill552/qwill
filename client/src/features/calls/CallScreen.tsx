@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { useCallStore } from '../../stores/callStore';
+import { useDevPrefsStore } from '../../stores/devPrefsStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useParticipantVideo } from '../../calls/useParticipantVideo';
@@ -29,24 +30,6 @@ const QUALITY_RING_CLASS: Record<'good' | 'poor' | 'lost', string | undefined> =
   poor: styles.ringPoor,
   lost: styles.ringLost,
 };
-
-const STATS_STORAGE_KEY = 'qwill:call-stats';
-
-function readStatsPreference(): boolean {
-  try {
-    return localStorage.getItem(STATS_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeStatsPreference(enabled: boolean): void {
-  try {
-    localStorage.setItem(STATS_STORAGE_KEY, enabled ? '1' : '0');
-  } catch {
-    return;
-  }
-}
 
 export function CallScreen({ onCollapse }: CallScreenProps) {
   const phase = useCallStore((s) => s.phase);
@@ -91,13 +74,9 @@ export function CallScreen({ onCollapse }: CallScreenProps) {
     if (!captureRate.slow) setCaptureHintHidden(false);
   }, [captureRate.slow]);
 
-  const [statsVisible, setStatsVisible] = useState(readStatsPreference);
-  const toggleStats = useCallback(() => {
-    setStatsVisible((visible) => {
-      writeStatsPreference(!visible);
-      return !visible;
-    });
-  }, []);
+  const statsVisible = useDevPrefsStore((s) => s.callStatsOverlayEnabled);
+  const toggleCallStatsOverlay = useDevPrefsStore((s) => s.toggleCallStatsOverlay);
+  const toggleStats = useCallback(() => toggleCallStatsOverlay(), [toggleCallStatsOverlay]);
   const longPress = useLongPress({ onLongPress: toggleStats });
   const hitsControl = (target: EventTarget | null): boolean => Boolean((target as HTMLElement | null)?.closest('button, a, input'));
   const onScreenPointerDown = (event: ReactPointerEvent): void => {
