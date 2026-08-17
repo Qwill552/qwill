@@ -1,6 +1,9 @@
 package com.qwill.app
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +28,22 @@ class QwillConnection(
 
     private val timeoutHandler = Handler(Looper.getMainLooper())
     private val timeoutRunnable = Runnable { finishRemotely() }
+    private val offlineRunnable = Runnable { if (!hasInternet()) finishRemotely() }
+
+    private val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            timeoutHandler.removeCallbacks(offlineRunnable)
+        }
+
+        override fun onLost(network: Network) {
+            timeoutHandler.removeCallbacks(offlineRunnable)
+            timeoutHandler.postDelayed(offlineRunnable, OFFLINE_GRACE_MS)
+        }
+    }
+
+    private var watching = false
 
     init {
         connectionProperties = PROPERTY_SELF_MANAGED
@@ -36,10 +55,11 @@ class QwillConnection(
         CallNotifications.showIncoming(context, callId, callerName, callKind)
         Ringer.start(context)
         timeoutHandler.postDelayed(timeoutRunnable, SELF_TIMEOUT_MS)
+        startWatchingNetwork()
     }
 
     override fun onAnswer() {
-        timeoutHandler.removeCallbacks(timeoutRunnable)
+        stopWatching()
         Ringer.stop()
         CallNotifications.cancel(context)
         setActive()
@@ -70,7 +90,7 @@ class QwillConnection(
     }
 
     private fun settle(cause: DisconnectCause) {
-        timeoutHandler.removeCallbacks(timeoutRunnable)
+        stopWatching()
         Ringer.stop()
         CallNotifications.cancel(context)
         CallRegistry.take(callId)
@@ -78,8 +98,31 @@ class QwillConnection(
         destroy()
     }
 
+    private fun startWatchingNetwork() {
+        val manager = connectivity
+        if (watching || manager == null) return
+        watching = runCatching { manager.registerDefaultNetworkCallback(networkCallback) }.isSuccess
+        if (watching && !hasInternet()) timeoutHandler.postDelayed(offlineRunnable, OFFLINE_GRACE_MS)
+    }
+
+    private fun stopWatching() {
+        timeoutHandler.removeCallbacks(timeoutRunnable)
+        timeoutHandler.removeCallbacks(offlineRunnable)
+        if (!watching) return
+        watching = false
+        runCatching { connectivity?.unregisterNetworkCallback(networkCallback) }
+    }
+
+    private fun hasInternet(): Boolean {
+        val manager = connectivity ?: return false
+        val active = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(active) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     private companion object {
         const val SELF_TIMEOUT_MS = 55_000L
+        const val OFFLINE_GRACE_MS = 2_000L
     }
 }
 
