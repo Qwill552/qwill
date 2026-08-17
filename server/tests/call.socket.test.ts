@@ -48,12 +48,19 @@ async function createPrivateChat(userId: string, targetUsername: string): Promis
   return chatId;
 }
 
+/** Сокет до установления соединения: события, которые сервер шлёт сразу на коннекте
+ *  (`call:invite`, `call:live`), нужно ждать слушателем, повешенным до него. */
+function openSocket(accessToken: string): ClientSocket {
+  const socket = ioClient(baseUrl, { auth: { token: accessToken }, transports: ['websocket'], forceNew: true });
+  openSockets.push(socket);
+  return socket;
+}
+
 function connectSocket(accessToken: string): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(baseUrl, { auth: { token: accessToken }, transports: ['websocket'], forceNew: true });
+    const socket = openSocket(accessToken);
     socket.once('connect', () => resolve(socket));
     socket.once('connect_error', reject);
-    openSockets.push(socket);
   });
 }
 
@@ -210,7 +217,7 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
     await emitWithAck<CallAcceptAck>(socketB, SocketEvent.CallAccept, { callId });
 
     socketB.disconnect();
-    const socketBAgain = await connectSocket(b.accessToken);
+    const socketBAgain = openSocket(b.accessToken);
     const live = await waitForEvent<CallLiveEvent>(socketBAgain, SocketEvent.CallLive);
 
     expect(live.calls.map((call) => call.id)).toContain(callId);
