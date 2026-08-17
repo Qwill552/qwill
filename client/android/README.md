@@ -80,34 +80,89 @@ Studio держит её отдельно в `~/.jdks`, оттуда же бер
 
 ## Релизная сборка
 
-Требуется ключ подписи (см. ниже). В Android Studio: `Build → Generate Signed Bundle / APK`,
-выбрать `APK`, указать путь к keystore и пароли, тип сборки `release`. Получившийся файл —
-в `client/android/app/release/app-release.apk`.
+Требуется ключ подписи (см. ниже). Из терминала — одной командой из `client/`:
 
-Перед сборкой обязательно `npm run android:sync -w @messenger/client`, чтобы в `assets/public`
-попал актуальный `dist`.
+```powershell
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+npm run android:release -w @messenger/client
+```
+
+Скрипт сам гоняет `android:sync` (веб-сборка + `cap sync`) и затем `gradlew assembleRelease`.
+Результат — `client/android/app/build/outputs/apk/release/app-release.apk`. Без
+`keystore.properties` (см. ниже) та же команда соберёт **неподписанный** APK: сборка не
+падает, но такой файл нельзя установить или раздать — `signingConfig` на `release` в этом
+случае просто не применяется.
+
+В Android Studio тот же результат: `Build → Generate Signed Bundle / APK`, `APK`, путь к
+keystore и пароли, тип сборки `release`.
 
 ## Ключ подписи
 
-Ключ не хранится в репозитории — `.gitignore` исключает `*.keystore` и `*.jks` из всего
-проекта. Отсутствие ключа при релизной сборке означает невозможность выпускать обновления
-для уже установивших приложение пользователей: Android отклоняет APK с другой подписью как
-другое приложение.
+Ключ не хранится в репозитории — `.gitignore` исключает `*.jks`, `*.keystore` и
+`keystore.properties` из всего проекта. Отсутствие ключа при релизной сборке означает
+невозможность выпускать обновления для уже установивших приложение пользователей: Android
+отклоняет APK с другой подписью как другое приложение.
 
 Хранить ключ и пароли от него нужно отдельно от репозитория — на локальной машине или
-в менеджере паролей, доступном тому, кто собирает релизы.
+в менеджере паролей, доступном тому, кто собирает релизы, и минимум в двух местах
+(потеря ключа означает потерю возможности выпускать обновления навсегда).
 
-### Создать ключ заново
+### Создать ключ
 
-Только если ключ утерян и приложение ещё не публиковалось нигде, где важна непрерывность
-обновлений (иначе новые версии станут для пользователей отдельным приложением):
-
-```bash
-keytool -genkeypair -v -keystore qwill-release.keystore -alias qwill -keyalg RSA -keysize 2048 -validity 10000
+```powershell
+& "$env:USERPROFILE\.jdks\jbr-21.0.11\bin\keytool.exe" -genkeypair -v `
+  -keystore qwill-release.jks -keyalg RSA -keysize 4096 -validity 10000 -alias qwill
 ```
 
 Команда спросит пароль хранилища, пароль ключа и данные владельца (можно оставить условные
-значения). Файл `qwill-release.keystore` и оба пароля — хранить вне репозитория.
+значения). Файл `qwill-release.jks` и оба пароля — хранить вне репозитория.
+
+Повторный запуск этой команды создаёт **новый, другой** ключ — делать это, только если
+старый утерян и приложение ещё не побывало ни у одного живого пользователя (иначе новая
+версия станет для всех отдельным приложением, ставящимся только поверх удаления старого).
+
+### Подключить ключ к сборке
+
+Скопировать `client/android/keystore.properties.example` в `client/android/keystore.properties`
+(файл в `.gitignore`, в репозиторий не попадает) и заполнить:
+
+```properties
+storeFile=C:\\path\\to\\qwill-release.jks
+storePassword=...
+keyAlias=qwill
+keyPassword=...
+```
+
+`storeFile` — абсолютный путь или путь относительно `client/android`. Обратные слэши в
+Windows-путях нужно экранировать двойным слэшем, как в примере выше (формат `.properties`).
+
+### Проверить подпись
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\<версия>\apksigner.bat" verify --print-certs `
+  client\android\app\build\outputs\apk\release\app-release.apk
+```
+
+Отпечаток сертификата (`SHA-256`) текущего релизного ключа:
+
+```
+<заполнить после первой подписанной сборки>
+```
+
+Совпадение отпечатка в выводе `apksigner` с этой строкой подтверждает, что выпуск подписан
+тем самым ключом, а не новым.
+
+## Версия
+
+`versionCode` и `versionName` задаются в одном месте — `client/android/version.properties`,
+который читает `app/build.gradle`. Перед каждым релизом: поднять `versionCode` на единицу
+(Android отказывает в установке поверх, если номер не больше уже установленного) и обновить
+`versionName` на человекочитаемую строку.
+
+Приложение может прочитать свою версию из JS через `getNativeAppVersion()`
+(`client/src/native/appVersion.ts`) — под капотом плагин `QwillAppInfo`
+(`AppInfoPlugin.kt`, отдельно от `CallPlugin`, так как это не про звонки).
 
 ## Раздача APK
 
