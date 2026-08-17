@@ -256,8 +256,6 @@ export function MessageRow({
     tap.cancel();
   }
 
-  const isCall = message.type === 'CALL';
-
   const items = useMemo<MessageMenuItem[]>(() => {
     const list: MessageMenuItem[] = [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }];
 
@@ -362,7 +360,6 @@ export function MessageRow({
           bubble={children}
           own={own}
           statusLabel={statusLabelFor(message, own, read)}
-          withReactions={!isCall}
           myReactions={myReactions}
           onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
           onExpandReactions={() => setEmojiPanelOpen(true)}

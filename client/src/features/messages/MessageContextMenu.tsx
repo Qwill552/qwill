@@ -22,7 +22,6 @@ interface MessageContextMenuProps {
   own: boolean;
   /** «✓✓ прочитано в 20:10» и подобное — null для чужих сообщений (ux-ui/06, секция 2). */
   statusLabel: string | null;
-  withReactions: boolean;
   myReactions: ReadonlySet<string>;
   onReact: (emoji: string) => void;
   onExpandReactions: () => void;
@@ -44,7 +43,6 @@ export function MessageContextMenu({
   bubble,
   own,
   statusLabel,
-  withReactions,
   myReactions,
   onReact,
   onExpandReactions,
@@ -137,19 +135,17 @@ export function MessageContextMenu({
       </div>
 
       <div ref={panelRef} className={`${styles.panel} ${closing ? styles.panelClosing : ''}`} style={panelStyle}>
-        {withReactions && (
-          <ReactionPicker
-            myReactions={myReactions}
-            onReact={(emoji) => {
-              onReact(emoji);
-              startClose();
-            }}
-            onExpand={() => {
-              onExpandReactions();
-              startClose();
-            }}
-          />
-        )}
+        <ReactionPicker
+          myReactions={myReactions}
+          onReact={(emoji) => {
+            onReact(emoji);
+            startClose();
+          }}
+          onExpand={() => {
+            onExpandReactions();
+            startClose();
+          }}
+        />
 
         <div className={styles.list} role="menu">
           {statusLabel && <div className={styles.status}>{statusLabel}</div>}
