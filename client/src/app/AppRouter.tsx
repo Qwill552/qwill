@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AuthPage } from '../pages/AuthPage';
+import { DownloadScreen } from '../pages/DownloadScreen';
 import { StubScreen } from '../pages/StubScreen';
 import { AppShell } from './AppShell';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -14,6 +15,14 @@ export function AppRouter() {
         element={
           <ErrorBoundary>
             <AuthPage />
+          </ErrorBoundary>
+        }
+      />
+      <Route
+        path="/download"
+        element={
+          <ErrorBoundary>
+            <DownloadScreen />
           </ErrorBoundary>
         }
       />

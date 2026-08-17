@@ -1,3 +1,4 @@
+import { isNativeShell } from '../native/shell';
 import { Icon } from '../ui/Icon';
 import styles from './UpdateBanner.module.css';
 import { useAppUpdate } from './useAppUpdate';
@@ -5,6 +6,7 @@ import { useAppUpdate } from './useAppUpdate';
 export function UpdateBanner() {
   const { updateAvailable, applyUpdate } = useAppUpdate();
 
+  if (isNativeShell()) return null;
   if (!updateAvailable) return null;
 
   return (

@@ -1,3 +1,4 @@
+export * from './appRelease.js';
 export * from './auth.js';
 export * from './chat.js';
 export * from './constants.js';

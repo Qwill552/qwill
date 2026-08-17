@@ -5,8 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
+import { isApkUpdateSupported, selectUpdateAvailable, useAppUpdateStore } from '../app/appUpdate';
 import { countPendingOutbox } from '../cache/outbox';
+import { formatBytes } from '../features/messages/Attachment';
 import { Modal } from '../features/groups/Modal';
+import { UpdateModal } from '../features/updates/UpdateModal';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -55,6 +58,11 @@ export function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [pendingOutboxCount, setPendingOutboxCount] = useState<number | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+
+  const updateInfo = useAppUpdateStore((s) => s.info);
+  const updateAvailable = useAppUpdateStore(selectUpdateAvailable);
+  const currentVersionName = useAppUpdateStore((s) => s.currentVersionName);
 
   async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
@@ -196,6 +204,18 @@ export function SettingsScreen() {
           />
         </Card>
 
+        {updateAvailable && updateInfo && (
+          <Card className={styles.cardReset}>
+            <Card.Row
+              icon="retry"
+              tint="green"
+              title="Доступно обновление"
+              subtitle={`Версия ${updateInfo.versionName} · ${formatBytes(updateInfo.sizeBytes)}`}
+              onClick={() => setUpdateOpen(true)}
+            />
+          </Card>
+        )}
+
         <Card className={styles.cardReset}>
           <Card.Row
             icon="settings"
@@ -215,7 +235,13 @@ export function SettingsScreen() {
             onClick={() => !loggingOut && void handleLogout()}
           />
         </Card>
+
+        {isApkUpdateSupported() && currentVersionName && (
+          <p className={styles.version}>Qwill {currentVersionName}</p>
+        )}
       </div>
+
+      {updateOpen && <UpdateModal onClose={() => setUpdateOpen(false)} />}
 
       {pendingOutboxCount != null && (
         <Modal title="Выйти из аккаунта" onClose={() => setPendingOutboxCount(null)} opaque>

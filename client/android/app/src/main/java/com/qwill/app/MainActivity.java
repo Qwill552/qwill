@@ -31,6 +31,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CallPlugin.class);
         registerPlugin(AppInfoPlugin.class);
+        registerPlugin(ApkUpdatePlugin.class);
         super.onCreate(savedInstanceState);
 
         current = new WeakReference<>(this);

@@ -7,6 +7,7 @@ import { pinoHttp } from 'pino-http';
 import { isAllowedClientOrigin } from './config/env.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
 import { generalLimiter } from './http/middleware/rateLimit.js';
+import { appVersionRouter } from './http/routes/appVersion.js';
 import { authRouter } from './http/routes/auth.js';
 import { callsRouter } from './http/routes/calls.js';
 import { chatsRouter } from './http/routes/chats.js';
@@ -47,6 +48,7 @@ export function createApp(): Express {
   // healthRouter — до общего лимитера, чтобы мониторинг не упирался в 200/мин (секция 8).
   app.use('/api', healthRouter);
   app.use('/api', generalLimiter);
+  app.use('/api/app', appVersionRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/chats', chatsRouter);

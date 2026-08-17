@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { isNativeShell } from '../native/shell';
+import { useCallStore } from '../stores/callStore';
 import { stashPendingDraft } from './pendingDraft';
 
 export interface AppUpdate {
@@ -7,14 +9,26 @@ export interface AppUpdate {
   applyUpdate: () => void;
 }
 
+function applyWaitingWorker(waiting: ServiceWorker): void {
+  stashPendingDraft();
+  navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+  waiting.postMessage({ type: 'SKIP_WAITING' });
+}
+
 /** Обновление применяется только по команде пользователя: sw.js в проде намеренно не зовёт
- *  skipWaiting сам, поэтому новая версия ждёт в 'waiting', пока её не попросят. */
+ *  skipWaiting сам, поэтому новая версия ждёт в 'waiting', пока её не попросят.
+ *
+ *  В оболочке команды не будет вовсе: плашка там не показывается (её место занято
+ *  обновлением APK, два «Обновить» с разным смыслом рядом — гарантированная путаница), и
+ *  версия, дождавшаяся своего часа к моменту запуска, применяется молча. Только на холодном
+ *  старте и только вне звонка: перезагрузка страницы посреди разговора оборвала бы его. */
 export function useAppUpdate(): AppUpdate {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    const shell = isNativeShell();
     let cancelled = false;
     let registration: ServiceWorkerRegistration | null = null;
 
@@ -39,6 +53,16 @@ export function useAppUpdate(): AppUpdate {
       if (cancelled) return;
 
       registration = ready;
+
+      if (shell) {
+        // Дождавшаяся своего часа версия применяется прямо здесь — это и есть холодный старт.
+        // Появившиеся позже (updatefound) в оболочке игнорируются до следующего запуска.
+        if (ready.waiting && navigator.serviceWorker.controller && useCallStore.getState().phase === 'idle') {
+          applyWaitingWorker(ready.waiting);
+        }
+        return;
+      }
+
       if (ready.waiting && navigator.serviceWorker.controller) setWaiting(ready.waiting);
       if (ready.installing) trackInstalling(ready.installing);
       ready.addEventListener('updatefound', handleUpdateFound);
@@ -54,10 +78,7 @@ export function useAppUpdate(): AppUpdate {
 
   function applyUpdate(): void {
     if (!waiting) return;
-
-    stashPendingDraft();
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
-    waiting.postMessage({ type: 'SKIP_WAITING' });
+    applyWaitingWorker(waiting);
   }
 
   return { updateAvailable: waiting !== null, applyUpdate };
