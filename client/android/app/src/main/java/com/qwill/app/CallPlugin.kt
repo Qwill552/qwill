@@ -54,6 +54,16 @@ class CallPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setCallBackgroundStyle(call: PluginCall) {
+        val style = call.getString("style")
+        if (style.isNullOrEmpty() || !CallBackgroundStyle.write(context, style)) {
+            call.reject("style обязателен")
+            return
+        }
+        call.resolve()
+    }
+
+    @PluginMethod
     fun callConnected(call: PluginCall) {
         MainActivity.hideConnecting()
         call.resolve()

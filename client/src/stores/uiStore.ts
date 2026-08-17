@@ -2,9 +2,11 @@ import type { FontSize, ThemePreference, UserSettingsDTO } from '@messenger/shar
 import { create } from 'zustand';
 
 import { updateSettingsRequest } from '../api/users';
+import { setCallBackgroundStyle, type CallBackgroundStyle } from '../calls/nativeCall';
 
 const THEME_KEY = 'messenger.theme';
 const FONT_SIZE_KEY = 'messenger.fontSize';
+const CALL_BACKGROUND_KEY = 'messenger.callBackground';
 
 /** Значения должны совпадать с --bg в tokens.css и с таблицей в инлайн-скрипте index.html. */
 const THEME_COLOR: Record<'light' | 'dark', string> = {
@@ -28,6 +30,11 @@ function readStoredPreference(): ThemePreference {
 function readStoredFontSize(): FontSize {
   const stored = localStorage.getItem(FONT_SIZE_KEY);
   return stored === 'small' || stored === 'medium' || stored === 'large' ? stored : 'medium';
+}
+
+function readStoredCallBackground(): CallBackgroundStyle {
+  const stored = localStorage.getItem(CALL_BACKGROUND_KEY);
+  return stored === 'glow' || stored === 'blobs' ? stored : 'glow';
 }
 
 /** Цвет системной строки браузера следует за темой — иначе на мобильном остаётся полоса чужого цвета. */
@@ -54,10 +61,12 @@ interface UiState {
   /** Сырое предпочтение (может быть 'system') — то, что показывает панель настроек. */
   themePreference: ThemePreference;
   fontSize: FontSize;
+  callBackground: CallBackgroundStyle;
   /** Быстрое переключение light↔dark из шапки — существовало до этапа 8, поведение не меняется. */
   toggleTheme: () => void;
   setThemePreference: (preference: ThemePreference) => void;
   setFontSize: (fontSize: FontSize) => void;
+  setCallBackground: (style: CallBackgroundStyle) => void;
   /** Настройки, пришедшие с сервера при логине/бутстрапе — применяются без повторного PATCH (этап 8). */
   hydrateFromServer: (settings: UserSettingsDTO) => void;
 }
@@ -85,6 +94,7 @@ export const useUiStore = create<UiState>((set, get) => {
     theme: (document.documentElement.dataset.theme as 'light' | 'dark' | undefined) ?? resolveTheme(initialPreference),
     themePreference: initialPreference,
     fontSize: readStoredFontSize(),
+    callBackground: readStoredCallBackground(),
 
     toggleTheme() {
       const next: ThemePreference = get().theme === 'dark' ? 'light' : 'dark';
@@ -103,6 +113,12 @@ export const useUiStore = create<UiState>((set, get) => {
       applyFontSize(fontSize);
       set({ fontSize });
       persist({ fontSize });
+    },
+
+    setCallBackground(style) {
+      localStorage.setItem(CALL_BACKGROUND_KEY, style);
+      set({ callBackground: style });
+      void setCallBackgroundStyle(style);
     },
 
     hydrateFromServer(settings) {

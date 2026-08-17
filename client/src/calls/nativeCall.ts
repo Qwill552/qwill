@@ -5,10 +5,13 @@ import { waitForConnectedSocket } from '../realtime/socket';
 import { useCallStore } from '../stores/callStore';
 import { traceCall } from './callTrace';
 
+export type CallBackgroundStyle = 'glow' | 'blobs';
+
 interface NativeCallPlugin {
   isNativeCallAvailable(): Promise<{ available: boolean }>;
   reportIncomingCall(options: { callId: string; callerName: string; callKind: CallKind }): Promise<void>;
   reportCallEnded(options: { callId: string }): Promise<void>;
+  setCallBackgroundStyle(options: { style: CallBackgroundStyle }): Promise<void>;
   callConnected(): Promise<void>;
   addListener(
     eventName: 'callAccepted' | 'callDeclined',
@@ -32,6 +35,15 @@ const NATIVE_ACCEPT_RETRIES = 2;
 
 export function isNativeCallAvailable(): boolean {
   return available;
+}
+
+export function isNativeShell(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('QwillCall');
+}
+
+export async function setCallBackgroundStyle(style: CallBackgroundStyle): Promise<void> {
+  if (!isNativeShell()) return;
+  await plugin.setCallBackgroundStyle({ style }).catch(() => undefined);
 }
 
 export async function initNativeCalls(): Promise<void> {

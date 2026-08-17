@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="call_avatar" type="id" />
+    <item name="call_connecting_avatar" type="id" />
+</resources>
