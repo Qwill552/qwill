@@ -30,6 +30,12 @@ Thumbs.db
 
 .superpowers/
 
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
