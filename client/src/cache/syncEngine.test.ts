@@ -15,6 +15,7 @@ function message(id: number, content: string, deletedAt: string | null = null): 
     replyToId: null,
     replyTo: null,
     forwardedFrom: null,
+    call: null,
     reactions: [],
     editedAt: null,
     deletedAt,

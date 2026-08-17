@@ -256,8 +256,28 @@ export function MessageRow({
     tap.cancel();
   }
 
+  const isCall = message.type === 'CALL';
+
   const items = useMemo<MessageMenuItem[]>(() => {
     const list: MessageMenuItem[] = [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }];
+
+    const deleteItem: MessageMenuItem = {
+      id: 'delete',
+      icon: 'trash',
+      label: 'Удалить',
+      danger: true,
+      onSelect: () => {
+        deleteMessage(chatId, message.id).catch(() => {
+          // Удаление своего сообщения почти никогда не падает — тихо не ломаем интерфейс.
+        });
+      },
+    };
+
+    if (message.type === 'CALL') {
+      if (canDelete) list.push(deleteItem);
+      list.push({ id: 'select', icon: 'check', label: 'Выделить', onSelect: () => enterSelection(message.id) });
+      return list;
+    }
 
     if (message.content) {
       list.push({ id: 'copy', icon: 'copy', label: 'Копировать', onSelect: () => void copyToClipboard(message.content!) });
@@ -276,22 +296,23 @@ export function MessageRow({
 
     if (canEdit) list.push({ id: 'edit', icon: 'edit', label: 'Изменить', onSelect: () => onEdit(message) });
 
-    if (canDelete) {
-      list.push({
-        id: 'delete',
-        icon: 'trash',
-        label: 'Удалить',
-        danger: true,
-        onSelect: () => {
-          deleteMessage(chatId, message.id).catch(() => {
-            // Удаление своего сообщения почти никогда не падает — тихо не ломаем интерфейс.
-          });
-        },
-      });
-    }
+    if (canDelete) list.push(deleteItem);
 
     return list;
-  }, [message, chatId, canPin, canEdit, canDelete, isPinned, onReply, onEdit, onForwardRequest, pinMessage, deleteMessage]);
+  }, [
+    message,
+    chatId,
+    canPin,
+    canEdit,
+    canDelete,
+    isPinned,
+    onReply,
+    onEdit,
+    onForwardRequest,
+    pinMessage,
+    deleteMessage,
+    enterSelection,
+  ]);
 
   const myReactions = useMemo(() => {
     if (!myId) return new Set<string>();
@@ -341,6 +362,7 @@ export function MessageRow({
           bubble={children}
           own={own}
           statusLabel={statusLabelFor(message, own, read)}
+          withReactions={!isCall}
           myReactions={myReactions}
           onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
           onExpandReactions={() => setEmojiPanelOpen(true)}

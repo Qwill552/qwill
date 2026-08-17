@@ -16,6 +16,7 @@ function message(id: number, chatId = 'c1'): MessageDto {
     replyToId: null,
     replyTo: null,
     forwardedFrom: null,
+    call: null,
     reactions: [],
     editedAt: null,
     deletedAt: null,

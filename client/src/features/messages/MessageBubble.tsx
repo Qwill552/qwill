@@ -7,6 +7,7 @@ import { Emoji } from '../emoji/Emoji';
 import { emojiOnlyContent, parseEmoji } from '../emoji/parseEmoji';
 import { VoiceMessage } from '../voice/VoiceMessage';
 import { AttachmentView, isVoiceAttachment, LocalAttachmentPreview } from './Attachment';
+import { CallMessage } from './CallMessage';
 import { MessageMeta } from './MessageMeta';
 import { ReplyQuote } from './ReplyQuote';
 import styles from './MessageBubble.module.css';
@@ -61,6 +62,15 @@ export function MessageBubble({ message, own, read, showAuthor, children }: Mess
   const classes = [styles.bubble, own ? styles.out : styles.in, message.status === 'failed' ? styles.failed : ''].join(
     ' ',
   );
+
+  if (message.type === 'CALL' && message.call && !message.deletedAt) {
+    return (
+      <div className={classes}>
+        <CallMessage call={message.call} own={own} createdAt={message.createdAt} />
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className={classes}>

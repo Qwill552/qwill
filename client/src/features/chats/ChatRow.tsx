@@ -1,6 +1,7 @@
 import type { ChatListItemDto } from '@messenger/shared';
 import { NavLink } from 'react-router-dom';
 
+import { callPreviewText, callSymbolIcon, isUnansweredCall } from '../calls/callLog';
 import { parseEmoji } from '../emoji/parseEmoji';
 import { Avatar } from '../../ui/Avatar';
 import { Badge } from '../../ui/Badge';
@@ -39,15 +40,18 @@ function isImage(chat: ChatListItemDto): boolean {
 }
 
 /** Иконка типа вложения перед превью. Голосовые появятся на этапе 7 — тогда сюда добавится mic. */
-function attachmentIcon(chat: ChatListItemDto): IconName | null {
-  if (!chat.lastMessage?.attachment) return null;
+function attachmentIcon(chat: ChatListItemDto, own: boolean): IconName | null {
+  const last = chat.lastMessage;
+  if (last && !last.deletedAt && last.call) return callSymbolIcon(last.call, own);
+  if (!last?.attachment) return null;
   return isImage(chat) ? 'camera' : 'attach';
 }
 
-function previewText(chat: ChatListItemDto): string {
+function previewText(chat: ChatListItemDto, own: boolean): string {
   const last = chat.lastMessage;
   if (!last) return 'Нет сообщений';
   if (last.deletedAt) return 'Сообщение удалено';
+  if (last.call) return callPreviewText(last.call, own);
   if (last.content) return last.content;
   if (last.attachment) return isImage(chat) ? 'Фото' : last.attachment.originalName || 'Файл';
   return 'Нет сообщений';
@@ -56,11 +60,14 @@ function previewText(chat: ChatListItemDto): string {
 export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowProps) {
   const last = chat.lastMessage;
   const own = Boolean(last?.sender && myUserId && last.sender.id === myUserId);
-  const icon = attachmentIcon(chat);
+  const isCall = Boolean(last?.call && !last.deletedAt);
+  const icon = attachmentIcon(chat, own);
+  const failedCall = Boolean(last?.call && !last.deletedAt && (isUnansweredCall(last.call) || last.call.status === 'DECLINED'));
   const typing = typingNames.length > 0;
 
   // В группе полезно видеть, кто написал; в личном чате это и так известно.
-  const authorPrefix = own ? 'Вы: ' : chat.type === 'GROUP' && last?.sender ? `${last.sender.displayName}: ` : '';
+  const authorPrefix =
+    isCall ? '' : own ? 'Вы: ' : chat.type === 'GROUP' && last?.sender ? `${last.sender.displayName}: ` : '';
 
   return (
     <NavLink
@@ -93,9 +100,15 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
             </p>
           ) : (
             <p className={styles.preview}>
-              {icon && <Icon name={icon} size={14} className={styles.attachIcon} />}
+              {icon && (
+                <Icon
+                  name={icon}
+                  size={14}
+                  className={`${styles.attachIcon} ${failedCall ? styles.failedCallIcon : ''}`}
+                />
+              )}
               {authorPrefix && <span className={styles.author}>{authorPrefix}</span>}
-              {parseEmoji(previewText(chat))}
+              {parseEmoji(previewText(chat, own))}
             </p>
           )}
           <Badge count={chat.unreadCount} />

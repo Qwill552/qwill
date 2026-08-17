@@ -1,0 +1,61 @@
+.record {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 34px;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-caption);
+}
+
+.symbol {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.symbolFailed {
+  color: var(--danger);
+}
+
+.time,
+.duration {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.phone {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--primary);
+}
+
+.own .symbol,
+.own .time,
+.own .duration {
+  color: color-mix(in srgb, var(--text-on-out) 78%, transparent);
+}
+
+.own .symbolFailed {
+  color: var(--danger);
+}
+
+.own .phone {
+  color: var(--text-on-out);
+}

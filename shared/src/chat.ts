@@ -189,6 +189,14 @@ export interface MessageForwardPreviewDto {
   senderName: string;
 }
 
+export interface MessageCallDto {
+  id: string;
+  kind: CallKind;
+  status: CallStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+}
+
 export interface MessageDto {
   id: number;
   chatId: string;
@@ -200,6 +208,7 @@ export interface MessageDto {
   replyToId: number | null;
   replyTo: MessageReplyPreviewDto | null;
   forwardedFrom: MessageForwardPreviewDto | null;
+  call: MessageCallDto | null;
   reactions: MessageReactionDto[];
   editedAt: string | null;
   deletedAt: string | null;

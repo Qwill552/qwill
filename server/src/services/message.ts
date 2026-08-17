@@ -1,6 +1,7 @@
 import type {
   AttachmentDto,
   MessageAttachmentInput,
+  MessageCallDto,
   MessageDto,
   MessageForwardPreviewDto,
   MessageReactionDto,
@@ -20,7 +21,7 @@ import { assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
 import * as pushService from './push.js';
 import { ChatRole } from '../generated/prisma/client.js';
-import type { Attachment, File, Message, Reaction, User } from '../generated/prisma/client.js';
+import type { Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
 type ReplyWithRelations = Message & { sender: User | null; attachments: { id: string }[] };
 type ForwardOriginWithRelations = Message & { sender: User | null };
@@ -31,6 +32,7 @@ export type MessageWithRelations = Message & {
   reactions: Reaction[];
   replyTo: ReplyWithRelations | null;
   forwardedFrom: ForwardOriginWithRelations | null;
+  call: Call | null;
 };
 
 function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
@@ -86,6 +88,18 @@ function toForwardPreview(forwardedFrom: ForwardOriginWithRelations | null): Mes
   };
 }
 
+function toMessageCallDto(call: Call | null): MessageCallDto | null {
+  if (!call) return null;
+
+  return {
+    id: call.id,
+    kind: call.kind,
+    status: call.status,
+    startedAt: call.startedAt?.toISOString() ?? null,
+    endedAt: call.endedAt?.toISOString() ?? null,
+  };
+}
+
 export function toMessageDto(message: MessageWithRelations): MessageDto {
   const deleted = !!message.deletedAt;
 
@@ -110,6 +124,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
     replyToId: message.replyToId,
     replyTo: toReplyPreview(message.replyTo),
     forwardedFrom: toForwardPreview(message.forwardedFrom),
+    call: toMessageCallDto(message.call),
     reactions: deleted ? [] : toReactionDtos(message.reactions),
     editedAt: message.editedAt?.toISOString() ?? null,
     deletedAt: message.deletedAt?.toISOString() ?? null,
@@ -123,6 +138,7 @@ export const messageInclude = {
   reactions: true,
   replyTo: { include: { sender: true, attachments: { select: { id: true } } } },
   forwardedFrom: { include: { sender: true } },
+  call: true,
 } as const;
 
 export interface SendMessageInput {

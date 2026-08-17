@@ -114,3 +114,7 @@
   color: rgba(var(--pulse-ink), 0.4);
   vertical-align: -3px;
 }
+
+.failedCallIcon {
+  color: var(--danger);
+}

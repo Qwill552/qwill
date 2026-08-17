@@ -466,6 +466,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         : null,
       // Отправка сообщения не пересылает — оптимистичное сообщение никогда не forwarded.
       forwardedFrom: null,
+      call: null,
       reactions: [],
       editedAt: null,
       deletedAt: null,
@@ -541,6 +542,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : null,
       forwardedFrom: null,
+      call: null,
       reactions: [],
       editedAt: null,
       deletedAt: null,
@@ -780,6 +782,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         replyToId: entry.replyToId,
         replyTo: null,
         forwardedFrom: null,
+        call: null,
         reactions: [],
         editedAt: null,
         deletedAt: null,
