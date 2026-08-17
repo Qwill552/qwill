@@ -47,6 +47,8 @@ interface MessageRowProps {
   /** В чате с объявлениями отвечать некому: композера нет, свайп-ответ и пункт «Ответить»
    *  вели бы в невидимый контекст (updates/03-announcements-chat.md). */
   canReply: boolean;
+  /** Там же незачем реакции: панель в контекстном меню и двойной тап выключаются вместе. */
+  canReact: boolean;
   isPinned: boolean;
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
@@ -107,6 +109,7 @@ export function MessageRow({
   canDelete,
   canPin,
   canReply,
+  canReact,
   isPinned,
   onReply,
   onEdit,
@@ -124,6 +127,10 @@ export function MessageRow({
 
   const bubbleRef = useRef<HTMLDivElement>(null);
   const suppressTapRef = useRef(false);
+  /** Касание началось на кнопке внутри пузыря («Обновить» в объявлении, «Повторить» у
+   *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
+   *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
+  const onBubbleActionRef = useRef(false);
   /** Арбитраж свайпа «назад» у левого края (ux-ui.md, журнал, этап 6): пока касание не
    *  сдвинулось, оно ничем не отличается от обычного — long-press работает и у самого края.
    *  `candidate` — трогали в полосе EDGE_SWIPE_ZONE_PX, решение ещё не принято; `active` —
@@ -164,7 +171,7 @@ export function MessageRow({
         suppressTapRef.current = false;
         return;
       }
-      if (selectionMode || !canAct) return;
+      if (selectionMode || !canAct || !canReact) return;
       haptic();
       toggleReaction(chatId, message.id, doubleTapReaction);
       setReactionFly({ x: point.x, y: point.y, emoji: doubleTapReaction, key: Date.now() });
@@ -181,6 +188,9 @@ export function MessageRow({
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
     suppressTapRef.current = false;
+    onBubbleActionRef.current = (event.target as HTMLElement).closest('button') !== null;
+    if (onBubbleActionRef.current) return;
+
     // Кандидат на свайп «назад» — только если можем вообще что-то отдать (не в мультивыборе,
     // не поверх открытого меню: тогда касание в этой полосе разбирает только сама строка,
     // как и остальные жесты в этих режимах) и палец стартовал у самого края экрана.
@@ -196,6 +206,7 @@ export function MessageRow({
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
+    if (onBubbleActionRef.current) return;
     const edge = edgeRef.current;
 
     if (edge.active) {
@@ -232,6 +243,11 @@ export function MessageRow({
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>): void {
+    if (onBubbleActionRef.current) {
+      onBubbleActionRef.current = false;
+      return;
+    }
+
     if (edgeRef.current.active) {
       edgeRef.current.active = false;
       endExternalEdgeSwipe();
@@ -251,6 +267,11 @@ export function MessageRow({
   }
 
   function handlePointerCancel(): void {
+    if (onBubbleActionRef.current) {
+      onBubbleActionRef.current = false;
+      return;
+    }
+
     if (edgeRef.current.active) {
       edgeRef.current.active = false;
       cancelExternalEdgeSwipe();
@@ -373,6 +394,7 @@ export function MessageRow({
           myReactions={myReactions}
           onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
           onExpandReactions={() => setEmojiPanelOpen(true)}
+          reactable={canReact}
           items={items}
           onClose={() => setMenuAnchor(null)}
         />

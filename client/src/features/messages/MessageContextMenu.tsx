@@ -25,6 +25,8 @@ interface MessageContextMenuProps {
   myReactions: ReadonlySet<string>;
   onReact: (emoji: string) => void;
   onExpandReactions: () => void;
+  /** Панель реакций скрыта — в чате с объявлениями реагировать не на кого. */
+  reactable: boolean;
   items: MessageMenuItem[];
   onClose: () => void;
 }
@@ -46,6 +48,7 @@ export function MessageContextMenu({
   myReactions,
   onReact,
   onExpandReactions,
+  reactable,
   items,
   onClose,
 }: MessageContextMenuProps) {
@@ -135,17 +138,19 @@ export function MessageContextMenu({
       </div>
 
       <div ref={panelRef} className={`${styles.panel} ${closing ? styles.panelClosing : ''}`} style={panelStyle}>
-        <ReactionPicker
-          myReactions={myReactions}
-          onReact={(emoji) => {
-            onReact(emoji);
-            startClose();
-          }}
-          onExpand={() => {
-            onExpandReactions();
-            startClose();
-          }}
-        />
+        {reactable && (
+          <ReactionPicker
+            myReactions={myReactions}
+            onReact={(emoji) => {
+              onReact(emoji);
+              startClose();
+            }}
+            onExpand={() => {
+              onExpandReactions();
+              startClose();
+            }}
+          />
+        )}
 
         <div className={styles.list} role="menu">
           {statusLabel && <div className={styles.status}>{statusLabel}</div>}

@@ -269,6 +269,7 @@ export function MessageList({
                 canDelete={(own || isGroupAdmin) && canAct}
                 canPin={canPinBase && canAct}
                 canReply={!isService}
+                canReact={!isService}
                 isPinned={pinnedMessage?.id === message.id}
                 onReply={onReply}
                 onEdit={onEdit}
