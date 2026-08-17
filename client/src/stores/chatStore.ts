@@ -54,7 +54,7 @@ import {
   readOutbox,
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
-import { hasPendingNativeAccept, isAcceptedNatively, reportCallEnded, reportIncomingCall } from '../calls/nativeCall';
+import { consumeNativeAccept, hasPendingNativeAccept, reportCallEnded, reportIncomingCall } from '../calls/nativeCall';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -994,7 +994,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
-      if (!isAcceptedNatively(event.call.id)) {
+      if (consumeNativeAccept(event.call.id)) {
+        void useCallStore.getState().joinCall(event.call.id);
+      } else {
         useCallStore.getState().applyInvite(event.call);
         const callerName = event.call.initiator?.displayName ?? '';
         void reportIncomingCall(event.call.id, callerName, event.call.kind);

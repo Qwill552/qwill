@@ -22,11 +22,12 @@ let initialized = false;
 
 /** Звонки, на которые уже ответили из системного интерфейса: приглашение по ним не должно
  *  показывать веб-экран входящего — человек уже согласился, спрашивать второй раз нельзя.
- *  Запись живёт до конца звонка, потому что подключением занимается быстрый путь ниже, а не
- *  обработчик приглашения. */
+ *  Запись снимает тот из двух путей подключения, который успел первым. */
 const acceptedNatively = new Set<string>();
 
 const NATIVE_ACCEPT_SOCKET_TIMEOUT_MS = 60_000;
+const NATIVE_ACCEPT_RETRY_MS = 7000;
+const NATIVE_ACCEPT_RETRIES = 2;
 
 export function isNativeCallAvailable(): boolean {
   return available;
@@ -69,8 +70,8 @@ export async function reportCallEnded(callId: string): Promise<void> {
   await plugin.reportCallEnded({ callId }).catch(() => undefined);
 }
 
-export function isAcceptedNatively(callId: string): boolean {
-  return acceptedNatively.has(callId);
+export function consumeNativeAccept(callId: string): boolean {
+  return acceptedNatively.delete(callId);
 }
 
 export function hasPendingNativeAccept(): boolean {
@@ -79,8 +80,8 @@ export function hasPendingNativeAccept(): boolean {
 
 /** Ответ мог прийти раньше приглашения (приложение поднимается с нуля) или позже него
  *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка.
- *  На холодном старте звонок не ждёт ни приглашения, ни списка чатов: как только сокет ожил,
- *  идёт сразу в joinCall. */
+ *  На холодном старте звонок дополнительно идёт в joinCall сам, как только ожил сокет, не
+ *  дожидаясь приглашения: что из двух случится раньше, то и подключит. */
 async function handleAccepted(callId: string): Promise<void> {
   const store = useCallStore.getState();
   if (store.call?.id === callId && store.phase === 'incoming') {
@@ -89,12 +90,33 @@ async function handleAccepted(callId: string): Promise<void> {
   }
 
   acceptedNatively.add(callId);
+  watchNativeAccept(callId);
+
   const socket = await waitForConnectedSocket(NATIVE_ACCEPT_SOCKET_TIMEOUT_MS);
-  if (!socket || !acceptedNatively.has(callId)) return;
+  if (!socket || !consumeNativeAccept(callId)) return;
 
   const current = useCallStore.getState();
   if (current.phase !== 'idle') return;
   await current.joinCall(callId);
+}
+
+/** Оверлей «Соединение…» снимается только переходом в active, поэтому проигранная гонка или
+ *  потерянный ack оставили бы человека на нём до 45-секундной страховки оболочки. `call === null`
+ *  означает, что ответа на call:accept не было вовсе — только тогда пробуем ещё раз. */
+function watchNativeAccept(callId: string): void {
+  let attempts = 0;
+  const tick = (): void => {
+    const state = useCallStore.getState();
+    if (state.call?.id === callId || state.phase !== 'idle') return;
+    if (attempts >= NATIVE_ACCEPT_RETRIES) return;
+
+    attempts += 1;
+    acceptedNatively.delete(callId);
+    void state.joinCall(callId).then(() => {
+      if (useCallStore.getState().call === null) setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
+    });
+  };
+  setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
 }
 
 async function handleDeclined(callId: string): Promise<void> {
