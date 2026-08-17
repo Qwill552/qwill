@@ -123,6 +123,7 @@ jobs:
             shared/package.json shared/dist \
             server/package.json server/prisma.config.ts server/dist server/prisma \
             client/package.json client/dist \
+            scripts/announce.mjs \
             deploy
 
       - name: Upload and activate
