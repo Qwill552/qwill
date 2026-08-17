@@ -11,6 +11,7 @@ import {
 } from '@messenger/shared';
 import type { Socket } from 'socket.io';
 
+import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
@@ -19,7 +20,7 @@ import { messageInclude, toMessageDto } from '../services/message.js';
 import { notifyCallEnded } from '../services/push.js';
 import { emitToChatExcept, getIo } from './index.js';
 
-const MISSED_TIMEOUT_MS = 45_000;
+const MISSED_TIMEOUT_MS = env.CALL_MISSED_TIMEOUT_MS;
 const missedTimers = new Map<string, NodeJS.Timeout>();
 
 function toAckError(error: unknown): { code: string; message: string } {

@@ -50,6 +50,7 @@ const envSchema = z.object({
   LIVEKIT_URL: z.string().min(1, 'LIVEKIT_URL обязателен'),
   LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
   LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),
+  CALL_MISSED_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 });
 
 const parsed = envSchema.safeParse(process.env);

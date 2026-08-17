@@ -23,7 +23,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+        },
+      },
     },
   ],
   webServer: {
@@ -35,5 +40,8 @@ export default defineConfig({
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // Звонок без ответа считается пропущенным за 45с в проде — непригодно для теста
+    // ЗВОНКИ-12/3, поэтому дев-сервер под e2e поднимается с укороченным таймаутом.
+    env: { ...process.env, CALL_MISSED_TIMEOUT_MS: '3000' },
   },
 });
