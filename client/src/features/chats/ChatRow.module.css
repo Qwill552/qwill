@@ -60,6 +60,20 @@
   gap: 6px;
 }
 
+/* Название с пометкой «официальный» — своя строка внутри .top: flex:1 держит она, а
+   название внутри только сжимается, поэтому галочка стоит вплотную за именем. */
+.titleWrap {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.titleWrap .title {
+  flex: 0 1 auto;
+}
+
 .title {
   overflow: hidden;
   flex: 1;

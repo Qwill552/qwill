@@ -157,8 +157,12 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
         />
         <div className={styles.body}>
           <div className={styles.top}>
-            <span className={styles.title}>{chat.title}</span>
-            {isService && <OfficialMark />}
+            {/* Обёртка нужна из-за flex:1 у названия: без неё галочка «официальный» уезжала
+                бы к правому краю строки, а не стояла сразу за названием. */}
+            <span className={styles.titleWrap}>
+              <span className={styles.title}>{chat.title}</span>
+              {isService && <OfficialMark />}
+            </span>
             {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
                 «отправлено». Двойная галочка появится вместе с этими данными. */}
             {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
@@ -182,7 +186,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
                 {parseEmoji(previewText(chat, own))}
               </p>
             )}
-            <Badge count={chat.unreadCount} />
+            <Badge count={chat.unreadCount} muted={chat.muted} />
           </div>
         </div>
       </NavLink>
