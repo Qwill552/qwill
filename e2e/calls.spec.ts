@@ -97,13 +97,15 @@ test('звонок устанавливается: исходящий у A, вх
 
     await expect(pageB.getByRole('alert')).toBeVisible({ timeout: CALL_CONNECT_TIMEOUT_MS });
     await expect(pageB.getByText('Входящий звонок…')).toBeVisible();
-    await expect(pageB.getByText(userA.displayName)).toBeVisible();
+    // Имя звонящего есть и в шапке чата в списке слева, и на самой карточке звонка —
+    // matcher без уточнения роли задевает оба, поэтому скоуп именно на карточку (role=alert).
+    await expect(pageB.getByRole('alert').getByText(userA.displayName)).toBeVisible();
 
     await pageB.getByRole('button', { name: 'Принять звонок' }).click();
 
     await expect(pageA.getByText(/^\d{2}:\d{2}$/)).toBeVisible({ timeout: CALL_CONNECT_TIMEOUT_MS });
     await expect(pageB.getByText(/^\d{2}:\d{2}$/)).toBeVisible({ timeout: CALL_CONNECT_TIMEOUT_MS });
-    await expect(pageB.getByText(userA.displayName)).toBeVisible();
+    await expect(pageB.getByRole('heading', { name: userA.displayName })).toBeVisible();
   } finally {
     await contextA.close();
     await contextB.close();
@@ -119,8 +121,11 @@ test('отклонение закрывает звонок у обоих и ос
 
     await pageB.getByRole('button', { name: 'Отклонить звонок' }).click();
 
-    await expect(pageA.getByText('Звонок отклонён')).toBeVisible({ timeout: CALL_CONNECT_TIMEOUT_MS });
+    // "Звонок отклонён" короткое время висит и на самом оверлее, и в записи ленты под ним
+    // одновременно (оверлей не размонтирует чат) — как признак закрытия звонка у A берём
+    // возврат кнопки "Позвонить", а не текст статуса, чтобы не ловить оба совпадения разом.
     await expect(pageB.getByRole('alert')).toHaveCount(0);
+    await expect(pageA.getByRole('button', { name: 'Позвонить' })).toBeVisible({ timeout: CALL_CONNECT_TIMEOUT_MS });
 
     await expect(messageRow(pageA, 'Звонок отклонён')).toBeVisible();
 
