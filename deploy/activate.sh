@@ -11,8 +11,11 @@ test -d "$RELEASE" || { echo "нет выпуска $RELEASE"; exit 1; }
 
 PREVIOUS=$(readlink -f "$ROOT/current" 2>/dev/null || true)
 
+mkdir -p "$ROOT/shared/app-releases"
+
 ln -sfn "$ROOT/shared/.env" "$RELEASE/.env"
 ln -sfn "$ROOT/shared/storage" "$RELEASE/storage"
+ln -sfn "$ROOT/shared/app-releases" "$RELEASE/app-releases"
 
 cd "$RELEASE"
 npm ci

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apkSource = path.join(repoRoot, 'client/android/app/build/outputs/apk/release/app-release.apk');
 const versionFile = path.join(repoRoot, 'client/android/version.properties');
-const outDir = path.join(repoRoot, 'releases');
+const outDir = path.join(repoRoot, 'app-releases');
 
 function readProperties(text) {
   return Object.fromEntries(
@@ -60,7 +60,7 @@ await fs.writeFile(
   'utf8',
 );
 
-console.log(`releases/${apkFile} и releases/android.json готовы`);
+console.log(`app-releases/${apkFile} и app-releases/android.json готовы`);
 console.log(`versionCode=${latestVersionCode} versionName=${versionName} minSupported=${minSupportedVersionCode}`);
 if (changelog.length === 0) {
   console.log('Список изменений пуст — передайте пункты аргументами: npm run release:manifest -- "Пункт 1" "Пункт 2"');

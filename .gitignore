@@ -13,7 +13,7 @@ legacy/uploads/
 
 storage/
 uploads/
-releases/
+app-releases/
 
 infra/livekit/certs/
 infra/livekit/.env

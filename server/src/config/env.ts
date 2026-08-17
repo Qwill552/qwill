@@ -30,7 +30,7 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
 
   STORAGE_DIR: z.string().default('./storage'),
-  APP_RELEASE_DIR: z.string().default('./releases'),
+  APP_RELEASE_DIR: z.string().default('./app-releases'),
   MAX_FILE_SIZE_BYTES: bytes.default(2 * 1024 * 1024 * 1024),
   MAX_AVATAR_SIZE_BYTES: bytes.default(50 * 1024 * 1024),
   UPLOAD_CHUNK_SIZE_BYTES: bytes.default(5 * 1024 * 1024),
@@ -72,7 +72,9 @@ export const env = {
   isProd: raw.NODE_ENV === 'production',
   /** Абсолютный путь к приватному хранилищу файлов. */
   storageDir: path.resolve(repoRoot, raw.STORAGE_DIR),
-  /** Абсолютный путь к каталогу выпусков: манифест android.json и APK рядом с ним. */
+  /** Абсолютный путь к каталогу выпусков приложения: манифест android.json и APK рядом с ним.
+   *  На проде обязан указывать в shared/ вне каталога выпуска кода — иначе APK стирается
+   *  при каждом деплое, как и storage (deploy.md, «Известные грабли»). */
   appReleaseDir: path.resolve(repoRoot, raw.APP_RELEASE_DIR),
   /** Разрешённые origin'ы клиента: список через запятую в CLIENT_ORIGIN. */
   clientOrigins: raw.CLIENT_ORIGIN.split(',')
