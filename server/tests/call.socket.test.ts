@@ -6,7 +6,6 @@ import {
   type CallAcceptAck,
   type CallEndedEvent,
   type CallInviteEvent,
-  type CallLiveEvent,
   type CallParticipantChangedEvent,
   type CallStartAck,
 } from '@messenger/shared';
@@ -18,6 +17,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
 import { createSocketServer } from '../src/realtime/index.js';
+import { getLiveCallsForParticipant } from '../src/services/call.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
 
 const app = createApp();
@@ -204,7 +204,7 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
     expect(messages[0]?.callId).toBe(callId);
   });
 
-  it('переподключившийся участник получает call:live с живым звонком', async () => {
+  it('участник активного звонка числится живым, пока звонок не завершён — на этом держится возврат после перезапуска', async () => {
     const a = await registerUser('cs6_a');
     const b = await registerUser('cs6_b');
     const chatId = await createPrivateChat(a.userId, b.username);
@@ -214,18 +214,18 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
 
     const startAck = await emitWithAck<CallStartAck>(socketA, SocketEvent.CallStart, { chatId, kind: 'AUDIO' });
     const callId = startAck.access!.call.id;
-    await emitWithAck<CallAcceptAck>(socketB, SocketEvent.CallAccept, { callId });
+    const acceptAck = await emitWithAck<CallAcceptAck>(socketB, SocketEvent.CallAccept, { callId });
+    expect(acceptAck.ok).toBe(true);
 
-    socketB.disconnect();
-    const socketBAgain = openSocket(b.accessToken);
-    const live = await waitForEvent<CallLiveEvent>(socketBAgain, SocketEvent.CallLive);
-
-    expect(live.calls.map((call) => call.id)).toContain(callId);
-    expect(live.calls[0]?.status).toBe('ACTIVE');
+    const liveForB = await getLiveCallsForParticipant(b.userId);
+    expect(liveForB.map((call) => call.id)).toContain(callId);
+    expect(liveForB.find((call) => call.id === callId)?.status).toBe('ACTIVE');
 
     const endedPromise = waitForEvent<CallEndedEvent>(socketA, SocketEvent.CallEnded);
     socketA.emit(SocketEvent.CallLeave, { callId });
     await endedPromise;
+
+    expect(await getLiveCallsForParticipant(b.userId)).toHaveLength(0);
   });
 
   it('не-участник чата на call:start получает ack с ошибкой и без токена', async () => {
