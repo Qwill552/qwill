@@ -16,6 +16,7 @@ import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import * as callService from '../services/call.js';
 import { messageInclude, toMessageDto } from '../services/message.js';
+import { notifyCallEnded } from '../services/push.js';
 import { emitToChatExcept, getIo } from './index.js';
 
 const MISSED_TIMEOUT_MS = 45_000;
@@ -56,6 +57,9 @@ export async function finishCall(callId: string, userId: string, status: CallSta
 
   const io = getIo();
   io?.to(call.chatId).emit(SocketEvent.CallEnded, { call } satisfies CallEndedEvent);
+  notifyCallEnded(call.id, call.chatId, userId).catch((error: unknown) => {
+    logger.error({ err: error, callId: call.id }, 'Не удалось отправить FCM о завершении звонка');
+  });
 
   const message = await prisma.message.findUnique({
     where: { clientId: `call:${call.id}` },

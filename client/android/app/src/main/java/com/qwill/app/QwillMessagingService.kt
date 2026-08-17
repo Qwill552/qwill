@@ -26,6 +26,11 @@ class QwillMessagingService : FirebaseMessagingService() {
             if (started) return
         }
 
+        if (data["kind"] == "call-ended" && !callId.isNullOrEmpty()) {
+            NativeCalls.reportEnded(applicationContext, callId)
+            return
+        }
+
         super.onMessageReceived(message)
         PushNotificationsPlugin.sendRemoteMessage(message)
     }

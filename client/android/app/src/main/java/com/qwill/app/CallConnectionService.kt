@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.telecom.Connection
 import android.telecom.ConnectionRequest
 import android.telecom.ConnectionService
@@ -21,6 +23,9 @@ class QwillConnection(
     private val showsOwnUi: Boolean,
 ) : Connection() {
 
+    private val timeoutHandler = Handler(Looper.getMainLooper())
+    private val timeoutRunnable = Runnable { finishRemotely() }
+
     init {
         connectionProperties = PROPERTY_SELF_MANAGED
         audioModeIsVoip = true
@@ -30,9 +35,11 @@ class QwillConnection(
         if (!showsOwnUi) return
         CallNotifications.showIncoming(context, callId, callerName, callKind)
         Ringer.start(context)
+        timeoutHandler.postDelayed(timeoutRunnable, SELF_TIMEOUT_MS)
     }
 
     override fun onAnswer() {
+        timeoutHandler.removeCallbacks(timeoutRunnable)
         Ringer.stop()
         CallNotifications.cancel(context)
         setActive()
@@ -63,11 +70,16 @@ class QwillConnection(
     }
 
     private fun settle(cause: DisconnectCause) {
+        timeoutHandler.removeCallbacks(timeoutRunnable)
         Ringer.stop()
         CallNotifications.cancel(context)
         CallRegistry.take(callId)
         setDisconnected(cause)
         destroy()
+    }
+
+    private companion object {
+        const val SELF_TIMEOUT_MS = 55_000L
     }
 }
 

@@ -49,7 +49,7 @@ export interface PushNotificationPayload {
   title: string;
   body: string;
   chatId: string;
-  kind?: 'message' | 'call';
+  kind?: 'message' | 'call' | 'call-ended';
   callId?: string;
   callerName?: string;
   callKind?: CallKind;

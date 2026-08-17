@@ -113,15 +113,15 @@ async function sendViaFcm(
 ): Promise<void> {
   if (!fcmReady || !sub.fcmToken) return;
 
-  const isCall = notification.kind === 'call';
+  const isDataOnly = notification.kind === 'call' || notification.kind === 'call-ended';
 
   try {
     await getMessaging().send({
       token: sub.fcmToken,
       data: toFcmData(notification),
-      ...(isCall ? {} : { notification: { title: notification.title, body: notification.body } }),
+      ...(isDataOnly ? {} : { notification: { title: notification.title, body: notification.body } }),
       android: {
-        priority: isCall ? 'high' : 'normal',
+        priority: isDataOnly ? 'high' : 'normal',
         ...(options?.ttl === undefined ? {} : { ttl: options.ttl * 1000 }),
       },
     });
@@ -171,6 +171,27 @@ export async function notifyOfflineMembersOfCall(
         { title, body, chatId, kind: 'call', callId, callerName: initiatorName, callKind: kind },
         { ttl: 45, urgency: 'high' },
       ),
+    ),
+  );
+}
+
+export async function notifyCallEnded(callId: string, chatId: string, excludeUserId: string): Promise<void> {
+  if (!fcmReady) return;
+
+  const members = await prisma.chatMember.findMany({
+    where: { chatId, userId: { not: excludeUserId } },
+    select: { userId: true },
+  });
+  if (members.length === 0) return;
+
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { userId: { in: members.map((m) => m.userId) }, provider: 'fcm' },
+    select: { id: true, fcmToken: true },
+  });
+
+  await Promise.all(
+    subscriptions.map((sub) =>
+      sendViaFcm(sub, { title: 'Звонок завершён', body: '', chatId, kind: 'call-ended', callId }, { ttl: 30, urgency: 'high' }),
     ),
   );
 }
