@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { CallKind } from '@messenger/shared';
 
+import { waitForConnectedSocket } from '../realtime/socket';
 import { useCallStore } from '../stores/callStore';
 
 interface NativeCallPlugin {
@@ -20,8 +21,12 @@ let available = false;
 let initialized = false;
 
 /** Звонки, на которые уже ответили из системного интерфейса: приглашение по ним не должно
- *  показывать веб-экран входящего — человек уже согласился, спрашивать второй раз нельзя. */
+ *  показывать веб-экран входящего — человек уже согласился, спрашивать второй раз нельзя.
+ *  Запись живёт до конца звонка, потому что подключением занимается быстрый путь ниже, а не
+ *  обработчик приглашения. */
 const acceptedNatively = new Set<string>();
+
+const NATIVE_ACCEPT_SOCKET_TIMEOUT_MS = 60_000;
 
 export function isNativeCallAvailable(): boolean {
   return available;
@@ -64,19 +69,32 @@ export async function reportCallEnded(callId: string): Promise<void> {
   await plugin.reportCallEnded({ callId }).catch(() => undefined);
 }
 
-export function consumeNativeAccept(callId: string): boolean {
-  return acceptedNatively.delete(callId);
+export function isAcceptedNatively(callId: string): boolean {
+  return acceptedNatively.has(callId);
+}
+
+export function hasPendingNativeAccept(): boolean {
+  return acceptedNatively.size > 0;
 }
 
 /** Ответ мог прийти раньше приглашения (приложение поднимается с нуля) или позже него
- *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка. */
+ *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка.
+ *  На холодном старте звонок не ждёт ни приглашения, ни списка чатов: как только сокет ожил,
+ *  идёт сразу в joinCall. */
 async function handleAccepted(callId: string): Promise<void> {
   const store = useCallStore.getState();
   if (store.call?.id === callId && store.phase === 'incoming') {
     await store.acceptCall();
     return;
   }
+
   acceptedNatively.add(callId);
+  const socket = await waitForConnectedSocket(NATIVE_ACCEPT_SOCKET_TIMEOUT_MS);
+  if (!socket || !acceptedNatively.has(callId)) return;
+
+  const current = useCallStore.getState();
+  if (current.phase !== 'idle') return;
+  await current.joinCall(callId);
 }
 
 async function handleDeclined(callId: string): Promise<void> {

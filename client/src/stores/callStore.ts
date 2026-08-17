@@ -287,7 +287,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       const state = get();
       if (state.call?.id !== call.id) return;
       void transport.disconnect();
-      if (state.phase !== 'active') {
+      if (state.phase === 'incoming') {
         set(initialState);
         return;
       }

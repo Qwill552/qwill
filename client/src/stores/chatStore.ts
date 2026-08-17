@@ -54,7 +54,7 @@ import {
   readOutbox,
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
-import { consumeNativeAccept, reportCallEnded, reportIncomingCall } from '../calls/nativeCall';
+import { hasPendingNativeAccept, isAcceptedNatively, reportCallEnded, reportIncomingCall } from '../calls/nativeCall';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -214,6 +214,26 @@ function seedPresence(
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const uploadAbortControllers = new Map<string, AbortController>();
+
+const CALL_START_SYNC_TIMEOUT_MS = 8000;
+
+/** Догон истории при реконнекте ждёт, пока принятый из системного интерфейса звонок дойдёт до
+ *  звука: иначе холодный старт тратит первые секунды на IndexedDB и синк вместо звонка. */
+function afterCallStarts(run: () => void): void {
+  let done = false;
+  const finish = (): void => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    unsubscribe();
+    run();
+  };
+
+  const unsubscribe = useCallStore.subscribe((state) => {
+    if (state.phase === 'active' || state.phase === 'ended') finish();
+  });
+  const timer = setTimeout(finish, CALL_START_SYNC_TIMEOUT_MS);
+}
 
 function typingKey(chatId: string, userId: string): string {
   return `${chatId}:${userId}`;
@@ -974,9 +994,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
-      if (consumeNativeAccept(event.call.id)) {
-        void useCallStore.getState().joinCall(event.call.id);
-      } else {
+      if (!isAcceptedNatively(event.call.id)) {
         useCallStore.getState().applyInvite(event.call);
         const callerName = event.call.initiator?.displayName ?? '';
         void reportIncomingCall(event.call.id, callerName, event.call.kind);
@@ -1004,10 +1022,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.off('connect').on('connect', () => {
       socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
       const activeChatId = get().activeChatId;
-      void syncAllCachedChats().then(() => {
-        if (activeChatId) void get().syncChatMessages(activeChatId);
-      });
-      void get().drainOutbox();
+      const sync = (): void => {
+        void syncAllCachedChats().then(() => {
+          if (activeChatId) void get().syncChatMessages(activeChatId);
+        });
+        void get().drainOutbox();
+      };
+
+      if (hasPendingNativeAccept()) afterCallStarts(sync);
+      else sync();
     });
   },
 

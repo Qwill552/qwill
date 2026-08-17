@@ -11,9 +11,15 @@ function emitVisibility(): void {
   socket?.emit(SocketEvent.VisibilityChange, payload);
 }
 
-/** Единственное место создания сокет-соединения (секция 4). Переподключается при каждом логине/рефреше токена. */
+/** Единственное место создания сокет-соединения (секция 4). Живое соединение при рефреше токена
+ *  не рвётся: обновляется только `auth`, который socket.io читает при следующем реконнекте. */
 export function connectSocket(accessToken: string): Socket {
-  disconnectSocket();
+  if (socket) {
+    socket.auth = { token: accessToken };
+    if (!socket.connected) socket.connect();
+    return socket;
+  }
+
   socket = io(SOCKET_URL, {
     auth: { token: accessToken },
     withCredentials: true,

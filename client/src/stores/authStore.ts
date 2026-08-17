@@ -2,7 +2,7 @@ import type { AuthResponse, LoginInput, PublicUser, RegisterInput } from '@messe
 import { create } from 'zustand';
 
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
-import { NetworkError, setAccessToken, setRefreshHandler } from '../api/client';
+import { NetworkError, restoreAccessToken, setAccessToken, setRefreshHandler } from '../api/client';
 import { getSettingsRequest } from '../api/users';
 import { clearAllCache } from '../cache/db';
 import { clearOfflineProfile, readOfflineProfile, saveOfflineProfile } from '../cache/offlineProfile';
@@ -29,10 +29,13 @@ interface AuthState {
   updateUser: (user: PublicUser) => void;
 }
 
+const cachedProfile = readOfflineProfile();
+
 export const useAuthStore = create<AuthState>((set, get) => {
   // React StrictMode вызывает эффект монтирования дважды в dev — без дедупликации это
   // означало два параллельных /auth/refresh с одним и тем же токеном (секция 3, этап 2).
   let bootstrapPromise: Promise<void> | null = null;
+  let refreshPromise: Promise<boolean> | null = null;
 
   function applyAuth(response: AuthResponse): void {
     setAccessToken(response.accessToken);
@@ -61,31 +64,47 @@ export const useAuthStore = create<AuthState>((set, get) => {
     unsubscribePush().catch(() => undefined);
   }
 
-  /** Сеть недоступна — не значит «сессия невалидна» (КЭШ-7): без профиля деться некуда, только тогда на /login. */
+  /** Сессия из локального мини-профиля: и как аварийный путь при отсутствии сети (КЭШ-7), и как
+   *  обычный первый кадр до ответа /auth/refresh (шаг ЗВОНКИ-11А). Без профиля деться некуда,
+   *  только тогда на /login. */
   function applyOfflineProfile(): boolean {
     const cached = readOfflineProfile();
     if (!cached) return false;
 
     set({ user: cached, status: 'authenticated', isOfflineSession: true });
+    const token = restoreAccessToken();
+    if (token) connectSocket(token);
     useChatStore.getState().subscribeToSocket(cached.id);
     return true;
   }
 
-  setRefreshHandler(async () => {
-    try {
-      applyAuth(await refreshRequest());
-      return true;
-    } catch (error) {
-      if (error instanceof NetworkError && applyOfflineProfile()) return true;
-      await clearAuth();
-      return false;
+  /** Один refresh на всё приложение: оптимистичный кадр рисуется до ответа сети, поэтому экраны
+   *  успевают уйти в 401 параллельно с bootstrap, а второй параллельный refresh той же кукой
+   *  сервер уже не примет. */
+  function runRefresh(): Promise<boolean> {
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        try {
+          applyAuth(await refreshRequest());
+          return true;
+        } catch (error) {
+          if (error instanceof NetworkError && applyOfflineProfile()) return true;
+          await clearAuth();
+          return false;
+        }
+      })().finally(() => {
+        refreshPromise = null;
+      });
     }
-  });
+    return refreshPromise;
+  }
+
+  setRefreshHandler(runRefresh);
 
   return {
-    user: null,
-    status: 'idle',
-    isOfflineSession: false,
+    user: cachedProfile,
+    status: cachedProfile ? 'authenticated' : 'idle',
+    isOfflineSession: cachedProfile !== null,
 
     async register(input) {
       applyAuth(await registerRequest(input));
@@ -103,13 +122,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
     bootstrap() {
       if (!bootstrapPromise) {
         bootstrapPromise = (async () => {
-          set({ status: 'loading' });
-          try {
-            applyAuth(await refreshRequest());
-          } catch (error) {
-            if (error instanceof NetworkError && applyOfflineProfile()) return;
-            await clearAuth();
-          }
+          if (!applyOfflineProfile()) set({ status: 'loading' });
+          await runRefresh();
         })();
       }
       return bootstrapPromise;
@@ -117,12 +131,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     async refreshWhenOnline() {
       if (!get().isOfflineSession) return;
-
-      try {
-        applyAuth(await refreshRequest());
-      } catch (error) {
-        if (!(error instanceof NetworkError)) await clearAuth();
-      }
+      await runRefresh();
     },
 
     updateUser(user) {

@@ -26,10 +26,44 @@ export class NetworkError extends Error {
   }
 }
 
-/** Токен живёт только в памяти вкладки — не в localStorage (секция 4). */
+const ACCESS_TOKEN_STORAGE_KEY = 'messenger.accessToken';
+const ACCESS_TOKEN_STORAGE_TTL_MS = 15 * 60 * 1000;
+
+interface StoredAccessToken {
+  token: string;
+  expiresAt: number;
+}
+
 let accessToken: string | null = null;
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  if (!token) {
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    return;
+  }
+  const stored: StoredAccessToken = { token, expiresAt: Date.now() + ACCESS_TOKEN_STORAGE_TTL_MS };
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, JSON.stringify(stored));
+}
+
+export function restoreAccessToken(): string | null {
+  const raw = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+  if (!raw) return null;
+
+  let stored: StoredAccessToken | null;
+  try {
+    stored = JSON.parse(raw) as StoredAccessToken;
+  } catch {
+    stored = null;
+  }
+
+  if (!stored?.token || stored.expiresAt <= Date.now()) {
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    return null;
+  }
+
+  accessToken = stored.token;
+  return stored.token;
 }
 
 /** authStore подставляет сюда вызов /auth/refresh, чтобы client.ts не знал о сторах (секция 8). */

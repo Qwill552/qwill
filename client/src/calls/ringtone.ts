@@ -141,3 +141,24 @@ export function stopRingback(): void {
     ringbackTimer = null;
   }
 }
+
+const ENDED_TONE_FREQ = 480;
+const ENDED_TONE_MS = 250;
+const ENDED_TONE_GAP_MS = 200;
+
+let endedTonePlaying = false;
+
+export function playCallEndedTone(): void {
+  if (endedTonePlaying) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  endedTonePlaying = true;
+  ctx.resume().catch(() => undefined);
+  const now = ctx.currentTime;
+  playTone(ctx, ENDED_TONE_FREQ, now, ENDED_TONE_MS, RINGBACK_GAIN);
+  playTone(ctx, ENDED_TONE_FREQ, now + (ENDED_TONE_MS + ENDED_TONE_GAP_MS) / 1000, ENDED_TONE_MS, RINGBACK_GAIN);
+  setTimeout(() => {
+    endedTonePlaying = false;
+  }, ENDED_TONE_MS * 2 + ENDED_TONE_GAP_MS);
+}

@@ -11,6 +11,7 @@ import { OutgoingCall } from './OutgoingCall';
 export function CallOverlay() {
   const phase = useCallStore((s) => s.phase);
   const callId = useCallStore((s) => s.call?.id ?? null);
+  const startedAt = useCallStore((s) => s.startedAt);
 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -23,7 +24,7 @@ export function CallOverlay() {
 
   if (phase === 'idle') return null;
   if (phase === 'incoming') return <IncomingCall />;
-  if (phase === 'outgoing') return <OutgoingCall />;
+  if (phase === 'outgoing' || (phase === 'ended' && startedAt === null)) return <OutgoingCall />;
   if (isCollapsible && collapsed) {
     return (
       <>

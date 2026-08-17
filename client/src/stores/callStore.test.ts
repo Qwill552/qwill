@@ -114,6 +114,27 @@ describe('callStore', () => {
     expect(useCallStore.getState().phase).toBe('idle');
   });
 
+  it('отклонение исходящего оставляет экран в ended с причиной, а не гасит сразу', () => {
+    vi.useFakeTimers();
+    useCallStore.setState({ phase: 'outgoing', call: buildCall() });
+
+    useCallStore.getState().applyEnded(buildCall({ status: 'DECLINED' }));
+    expect(useCallStore.getState().phase).toBe('ended');
+    expect(useCallStore.getState().call?.status).toBe('DECLINED');
+
+    vi.runAllTimers();
+    expect(useCallStore.getState().phase).toBe('idle');
+  });
+
+  it('отмена звонящим закрывает экран входящего сразу, без фазы ended', () => {
+    useCallStore.getState().applyInvite(buildCall());
+
+    useCallStore.getState().applyEnded(buildCall({ status: 'MISSED' }));
+
+    expect(useCallStore.getState().phase).toBe('idle');
+    expect(useCallStore.getState().call).toBeNull();
+  });
+
   it('toggleMic инвертирует micEnabled и зовёт транспорт ровно один раз', async () => {
     const transport = stubTransport();
     setCallTransport(transport);

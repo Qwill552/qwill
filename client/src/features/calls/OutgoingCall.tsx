@@ -1,6 +1,7 @@
+import type { CallStatus } from '@messenger/shared';
 import { useEffect } from 'react';
 
-import { startRingback, stopRingback } from '../../calls/ringtone';
+import { playCallEndedTone, startRingback, stopRingback } from '../../calls/ringtone';
 import { useAuthStore } from '../../stores/authStore';
 import { useCallStore } from '../../stores/callStore';
 import { Avatar } from '../../ui/Avatar';
@@ -13,8 +14,15 @@ const QUALITY_RING_CLASS: Record<'good' | 'poor' | 'lost', string | undefined> =
   lost: styles.ringLost,
 };
 
+function endedLabel(status: CallStatus): string {
+  if (status === 'DECLINED') return 'Звонок отклонён';
+  if (status === 'MISSED') return 'Не отвечает';
+  return 'Звонок завершён';
+}
+
 export function OutgoingCall() {
   const call = useCallStore((s) => s.call);
+  const phase = useCallStore((s) => s.phase);
   const micEnabled = useCallStore((s) => s.micEnabled);
   const audioRoute = useCallStore((s) => s.audioRoute);
   const connectionQuality = useCallStore((s) => s.connectionQuality);
@@ -25,13 +33,22 @@ export function OutgoingCall() {
 
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
+  const ended = phase === 'ended';
+
   useEffect(() => {
+    if (ended) {
+      stopRingback();
+      playCallEndedTone();
+      return;
+    }
+
     startRingback();
     return () => stopRingback();
-  }, []);
+  }, [ended]);
 
   const otherMember = call?.participants.find((p) => p.user.id !== myId)?.user ?? null;
   const displayName = otherMember?.displayName ?? '…';
+  const status = ended ? endedLabel(call?.status ?? 'ENDED') : (error ?? 'Звоним…');
 
   return (
     <div className={styles.screen}>
@@ -40,7 +57,7 @@ export function OutgoingCall() {
           <Avatar label={displayName} avatarUrl={otherMember?.avatarUrl} size={128} color={otherMember?.avatarColor} colorKey={otherMember?.id} />
         </div>
         <h1 className={styles.name}>{displayName}</h1>
-        <p className={`${styles.status} ${error ? styles.statusError : ''}`}>{error ?? 'Звоним…'}</p>
+        <p className={`${styles.status} ${error && !ended ? styles.statusError : ''}`}>{status}</p>
       </div>
 
       <div className={styles.bottom}>
