@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { CallOverlay } from '../features/calls/CallOverlay';
-import { RequiredUpdateModal } from '../features/updates/UpdateModal';
+import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
 import { AmbientBlobs } from './AmbientBlobs';
 import { useAppUpdateStore } from './appUpdate';
 import { ScreenStack } from './ScreenStack';
@@ -14,6 +14,8 @@ import { UpdateBanner } from './UpdateBanner';
  *  [таб-бар] — этап 0, буквальный перенос из design-archive/reference. */
 export function AppShell() {
   const checkAppUpdate = useAppUpdateStore((s) => s.check);
+  const updateModalOpen = useAppUpdateStore((s) => s.modalOpen);
+  const closeUpdateModal = useAppUpdateStore((s) => s.closeModal);
 
   useEffect(() => {
     void checkAppUpdate();
@@ -26,6 +28,7 @@ export function AppShell() {
       <TabBar />
       <UpdateBanner />
       <CallOverlay />
+      {updateModalOpen && <UpdateModal onClose={closeUpdateModal} />}
       <RequiredUpdateModal />
     </div>
   );

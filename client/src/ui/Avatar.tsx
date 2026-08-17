@@ -22,6 +22,10 @@ interface AvatarProps {
   /** Буквально из референса: тень есть только у аватара в списке чатов
    *  (0 8px 20px -10px rgba(0,0,0,.9)) — у остальных размеров её нет. */
   shadow?: boolean;
+  /** Готовая картинка вместо файла из хранилища — логотип сервисного аккаунта Qwill. Он не
+   *  загружался как File и живёт статикой (`/icon-192.png`, тот же значок, что у установленного
+   *  приложения), поэтому мимо useFileSrc. Перебивает avatarUrl. */
+  imageSrc?: string;
   className?: string;
 }
 
@@ -40,10 +44,12 @@ export function Avatar({
   color,
   colorKey,
   shadow,
+  imageSrc,
   className,
 }: AvatarProps) {
   const fileId = avatarUrl ? fileIdFromUrl(avatarUrl) : null;
-  const src = useFileSrc(fileId, 'thumb');
+  const fileSrc = useFileSrc(fileId, 'thumb');
+  const src = imageSrc ?? fileSrc;
 
   return (
     <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>

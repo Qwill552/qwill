@@ -1,12 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useBackHandler } from '../app/useBackHandler';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
+import { OfficialMark } from '../features/chat/OfficialMark';
+import { ServiceChatBar } from '../features/chat/ServiceChatBar';
+import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
+import { Menu, type MenuItem } from '../ui/Menu';
 import { GroupCallBanner } from '../features/calls/GroupCallBanner';
 import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
@@ -42,9 +46,13 @@ const COMPOSER_STYLE = {
 export function ChatScreen() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
+  /** Меню чата в списке умеет открыть профиль группы, а живёт панель группы здесь —
+   *  переход приносит просьбу открыть её вместе с навигацией. */
+  const openPanelRequested = (useLocation().state as { openPanel?: boolean } | null)?.openPanel === true;
 
   const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
+  const [headerMenuAnchor, setHeaderMenuAnchor] = useState<DOMRect | null>(null);
   /** Сообщения, для которых открыт шит выбора чата-получателя — из контекстного меню
    *  одной строки или из панели мультивыбора (ux-ui/06-message-interaction.md). */
   const [forwardRequest, setForwardRequest] = useState<number[] | null>(null);
@@ -67,6 +75,7 @@ export function ChatScreen() {
   const selectedIds = useChatStore((s) => s.selectedIds);
   const exitSelection = useChatStore((s) => s.exitSelection);
   const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
+  const setChatMuted = useChatStore((s) => s.setChatMuted);
   /** Только чтобы знать, резервировать ли под баннер место в ленте (--pinned-h) — сам
    *  баннер рисует и владеет им `MessageList` (там же живут права на закреп/снятие),
    *  сюда он лишь порталится, чтобы не оказаться под блюром шапки (см. ниже, pinnedSlot). */
@@ -101,9 +110,10 @@ export function ChatScreen() {
   useEffect(() => {
     // Ответ/правка привязаны к открытому чату — при переходе в другой чат контекст неактуален.
     setComposerContext(null);
-    setGroupPanelOpen(false);
+    setGroupPanelOpen(openPanelRequested);
+    setHeaderMenuAnchor(null);
     exitSelection();
-  }, [chatId, exitSelection]);
+  }, [chatId, exitSelection, openPanelRequested]);
 
   useEffect(() => {
     // Меня удалили из группы (или я вышел) — если это открытый чат, уходим из него (секция 8).
@@ -141,6 +151,8 @@ export function ChatScreen() {
 
   const activeChat = chats.find((c) => c.id === chatId);
   const isGroup = activeChat?.type === 'GROUP';
+  const isService = isServiceChat(activeChat);
+  const muted = activeChat?.muted ?? false;
   const isTyping = typingUsers.length > 0;
 
   const activeGroupCall = chatId ? (activeCallByChat[chatId] ?? null) : null;
@@ -148,7 +160,9 @@ export function ChatScreen() {
 
   let subtitle: string | null = null;
   let subtitleTone: 'default' | 'online' | 'accent' = 'default';
-  if (isTyping) {
+  if (isService) {
+    subtitle = null;
+  } else if (isTyping) {
     subtitle = isGroup ? `${typingUsers.map((u) => u.displayName).join(', ')} печатает…` : 'печатает…';
     subtitleTone = 'accent';
   } else if (isGroup) {
@@ -195,6 +209,26 @@ export function ChatScreen() {
     setComposerContext({ mode: 'reply', message });
     exitSelection();
   }
+
+  const muteItem: MenuItem = {
+    id: 'mute',
+    label: muted ? 'Включить уведомления' : 'Отключить уведомления',
+    icon: muted ? 'mute' : 'bell',
+    muted,
+    onSelect: () => {
+      if (chatId) setChatMuted(chatId, !muted).catch(() => undefined);
+    },
+  };
+
+  const profileItem: MenuItem = {
+    id: 'profile',
+    label: 'Профиль',
+    icon: 'user-circle',
+    onSelect: () => {
+      if (isGroup) setGroupPanelOpen(true);
+      else navigate(`/chats/${chatId}/info`);
+    },
+  };
 
   if (!chatId) return null;
 
@@ -272,29 +306,52 @@ export function ChatScreen() {
             <GlassButton icon="back" label="Назад к чатам" onClick={() => navigate('/chats')} />
             <GlassPill
               variant="cap"
-              title={activeChat?.title ?? '…'}
+              title={
+                isService ? (
+                  <span className={styles.serviceTitle}>
+                    {activeChat?.title ?? '…'}
+                    <OfficialMark size={16} />
+                  </span>
+                ) : (
+                  (activeChat?.title ?? '…')
+                )
+              }
               subtitle={subtitle}
               subtitleTone={subtitleTone}
               leading={
                 <Avatar
                   label={activeChat?.title ?? '?'}
                   avatarUrl={activeChat?.avatarUrl}
+                  imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
                   size={40}
                   color={activeChat?.otherMember?.avatarColor}
                   colorKey={chatId}
                 />
               }
-              onClick={() => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))}
+              onClick={
+                isService ? undefined : () => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))
+              }
             />
-            <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />
+            {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
+            {!isService && (
+              <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />
+            )}
             <GlassButton
               icon="more"
               label="Ещё"
-              onClick={() => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))}
+              onClick={(event) => setHeaderMenuAnchor(event.currentTarget.getBoundingClientRect())}
             />
           </>
         )}
       </ChromeBar>
+
+      {headerMenuAnchor && (
+        <Menu
+          anchor={headerMenuAnchor}
+          onClose={() => setHeaderMenuAnchor(null)}
+          items={isService ? [muteItem] : [profileItem, muteItem]}
+        />
+      )}
 
       {/* Размытая подложка композера — прогрессивный блюр, зеркально шапке. */}
       <div className={styles.composerFade}>
@@ -312,6 +369,8 @@ export function ChatScreen() {
               onReply={handleSelectionReply}
               onForward={() => setForwardRequest([...selectedIds])}
             />
+          ) : isService ? (
+            <ServiceChatBar chatId={chatId} muted={muted} />
           ) : (
             <MessageComposer
               chatId={chatId}

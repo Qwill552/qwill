@@ -48,6 +48,8 @@ async function registerUser(suffix: string): Promise<{ token: string; userId: st
 describe('push-уведомления (этап 9, секция 10А)', () => {
   afterAll(async () => {
     await prisma.chat.deleteMany({ where: { id: { in: createdChatIds } } });
+    // Подписка fcm заводит чат с сервисным аккаунтом (ОБНОВЛЕНИЯ-3) — он тоже мусор прогона.
+    await prisma.chat.deleteMany({ where: { members: { some: { userId: { in: createdUserIds } } } } });
     await prisma.pushSubscription.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await prisma.$disconnect();

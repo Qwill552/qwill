@@ -1,11 +1,18 @@
 import type { ChatListItemDto } from '@messenger/shared';
-import { NavLink } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 import { callPreviewText, callSymbolIcon, isUnansweredCall } from '../calls/callLog';
+import { OfficialMark } from '../chat/OfficialMark';
+import { isServiceChat, SERVICE_AVATAR_SRC } from '../chat/serviceChat';
 import { parseEmoji } from '../emoji/parseEmoji';
+import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from '../../ui/Avatar';
 import { Badge } from '../../ui/Badge';
+import { useLongPress } from '../../ui/gestures/useLongPress';
+import { haptic } from '../../ui/haptic';
 import { Icon, type IconName } from '../../ui/Icon';
+import { Menu, type MenuItem } from '../../ui/Menu';
 import styles from './ChatRow.module.css';
 
 interface ChatRowProps {
@@ -52,12 +59,56 @@ function previewText(chat: ChatListItemDto, own: boolean): string {
   if (!last) return 'Нет сообщений';
   if (last.deletedAt) return 'Сообщение удалено';
   if (last.call) return callPreviewText(last.call, own);
+  if (last.announcement) return `Новое обновление (${last.announcement.versionName})`;
   if (last.content) return last.content;
   if (last.attachment) return isImage(chat) ? 'Фото' : last.attachment.originalName || 'Файл';
   return 'Нет сообщений';
 }
 
 export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowProps) {
+  const navigate = useNavigate();
+  const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const rowRef = useRef<HTMLAnchorElement>(null);
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  /** Долгое нажатие уже открыло меню — отпускание пальца не должно вдобавок увести в чат. */
+  const suppressNavigationRef = useRef(false);
+
+  const isService = isServiceChat(chat);
+
+  function openMenu(): void {
+    const rect = rowRef.current?.getBoundingClientRect();
+    if (rect) setMenuAnchor(rect);
+  }
+
+  const longPress = useLongPress({
+    onLongPress: () => {
+      suppressNavigationRef.current = true;
+      haptic();
+      openMenu();
+    },
+    disabled: () => menuAnchor !== null,
+  });
+
+  const muteItem: MenuItem = {
+    id: 'mute',
+    label: chat.muted ? 'Включить уведомления' : 'Отключить уведомления',
+    icon: chat.muted ? 'mute' : 'bell',
+    muted: chat.muted,
+    onSelect: () => {
+      setChatMuted(chat.id, !chat.muted).catch(() => undefined);
+    },
+  };
+
+  const profileItem: MenuItem = {
+    id: 'profile',
+    label: 'Профиль',
+    icon: 'user-circle',
+    onSelect: () => {
+      if (chat.type === 'GROUP') navigate(`/chats/${chat.id}`, { state: { openPanel: true } });
+      else navigate(`/chats/${chat.id}/info`);
+    },
+  };
+
   const last = chat.lastMessage;
   const own = Boolean(last?.sender && myUserId && last.sender.id === myUserId);
   const isCall = Boolean(last?.call && !last.deletedAt);
@@ -70,50 +121,81 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
     isCall ? '' : own ? 'Вы: ' : chat.type === 'GROUP' && last?.sender ? `${last.sender.displayName}: ` : '';
 
   return (
-    <NavLink
-      to={`/chats/${chat.id}`}
-      className={({ isActive }) => `${styles.row} ${isActive ? styles.active : ''}`}
-      data-unread={chat.unreadCount > 0 ? 'true' : undefined}
-      style={{ animationDelay: `${index * 0.045}s` }}
-    >
-      <Avatar
-        label={chat.title}
-        avatarUrl={chat.avatarUrl}
-        size={52}
-        online={online}
-        color={chat.otherMember?.avatarColor}
-        colorKey={chat.id}
-        shadow
-      />
-      <div className={styles.body}>
-        <div className={styles.top}>
-          <span className={styles.title}>{chat.title}</span>
-          {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
-              «отправлено». Двойная галочка появится вместе с этими данными. */}
-          {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
-          {last && <span className={styles.time}>{formatWhen(last.createdAt)}</span>}
+    <>
+      <NavLink
+        ref={rowRef}
+        to={`/chats/${chat.id}`}
+        className={({ isActive }) => `${styles.row} ${isActive ? styles.active : ''}`}
+        data-unread={chat.unreadCount > 0 ? 'true' : undefined}
+        style={{ animationDelay: `${index * 0.045}s` }}
+        onPointerDown={(event) => {
+          suppressNavigationRef.current = false;
+          longPress.onPointerDown(event);
+        }}
+        onPointerMove={longPress.onPointerMove}
+        onPointerUp={longPress.onPointerUp}
+        onPointerCancel={longPress.onPointerCancel}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          openMenu();
+        }}
+        onClick={(event) => {
+          if (!suppressNavigationRef.current) return;
+          suppressNavigationRef.current = false;
+          event.preventDefault();
+        }}
+      >
+        <Avatar
+          label={chat.title}
+          avatarUrl={chat.avatarUrl}
+          imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
+          size={52}
+          online={online}
+          color={chat.otherMember?.avatarColor}
+          colorKey={chat.id}
+          shadow
+        />
+        <div className={styles.body}>
+          <div className={styles.top}>
+            <span className={styles.title}>{chat.title}</span>
+            {isService && <OfficialMark />}
+            {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
+                «отправлено». Двойная галочка появится вместе с этими данными. */}
+            {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
+            {last && <span className={styles.time}>{formatWhen(last.createdAt)}</span>}
+          </div>
+          <div className={styles.bottom}>
+            {typing ? (
+              <p className={styles.typing}>
+                {chat.type === 'GROUP' ? `${typingNames.join(', ')} печатает…` : 'печатает…'}
+              </p>
+            ) : (
+              <p className={styles.preview}>
+                {icon && (
+                  <Icon
+                    name={icon}
+                    size={14}
+                    className={`${styles.attachIcon} ${failedCall ? styles.failedCallIcon : ''}`}
+                  />
+                )}
+                {authorPrefix && <span className={styles.author}>{authorPrefix}</span>}
+                {parseEmoji(previewText(chat, own))}
+              </p>
+            )}
+            <Badge count={chat.unreadCount} />
+          </div>
         </div>
-        <div className={styles.bottom}>
-          {typing ? (
-            <p className={styles.typing}>
-              {chat.type === 'GROUP' ? `${typingNames.join(', ')} печатает…` : 'печатает…'}
-            </p>
-          ) : (
-            <p className={styles.preview}>
-              {icon && (
-                <Icon
-                  name={icon}
-                  size={14}
-                  className={`${styles.attachIcon} ${failedCall ? styles.failedCallIcon : ''}`}
-                />
-              )}
-              {authorPrefix && <span className={styles.author}>{authorPrefix}</span>}
-              {parseEmoji(previewText(chat, own))}
-            </p>
-          )}
-          <Badge count={chat.unreadCount} />
-        </div>
-      </div>
-    </NavLink>
+      </NavLink>
+
+      {/* Вне NavLink: React пропускает события портала по дереву компонентов, и пункт меню,
+          отрисованный его ребёнком, заодно уводил бы в чат. */}
+      {menuAnchor && (
+        <Menu
+          anchor={menuAnchor}
+          onClose={() => setMenuAnchor(null)}
+          items={isService ? [muteItem] : [profileItem, muteItem]}
+        />
+      )}
+    </>
   );
 }

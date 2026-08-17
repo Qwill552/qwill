@@ -44,6 +44,9 @@ interface MessageRowProps {
   canDelete: boolean;
   /** «Закрепить» — в приватном чате любой участник, в группе — OWNER/ADMIN. */
   canPin: boolean;
+  /** В чате с объявлениями отвечать некому: композера нет, свайп-ответ и пункт «Ответить»
+   *  вели бы в невидимый контекст (updates/03-announcements-chat.md). */
+  canReply: boolean;
   isPinned: boolean;
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
@@ -103,6 +106,7 @@ export function MessageRow({
   canEdit,
   canDelete,
   canPin,
+  canReply,
   isPinned,
   onReply,
   onEdit,
@@ -172,7 +176,7 @@ export function MessageRow({
       haptic();
       onReply(message);
     },
-    disabled: () => selectionMode || !canAct,
+    disabled: () => selectionMode || !canAct || !canReply,
   });
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
@@ -257,7 +261,9 @@ export function MessageRow({
   }
 
   const items = useMemo<MessageMenuItem[]>(() => {
-    const list: MessageMenuItem[] = [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }];
+    const list: MessageMenuItem[] = canReply
+      ? [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }]
+      : [];
 
     const deleteItem: MessageMenuItem = {
       id: 'delete',
@@ -271,7 +277,10 @@ export function MessageRow({
       },
     };
 
-    if (message.type === 'CALL') {
+    if (message.type === 'CALL' || message.announcement) {
+      if (message.announcement) {
+        list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest([message.id]) });
+      }
       if (canDelete) list.push(deleteItem);
       list.push({ id: 'select', icon: 'check', label: 'Выделить', onSelect: () => enterSelection(message.id) });
       return list;
@@ -303,6 +312,7 @@ export function MessageRow({
     canPin,
     canEdit,
     canDelete,
+    canReply,
     isPinned,
     onReply,
     onEdit,

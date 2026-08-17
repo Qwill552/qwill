@@ -39,6 +39,7 @@ import {
   leaveGroupRequest,
   listChatsRequest,
   removeMemberRequest,
+  setChatMutedRequest,
   transferOwnershipRequest,
   updateGroupRequest,
   updateMemberRoleRequest,
@@ -82,6 +83,20 @@ export interface LocalAttachmentState {
 /** Локальное расширение сообщения статусом оптимистичной отправки и черновиком вложения
  *  до подтверждения сервером — на сервер не уходит (этап 7, ux-ui/07-composer.md). */
 export type LocalMessage = MessageDto & { status?: 'sending' | 'failed'; localAttachment?: LocalAttachmentState };
+
+/** Автор оптимистичного сообщения — я сам, а сервисным аккаунтом я быть не могу:
+ *  PublicUser этого поля не несёт, оно есть только у участников чата. */
+function asSender(user: PublicUser): ChatMemberSummary {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    avatarColor: user.avatarColor,
+    lastSeenAt: user.lastSeenAt,
+    isService: false,
+  };
+}
 
 interface PresenceInfo {
   online: boolean;
@@ -134,6 +149,9 @@ interface ChatState {
   leaveGroup: (chatId: string) => Promise<void>;
   transferOwnership: (chatId: string, username: string) => Promise<void>;
   updateGroupInfo: (chatId: string, input: UpdateGroupInput) => Promise<void>;
+  /** Уведомления по чату — оптимистично: тумблер и вид пункта меню переключаются сразу,
+   *  а при отказе сервера возвращаются обратно. */
+  setChatMuted: (chatId: string, muted: boolean) => Promise<void>;
   clearKicked: () => void;
   sendMessage: (
     chatId: string,
@@ -438,6 +456,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().applyChatUpdated(event);
   },
 
+  async setChatMuted(chatId, muted) {
+    const previous = get().chats.find((c) => c.id === chatId)?.muted ?? false;
+    set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, muted } : c)) }));
+
+    try {
+      await setChatMutedRequest(chatId, muted);
+    } catch (error) {
+      set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, muted: previous } : c)) }));
+      throw error;
+    }
+  },
+
   clearKicked() {
     set({ kickedChatId: null });
   },
@@ -449,7 +479,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: -Date.now(),
       chatId,
       clientId,
-      sender,
+      sender: asSender(sender),
       type: attachment ? 'MEDIA' : 'TEXT',
       content: content || null,
       // Вложение появится в ленте только после ack — превью во время отправки не показываем (см. композер).
@@ -467,6 +497,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Отправка сообщения не пересылает — оптимистичное сообщение никогда не forwarded.
       forwardedFrom: null,
       call: null,
+      announcement: null,
       reactions: [],
       editedAt: null,
       deletedAt: null,
@@ -527,7 +558,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: -Date.now(),
       chatId,
       clientId,
-      sender,
+      sender: asSender(sender),
       type: 'MEDIA',
       content: options.caption || null,
       attachment: null,
@@ -543,6 +574,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         : null,
       forwardedFrom: null,
       call: null,
+      announcement: null,
       reactions: [],
       editedAt: null,
       deletedAt: null,
@@ -775,7 +807,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: -entry.createdAt,
         chatId: entry.chatId,
         clientId: entry.clientId,
-        sender: me,
+        sender: me ? asSender(me) : null,
         type: entry.attachment ? 'MEDIA' : 'TEXT',
         content: entry.content,
         attachment: null,
@@ -783,6 +815,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         replyTo: null,
         forwardedFrom: null,
         call: null,
+        announcement: null,
         reactions: [],
         editedAt: null,
         deletedAt: null,

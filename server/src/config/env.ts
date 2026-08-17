@@ -47,6 +47,10 @@ const envSchema = z.object({
   /// JSON ключа сервисного аккаунта Firebase одной строкой (секция 10А).
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
 
+  /// Секрет для рассылки объявления о выпуске (POST /api/app/announce, updates/03).
+  /// Не задан — маршрут выключен целиком: рассылать объявления некому и незачем.
+  ANNOUNCE_TOKEN: z.string().min(16).optional(),
+
   LIVEKIT_URL: z.string().min(1, 'LIVEKIT_URL обязателен'),
   LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
   LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),

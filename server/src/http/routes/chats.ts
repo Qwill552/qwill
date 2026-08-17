@@ -1,5 +1,6 @@
 import {
   addMemberSchema,
+  chatMuteSchema,
   createGroupSchema,
   createPrivateChatSchema,
   messagesQuerySchema,
@@ -126,6 +127,13 @@ chatsRouter.patch('/:id', validateBody(updateGroupSchema), (req, res, next) => {
       emitChatUpdated(chatId, chat);
       res.json(chat);
     })
+    .catch(next);
+});
+
+chatsRouter.patch('/:id/mute', validateBody(chatMuteSchema), (req, res, next) => {
+  chatService
+    .setChatMuted(paramId(req, 'id'), req.userId!, req.body.muted)
+    .then((muted) => res.json({ muted }))
     .catch(next);
 });
 

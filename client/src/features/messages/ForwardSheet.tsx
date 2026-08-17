@@ -5,6 +5,7 @@ import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
 import { Sheet } from '../../ui/Sheet';
 import { Spinner } from '../../ui/Spinner';
+import { isServiceChat } from '../chat/serviceChat';
 import styles from './ForwardSheet.module.css';
 
 interface ForwardSheetProps {
@@ -21,6 +22,7 @@ interface ForwardSheetProps {
 export function ForwardSheet({ fromChatId, messageIds, onClose, onForwarded }: ForwardSheetProps) {
   const chats = useChatStore((s) => s.chats);
   const forwardMessages = useChatStore((s) => s.forwardMessages);
+  const targets = chats.filter((chat) => !isServiceChat(chat));
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export function ForwardSheet({ fromChatId, messageIds, onClose, onForwarded }: F
     <Sheet title="Переслать" onClose={onClose}>
       {error && <p className={styles.error}>{error}</p>}
       <Card>
-        {chats.map((chat) => (
+        {targets.map((chat) => (
           <Card.Row
             key={chat.id}
             title={chat.title}

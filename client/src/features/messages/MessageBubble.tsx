@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { tintVar } from '../../ui/tint';
+import { AnnouncementBubble } from '../chat/AnnouncementBubble';
 import { Emoji } from '../emoji/Emoji';
 import { emojiOnlyContent, parseEmoji } from '../emoji/parseEmoji';
 import { VoiceMessage } from '../voice/VoiceMessage';
@@ -62,6 +63,15 @@ export function MessageBubble({ message, own, read, showAuthor, children }: Mess
   const classes = [styles.bubble, own ? styles.out : styles.in, message.status === 'failed' ? styles.failed : ''].join(
     ' ',
   );
+
+  if (message.announcement && !message.deletedAt) {
+    return (
+      <div className={classes}>
+        <AnnouncementBubble announcement={message.announcement} createdAt={message.createdAt} />
+        {children}
+      </div>
+    );
+  }
 
   if (message.type === 'CALL' && message.call && !message.deletedAt) {
     return (

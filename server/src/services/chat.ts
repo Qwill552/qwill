@@ -15,7 +15,7 @@ type ChatWithRelations = Chat & {
 };
 
 export function toMemberSummary(
-  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'avatarColor' | 'lastSeenAt'>,
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'avatarColor' | 'lastSeenAt' | 'isService'>,
 ): ChatMemberSummary {
   return {
     id: user.id,
@@ -24,6 +24,7 @@ export function toMemberSummary(
     avatarUrl: fileUrl(user.avatarFileId),
     avatarColor: toAvatarColor(user.avatarColor),
     lastSeenAt: user.lastSeenAt.toISOString(),
+    isService: user.isService,
   };
 }
 
@@ -31,6 +32,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
   const other = chat.type === 'PRIVATE' ? chat.members.find((m) => m.userId !== userId) : undefined;
   const otherSummary = other ? toMemberSummary(other.user) : null;
   const lastMessageRow = chat.messages[0];
+  const own = chat.members.find((m) => m.userId === userId);
 
   return {
     id: chat.id,
@@ -41,6 +43,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
     lastMessage: lastMessageRow ? toMessageDto(lastMessageRow) : null,
     updatedAt: chat.updatedAt.toISOString(),
     unreadCount,
+    muted: own?.mutedAt != null,
   };
 }
 
@@ -72,6 +75,19 @@ export async function assertMember(chatId: string, userId: string): Promise<void
   throw forbidden('Вы не участник этого чата', ErrorCode.NOT_A_MEMBER);
 }
 
+/** Чат с сервисным аккаунтом только для чтения: писать в него может лишь сам сервисный
+ *  аккаунт, остальные получают отказ, каким бы путём отправка ни пришла
+ *  (updates/03-announcements-chat.md, шаг 6). */
+export async function assertChatWritable(chatId: string, userId: string): Promise<void> {
+  const serviceMember = await prisma.chatMember.findFirst({
+    where: { chatId, user: { isService: true } },
+    select: { userId: true },
+  });
+  if (!serviceMember || serviceMember.userId === userId) return;
+
+  throw forbidden('В этот чат нельзя писать');
+}
+
 export function pairKeyFor(a: string, b: string): string {
   return [a, b].sort().join(':');
 }
@@ -85,7 +101,7 @@ export interface PrivateChatResult {
 /** Создание приватного чата защищено уникальным pairKey от гонки при обеих сторонах (секция 2). */
 export async function getOrCreatePrivateChat(userId: string, targetUsername: string): Promise<PrivateChatResult> {
   const target = await prisma.user.findUnique({ where: { username: targetUsername } });
-  if (!target) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
+  if (!target || target.isService) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
   if (target.id === userId) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Нельзя создать чат с самим собой');
 
   const pairKey = pairKeyFor(userId, target.id);
@@ -129,7 +145,7 @@ export async function createGroupChat(creatorId: string, title: string, username
     throw badRequest(ErrorCode.VALIDATION_FAILED, 'Добавьте хотя бы одного участника, кроме себя');
   }
 
-  const users = await prisma.user.findMany({ where: { username: { in: uniqueUsernames } } });
+  const users = await prisma.user.findMany({ where: { username: { in: uniqueUsernames }, isService: false } });
   const foundUsernames = new Set(users.map((u) => u.username));
   const missing = uniqueUsernames.find((u) => !foundUsernames.has(u));
   if (missing) throw notFound(ErrorCode.NOT_FOUND, `Пользователь @${missing} не найден`);
@@ -240,6 +256,18 @@ export async function markChatRead(chatId: string, userId: string, messageId: nu
   return nextCursor;
 }
 
+/** Уведомления по чату выключаются каждым участником для себя: заглушённый чат перестаёт
+ *  присылать пуши о сообщениях, но остаётся в списке и по-прежнему звонит. */
+export async function setChatMuted(chatId: string, userId: string, muted: boolean): Promise<boolean> {
+  await assertMember(chatId, userId);
+
+  await prisma.chatMember.update({
+    where: { chatId_userId: { chatId, userId } },
+    data: { mutedAt: muted ? new Date() : null },
+  });
+  return muted;
+}
+
 /** Все пользователи, с которыми у userId есть общий чат — получатели его presence-событий (секция 3). */
 export async function getCoMemberIds(userId: string): Promise<string[]> {
   const memberships = await prisma.chatMember.findMany({
@@ -249,7 +277,11 @@ export async function getCoMemberIds(userId: string): Promise<string[]> {
   if (memberships.length === 0) return [];
 
   const coMembers = await prisma.chatMember.findMany({
-    where: { chatId: { in: memberships.map((m) => m.chatId) }, userId: { not: userId } },
+    where: {
+      chatId: { in: memberships.map((m) => m.chatId) },
+      userId: { not: userId },
+      user: { isService: false },
+    },
     select: { userId: true },
     distinct: ['userId'],
   });

@@ -158,6 +158,15 @@
   flex: 1;
 }
 
+/* Название сервисного чата и пометка «официальный» — одной строкой, галочка не переносится
+   и не растягивает капсулу. */
+.serviceTitle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .error {
   display: grid;
   height: 100%;

@@ -7,6 +7,7 @@ import { Badge } from '../../ui/Badge';
 import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
 import { Icon } from '../../ui/Icon';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
+import { isServiceChat } from '../chat/serviceChat';
 import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
@@ -72,6 +73,7 @@ export function MessageList({
   const members = useChatStore((s) => s.membersByChat[chatId]);
   const loadMembers = useChatStore((s) => s.loadMembers);
   const unreadCount = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.unreadCount ?? 0);
+  const isService = useChatStore((s) => isServiceChat(s.chats.find((c) => c.id === chatId)));
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   // Права на «Удалить чужое»/«Закрепить» в группе завязаны на роль участника (membersByChat) —
@@ -266,6 +268,7 @@ export function MessageList({
                 canEdit={own && canAct}
                 canDelete={(own || isGroupAdmin) && canAct}
                 canPin={canPinBase && canAct}
+                canReply={!isService}
                 isPinned={pinnedMessage?.id === message.id}
                 onReply={onReply}
                 onEdit={onEdit}

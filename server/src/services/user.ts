@@ -115,6 +115,7 @@ export async function searchUsers(query: string, requesterId: string): Promise<U
     where: {
       username: { contains: query.toLowerCase() },
       id: { not: requesterId },
+      isService: false,
     },
     take: USER_SEARCH_PAGE_SIZE,
     orderBy: { username: 'asc' },

@@ -27,6 +27,7 @@ enum MessageType {
   MEDIA
   SYSTEM
   CALL
+  ANNOUNCEMENT
 }
 
 enum CallKind {
@@ -62,6 +63,12 @@ model User {
   /// назначается случайно один раз при регистрации и больше не меняется, чтобы один и тот же
   /// человек не красился по-разному на разных экранах (shared/src/user.ts, AVATAR_COLOR_VALUES).
   avatarColor String @default("blue")
+
+  /// Сервисный аккаунт Qwill, от которого приходят объявления о выпусках: не находится поиском,
+  /// не добавляется в группы, не рассылает presence, и в чат с ним нельзя писать
+  /// (updates/03-announcements-chat.md). Ровно одна такая запись, заводится сама при первой
+  /// FCM-подписке.
+  isService Boolean @default(false)
 
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
@@ -139,6 +146,11 @@ model ChatMember {
   /// Непрочитанные = сообщения чата с id > lastReadMessageId от других авторов.
   lastReadMessageId Int?
 
+  /// Уведомления по чату выключены этим участником: пуши о новых сообщениях ему не уходят,
+  /// звонки приходят по-прежнему. Время, а не флаг — по той же причине, что и deletedAt:
+  /// видно, когда именно заглушили.
+  mutedAt DateTime?
+
   @@id([chatId, userId])
   @@index([userId])
 }
@@ -164,6 +176,9 @@ model Message {
 
   callId String?
   call   Call?   @relation(fields: [callId], references: [id], onDelete: SetNull)
+
+  announcementId String?
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
 
   replyToId Int?
   replyTo   Message?  @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
@@ -332,4 +347,19 @@ model CallParticipant {
   leftAt   DateTime?
 
   @@unique([callId, userId])
+}
+
+/// Один выпуск приложения — одна запись; сообщения в чатах всех получателей ссылаются на неё.
+/// Уникальный versionCode и есть защита от повторной рассылки той же версии
+/// (updates/03-announcements-chat.md, шаг 5).
+model Announcement {
+  id String @id @default(cuid(2))
+
+  versionCode Int    @unique
+  versionName String
+  changelog   String[]
+
+  createdAt DateTime @default(now())
+
+  messages Message[]
 }

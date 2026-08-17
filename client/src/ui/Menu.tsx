@@ -9,6 +9,8 @@ export interface MenuItem {
   label: string;
   icon?: IconName;
   danger?: boolean;
+  /** Пункт приглушён — так показывается уже выключенное состояние, а не запрет нажатия. */
+  muted?: boolean;
   /** Не закрывать меню после выбора — например, чтобы сравнить несколько состояний подряд,
    *  не открывая меню заново каждый раз. */
   keepOpen?: boolean;
@@ -71,7 +73,7 @@ export function Menu({ anchor, items, onClose }: MenuProps) {
             key={item.id}
             type="button"
             role="menuitem"
-            className={`${styles.item} ${item.danger ? styles.danger : ''}`}
+            className={`${styles.item} ${item.danger ? styles.danger : ''} ${item.muted ? styles.muted : ''}`}
             onClick={(e) => {
               item.onSelect(e);
               if (!item.keepOpen) onClose();

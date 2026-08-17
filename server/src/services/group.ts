@@ -61,7 +61,7 @@ export async function addMember(chatId: string, username: string, requesterId: s
   assertCanManageMembers(requester.role);
 
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
+  if (!user || user.isService) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
 
   const alreadyMember = await prisma.chatMember.findUnique({
     where: { chatId_userId: { chatId, userId: user.id } },

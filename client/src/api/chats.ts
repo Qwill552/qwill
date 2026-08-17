@@ -48,6 +48,10 @@ export function updateGroupRequest(chatId: string, input: UpdateGroupInput): Pro
   return apiRequest<ChatUpdatedEvent>(`/api/chats/${chatId}`, { method: 'PATCH', body: input });
 }
 
+export function setChatMutedRequest(chatId: string, muted: boolean): Promise<{ muted: boolean }> {
+  return apiRequest<{ muted: boolean }>(`/api/chats/${chatId}/mute`, { method: 'PATCH', body: { muted } });
+}
+
 export function getMembersRequest(chatId: string): Promise<{ members: GroupMemberDTO[] }> {
   return apiRequest<{ members: GroupMemberDTO[] }>(`/api/chats/${chatId}/members`);
 }

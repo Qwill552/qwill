@@ -1,5 +1,6 @@
 import type {
   AttachmentDto,
+  MessageAnnouncementDto,
   MessageAttachmentInput,
   MessageCallDto,
   MessageDto,
@@ -17,11 +18,11 @@ import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { logger } from '../lib/logger.js';
 import { presenceStore } from '../realtime/presence.js';
-import { assertMember } from './chat.js';
+import { assertChatWritable, assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
 import * as pushService from './push.js';
 import { ChatRole } from '../generated/prisma/client.js';
-import type { Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
+import type { Announcement, Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
 type ReplyWithRelations = Message & { sender: User | null; attachments: { id: string }[] };
 type ForwardOriginWithRelations = Message & { sender: User | null };
@@ -33,6 +34,7 @@ export type MessageWithRelations = Message & {
   replyTo: ReplyWithRelations | null;
   forwardedFrom: ForwardOriginWithRelations | null;
   call: Call | null;
+  announcement: Announcement | null;
 };
 
 function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
@@ -88,6 +90,17 @@ function toForwardPreview(forwardedFrom: ForwardOriginWithRelations | null): Mes
   };
 }
 
+function toMessageAnnouncementDto(announcement: Announcement | null): MessageAnnouncementDto | null {
+  if (!announcement) return null;
+
+  return {
+    id: announcement.id,
+    versionCode: announcement.versionCode,
+    versionName: announcement.versionName,
+    changelog: announcement.changelog,
+  };
+}
+
 function toMessageCallDto(call: Call | null): MessageCallDto | null {
   if (!call) return null;
 
@@ -115,6 +128,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
           avatarUrl: fileUrl(message.sender.avatarFileId),
           avatarColor: toAvatarColor(message.sender.avatarColor),
           lastSeenAt: message.sender.lastSeenAt.toISOString(),
+          isService: message.sender.isService,
         }
       : null,
     type: message.type,
@@ -125,6 +139,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
     replyTo: toReplyPreview(message.replyTo),
     forwardedFrom: toForwardPreview(message.forwardedFrom),
     call: toMessageCallDto(message.call),
+    announcement: deleted ? null : toMessageAnnouncementDto(message.announcement),
     reactions: deleted ? [] : toReactionDtos(message.reactions),
     editedAt: message.editedAt?.toISOString() ?? null,
     deletedAt: message.deletedAt?.toISOString() ?? null,
@@ -139,6 +154,7 @@ export const messageInclude = {
   replyTo: { include: { sender: true, attachments: { select: { id: true } } } },
   forwardedFrom: { include: { sender: true } },
   call: true,
+  announcement: true,
 } as const;
 
 export interface SendMessageInput {
@@ -148,11 +164,15 @@ export interface SendMessageInput {
   content?: string;
   replyToId?: number;
   attachment?: MessageAttachmentInput;
+  /** Заполняется только рассылкой объявлений (services/announcements.ts): сообщение получает
+   *  тип ANNOUNCEMENT и ссылку на выпуск, из которой пузырь собирает себя сам. */
+  announcementId?: string;
 }
 
 /** Единственный способ создать сообщение — вызывается только из socket-хендлера (секция 3). */
 export async function sendMessage(input: SendMessageInput): Promise<MessageDto> {
   await assertMember(input.chatId, input.senderId);
+  await assertChatWritable(input.chatId, input.senderId);
 
   const existing = await prisma.message.findUnique({
     where: { clientId: input.clientId },
@@ -176,7 +196,8 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
       senderId: input.senderId,
       clientId: input.clientId,
       content: input.content ?? null,
-      type: input.attachment ? 'MEDIA' : 'TEXT',
+      type: input.announcementId ? 'ANNOUNCEMENT' : input.attachment ? 'MEDIA' : 'TEXT',
+      announcementId: input.announcementId,
       replyToId: input.replyToId,
       ...(attachmentCreate ? { attachments: { create: attachmentCreate } } : {}),
     },
@@ -198,7 +219,7 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
  *  в фоне (свёрнутое приложение), но push всё равно нужен, раз человек сейчас не смотрит (этап 9). */
 async function notifyOfflineMembers(chatId: string, senderId: string, message: MessageDto): Promise<void> {
   const members = await prisma.chatMember.findMany({
-    where: { chatId, userId: { not: senderId } },
+    where: { chatId, userId: { not: senderId }, mutedAt: null },
     select: { userId: true },
   });
   const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.hasVisibleClient(userId));
@@ -207,7 +228,9 @@ async function notifyOfflineMembers(chatId: string, senderId: string, message: M
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, title: true } });
   const senderName = message.sender?.displayName ?? 'Кто-то';
   const title = chat?.type === 'GROUP' ? `${senderName} · ${chat.title ?? 'Группа'}` : senderName;
-  const body = message.content ?? (message.attachment ? 'Прислал(а) файл' : 'Новое сообщение');
+  const body = message.announcement
+    ? `Новое обновление (${message.announcement.versionName})`
+    : (message.content ?? (message.attachment ? 'Прислал(а) файл' : 'Новое сообщение'));
 
   await Promise.all(
     offlineMemberIds.map((userId) => pushService.sendToUser(userId, { title, body, chatId })),
@@ -351,6 +374,7 @@ export interface ForwardMessagesInput {
 export async function forwardMessages(input: ForwardMessagesInput): Promise<MessageDto[]> {
   await assertMember(input.fromChatId, input.userId);
   await assertMember(input.toChatId, input.userId);
+  await assertChatWritable(input.toChatId, input.userId);
 
   const sources = await prisma.message.findMany({
     where: { id: { in: input.messageIds }, chatId: input.fromChatId },

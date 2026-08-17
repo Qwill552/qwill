@@ -128,8 +128,13 @@ export const startCallSchema = z.object({
 });
 export type StartCallInput = z.infer<typeof startCallSchema>;
 
+export const chatMuteSchema = z.object({
+  muted: z.boolean(),
+});
+export type ChatMuteInput = z.infer<typeof chatMuteSchema>;
+
 export type ChatType = 'PRIVATE' | 'GROUP';
-export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM' | 'CALL';
+export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM' | 'CALL' | 'ANNOUNCEMENT';
 export type GroupRole = 'OWNER' | 'ADMIN' | 'MEMBER';
 export type CallKind = 'AUDIO' | 'VIDEO';
 export type CallStatus = 'RINGING' | 'ACTIVE' | 'ENDED' | 'MISSED' | 'DECLINED';
@@ -143,6 +148,9 @@ export interface ChatMemberSummary {
   avatarColor: AvatarColor;
   /** Онлайн-статус — не хранится здесь, вычисляется клиентом из user:presence поверх этого значения. */
   lastSeenAt: string;
+  /** Сервисный аккаунт Qwill: логотип вместо аватара, пометка «официальный», нельзя писать
+   *  и звонить (updates/03-announcements-chat.md). У живых людей всегда false. */
+  isService: boolean;
 }
 
 /** Участник группы с ролью — панель управления группой (этап 7). username — чтобы клиент мог
@@ -197,6 +205,15 @@ export interface MessageCallDto {
   endedAt: string | null;
 }
 
+/** Объявление о выпуске приложения — структура, а не текст: пузырь рисует заголовок,
+ *  список пунктов и кнопку «Обновить» сам (updates/03-announcements-chat.md). */
+export interface MessageAnnouncementDto {
+  id: string;
+  versionCode: number;
+  versionName: string;
+  changelog: string[];
+}
+
 export interface MessageDto {
   id: number;
   chatId: string;
@@ -209,6 +226,7 @@ export interface MessageDto {
   replyTo: MessageReplyPreviewDto | null;
   forwardedFrom: MessageForwardPreviewDto | null;
   call: MessageCallDto | null;
+  announcement: MessageAnnouncementDto | null;
   reactions: MessageReactionDto[];
   editedAt: string | null;
   deletedAt: string | null;
@@ -227,6 +245,9 @@ export interface ChatListItemDto {
   updatedAt: string;
   /** Сообщения чужих авторов с id больше собственного lastReadMessageId (секция 2). */
   unreadCount: number;
+  /** Уведомления по этому чату выключены лично мной — пуши о новых сообщениях не уходят.
+   *  На звонки не влияет. */
+  muted: boolean;
 }
 
 export interface ChatDto extends ChatListItemDto {

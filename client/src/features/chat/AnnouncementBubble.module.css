@@ -1,0 +1,98 @@
+/* Содержимое пузыря объявления. Сам пузырь — обычный входящий (.bubble .in в
+   MessageBubble.module.css), поэтому здесь ни фона, ни радиуса, ни размытия: только
+   раскладка внутри и акцентная шапка-строка с версией. */
+
+.announcement {
+  display: flex;
+  min-width: min(258px, 100%);
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Шапка вынесена к краям пузыря отрицательными полями — линия делит пузырь целиком,
+   а не только колонку текста. */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: -8px -12px var(--space-1);
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--pulse-bubbd);
+  color: var(--primary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+}
+
+.headerIcon {
+  flex-shrink: 0;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: block;
+  padding-left: var(--space-1);
+  word-break: break-word;
+}
+
+.note {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  font-style: italic;
+}
+
+.action {
+  min-height: 44px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-message);
+  font-weight: 600;
+  transition: background var(--dur-tab);
+}
+
+.action:hover {
+  background: var(--primary-press);
+}
+
+.action:active {
+  background: var(--primary-press);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.installed {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+/* Якорь для абсолютно позиционированной MessageMeta: время встаёт под содержимым,
+   а не поверх кнопки. Высота — под саму метку (11px + подпиксельный запас). */
+.metaRow {
+  position: relative;
+  display: block;
+  height: 13px;
+}

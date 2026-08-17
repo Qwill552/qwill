@@ -18,6 +18,7 @@
     "build": "npm run build -w @messenger/shared && npm run build -w @messenger/server && npm run build -w @messenger/client",
     "build:emoji": "node scripts/build-emoji.mjs",
     "release:manifest": "node scripts/make-release-manifest.mjs",
+    "announce": "node scripts/announce.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",

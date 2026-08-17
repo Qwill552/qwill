@@ -39,6 +39,12 @@ interface AppUpdateState {
   error: string | null;
   permissionRequired: boolean;
   permissionJustGranted: boolean;
+  /** Экран обновления открыт. Живёт в сторе, а не в состоянии экрана: открыть его умеют и
+   *  строка в Настройках, и кнопка в объявлении из чата Qwill, а сама модалка одна и висит
+   *  в оболочке (ОБНОВЛЕНИЯ-3). */
+  modalOpen: boolean;
+  openModal: () => void;
+  closeModal: () => void;
   check: () => Promise<void>;
   download: () => Promise<void>;
   cancel: () => Promise<void>;
@@ -79,6 +85,14 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => {
     error: null,
     permissionRequired: false,
     permissionJustGranted: false,
+    modalOpen: false,
+
+    openModal: () => {
+      set({ modalOpen: true });
+      if (!get().info) void get().check();
+    },
+
+    closeModal: () => set({ modalOpen: false }),
 
     check: async () => {
       if (!isApkUpdateSupported()) return;
