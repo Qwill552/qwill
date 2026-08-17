@@ -53,6 +53,7 @@ function resetStore(): void {
     startedAt: null,
     error: null,
     cameraError: null,
+    rejoinable: null,
   });
 }
 
@@ -133,6 +134,29 @@ describe('callStore', () => {
 
     expect(useCallStore.getState().phase).toBe('idle');
     expect(useCallStore.getState().call).toBeNull();
+  });
+
+  it('живой звонок после перезапуска предлагается к возврату, а не подхватывается сам', () => {
+    useCallStore.getState().applyLiveCalls([buildCall({ status: 'ACTIVE' })]);
+
+    expect(useCallStore.getState().phase).toBe('idle');
+    expect(useCallStore.getState().rejoinable?.id).toBe('call-1');
+  });
+
+  it('завершение звонка убирает предложение вернуться', () => {
+    useCallStore.getState().applyLiveCalls([buildCall({ status: 'ACTIVE' })]);
+
+    useCallStore.getState().applyEnded(buildCall({ status: 'ENDED' }));
+
+    expect(useCallStore.getState().rejoinable).toBeNull();
+  });
+
+  it('идущий разговор не подменяется предложением вернуться', () => {
+    useCallStore.setState({ phase: 'active', call: buildCall({ status: 'ACTIVE' }) });
+
+    useCallStore.getState().applyLiveCalls([buildCall({ id: 'call-2', status: 'ACTIVE' })]);
+
+    expect(useCallStore.getState().rejoinable).toBeNull();
   });
 
   it('toggleMic инвертирует micEnabled и зовёт транспорт ровно один раз', async () => {

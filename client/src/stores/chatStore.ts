@@ -2,6 +2,7 @@ import type {
   CallDto,
   CallEndedEvent,
   CallInviteEvent,
+  CallLiveEvent,
   CallParticipantChangedEvent,
   ChatDto,
   ChatListItemDto,
@@ -1002,6 +1003,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         void reportIncomingCall(event.call.id, callerName, event.call.kind);
       }
       set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
+    });
+
+    socket.off(SocketEvent.CallLive).on(SocketEvent.CallLive, (event: CallLiveEvent) => {
+      useCallStore.getState().applyLiveCalls(event.calls);
+      set((state) => {
+        const activeCallByChat = { ...state.activeCallByChat };
+        for (const call of event.calls) activeCallByChat[call.chatId] = call;
+        return { activeCallByChat };
+      });
     });
 
     socket.off(SocketEvent.CallEnded).on(SocketEvent.CallEnded, (event: CallEndedEvent) => {

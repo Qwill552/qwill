@@ -37,7 +37,7 @@ class CallPlugin : Plugin() {
             callId = callId,
             callerName = call.getString("callerName").orEmpty(),
             callKind = call.getString("callKind").orEmpty(),
-            showUi = false,
+            showUi = true,
         )
         call.resolve()
     }

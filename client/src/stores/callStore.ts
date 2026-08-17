@@ -71,6 +71,7 @@ const initialState: CallState = {
   startedAt: null,
   error: null,
   cameraError: null,
+  rejoinable: null,
 };
 
 interface CallStoreState extends CallState {
@@ -92,6 +93,8 @@ interface CallStoreState extends CallState {
   applyInvite: (call: CallDto) => void;
   applyEnded: (call: CallDto) => void;
   applyCallUpdate: (call: CallDto) => void;
+  applyLiveCalls: (calls: CallDto[]) => void;
+  rejoinCall: () => Promise<void>;
 }
 
 export const useCallStore = create<CallStoreState>((set, get) => {
@@ -283,8 +286,21 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       set({ phase: 'incoming', call, participants: toParticipantStates(call.participants), error: null });
     },
 
+    applyLiveCalls(calls) {
+      if (get().phase !== 'idle') return;
+      set({ rejoinable: calls[0] ?? null });
+    },
+
+    async rejoinCall() {
+      const call = get().rejoinable;
+      if (!call) return;
+      set({ rejoinable: null });
+      await get().joinCall(call.id);
+    },
+
     applyEnded(call) {
       const state = get();
+      if (state.rejoinable?.id === call.id) set({ rejoinable: null });
       if (state.call?.id !== call.id) return;
       void transport.disconnect();
       if (state.phase === 'incoming') {

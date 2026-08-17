@@ -33,6 +33,8 @@ export interface CallState {
   startedAt: number | null;
   error: string | null;
   cameraError: string | null;
+  /** Звонок, в котором человек всё ещё числится участником после перезапуска приложения. */
+  rejoinable: CallDto | null;
 }
 
 export interface CallTransportCallbacks {

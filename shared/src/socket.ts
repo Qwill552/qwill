@@ -31,6 +31,7 @@ export const SocketEvent = {
   CallLeave: 'call:leave',
   CallEnded: 'call:ended',
   CallParticipantChanged: 'call:participantChanged',
+  CallLive: 'call:live',
 } as const;
 
 export type SocketEvent = (typeof SocketEvent)[keyof typeof SocketEvent];
@@ -155,4 +156,10 @@ export interface CallEndedEvent {
 
 export interface CallParticipantChangedEvent {
   call: CallDto;
+}
+
+/** Звонки, в которых человек всё ещё числится участником, — присылаются при подключении сокета,
+ *  чтобы перезапуск приложения или перезагрузка вкладки не теряли разговор. */
+export interface CallLiveEvent {
+  calls: CallDto[];
 }
