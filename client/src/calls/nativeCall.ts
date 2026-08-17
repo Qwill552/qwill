@@ -3,6 +3,7 @@ import type { CallKind } from '@messenger/shared';
 
 import { waitForConnectedSocket } from '../realtime/socket';
 import { useCallStore } from '../stores/callStore';
+import { traceCall } from './callTrace';
 
 interface NativeCallPlugin {
   isNativeCallAvailable(): Promise<{ available: boolean }>;
@@ -81,10 +82,13 @@ export function hasPendingNativeAccept(): boolean {
 /** Ответ мог прийти раньше приглашения (приложение поднимается с нуля) или позже него
  *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка. */
 async function handleAccepted(callId: string): Promise<void> {
+  traceCall('нативный accept получен', callId);
   acceptedNatively.add(callId);
   watchNativeAccept(callId);
 
+  traceCall('ожидание сокета началось');
   const socket = await waitForConnectedSocket(NATIVE_ACCEPT_SOCKET_TIMEOUT_MS);
+  traceCall('ожидание сокета закончилось', socket ? 'сокет живой' : 'таймаут');
   if (!socket) return;
   await enterAcceptedCall(callId);
 }
@@ -120,6 +124,7 @@ function watchNativeAccept(callId: string): void {
     if (attempts >= NATIVE_ACCEPT_RETRIES) return;
     attempts += 1;
 
+    traceCall('сторож входа в звонок: попытка', String(attempts));
     void enterAcceptedCall(callId).then((entered) => {
       if (!entered) setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
     });
@@ -128,6 +133,7 @@ function watchNativeAccept(callId: string): void {
 }
 
 async function handleDeclined(callId: string): Promise<void> {
+  traceCall('нативный decline получен', callId);
   acceptedNatively.delete(callId);
   await useCallStore.getState().declineCallById(callId);
 }

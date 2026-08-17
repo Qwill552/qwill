@@ -4,9 +4,18 @@ import { Router } from 'express';
 import { prisma } from '../../db/prisma.js';
 import { unauthorized } from '../../lib/errors.js';
 import { finishCall } from '../../realtime/call-handlers.js';
+import * as callService from '../../services/call.js';
+import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const callsRouter = Router();
+
+callsRouter.get('/live', requireAuth, (req, res, next) => {
+  callService
+    .getLiveCallsForParticipant(req.userId!)
+    .then((calls) => res.json({ calls }))
+    .catch(next);
+});
 
 /** Отклонение с заблокированного телефона: WebView в этот момент не поднят и сокета нет,
  *  поэтому звонящий узнаёт об отказе отсюда, а не через веб-слой (шаг ЗВОНКИ-11). */

@@ -11,6 +11,7 @@ import {
   messageSendSchema,
   SocketEvent,
   type CallInviteEvent,
+  type CallLiveEvent,
   type ChatPinnedEvent,
   type ChatReadEvent,
   type ChatReadPayload,
@@ -145,6 +146,11 @@ async function bootstrapSocket(socket: Socket, userId: string): Promise<void> {
   const pendingInvites = await callService.getPendingInvites(userId);
   for (const call of pendingInvites) {
     socket.emit(SocketEvent.CallInvite, { call } satisfies CallInviteEvent);
+  }
+
+  const liveCalls = await callService.getLiveCallsForParticipant(userId);
+  if (liveCalls.length > 0) {
+    socket.emit(SocketEvent.CallLive, { calls: liveCalls } satisfies CallLiveEvent);
   }
 }
 

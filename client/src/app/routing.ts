@@ -21,6 +21,7 @@ function normalize(pathname: string): string {
 function staticParent(pathname: string): string | null {
   if (pathname === '/settings/appearance') return '/settings';
   if (pathname === '/settings/developer') return '/settings';
+  if (pathname === '/settings/developer/call-trace') return '/settings/developer';
   return null;
 }
 

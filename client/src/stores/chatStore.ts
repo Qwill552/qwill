@@ -28,6 +28,7 @@ import type {
 import { SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
+import { getLiveCallsRequest } from '../api/calls';
 import {
   addMemberRequest,
   createGroupRequest,
@@ -55,6 +56,7 @@ import {
   readOutbox,
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
+import { traceCall } from '../calls/callTrace';
 import {
   consumeNativeAccept,
   hasPendingNativeAccept,
@@ -1001,6 +1003,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
+      traceCall('call:invite получен', event.call.id);
       const callerName = event.call.initiator?.displayName ?? '';
       if (consumeNativeAccept(event.call.id)) {
         void useCallStore.getState().joinCall(event.call.id);
@@ -1022,6 +1025,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.CallEnded).on(SocketEvent.CallEnded, (event: CallEndedEvent) => {
+      traceCall('call:ended получен', event.call.id);
       void reportCallEnded(event.call.id);
       useCallStore.getState().applyEnded(event.call);
       set((state) => {
@@ -1050,6 +1054,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (hasPendingNativeAccept()) afterCallStarts(sync);
       else sync();
+
+      void getLiveCallsRequest()
+        .then((response) => useCallStore.getState().applyLiveCalls(response.calls))
+        .catch(() => undefined);
     });
   },
 

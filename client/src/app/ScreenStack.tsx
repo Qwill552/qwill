@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
 
 import { AppearanceScreen } from '../pages/AppearanceScreen';
+import { CallTraceScreen } from '../pages/CallTraceScreen';
 import { ChatInfoScreen } from '../pages/ChatInfoScreen';
 import { ChatScreen } from '../pages/ChatScreen';
 import { ChatsScreen } from '../pages/ChatsScreen';
@@ -51,6 +52,7 @@ function RouteSwitch({ location }: { location: Location }) {
       <Route path="/settings" element={<SettingsScreen />} />
       <Route path="/settings/appearance" element={<AppearanceScreen />} />
       <Route path="/settings/developer" element={<DeveloperScreen />} />
+      <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
       <Route path="/profile" element={<ProfileScreen />} />
       <Route path="*" element={<Navigate to="/chats" replace />} />
     </Routes>

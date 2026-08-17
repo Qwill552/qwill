@@ -36,6 +36,13 @@ export function DeveloperScreen() {
               />
             }
           />
+          <Card.Row
+            icon="history"
+            tint="violet"
+            title="Диагностика звонков"
+            subtitle="Журнал последних событий звонка"
+            onClick={() => navigate('/settings/developer/call-trace')}
+          />
         </Card>
       </div>
 

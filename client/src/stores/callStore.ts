@@ -12,6 +12,7 @@ import { SocketEvent } from '@messenger/shared';
 import type { Socket } from 'socket.io-client';
 import { create } from 'zustand';
 
+import { traceCall } from '../calls/callTrace';
 import { liveKitTransport } from '../calls/transport';
 import type { CallParticipantState, CallState, CallTransport, CallVideoSource } from '../calls/types';
 import { getSocket, waitForConnectedSocket } from '../realtime/socket';
@@ -118,6 +119,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
   }
 
   async function connectToRoom(access: CallAccessDto): Promise<boolean> {
+    traceCall('подключение к LiveKit начато');
     try {
       await transport.connect(access.url, access.token, {
         onParticipantsChanged: (participants) => {
@@ -135,9 +137,12 @@ export const useCallStore = create<CallStoreState>((set, get) => {
           scheduleReset();
         },
       });
+      traceCall('подключение к LiveKit закончено', 'успех');
       return true;
     } catch (error) {
-      set({ ...initialState, error: error instanceof Error ? error.message : 'Не удалось подключиться к звонку' });
+      const message = error instanceof Error ? error.message : 'Не удалось подключиться к звонку';
+      traceCall('подключение к LiveKit закончено', `провал: ${message}`);
+      set({ ...initialState, error: message });
       return false;
     }
   }
@@ -171,7 +176,9 @@ export const useCallStore = create<CallStoreState>((set, get) => {
         return;
       }
       const payload: CallActionPayload = { callId };
+      traceCall('call:accept отправлен', `join ${callId}`);
       const ack = await emitWithAck<CallAcceptAck>(socket, SocketEvent.CallAccept, payload);
+      traceCall('call:accept ack получен', ack.ok ? 'ok' : (ack.error?.message ?? 'ошибка'));
       if (!ack.ok || !ack.access) {
         set({ error: ack.error?.message ?? 'Не удалось присоединиться к звонку' });
         return;
@@ -187,7 +194,9 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       const socket = getSocket();
       if (!socket) return;
       const payload: CallActionPayload = { callId: call.id };
+      traceCall('call:accept отправлен', `accept ${call.id}`);
       const ack = await emitWithAck<CallAcceptAck>(socket, SocketEvent.CallAccept, payload);
+      traceCall('call:accept ack получен', ack.ok ? 'ok' : (ack.error?.message ?? 'ошибка'));
       if (!ack.ok || !ack.access) {
         set({ error: ack.error?.message ?? 'Не удалось принять звонок' });
         return;
@@ -292,6 +301,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
     },
 
     applyLiveCalls(calls) {
+      traceCall('call:live получен', `звонков: ${calls.length}`);
       if (get().phase !== 'idle') return;
       set({ rejoinable: calls[0] ?? null });
     },
@@ -322,4 +332,8 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       set({ call, participants: mergeParticipants(state.participants, call.participants) });
     },
   };
+});
+
+useCallStore.subscribe((state, previous) => {
+  if (state.phase !== previous.phase) traceCall('фаза сменилась', `${previous.phase} → ${state.phase}`);
 });
