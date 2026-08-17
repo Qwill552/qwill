@@ -6,6 +6,7 @@ import {
   type CallAcceptAck,
   type CallEndedEvent,
   type CallInviteEvent,
+  type CallLiveEvent,
   type CallParticipantChangedEvent,
   type CallStartAck,
 } from '@messenger/shared';
@@ -194,6 +195,30 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
     const messages = await prisma.message.findMany({ where: { chatId, type: 'CALL' } });
     expect(messages).toHaveLength(1);
     expect(messages[0]?.callId).toBe(callId);
+  });
+
+  it('переподключившийся участник получает call:live с живым звонком', async () => {
+    const a = await registerUser('cs6_a');
+    const b = await registerUser('cs6_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+
+    const socketA = await connectSocket(a.accessToken);
+    const socketB = await connectSocket(b.accessToken);
+
+    const startAck = await emitWithAck<CallStartAck>(socketA, SocketEvent.CallStart, { chatId, kind: 'AUDIO' });
+    const callId = startAck.access!.call.id;
+    await emitWithAck<CallAcceptAck>(socketB, SocketEvent.CallAccept, { callId });
+
+    socketB.disconnect();
+    const socketBAgain = await connectSocket(b.accessToken);
+    const live = await waitForEvent<CallLiveEvent>(socketBAgain, SocketEvent.CallLive);
+
+    expect(live.calls.map((call) => call.id)).toContain(callId);
+    expect(live.calls[0]?.status).toBe('ACTIVE');
+
+    const endedPromise = waitForEvent<CallEndedEvent>(socketA, SocketEvent.CallEnded);
+    socketA.emit(SocketEvent.CallLeave, { callId });
+    await endedPromise;
   });
 
   it('не-участник чата на call:start получает ack с ошибкой и без токена', async () => {

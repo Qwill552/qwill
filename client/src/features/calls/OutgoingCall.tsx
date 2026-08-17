@@ -34,6 +34,7 @@ export function OutgoingCall() {
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   const ended = phase === 'ended';
+  const answered = call?.status === 'ACTIVE';
 
   useEffect(() => {
     if (ended) {
@@ -42,13 +43,19 @@ export function OutgoingCall() {
       return;
     }
 
+    if (answered) {
+      stopRingback();
+      return;
+    }
+
     startRingback();
     return () => stopRingback();
-  }, [ended]);
+  }, [ended, answered]);
 
   const otherMember = call?.participants.find((p) => p.user.id !== myId)?.user ?? null;
   const displayName = otherMember?.displayName ?? '…';
-  const status = ended ? endedLabel(call?.status ?? 'ENDED') : (error ?? 'Звоним…');
+  const ringingStatus = answered ? 'Соединяем…' : 'Звоним…';
+  const status = ended ? endedLabel(call?.status ?? 'ENDED') : (error ?? ringingStatus);
 
   return (
     <div className={styles.screen}>

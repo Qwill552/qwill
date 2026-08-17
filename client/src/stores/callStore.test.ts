@@ -1,8 +1,8 @@
-import type { CallAcceptAck, CallDto } from '@messenger/shared';
+import type { CallAcceptAck, CallDto, CallStartAck } from '@messenger/shared';
 import type { Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CallTransport } from '../calls/types';
+import type { CallParticipantState, CallTransport, CallTransportCallbacks } from '../calls/types';
 import { getSocket } from '../realtime/socket';
 import { setCallTransport, useCallStore } from './callStore';
 
@@ -113,6 +113,37 @@ describe('callStore', () => {
 
     vi.runAllTimers();
     expect(useCallStore.getState().phase).toBe('idle');
+  });
+
+  it('звонящий уходит в разговор только когда собеседник появился в комнате', async () => {
+    const access = { call: buildCall(), token: 'token', url: 'wss://example' };
+    const emit = vi.fn((_event: string, _payload: unknown, callback: (ack: CallStartAck) => void) => {
+      callback({ ok: true, access });
+    });
+    vi.mocked(getSocket).mockReturnValue({ emit } as unknown as Socket);
+
+    let callbacks: CallTransportCallbacks | undefined;
+    setCallTransport(
+      stubTransport({
+        connect: vi.fn(async (_url: string, _token: string, incoming: CallTransportCallbacks) => {
+          callbacks = incoming;
+        }),
+      }),
+    );
+
+    await useCallStore.getState().startCall('chat-1', 'AUDIO');
+    expect(useCallStore.getState().phase).toBe('outgoing');
+
+    useCallStore.getState().applyCallUpdate(buildCall({ status: 'ACTIVE' }));
+    expect(useCallStore.getState().phase).toBe('outgoing');
+
+    callbacks?.onParticipantsChanged([
+      { userId: 'me' } as CallParticipantState,
+      { userId: 'other' } as CallParticipantState,
+    ]);
+
+    expect(useCallStore.getState().phase).toBe('active');
+    expect(useCallStore.getState().startedAt).not.toBeNull();
   });
 
   it('отклонение исходящего оставляет экран в ended с причиной, а не гасит сразу', () => {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import { useBackHandler } from '../../app/useBackHandler';
-import { isNativeCallAvailable } from '../../calls/nativeCall';
 import { useCallStore } from '../../stores/callStore';
 import { CallBanner } from './CallBanner';
 import { CallPip } from './CallPip';
@@ -25,7 +24,7 @@ export function CallOverlay() {
   useBackHandler(isCollapsible && !collapsed, () => setCollapsed(true));
 
   if (phase === 'idle') return <RejoinBanner />;
-  if (phase === 'incoming') return isNativeCallAvailable() ? null : <IncomingCall />;
+  if (phase === 'incoming') return <IncomingCall />;
   if (phase === 'outgoing' || (phase === 'ended' && startedAt === null)) return <OutgoingCall />;
   if (isCollapsible && collapsed) {
     return (

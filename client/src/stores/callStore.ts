@@ -120,7 +120,12 @@ export const useCallStore = create<CallStoreState>((set, get) => {
   async function connectToRoom(access: CallAccessDto): Promise<boolean> {
     try {
       await transport.connect(access.url, access.token, {
-        onParticipantsChanged: (participants) => set({ participants }),
+        onParticipantsChanged: (participants) => {
+          set({ participants });
+          if (get().phase === 'outgoing' && participants.length > 1) {
+            set({ phase: 'active', startedAt: Date.now() });
+          }
+        },
         onActiveSpeakerChanged: (activeSpeakerId) => set({ activeSpeakerId }),
         onConnectionQualityChanged: (connectionQuality) => set({ connectionQuality }),
         onScreenShareChanged: (screenShareEnabled) => set({ screenShareEnabled }),
@@ -314,13 +319,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
     applyCallUpdate(call) {
       const state = get();
       if (state.call?.id !== call.id) return;
-      const becameActive = state.phase === 'outgoing' && call.status === 'ACTIVE';
-      set({
-        call,
-        participants: mergeParticipants(state.participants, call.participants),
-        phase: becameActive ? 'active' : state.phase,
-        startedAt: becameActive ? Date.now() : state.startedAt,
-      });
+      set({ call, participants: mergeParticipants(state.participants, call.participants) });
     },
   };
 });

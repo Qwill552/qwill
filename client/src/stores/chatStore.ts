@@ -55,7 +55,13 @@ import {
   readOutbox,
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
-import { consumeNativeAccept, hasPendingNativeAccept, reportCallEnded, reportIncomingCall } from '../calls/nativeCall';
+import {
+  consumeNativeAccept,
+  hasPendingNativeAccept,
+  isNativeCallAvailable,
+  reportCallEnded,
+  reportIncomingCall,
+} from '../calls/nativeCall';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -995,12 +1001,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.CallInvite).on(SocketEvent.CallInvite, (event: CallInviteEvent) => {
+      const callerName = event.call.initiator?.displayName ?? '';
       if (consumeNativeAccept(event.call.id)) {
         void useCallStore.getState().joinCall(event.call.id);
+      } else if (isNativeCallAvailable()) {
+        void reportIncomingCall(event.call.id, callerName, event.call.kind);
       } else {
         useCallStore.getState().applyInvite(event.call);
-        const callerName = event.call.initiator?.displayName ?? '';
-        void reportIncomingCall(event.call.id, callerName, event.call.kind);
       }
       set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
     });

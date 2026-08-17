@@ -79,41 +79,49 @@ export function hasPendingNativeAccept(): boolean {
 }
 
 /** Ответ мог прийти раньше приглашения (приложение поднимается с нуля) или позже него
- *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка.
- *  На холодном старте звонок дополнительно идёт в joinCall сам, как только ожил сокет, не
- *  дожидаясь приглашения: что из двух случится раньше, то и подключит. */
+ *  (приложение было открыто, ответили с гарнитуры) — обрабатываются оба порядка. */
 async function handleAccepted(callId: string): Promise<void> {
-  const store = useCallStore.getState();
-  if (store.call?.id === callId && store.phase === 'incoming') {
-    await store.acceptCall();
-    return;
-  }
-
   acceptedNatively.add(callId);
   watchNativeAccept(callId);
 
   const socket = await waitForConnectedSocket(NATIVE_ACCEPT_SOCKET_TIMEOUT_MS);
-  if (!socket || !consumeNativeAccept(callId)) return;
+  if (!socket) return;
+  await enterAcceptedCall(callId);
+}
 
-  const current = useCallStore.getState();
-  if (current.phase !== 'idle') return;
-  await current.joinCall(callId);
+/** Единственное место, где принятый в системном интерфейсе звонок доводится до разговора.
+ *  Разбирает все три состояния стора, а не только `idle`: приглашение по сокету могло успеть
+ *  раньше нативного события и увести фазу в `incoming`, и тогда молчаливый выход оставлял бы
+ *  человека на оверлее «Соединение…» навсегда. */
+async function enterAcceptedCall(callId: string): Promise<boolean> {
+  const store = useCallStore.getState();
+  const isOurCall = store.call?.id === callId;
+  consumeNativeAccept(callId);
+
+  if (isOurCall && store.phase === 'incoming') {
+    await store.acceptCall();
+    return useCallStore.getState().call !== null;
+  }
+
+  if (isOurCall) return true;
+
+  if (store.phase !== 'idle') return false;
+
+  await store.joinCall(callId);
+  return useCallStore.getState().call !== null;
 }
 
 /** Оверлей «Соединение…» снимается только переходом в active, поэтому проигранная гонка или
- *  потерянный ack оставили бы человека на нём до 45-секундной страховки оболочки. `call === null`
- *  означает, что ответа на call:accept не было вовсе — только тогда пробуем ещё раз. */
+ *  потерянный ack оставили бы человека на нём до 45-секундной страховки оболочки. Сторож
+ *  переспрашивает состояние, а не сдаётся на первой же неподходящей фазе. */
 function watchNativeAccept(callId: string): void {
   let attempts = 0;
   const tick = (): void => {
-    const state = useCallStore.getState();
-    if (state.call?.id === callId || state.phase !== 'idle') return;
     if (attempts >= NATIVE_ACCEPT_RETRIES) return;
-
     attempts += 1;
-    acceptedNatively.delete(callId);
-    void state.joinCall(callId).then(() => {
-      if (useCallStore.getState().call === null) setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
+
+    void enterAcceptedCall(callId).then((entered) => {
+      if (!entered) setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
     });
   };
   setTimeout(tick, NATIVE_ACCEPT_RETRY_MS);
