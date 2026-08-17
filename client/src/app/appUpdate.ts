@@ -38,11 +38,13 @@ interface AppUpdateState {
   percent: number;
   error: string | null;
   permissionRequired: boolean;
+  permissionJustGranted: boolean;
   check: () => Promise<void>;
   download: () => Promise<void>;
   cancel: () => Promise<void>;
   install: () => Promise<void>;
   requestPermission: () => Promise<void>;
+  recheckPermission: () => Promise<void>;
   reset: () => void;
 }
 
@@ -76,6 +78,7 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => {
     percent: 0,
     error: null,
     permissionRequired: false,
+    permissionJustGranted: false,
 
     check: async () => {
       if (!isApkUpdateSupported()) return;
@@ -119,17 +122,17 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => {
       await cancelApkDownload();
       await detachProgress();
       await discardApk();
-      set({ phase: 'idle', percent: 0, error: null });
+      set({ phase: 'idle', percent: 0, error: null, permissionJustGranted: false });
     },
 
     install: async () => {
       if (!(await canInstallApk())) {
-        set({ permissionRequired: true });
+        set({ permissionRequired: true, permissionJustGranted: false });
         return;
       }
       try {
         await installApk();
-        set({ permissionRequired: false });
+        set({ permissionRequired: false, permissionJustGranted: false });
       } catch (error) {
         set({ phase: 'error', error: error instanceof Error ? error.message : 'Не удалось начать установку' });
       }
@@ -137,6 +140,14 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => {
 
     requestPermission: async () => {
       await openInstallPermissionSettings();
+    },
+
+    /** Возврат из системных настроек не порождает никакого события в вебе — состояние
+     *  тумблера приходится перечитывать самим, когда приложение снова оказалось на экране. */
+    recheckPermission: async () => {
+      if (!get().permissionRequired) return;
+      if (!(await canInstallApk())) return;
+      set({ permissionRequired: false, permissionJustGranted: true });
     },
 
     reset: () => {

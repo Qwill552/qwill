@@ -1,5 +1,6 @@
 package com.qwill.app
 
+import android.webkit.CookieManager
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -79,6 +80,7 @@ class ApkUpdatePlugin : Plugin() {
             call.reject("Файл обновления не найден")
             return
         }
+        CookieManager.getInstance().flush()
         context.startActivity(intent)
         call.resolve()
     }

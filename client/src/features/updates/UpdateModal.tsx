@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   selectUpdateRequired,
@@ -54,21 +54,55 @@ function PermissionStep({ onGo, onBack }: { onGo: () => void; onBack: (() => voi
   );
 }
 
+function PermissionGrantedStep({ onInstall }: { onInstall: () => void }) {
+  return (
+    <div className={styles.permission}>
+      <span className={styles.permissionIconDone}>
+        <Icon name="check" size={28} />
+      </span>
+      <p className={styles.permissionDoneText}>Разрешение выдано успешно!</p>
+      <p className={styles.permissionAside}>(Хватит читать всякую чепуху! устанавливай апдейт!)</p>
+      <button type="button" className={styles.primaryButton} onClick={onInstall}>
+        Установить
+      </button>
+    </div>
+  );
+}
+
 function UpdateBody({ blocking }: { blocking: boolean }) {
   const info = useAppUpdateStore((s) => s.info);
   const phase = useAppUpdateStore((s) => s.phase);
   const percent = useAppUpdateStore((s) => s.percent);
   const error = useAppUpdateStore((s) => s.error);
   const permissionRequired = useAppUpdateStore((s) => s.permissionRequired);
+  const permissionJustGranted = useAppUpdateStore((s) => s.permissionJustGranted);
   const download = useAppUpdateStore((s) => s.download);
   const cancel = useAppUpdateStore((s) => s.cancel);
   const install = useAppUpdateStore((s) => s.install);
   const requestPermission = useAppUpdateStore((s) => s.requestPermission);
+  const recheckPermission = useAppUpdateStore((s) => s.recheckPermission);
   const reset = useAppUpdateStore((s) => s.reset);
 
   const [explainingPermission, setExplainingPermission] = useState(false);
 
+  // Единственный сигнал о возврате из системных настроек, который доходит до WebView.
+  useEffect(() => {
+    function handleVisibility(): void {
+      if (document.visibilityState === 'visible') void recheckPermission();
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [recheckPermission]);
+
   if (!info) return null;
+
+  if (permissionJustGranted && phase === 'ready') {
+    return <PermissionGrantedStep onInstall={() => void install()} />;
+  }
 
   if (explainingPermission || (permissionRequired && phase === 'ready')) {
     return (
