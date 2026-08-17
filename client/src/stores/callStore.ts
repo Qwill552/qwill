@@ -19,6 +19,8 @@ import { getSocket, waitForConnectedSocket } from '../realtime/socket';
 
 const CALL_ENDED_RESET_DELAY_MS = 2000;
 const CAMERA_ERROR_DISPLAY_MS = 3000;
+const CALL_ACCEPT_ACK_TIMEOUT_MS = 1500;
+const CALL_ACCEPT_ACK_ATTEMPTS = 5;
 
 let transport: CallTransport = liveKitTransport;
 
@@ -30,6 +32,39 @@ function emitWithAck<T>(socket: Socket, event: string, payload: unknown): Promis
   return new Promise((resolve) => {
     socket.emit(event, payload, resolve);
   });
+}
+
+function emitWithTimeout<T>(socket: Socket, event: string, payload: unknown, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, timeoutMs);
+    socket.emit(event, payload, (response: T) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(response);
+    });
+  });
+}
+
+async function emitCallAcceptWithRetry(callId: string): Promise<CallAcceptAck | null> {
+  const payload: CallActionPayload = { callId };
+  for (let attempt = 1; attempt <= CALL_ACCEPT_ACK_ATTEMPTS; attempt += 1) {
+    const socket = getSocket();
+    if (!socket) return null;
+    traceCall('call:accept отправлен', `попытка ${attempt}: ${callId}`);
+    const ack = await emitWithTimeout<CallAcceptAck>(socket, SocketEvent.CallAccept, payload, CALL_ACCEPT_ACK_TIMEOUT_MS);
+    if (ack) {
+      traceCall('call:accept ack получен', ack.ok ? 'ok' : (ack.error?.message ?? 'ошибка'));
+      return ack;
+    }
+    traceCall('call:accept ack не получен за таймаут', `попытка ${attempt}`);
+  }
+  return null;
 }
 
 function toParticipantState(participant: CallParticipantDto): CallParticipantState {
@@ -101,6 +136,7 @@ interface CallStoreState extends CallState {
 export const useCallStore = create<CallStoreState>((set, get) => {
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
   let cameraErrorTimer: ReturnType<typeof setTimeout> | null = null;
+  let acceptInFlight: string | null = null;
 
   function scheduleReset(): void {
     if (resetTimer) clearTimeout(resetTimer);
@@ -169,41 +205,43 @@ export const useCallStore = create<CallStoreState>((set, get) => {
     },
 
     async joinCall(callId) {
-      if (get().phase !== 'idle') return;
-      const socket = getSocket();
-      if (!socket) {
+      if (get().phase !== 'idle' || acceptInFlight === callId) return;
+      if (!getSocket()) {
         set({ error: 'Нет соединения' });
         return;
       }
-      const payload: CallActionPayload = { callId };
-      traceCall('call:accept отправлен', `join ${callId}`);
-      const ack = await emitWithAck<CallAcceptAck>(socket, SocketEvent.CallAccept, payload);
-      traceCall('call:accept ack получен', ack.ok ? 'ok' : (ack.error?.message ?? 'ошибка'));
-      if (!ack.ok || !ack.access) {
-        set({ error: ack.error?.message ?? 'Не удалось присоединиться к звонку' });
-        return;
+      acceptInFlight = callId;
+      try {
+        const ack = await emitCallAcceptWithRetry(callId);
+        if (!ack?.ok || !ack.access) {
+          set({ error: ack?.error?.message ?? 'Не удалось присоединиться к звонку' });
+          return;
+        }
+        set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
+        const connected = await connectToRoom(ack.access);
+        if (connected) set({ phase: 'active', startedAt: Date.now() });
+      } finally {
+        if (acceptInFlight === callId) acceptInFlight = null;
       }
-      set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
-      const connected = await connectToRoom(ack.access);
-      if (connected) set({ phase: 'active', startedAt: Date.now() });
     },
 
     async acceptCall() {
       const { call, phase } = get();
-      if (!call || phase !== 'incoming') return;
-      const socket = getSocket();
-      if (!socket) return;
-      const payload: CallActionPayload = { callId: call.id };
-      traceCall('call:accept отправлен', `accept ${call.id}`);
-      const ack = await emitWithAck<CallAcceptAck>(socket, SocketEvent.CallAccept, payload);
-      traceCall('call:accept ack получен', ack.ok ? 'ok' : (ack.error?.message ?? 'ошибка'));
-      if (!ack.ok || !ack.access) {
-        set({ error: ack.error?.message ?? 'Не удалось принять звонок' });
-        return;
+      if (!call || phase !== 'incoming' || acceptInFlight === call.id) return;
+      if (!getSocket()) return;
+      acceptInFlight = call.id;
+      try {
+        const ack = await emitCallAcceptWithRetry(call.id);
+        if (!ack?.ok || !ack.access) {
+          set({ error: ack?.error?.message ?? 'Не удалось принять звонок' });
+          return;
+        }
+        set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
+        const connected = await connectToRoom(ack.access);
+        if (connected) set({ phase: 'active', startedAt: Date.now() });
+      } finally {
+        if (acceptInFlight === call.id) acceptInFlight = null;
       }
-      set({ call: ack.access.call, participants: toParticipantStates(ack.access.call.participants) });
-      const connected = await connectToRoom(ack.access);
-      if (connected) set({ phase: 'active', startedAt: Date.now() });
     },
 
     async declineCall() {

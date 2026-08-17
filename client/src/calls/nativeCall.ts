@@ -27,7 +27,7 @@ let initialized = false;
 const acceptedNatively = new Set<string>();
 
 const NATIVE_ACCEPT_SOCKET_TIMEOUT_MS = 60_000;
-const NATIVE_ACCEPT_RETRY_MS = 7000;
+const NATIVE_ACCEPT_RETRY_MS = 2000;
 const NATIVE_ACCEPT_RETRIES = 2;
 
 export function isNativeCallAvailable(): boolean {
