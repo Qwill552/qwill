@@ -23,8 +23,8 @@ export default defineConfig(() => {
         injectRegister: null,
         registerType: 'autoUpdate',
         manifest: {
-          name: 'Messenger',
-          short_name: 'Messenger',
+          name: 'Qwill',
+          short_name: 'Qwill',
           description: 'Мессенджер — чаты, группы, файлы',
           start_url: '/',
           display: 'standalone',
