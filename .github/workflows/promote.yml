@@ -8,12 +8,16 @@ on:
         required: false
         default: main
 
-permissions:
-  contents: write
+concurrency:
+  group: promote
+  cancel-in-progress: false
 
 jobs:
   promote:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      checks: read
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
     steps:
@@ -24,10 +28,24 @@ jobs:
 
       - name: Определить коммит
         id: resolve
+        env:
+          REF: ${{ inputs.ref }}
         run: |
-          SHA=$(git rev-parse "origin/${{ inputs.ref }}" 2>/dev/null || git rev-parse "${{ inputs.ref }}")
+          SHA=$(git rev-parse "origin/$REF" 2>/dev/null || git rev-parse "$REF")
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Выпускается $SHA"
+
+      - name: Проверить, что CI зелёный
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" --jq '[.check_runs[] | select(.name == "ci")][0].conclusion // "нет прогона"')
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "CI для $SHA не зелёный (conclusion: $CONCLUSION) — выпуск остановлен"
+            exit 1
+          fi
+          echo "CI зелёный ($SHA), продолжаем"
 
       - name: Что уедет людям
         run: git log --oneline "origin/prod..$SHA" || echo "ветки prod ещё нет"

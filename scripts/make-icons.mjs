@@ -59,7 +59,7 @@ async function writeAndroidIcons(resDir, hue) {
     await writeSquare(path.join(dir, 'ic_launcher.png'), launcher, hue);
     await writeCircle(path.join(dir, 'ic_launcher_round.png'), launcher, hue);
     await writeSquare(path.join(dir, 'ic_launcher_foreground.png'), foreground, hue);
-    console.log(`${path.basename(resDir)} mipmap-${density} — ${launcher}px значок, ${foreground}px слой адаптивной иконки`);
+    console.log(`${path.basename(path.dirname(resDir))} mipmap-${density} — ${launcher}px значок, ${foreground}px слой адаптивной иконки`);
   }
 }
 
