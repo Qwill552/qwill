@@ -12,6 +12,7 @@
   overflow-y: auto;
   padding: var(--chrome-space-top) var(--space-4) calc(var(--safe-bottom) + var(--space-6));
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .log {

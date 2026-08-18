@@ -11,6 +11,7 @@
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   padding: calc(10px + var(--safe-top)) calc(14px + var(--safe-right)) calc(96px + var(--safe-bottom))
     calc(14px + var(--safe-left));
   display: flex;

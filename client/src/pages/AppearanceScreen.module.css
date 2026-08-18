@@ -15,6 +15,7 @@
   padding-top: var(--chrome-space-top);
   padding-bottom: calc(var(--safe-bottom) + var(--space-6));
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .control {

@@ -8,6 +8,7 @@
   overflow-y: auto;
   padding: 0 10px calc(96px + var(--safe-bottom));
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .skeletonRow {
