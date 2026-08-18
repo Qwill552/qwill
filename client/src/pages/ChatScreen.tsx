@@ -260,14 +260,7 @@ export function ChatScreen() {
     >
       <ChatWallpaper />
 
-      {/* Размытая подложка шапки — прогрессивный блюр (4 вложенных слоя нарастающей силы),
-          см. комментарий в ChatScreen.module.css и журнал ux-ui.md. */}
-      <div className={styles.headerFade}>
-        <div className={styles.headerFadeLayer} />
-        <div className={styles.headerFadeLayer} />
-        <div className={styles.headerFadeLayer} />
-        <div className={styles.headerFadeLayer} />
-      </div>
+      <div className={styles.headerFade} />
 
       <MessageList
         chatId={chatId}
@@ -353,13 +346,7 @@ export function ChatScreen() {
         />
       )}
 
-      {/* Размытая подложка композера — прогрессивный блюр, зеркально шапке. */}
-      <div className={styles.composerFade}>
-        <div className={styles.composerFadeLayer} />
-        <div className={styles.composerFadeLayer} />
-        <div className={styles.composerFadeLayer} />
-        <div className={styles.composerFadeLayer} />
-      </div>
+      <div className={styles.composerFade} />
 
       <ChromeBar side="bottom" style={COMPOSER_STYLE}>
         <div ref={composerRef} className={styles.composerSlot}>
