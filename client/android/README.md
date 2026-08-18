@@ -1,12 +1,60 @@
 # Qwill — сборка Android
 
-Обёртка Capacitor вокруг веб-клиента `client/`. WebView грузит интерфейс с
-`https://qwill.mooo.com` (`server.url` в `client/capacitor.config.ts`), а не из собранного
-`dist/` внутри APK. `applicationId`: `com.qwill.app`.
+Обёртка Capacitor вокруг веб-клиента `client/`. WebView грузит интерфейс не из собранного
+`dist/` внутри APK, а с боевого или dev-сервера — адрес задаёт `server.url`, разный для
+каждого flavor'а (см. «Два контура» ниже).
 
 Следствие: правки клиента приезжают на телефон сами после деплоя, пересобирать и раздавать
 APK заново нужно только при изменениях нативного слоя (`client/android/`, плагины, манифест).
 Обоснование выбора — в журнале `calls.md` за 2026-08-16.
+
+## Два контура: prod и dev
+
+Проект собирается в двух product flavor'ах (`flavorDimensions "channel"` в
+`app/build.gradle`):
+
+| | `prod` | `dev` |
+|---|---|---|
+| `applicationId` | `com.qwill.app` | `com.qwill.app.dev` |
+| Имя приложения | Qwill | Qwill Dev |
+| `server.url` | `https://qwill.mooo.com` | `https://dev.qwill.mooo.com` |
+| Иконка | штатная | тот же макет, другой оттенок |
+| Задача Gradle (релиз) | `assembleProdRelease` | `assembleDevRelease` |
+| npm-скрипт | `android:release` | `android:release:dev` |
+
+Оба flavor'а ставятся на одно устройство одновременно и не мешают друг другу — это разные
+Android-приложения с разными `applicationId`, у каждого свои чаты и свой аккаунт.
+
+Ресурсы `dev` (имя, иконки, конфиг Capacitor) лежат в `client/android/app/src/dev/` —
+Gradle накладывает их поверх `src/main/` только при сборке `dev`-flavor'а. Конфиг Capacitor
+для dev (`src/dev/assets/capacitor.config.json`) не пишется руками: его генерирует
+`scripts/make-dev-capacitor-config.mjs`, беря за основу `src/main/assets/capacitor.config.json`,
+который кладёт туда `cap sync` (шаг `android:sync`), и подменяя в нём `appId`, `appName` и
+`server.url` на dev-значения. Если формат конфига Capacitor когда-нибудь изменится, dev-версия
+подхватит изменение автоматически — вместо того чтобы разъехаться с прод-версией, как было бы
+при ручном файле.
+
+Установить dev-сборку на подключённое устройство без Android Studio:
+
+```powershell
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+client\android\gradlew.bat -p client\android installDevDebug
+```
+
+или поставить уже собранный релизный APK явно через `adb`:
+
+```powershell
+adb install -r client\android\app\build\outputs\apk\dev\release\app-dev-release.apk
+```
+
+`-r` переустанавливает поверх уже стоящей версии того же `applicationId`, не трогая боевое
+приложение рядом — у него другой `applicationId`, и `adb` их не путает.
+
+**Dev-приложение не показывает баннер «Доступно обновление».** Каталог выпусков
+(`APP_RELEASE_DIR`) на dev-контуре пуст — манифеста `android.json` там нет, поэтому
+`getAndroidRelease()` (`server/src/services/appRelease.ts`) возвращает `null`, и код баннера
+просто не срабатывает. Раздача APK через `/api/app/*` заведена только для прода.
 
 ## Уведомления в оболочке — через FCM (шаг 10А)
 
@@ -26,10 +74,16 @@ push-сервисе — она есть у браузера Chrome, а не у �
 
 1. [Firebase Console](https://console.firebase.google.com/) → создать проект (или использовать
    существующий).
-2. Добавить Android-приложение с `applicationId` **`com.qwill.app`** (см. `app/build.gradle`).
+2. Добавить **два** Android-приложения в этом же проекте: `com.qwill.app` (прод) и
+   `com.qwill.app.dev` (dev) — оба `applicationId` см. в `app/build.gradle`
+   (`applicationIdSuffix ".dev"` у flavor'а `dev`). Без второго приложения FCM для dev-сборки
+   не инициализируется тем же путём, что описан выше для прода.
 3. Скачать `google-services.json` и положить в `client/android/app/google-services.json`.
-   Файл не коммитится (`client/android/.gitignore`) — при потере или на новой машине сборки
-   повторить эти шаги заново, ключи и `project_id` возьмутся из того же проекта Firebase.
+   Один и тот же файл покрывает оба `applicationId` — Firebase кладёт в него записи всех
+   приложений проекта, а плагин `google-services` на сборке выбирает нужную по
+   `applicationId` собираемого flavor'а. Файл не коммитится (`client/android/.gitignore`) —
+   при потере или на новой машине сборки повторить эти шаги заново, ключи и `project_id`
+   возьмутся из того же проекта Firebase.
 4. Серверу отдельно нужен ключ сервисного аккаунта того же проекта — Firebase Console →
    Project settings → Service accounts → Generate new private key, JSON целиком в
    `FCM_SERVICE_ACCOUNT_JSON` в `.env` на сервере (см. `.env.example`), в репозиторий не
@@ -49,22 +103,31 @@ npm run android:open -w @messenger/client
 телефоне (отладка по USB включена) или на эмуляторе — кнопка Run.
 
 `android:sync` пересобирает `client/dist`, копирует его в
-`android/app/src/main/assets/public` и обновляет `capacitor.config.json` внутри APK;
+`android/app/src/main/assets/public`, обновляет `capacitor.config.json` внутри APK и следом
+запускает `make-dev-capacitor-config.mjs`, который тем же проходом обновляет
+`src/dev/assets/capacitor.config.json` для dev-flavor'а (см. «Два контура» выше);
 `android:open` открывает проект в Android Studio. Скопированный `dist` при заданном
 `server.url` не используется — он остаётся в APK как побочный результат `cap sync`.
 После правок в `client/src` пересобирать APK не нужно: телефон возьмёт новую версию с
-`qwill.mooo.com` после деплоя. Прогнать `android:sync` нужно, только если менялся
-`capacitor.config.ts` или нативная часть.
+боевого или dev-сервера (в зависимости от установленного flavor'а) после деплоя. Прогнать
+`android:sync` нужно, только если менялся `capacitor.config.ts` или нативная часть.
+
+В Android Studio выбор flavor'а для сборки/запуска — панель **Build Variants** (слева внизу):
+`prodDebug`, `devDebug`, `prodRelease`, `devRelease`.
 
 ## Сборка и установка без Android Studio
 
-Android Studio нужна только как источник JDK и как GUI. Тот же результат из терминала:
+Android Studio нужна только как источник JDK и как GUI. Тот же результат из терминала —
+для прод-flavor'а:
 
 ```powershell
 $env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
-client\android\gradlew.bat -p client\android installDebug
+client\android\gradlew.bat -p client\android installProdDebug
 ```
+
+или `installDevDebug` для dev-flavor'а. Продукт с двумя flavor'ами не создаёт общей задачи
+`installDebug` — нужно называть flavor явно, иначе Gradle откажет с ошибкой неоднозначности.
 
 **JDK берётся не из каталога Android Studio.** Встроенная в Studio JBR (`D:\android\jbr` на
 машине разработки) — Java 25, а Gradle 8.14.3 её не поддерживает и падает с
@@ -73,14 +136,16 @@ Studio держит её отдельно в `~/.jdks`, оттуда же бер
 Сборка из терминала при открытой Studio может пройти и с неверным `JAVA_HOME`, переиспользовав
 её демон, — это маскирует ошибку до момента, когда Studio закрыта.
 
-`installDebug` собирает отладочный APK и ставит его на подключённое по USB устройство.
-Список устройств — `platform-tools\adb.exe devices`, лог приложения — `adb logcat`.
-Строка `D Capacitor: Loading app at https://qwill.mooo.com` в логе подтверждает, что
-оболочка взяла интерфейс с прода.
+`installProdDebug`/`installDevDebug` собирает отладочный APK нужного flavor'а и ставит его
+на подключённое по USB устройство. Список устройств — `platform-tools\adb.exe devices`, лог
+приложения — `adb logcat`. Строка `D Capacitor: Loading app at https://qwill.mooo.com` (для
+`prod`) или `https://dev.qwill.mooo.com` (для `dev`) в логе подтверждает, откуда оболочка
+взяла интерфейс.
 
 ## Релизная сборка
 
-Требуется ключ подписи (см. ниже). Из терминала — одной командой из `client/`:
+Требуется ключ подписи (см. ниже) — общий для обоих flavor'ов, отдельного ключа для `dev` не
+заводится. Из терминала — одной командой из `client/`:
 
 ```powershell
 $env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
@@ -88,11 +153,14 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 npm run android:release -w @messenger/client
 ```
 
-Скрипт сам гоняет `android:sync` (веб-сборка + `cap sync`) и затем `gradlew assembleRelease`.
-Результат — `client/android/app/build/outputs/apk/release/app-release.apk`. Без
-`keystore.properties` (см. ниже) та же команда соберёт **неподписанный** APK: сборка не
-падает, но такой файл нельзя установить или раздать — `signingConfig` на `release` в этом
-случае просто не применяется.
+Собирает **только `prod`**: скрипт сам гоняет `android:sync` (веб-сборка + `cap sync`) и
+затем `gradlew assembleProdRelease`. Результат —
+`client/android/app/build/outputs/apk/prod/release/app-prod-release.apk`. Для dev-сборки —
+`npm run android:release:dev -w @messenger/client`, результат в
+`.../apk/dev/release/app-dev-release.apk`; на прод она не раздаётся (см. «Два контура»),
+собирается только для локальной установки через `adb`. Без `keystore.properties` (см. ниже)
+обе команды соберут **неподписанный** APK: сборка не падает, но такой файл нельзя установить
+или раздать — `signingConfig` на `release` в этом случае просто не применяется.
 
 В Android Studio тот же результат: `Build → Generate Signed Bundle / APK`, `APK`, путь к
 keystore и пароли, тип сборки `release`.
@@ -141,7 +209,7 @@ Windows-путях нужно экранировать двойным слэше
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\build-tools\<версия>\apksigner.bat" verify --print-certs `
-  client\android\app\build\outputs\apk\release\app-release.apk
+  client\android\app\build\outputs\apk\prod\release\app-prod-release.apk
 ```
 
 Отпечаток сертификата (`SHA-256`) текущего релизного ключа:
@@ -185,10 +253,19 @@ Windows-путях нужно экранировать двойным слэше
 не попадает в прекэш service worker, а новый блок в общем Caddyfile потребовал бы
 `systemctl restart caddy`, обрывающий на секунду **все** домены машины, не только Qwill.
 
+**Раздача APK заведена только для прода.** На dev-контуре (`/var/www/message-dev`)
+`app-releases/` не наполняется — там нет `android.json`, `getAndroidRelease()`
+(`server/src/services/appRelease.ts`) отдаёт `null`, и «Qwill Dev» баннер обновления никогда
+не показывает (см. «Два контура» выше). Устанавливать новую dev-сборку на устройство —
+вручную через `adb install`, отдельного канала раздачи для неё не заводилось.
+
 ### Выпустить новую версию
 
+Только для `prod` — у `dev` нет раздачи и, соответственно, этого протокола.
+
 1. Поднять `versionCode` на единицу и `versionName` в `client/android/version.properties`.
-2. Собрать: `npm run android:release -w @messenger/client`.
+2. Собрать: `npm run android:release -w @messenger/client` (именно этот скрипт, не
+   `android:release:dev` — манифест собирается из прод-APK).
 3. Собрать манифест и положить APK рядом с ним:
 
 ```powershell
