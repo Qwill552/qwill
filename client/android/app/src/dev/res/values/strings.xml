@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qwill Dev</string>
+    <string name="title_activity_main">Qwill Dev</string>
+    <string name="package_name">com.qwill.app.dev</string>
+    <string name="custom_url_scheme">com.qwill.app.dev</string>
+    <string name="call_phone_account">Qwill Dev</string>
+    <string name="qwill_api_base" translatable="false">https://dev.qwill.mooo.com</string>
+</resources>

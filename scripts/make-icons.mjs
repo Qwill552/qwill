@@ -23,9 +23,12 @@ const ANDROID_DENSITIES = [
 
 const webDir = path.join(repoRoot, 'client', 'public');
 const androidResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'main', 'res');
+const DEV_HUE = 150;
+const devResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'dev', 'res');
 
-function square(size) {
-  return sharp(SOURCE).resize(size, size, { fit: 'cover' }).png();
+function square(size, hue) {
+  const base = sharp(SOURCE).resize(size, size, { fit: 'cover' });
+  return (hue ? base.modulate({ hue }) : base).png();
 }
 
 function circleMask(size) {
@@ -35,17 +38,29 @@ function circleMask(size) {
   );
 }
 
-async function writeSquare(target, size) {
-  await writeFile(target, await square(size).toBuffer());
+async function writeSquare(target, size, hue) {
+  await writeFile(target, await square(size, hue).toBuffer());
 }
 
-async function writeCircle(target, size) {
-  const base = await square(size).ensureAlpha().toBuffer();
+async function writeCircle(target, size, hue) {
+  const base = await square(size, hue).ensureAlpha().toBuffer();
   const masked = await sharp(base)
     .composite([{ input: circleMask(size), blend: 'dest-in' }])
     .png()
     .toBuffer();
   await writeFile(target, masked);
+}
+
+async function writeAndroidIcons(resDir, hue) {
+  for (const { density, launcher, foreground } of ANDROID_DENSITIES) {
+    const dir = path.join(resDir, `mipmap-${density}`);
+    await mkdir(dir, { recursive: true });
+
+    await writeSquare(path.join(dir, 'ic_launcher.png'), launcher, hue);
+    await writeCircle(path.join(dir, 'ic_launcher_round.png'), launcher, hue);
+    await writeSquare(path.join(dir, 'ic_launcher_foreground.png'), foreground, hue);
+    console.log(`${path.basename(resDir)} mipmap-${density} — ${launcher}px значок, ${foreground}px слой адаптивной иконки`);
+  }
 }
 
 async function main() {
@@ -60,15 +75,8 @@ async function main() {
     console.log(`client/public/${file} — ${size}x${size}`);
   }
 
-  for (const { density, launcher, foreground } of ANDROID_DENSITIES) {
-    const dir = path.join(androidResDir, `mipmap-${density}`);
-    await mkdir(dir, { recursive: true });
-
-    await writeSquare(path.join(dir, 'ic_launcher.png'), launcher);
-    await writeCircle(path.join(dir, 'ic_launcher_round.png'), launcher);
-    await writeSquare(path.join(dir, 'ic_launcher_foreground.png'), foreground);
-    console.log(`mipmap-${density} — ${launcher}px значок, ${foreground}px слой адаптивной иконки`);
-  }
+  await writeAndroidIcons(androidResDir);
+  await writeAndroidIcons(devResDir, DEV_HUE);
 }
 
 await main();

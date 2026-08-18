@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "android:sync": "npm run build && cap sync android",
+    "android:sync": "npm run build && cap sync android && node ../scripts/make-dev-capacitor-config.mjs",
     "android:open": "cap open android",
     "android:dev": "cap run android",
-    "android:release": "npm run android:sync && android\\gradlew.bat -p android assembleRelease"
+    "android:release": "npm run android:sync && android\\gradlew.bat -p android assembleProdRelease",
+    "android:release:dev": "npm run android:sync && android\\gradlew.bat -p android assembleDevRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

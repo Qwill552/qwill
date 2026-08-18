@@ -1,0 +1,12 @@
+{
+  "appId": "com.qwill.app.dev",
+  "appName": "Qwill Dev",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "url": "https://dev.qwill.mooo.com"
+  }
+}

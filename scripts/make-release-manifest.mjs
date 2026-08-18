@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const apkSource = path.join(repoRoot, 'client/android/app/build/outputs/apk/release/app-release.apk');
+const apkSource = path.join(repoRoot, 'client/android/app/build/outputs/apk/prod/release/app-prod-release.apk');
 const versionFile = path.join(repoRoot, 'client/android/version.properties');
 const outDir = path.join(repoRoot, 'app-releases');
 
