@@ -18,7 +18,7 @@
   padding: 5px 13px;
   border-radius: 15px;
   background: rgba(var(--pulse-dock), 0.5);
-  backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
   box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
   color: rgba(var(--pulse-ink), 0.72);
   font-size: 12px;

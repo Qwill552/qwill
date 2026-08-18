@@ -15,7 +15,7 @@
   border: 1px solid var(--pulse-capbd);
   border-radius: var(--radius-md);
   background: var(--pulse-cap);
-  backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
   box-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.16);
   animation: bannerIn var(--dur-menu) var(--ease-screen);
 }

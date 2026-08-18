@@ -37,7 +37,7 @@
   border: 1px solid rgba(var(--pulse-glass), 0.09);
   border-radius: var(--radius-pill);
   background: rgba(var(--pulse-dock), 0.5);
-  backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
   color: rgba(var(--pulse-ink), 0.72);
   font: inherit;
   font-size: 12px;
@@ -72,7 +72,7 @@
   border: 1px solid rgba(var(--pulse-glass), 0.09);
   border-radius: 20px 20px 20px 7px;
   background: rgba(var(--pulse-glass), 0.08);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(8px);
 }
 
 .dot {
@@ -132,7 +132,7 @@
   border: 1px solid rgba(var(--pulse-glass), 0.1);
   border-radius: var(--radius-pill);
   background: rgba(var(--pulse-glass), 0.08);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(10px);
   color: rgb(var(--pulse-ink));
   cursor: pointer;
   transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
