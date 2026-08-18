@@ -123,7 +123,7 @@
    Своей вёрстки в референсе нет — держит рецепт стекла остального чата. */
 .jump {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   right: calc(var(--safe-right) + 14px);
   bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
   display: grid;
