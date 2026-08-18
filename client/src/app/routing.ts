@@ -41,13 +41,6 @@ export function parentPathOf(pathname: string): string | null {
   return staticParent(path);
 }
 
-/** Лента одного чата — единственный экран, где полоса свайпа «назад» у левого края
- *  (ScreenStack) отдаёт разбор жеста строке сообщения вместо того, чтобы владеть им
- *  безусловно (ux-ui.md, журнал, этап 6: арбитраж по направлению первого движения). */
-export function isChatFeedPath(pathname: string): boolean {
-  return matchPath('/chats/:chatId', normalize(pathname)) !== null;
-}
-
 /** Первый сегмент пути — вкладка, которой принадлежит экран. */
 export function tabOf(pathname: string): string {
   return normalize(pathname).split('/')[1] ?? '';

@@ -10,10 +10,12 @@
   height: 100%;
   flex-direction: column;
   gap: 4px;
+  overflow-x: clip;
   overflow-y: auto;
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
     calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 40px);
   overscroll-behavior: contain;
+  touch-action: pan-y;
   transition: padding-bottom var(--dur-menu) var(--ease-screen);
   /* Строка — user-select:none (жест long-press не должен запускать выделение всей строки
      браузером), текст пузыря — user-select:text (ux-ui/gestures.md, «Выделение текста

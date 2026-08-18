@@ -3,14 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import {
-  beginExternalEdgeSwipe,
-  cancelExternalEdgeSwipe,
-  EDGE_SWIPE_LOCK_PX,
-  EDGE_SWIPE_ZONE_PX,
-  endExternalEdgeSwipe,
-  updateExternalEdgeSwipe,
-} from '../../app/edgeSwipeBridge';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { useReactionPrefsStore } from '../../stores/reactionPrefsStore';
 import { Avatar } from '../../ui/Avatar';
@@ -131,11 +123,6 @@ export function MessageRow({
    *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
    *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
   const onBubbleActionRef = useRef(false);
-  /** Арбитраж свайпа «назад» у левого края (ux-ui.md, журнал, этап 6): пока касание не
-   *  сдвинулось, оно ничем не отличается от обычного — long-press работает и у самого края.
-   *  `candidate` — трогали в полосе EDGE_SWIPE_ZONE_PX, решение ещё не принято; `active` —
-   *  жест уже отдан навигации назад, строка больше не участвует в нём. */
-  const edgeRef = useRef({ candidate: false, active: false, startX: 0, startY: 0, startTime: 0 });
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
@@ -191,53 +178,12 @@ export function MessageRow({
     onBubbleActionRef.current = (event.target as HTMLElement).closest('button') !== null;
     if (onBubbleActionRef.current) return;
 
-    // Кандидат на свайп «назад» — только если можем вообще что-то отдать (не в мультивыборе,
-    // не поверх открытого меню: тогда касание в этой полосе разбирает только сама строка,
-    // как и остальные жесты в этих режимах) и палец стартовал у самого края экрана.
-    edgeRef.current = {
-      candidate: !selectionMode && menuAnchor === null && event.clientX <= EDGE_SWIPE_ZONE_PX,
-      active: false,
-      startX: event.clientX,
-      startY: event.clientY,
-      startTime: event.timeStamp,
-    };
     longPress.onPointerDown(event);
     swipe.onPointerDown(event);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
     if (onBubbleActionRef.current) return;
-    const edge = edgeRef.current;
-
-    if (edge.active) {
-      updateExternalEdgeSwipe({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
-      return;
-    }
-
-    if (edge.candidate) {
-      const dx = event.clientX - edge.startX;
-      const dy = event.clientY - edge.startY;
-      if (Math.abs(dy) > EDGE_SWIPE_LOCK_PX && Math.abs(dy) > Math.abs(dx)) {
-        // Вертикаль раньше горизонтали — это скролл, свайпу назад тут делать нечего
-        // (симметрично тому же правилу у свайпа-ответа, gestures.md, «Общие правила», п.2).
-        edge.candidate = false;
-      } else if (dx > EDGE_SWIPE_LOCK_PX) {
-        // Потянул вправо у самого края — жест целиком уходит навигации: гасим всё, что
-        // строка успела начать за это же касание, и передаём его ScreenStack с координат
-        // настоящего pointerdown (edge.startX/Y/Time), а не текущей точки — иначе экран
-        // «доезжал» бы до пальца вместо того, чтобы уже стоять там, где надо.
-        edge.candidate = false;
-        edge.active = true;
-        suppressTapRef.current = true;
-        longPress.onPointerCancel();
-        tap.cancel();
-        swipe.onPointerCancel();
-        beginExternalEdgeSwipe({ x: edge.startX, y: edge.startY, timeStamp: edge.startTime });
-        updateExternalEdgeSwipe({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
-        return;
-      }
-    }
-
     longPress.onPointerMove(event);
     swipe.onPointerMove(event);
   }
@@ -245,12 +191,6 @@ export function MessageRow({
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>): void {
     if (onBubbleActionRef.current) {
       onBubbleActionRef.current = false;
-      return;
-    }
-
-    if (edgeRef.current.active) {
-      edgeRef.current.active = false;
-      endExternalEdgeSwipe();
       return;
     }
 
@@ -272,10 +212,6 @@ export function MessageRow({
       return;
     }
 
-    if (edgeRef.current.active) {
-      edgeRef.current.active = false;
-      cancelExternalEdgeSwipe();
-    }
     longPress.onPointerCancel();
     swipe.onPointerCancel();
     tap.cancel();

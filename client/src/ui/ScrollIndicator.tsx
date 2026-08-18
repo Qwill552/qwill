@@ -175,6 +175,7 @@ export function ScrollIndicator({ target, mode = 'full', boundsTop, boundsBottom
       <div
         className={`${styles.thumb} ${visible ? styles.visible : ''} ${interactive ? styles.interactive : ''}`}
         style={{ height: thumbHeight, right: thumbRight, transform: `translateY(${offset}px)` }}
+        data-no-back-swipe
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

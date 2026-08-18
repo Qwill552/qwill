@@ -12,13 +12,20 @@ import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StubScreen } from '../pages/StubScreen';
 import { hasOpenOverlay } from './useBackHandler';
-import { registerEdgeSwipeHandlers, type EdgeSwipePoint } from './edgeSwipeBridge';
-import { isChatFeedPath, parentPathOf, transitionKind, type TransitionKind } from './routing';
+import { parentPathOf, transitionKind, type TransitionKind } from './routing';
 import { rememberTabPath } from './tabNav';
 import styles from './ScreenStack.module.css';
 
-/** Зона у левого края, откуда стартует свайп «назад» — буквально из bindSwipe в референсе. */
-const EDGE_ZONE = 32;
+interface SwipePoint {
+  x: number;
+  y: number;
+  timeStamp: number;
+}
+
+const MOUSE_EDGE_ZONE = 32;
+const BACK_SWIPE_LOCK_PX = 10;
+const BACK_SWIPE_DOMINANCE = 2;
+const DRAG_WATCHDOG_MS = 4000;
 /** Порог срабатывания: доля ширины экрана — буквально 0.4 из bindSwipe. */
 const POP_THRESHOLD = 0.4;
 /** Скорость броска, px/мс — референсовые 5.5 px/16мс-кадр, переведённые в px/мс. */
@@ -145,7 +152,13 @@ export function ScreenStack() {
     width: number;
     parentPath: string;
     crossed: boolean;
-    vertical: boolean;
+  } | null>(null);
+  const backSwipeRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startTime: number;
+    taken: boolean;
   } | null>(null);
   const pendingCommit = useRef<string | null>(null);
   /** Дозор на случай, если `transitionend` не придёт вовсе (см. armFallback ниже). */
@@ -186,6 +199,19 @@ export function ScreenStack() {
       if (fallbackToken.current !== token) return;
       finishAnim();
     }, durationMs + 80);
+  }
+
+  function armDragWatchdog(): void {
+    const token = ++fallbackToken.current;
+    clearFallback();
+    fallbackTimer.current = setTimeout(() => {
+      if (fallbackToken.current !== token) return;
+      if (backSwipeRef.current?.taken) {
+        armDragWatchdog();
+        return;
+      }
+      finishAnim();
+    }, DRAG_WATCHDOG_MS);
   }
 
   function finishAnim(): void {
@@ -262,17 +288,14 @@ export function ScreenStack() {
     finishAnim();
   }
 
-  // beginDrag/updateDrag/endDrag/cancelDrag берут только координаты и метку времени, а не
-  // React PointerEvent — их зовут и родные обработчики .edge (свайп на любом другом экране),
-  // и MessageRow через edgeSwipeBridge (свайп в ленте чата, где решение «это точно свайп
-  // назад, а не long-press по сообщению» принимает сама строка, см. её комментарий у
-  // handlePointerMove). beginDrag получает координаты НАСТОЯЩЕГО pointerdown, а не момента
-  // передачи — иначе экран «доезжал» бы до пальца вместо того, чтобы уже стоять там, где надо.
-  function beginDrag(point: EdgeSwipePoint): void {
-    if (anim || hasOpenOverlay()) return;
+  function beginDrag(point: SwipePoint): boolean {
+    if (hasOpenOverlay()) return false;
+    if (anim && (anim.mode !== 'drag' || dragRef.current?.active)) return false;
     const parent = parentPathOf(displayLocation.pathname);
-    if (!parent) return;
+    if (!parent) return false;
 
+    cancelFallback();
+    pendingCommit.current = null;
     const width = stackRef.current?.offsetWidth || window.innerWidth;
     dragRef.current = {
       active: true,
@@ -285,7 +308,6 @@ export function ScreenStack() {
       width,
       parentPath: parent,
       crossed: false,
-      vertical: false,
     };
     setAnim({
       kind: 'pop',
@@ -297,21 +319,22 @@ export function ScreenStack() {
       durationMs: SETTLE_MS,
       easing: SETTLE_EASE,
     });
+    armDragWatchdog();
+    return true;
   }
 
-  function updateDrag(point: EdgeSwipePoint): void {
+  function abandonStuckDrag(): void {
+    if (!anim || anim.mode !== 'drag') return;
+    pendingCommit.current = null;
+    cancelFallback();
+    setAnim(null);
+  }
+
+  function updateDrag(point: SwipePoint): void {
     const d = dragRef.current;
     if (!d?.active) return;
 
     const dx = point.x - d.startX;
-    const dy = point.y - d.startY;
-    if (!d.vertical && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
-      // Ушли по вертикали раньше горизонтали — это скролл, жест отменяется (gestures.md, правило 2).
-      d.active = false;
-      setAnim(null);
-      return;
-    }
-
     const elapsed = point.timeStamp - d.lastTime;
     if (elapsed > 0) d.velocity = (point.x - d.lastX) / elapsed;
     d.lastX = point.x;
@@ -328,7 +351,10 @@ export function ScreenStack() {
 
   function endDrag(): void {
     const d = dragRef.current;
-    if (!d?.active) return;
+    if (!d?.active) {
+      abandonStuckDrag();
+      return;
+    }
     d.active = false;
 
     // Итог решает не то, докуда экран КОГДА-ЛИБО доехал за время жеста, а куда он реально
@@ -367,59 +393,92 @@ export function ScreenStack() {
     }
   }
 
-  /** Жест сорвался без внятного отпускания (например, MessageRow потеряла указатель) —
-   *  просто гасим драг без commit/settle-анимации, экран остаётся на месте. */
   function cancelDrag(): void {
-    if (dragRef.current) dragRef.current.active = false;
-    setAnim(null);
-  }
-
-  // Родные обработчики .edge — только на экранах, где эта полоса физически владеет
-  // касанием целиком (везде, кроме ленты чата, см. рендер ниже и isChatFeedPath).
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>): void {
-    if (event.clientX > EDGE_ZONE) return;
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Указатель не «активен» с точки зрения браузера — жест всё равно продолжит
-      // работать по обычным pointermove/pointerup, просто без захвата вне зоны.
+    const d = dragRef.current;
+    if (!d?.active) {
+      abandonStuckDrag();
+      return;
     }
-    beginDrag({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
+    d.active = false;
+    pendingCommit.current = null;
+    setAnim((a) => (a && a.mode === 'drag' ? { ...a, progress: 0, transition: true, durationMs: SETTLE_MS, easing: SETTLE_EASE } : a));
+    armFallback(SETTLE_MS);
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>): void {
-    updateDrag({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
+  const liveDrag = useRef({ begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag });
+  liveDrag.current = { begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag };
+
+  useEffect(() => {
+    function handleMove(event: globalThis.PointerEvent): void {
+      const swipe = backSwipeRef.current;
+      if (!swipe || event.pointerId !== swipe.pointerId) return;
+
+      if (swipe.taken) {
+        liveDrag.current.update({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
+        return;
+      }
+
+      const dx = event.clientX - swipe.startX;
+      const dy = event.clientY - swipe.startY;
+      if (dx > BACK_SWIPE_LOCK_PX && dx > BACK_SWIPE_DOMINANCE * Math.abs(dy)) {
+        if (!liveDrag.current.begin({ x: swipe.startX, y: swipe.startY, timeStamp: swipe.startTime })) {
+          backSwipeRef.current = null;
+          return;
+        }
+        swipe.taken = true;
+        liveDrag.current.update({ x: event.clientX, y: event.clientY, timeStamp: event.timeStamp });
+        return;
+      }
+      if (Math.abs(dy) > BACK_SWIPE_LOCK_PX || dx < -BACK_SWIPE_LOCK_PX) backSwipeRef.current = null;
+    }
+
+    function handleUp(event: globalThis.PointerEvent): void {
+      const swipe = backSwipeRef.current;
+      if (!swipe || event.pointerId !== swipe.pointerId) return;
+      backSwipeRef.current = null;
+      if (swipe.taken) liveDrag.current.end();
+    }
+
+    function handleCancel(event: globalThis.PointerEvent): void {
+      const swipe = backSwipeRef.current;
+      if (!swipe || event.pointerId !== swipe.pointerId) return;
+      backSwipeRef.current = null;
+      if (swipe.taken) liveDrag.current.cancel();
+    }
+
+    window.addEventListener('pointermove', handleMove, { passive: true });
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleCancel);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleCancel);
+    };
+  }, []);
+
+  function handleStackPointerDown(event: PointerEvent<HTMLDivElement>): void {
+    if (backSwipeRef.current?.taken) return;
+    backSwipeRef.current = null;
+    if (!event.isPrimary) return;
+    if (event.pointerType === 'mouse' && (event.button !== 0 || event.clientX > MOUSE_EDGE_ZONE)) return;
+    if ((event.target as HTMLElement | null)?.closest('[data-no-back-swipe], input[type="range"]')) return;
+    if (hasOpenOverlay()) return;
+    if (anim && (anim.mode !== 'drag' || dragRef.current?.active)) return;
+    if (!parentPathOf(displayLocation.pathname)) return;
+
+    backSwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startTime: event.timeStamp,
+      taken: false,
+    };
   }
-
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>): void {
-    if (dragRef.current?.active) event.currentTarget.releasePointerCapture(event.pointerId);
-    endDrag();
-  }
-
-  // Единственная точка, через которую MessageRow передаёт уже начатый жест (ux-ui.md,
-  // журнал, этап 6). Регистрируется один раз при монтировании — сам ScreenStack не
-  // размонтируется, а beginDrag/updateDrag/endDrag/cancelDrag меняются каждый рендер
-  // (замыкают текущие anim/displayLocation), поэтому передаём в реестр не их самих, а
-  // тонкие обёртки поверх ref'а с последними версиями — тот же приём, что onCloseRef
-  // в useBackHandler.ts, чтобы регистрация не гонялась за каждым рендером.
-  const liveDragHandlers = useRef({ begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag });
-  liveDragHandlers.current = { begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag };
-
-  useEffect(
-    () =>
-      registerEdgeSwipeHandlers({
-        begin: (point) => liveDragHandlers.current.begin(point),
-        update: (point) => liveDragHandlers.current.update(point),
-        end: () => liveDragHandlers.current.end(),
-        cancel: () => liveDragHandlers.current.cancel(),
-      }),
-    [],
-  );
 
   const toLocation = anim?.to ?? displayLocation;
 
   return (
-    <div className={styles.stack} ref={stackRef}>
+    <div className={styles.stack} ref={stackRef} onPointerDown={handleStackPointerDown}>
       {anim && (
         <div key={anim.from.pathname} className={styles.layer} style={layerStyle(anim, 'from')}>
           <RouteSwitch location={anim.from} />
@@ -437,20 +496,6 @@ export function ScreenStack() {
         <RouteSwitch location={toLocation} />
         {anim && <div className={styles.scrim} style={scrimStyle(anim, 'to')} />}
       </div>
-
-      <div
-        key="edge"
-        className={styles.edge}
-        // Лента чата разбирает этот же жест сама (MessageRow, через edgeSwipeBridge) —
-        // здесь полоса не должна физически перехватывать касание, иначе long-press по
-        // сообщению у самого края никогда бы не получал pointerdown вовсе (ux-ui.md,
-        // журнал, этап 6). На остальных экранах конфликтовать не с чем — полоса как была.
-        style={isChatFeedPath(toLocation.pathname) ? { pointerEvents: 'none' } : undefined}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      />
     </div>
   );
 }

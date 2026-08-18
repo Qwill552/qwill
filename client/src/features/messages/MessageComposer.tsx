@@ -323,7 +323,7 @@ export function MessageComposer({
       {context && <ComposerContextBar context={context} onCancel={handleCancelContext} />}
       {error && <p className={styles.error}>{error}</p>}
 
-      <form className={styles.composer} onSubmit={handleSubmit}>
+      <form className={styles.composer} data-no-back-swipe onSubmit={handleSubmit}>
         {recording ? (
           <VoiceRecorder
             ref={recorderRef}
