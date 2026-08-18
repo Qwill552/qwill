@@ -219,8 +219,8 @@
   --chrome-bar-shadow: none;
   --chrome-divider: transparent;
 
-  --chrome-bg: color-mix(in srgb, var(--surface-2) 64%, transparent);
-  --chrome-blur: blur(30px) saturate(190%);
+  --chrome-bg: color-mix(in srgb, var(--surface-2) 56%, transparent);
+  --chrome-blur: blur(24px) saturate(190%);
   --chrome-border: color-mix(in srgb, var(--lift) 9%, transparent);
   --chrome-shadow: var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--lift) 14%, transparent);
 
@@ -230,13 +230,13 @@
   --card-border: color-mix(in srgb, var(--lift) 5%, transparent);
   --card-shadow: var(--shadow-sm);
 
-  --sheet-bg: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  --sheet-blur: blur(32px) saturate(180%);
+  --sheet-bg: color-mix(in srgb, var(--surface-2) 74%, transparent);
+  --sheet-blur: blur(26px) saturate(180%);
   --sheet-border: var(--chrome-border);
   --sheet-shadow: var(--shadow-lg);
 
-  --menu-bg: color-mix(in srgb, var(--surface-2) 78%, transparent);
-  --menu-blur: blur(28px) saturate(180%);
+  --menu-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  --menu-blur: blur(22px) saturate(180%);
   --menu-border: var(--chrome-border);
   --menu-shadow: var(--shadow-lg);
 
@@ -248,7 +248,7 @@
 :root[data-theme='light'],
 [data-theme='light'] {
   --chrome-border: color-mix(in srgb, var(--border) 85%, transparent);
-  --chrome-bg: color-mix(in srgb, var(--surface) 70%, transparent);
+  --chrome-bg: color-mix(in srgb, var(--surface) 62%, transparent);
   --chrome-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--lift) 70%, transparent);
   --card-border: var(--border);
 }

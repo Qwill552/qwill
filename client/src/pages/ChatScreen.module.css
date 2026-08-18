@@ -74,23 +74,23 @@
 
 .headerFadeLayer:nth-child(1) {
   height: 100%;
-  background: linear-gradient(180deg, rgba(var(--pulse-dock), 0.58), rgba(var(--pulse-dock), 0.3));
-  backdrop-filter: blur(22px) saturate(170%);
+  background: linear-gradient(180deg, rgba(var(--pulse-dock), 0.48), rgba(var(--pulse-dock), 0.22));
+  backdrop-filter: blur(18px) saturate(170%);
 }
 
 .headerFadeLayer:nth-child(2) {
   height: 78%;
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(12px);
 }
 
 .headerFadeLayer:nth-child(3) {
   height: 55%;
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(18px);
 }
 
 .headerFadeLayer:nth-child(4) {
   height: 30%;
-  backdrop-filter: blur(34px);
+  backdrop-filter: blur(28px);
 }
 
 /* Размытая подложка композера — то же лечение, зеркально: капсула поля ввода снизу,
@@ -124,22 +124,22 @@
 
 .composerFadeLayer:nth-child(1) {
   height: 100%;
-  backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
 }
 
 .composerFadeLayer:nth-child(2) {
   height: 78%;
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(18px);
 }
 
 .composerFadeLayer:nth-child(3) {
   height: 55%;
-  backdrop-filter: blur(28px);
+  backdrop-filter: blur(22px);
 }
 
 .composerFadeLayer:nth-child(4) {
   height: 28%;
-  backdrop-filter: blur(36px);
+  backdrop-filter: blur(28px);
 }
 
 /* Обёртка, которую меряет ResizeObserver: её высота уходит в --composer-h и оттуда
