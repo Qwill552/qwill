@@ -1,0 +1,47 @@
+name: Выпустить в прод
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Что выпускаем: ветка или коммит. По умолчанию main"
+        required: false
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Определить коммит
+        id: resolve
+        run: |
+          SHA=$(git rev-parse "origin/${{ inputs.ref }}" 2>/dev/null || git rev-parse "${{ inputs.ref }}")
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Выпускается $SHA"
+
+      - name: Что уедет людям
+        run: git log --oneline "origin/prod..$SHA" || echo "ветки prod ещё нет"
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+
+      # force, а не fast-forward: та же кнопка с прошлым sha — это откат.
+      - name: Перевести ветку prod
+        run: git push --force origin "${{ steps.resolve.outputs.sha }}:refs/heads/prod"
+
+  deploy:
+    needs: promote
+    uses: ./.github/workflows/deploy.yml
+    with:
+      channel: prod
+      ref: ${{ needs.promote.outputs.sha }}
+    secrets: inherit
