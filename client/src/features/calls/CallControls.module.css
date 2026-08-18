@@ -61,7 +61,6 @@
   border-color: var(--chrome-border);
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
-  -webkit-backdrop-filter: var(--chrome-blur);
   box-shadow: var(--chrome-shadow);
 }
 

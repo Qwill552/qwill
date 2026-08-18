@@ -13,7 +13,6 @@
   border-radius: 50%;
   background: rgba(var(--pulse-glass), 0.08);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   color: rgb(var(--pulse-ink));
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
@@ -48,7 +47,6 @@
   border-color: var(--chrome-border);
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
-  -webkit-backdrop-filter: var(--chrome-blur);
   box-shadow: var(--chrome-shadow);
   color: var(--text-primary);
 }

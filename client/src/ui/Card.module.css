@@ -19,7 +19,6 @@
   border-radius: 22px;
   background: rgba(var(--pulse-glass), 0.055);
   backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
 }
 
 .row {

@@ -20,7 +20,6 @@
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: var(--sheet-bg);
   backdrop-filter: var(--sheet-blur);
-  -webkit-backdrop-filter: var(--sheet-blur);
   box-shadow: var(--sheet-shadow);
   animation: rise var(--dur-menu) var(--ease-screen);
 }

@@ -9,7 +9,6 @@
   z-index: 300;
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
   animation: scrimIn var(--dur-menu) var(--ease-screen);
 }
 
@@ -97,7 +96,6 @@
   border-radius: 18px;
   background: var(--menu-bg);
   backdrop-filter: var(--menu-blur);
-  -webkit-backdrop-filter: var(--menu-blur);
   box-shadow: var(--menu-shadow);
 }
 

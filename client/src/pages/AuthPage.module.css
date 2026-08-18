@@ -20,7 +20,6 @@
      Значения — в --auth-card-* (tokens.css), включая фолбэк без backdrop-filter. */
   background: var(--auth-card-bg);
   backdrop-filter: var(--auth-card-blur);
-  -webkit-backdrop-filter: var(--auth-card-blur);
   border: 1px solid var(--auth-card-border);
   border-top-color: var(--auth-card-border-strong);
   border-left-color: var(--auth-card-border-strong);

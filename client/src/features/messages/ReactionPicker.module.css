@@ -7,7 +7,6 @@
   border-radius: var(--radius-pill);
   background: var(--menu-bg);
   backdrop-filter: var(--menu-blur);
-  -webkit-backdrop-filter: var(--menu-blur);
   box-shadow: var(--menu-shadow);
 }
 

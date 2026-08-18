@@ -187,7 +187,6 @@
   padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
 }
 
 .blockingCard {

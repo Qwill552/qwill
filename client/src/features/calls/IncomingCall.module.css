@@ -8,7 +8,6 @@
   padding: var(--space-4);
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
   animation: fade var(--dur-menu) var(--ease-screen);
 }
 

@@ -9,7 +9,6 @@
   /* В режиме Стекло фон размывается, в Строгом — затемняется. Решает токен, не компонент. */
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
   animation: fadeIn var(--transition);
 }
 
@@ -22,7 +21,6 @@
   border-radius: var(--radius-card);
   background: var(--sheet-bg);
   backdrop-filter: var(--sheet-blur);
-  -webkit-backdrop-filter: var(--sheet-blur);
   box-shadow: var(--sheet-shadow);
   animation: popIn var(--transition);
 }
@@ -30,7 +28,6 @@
 .opaque {
   background: var(--card-bg);
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .header {
