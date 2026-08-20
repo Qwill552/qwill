@@ -1233,7 +1233,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   applyChatDetail(chat: ChatDto) {
     set((state) => ({
-      chats: upsertChat(state.chats, chat),
+      chats: state.chats.some((c) => c.id === chat.id)
+        ? state.chats.map((c) => (c.id === chat.id ? chat : c))
+        : [chat, ...state.chats],
       readCursorsByChat: { ...state.readCursorsByChat, [chat.id]: chat.readCursors },
       presenceByUser: seedPresence(state.presenceByUser, chat.members),
       pinnedByChat: { ...state.pinnedByChat, [chat.id]: chat.pinnedMessage },

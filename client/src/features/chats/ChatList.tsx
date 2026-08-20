@@ -55,10 +55,15 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
   }));
 
   const visible = useMemo(() => {
-    if (filter === 'unread') return chats.filter((c) => c.unreadCount > 0);
-    if (filter === 'private') return chats.filter((c) => c.type === 'PRIVATE');
-    if (filter === 'groups') return chats.filter((c) => c.type === 'GROUP');
-    return chats;
+    const filtered =
+      filter === 'unread'
+        ? chats.filter((c) => c.unreadCount > 0)
+        : filter === 'private'
+          ? chats.filter((c) => c.type === 'PRIVATE')
+          : filter === 'groups'
+            ? chats.filter((c) => c.type === 'GROUP')
+            : chats;
+    return [...filtered].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
   }, [chats, filter]);
 
   const loading = !chatsLoaded && chats.length === 0;
