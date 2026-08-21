@@ -1,12 +1,16 @@
 import type { MessageDto } from '@messenger/shared';
 
 import { Icon } from '../../ui/Icon';
+import { isVoiceAttachment } from './Attachment';
 import styles from './PinnedBanner.module.css';
 
 function previewText(message: MessageDto): string {
   if (message.deletedAt) return 'Сообщение удалено';
   if (message.content) return message.content;
-  if (message.attachment) return 'Вложение';
+  if (message.attachment) {
+    const isVoice = isVoiceAttachment(message.attachment) || message.attachment.file.mimeType.startsWith('audio/');
+    return isVoice ? 'Голосовое сообщение' : 'Вложение';
+  }
   return '';
 }
 

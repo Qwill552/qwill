@@ -6,6 +6,7 @@ import { callPreviewText, callSymbolIcon, isUnansweredCall } from '../calls/call
 import { OfficialMark } from '../chat/OfficialMark';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../chat/serviceChat';
 import { parseEmoji } from '../emoji/parseEmoji';
+import { isVoiceAttachment } from '../messages/Attachment';
 import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from '../../ui/Avatar';
 import { Badge } from '../../ui/Badge';
@@ -42,16 +43,28 @@ function formatWhen(iso: string): string {
   return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
+function isVoice(chat: ChatListItemDto): boolean {
+  const attachment = chat.lastMessage?.attachment;
+  if (!attachment) return false;
+  return isVoiceAttachment(attachment) || attachment.file.mimeType.startsWith('audio/');
+}
+
 function isImage(chat: ChatListItemDto): boolean {
   return chat.lastMessage?.attachment?.file.mimeType.startsWith('image/') ?? false;
 }
 
-/** Иконка типа вложения перед превью. Голосовые появятся на этапе 7 — тогда сюда добавится mic. */
+function isVideo(chat: ChatListItemDto): boolean {
+  return chat.lastMessage?.attachment?.file.mimeType.startsWith('video/') ?? false;
+}
+
 function attachmentIcon(chat: ChatListItemDto, own: boolean): IconName | null {
   const last = chat.lastMessage;
   if (last && !last.deletedAt && last.call) return callSymbolIcon(last.call, own);
   if (!last?.attachment) return null;
-  return isImage(chat) ? 'camera' : 'attach';
+  if (isVoice(chat)) return 'mic';
+  if (isImage(chat)) return 'camera';
+  if (isVideo(chat)) return 'image';
+  return 'attach';
 }
 
 function previewText(chat: ChatListItemDto, own: boolean): string {
@@ -61,7 +74,12 @@ function previewText(chat: ChatListItemDto, own: boolean): string {
   if (last.call) return callPreviewText(last.call, own);
   if (last.announcement) return `Новое обновление (${last.announcement.versionName})`;
   if (last.content) return last.content;
-  if (last.attachment) return isImage(chat) ? 'Фото' : last.attachment.originalName || 'Файл';
+  if (last.attachment) {
+    if (isVoice(chat)) return 'Голосовое сообщение';
+    if (isImage(chat)) return 'Фото';
+    if (isVideo(chat)) return 'Видео';
+    return last.attachment.originalName || 'Файл';
+  }
   return 'Нет сообщений';
 }
 
