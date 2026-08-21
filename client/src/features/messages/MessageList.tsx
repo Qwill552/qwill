@@ -18,7 +18,7 @@ import styles from './MessageList.module.css';
 /** Сообщения одного автора ближе этого интервала визуально группируются в серию. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 /** Насколько далеко надо уйти вверх, чтобы появилась кнопка «вниз» — в экранах. */
-const JUMP_AFTER_SCREENS = 1.5;
+const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
 
@@ -181,7 +181,8 @@ export function MessageList({
     bumpScrollEpoch();
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
     stuckToBottom.current = distance < STICK_THRESHOLD;
-    setShowJump(distance > el.clientHeight * JUMP_AFTER_SCREENS);
+    if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
+    else if (distance < STICK_THRESHOLD) setShowJump(false);
   }
 
   function handleLoadMore(): void {
