@@ -6,11 +6,19 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE = path.join(repoRoot, 'qwill.png');
+const WEB_SOURCE = path.join(repoRoot, 'qwill.png');
+const ANDROID_SOURCE = path.join(repoRoot, 'qwill-android.png');
+const FAVICON_DARK_SOURCE = path.join(repoRoot, 'qwill-no-background.png');
 
 const WEB_ICONS = [
-  { file: 'icon-192.png', size: 192 },
-  { file: 'icon-512.png', size: 512 },
+  { file: 'icon-192.png', size: 192, source: WEB_SOURCE },
+  { file: 'icon-512.png', size: 512, source: WEB_SOURCE },
+];
+
+const FAVICONS = [
+  { file: 'favicon-light.png', size: 32, source: WEB_SOURCE },
+  { file: 'favicon-dark.png', size: 32, source: FAVICON_DARK_SOURCE },
+  { file: 'apple-touch-icon.png', size: 180, source: WEB_SOURCE },
 ];
 
 const ANDROID_DENSITIES = [
@@ -26,8 +34,8 @@ const androidResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'ma
 const DEV_HUE = 150;
 const devResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'dev', 'res');
 
-function square(size, hue) {
-  const base = sharp(SOURCE).resize(size, size, { fit: 'cover' });
+function square(source, size, hue) {
+  const base = sharp(source).resize(size, size, { fit: 'cover' });
   return (hue ? base.modulate({ hue }) : base).png();
 }
 
@@ -38,12 +46,12 @@ function circleMask(size) {
   );
 }
 
-async function writeSquare(target, size, hue) {
-  await writeFile(target, await square(size, hue).toBuffer());
+async function writeSquare(source, target, size, hue) {
+  await writeFile(target, await square(source, size, hue).toBuffer());
 }
 
-async function writeCircle(target, size, hue) {
-  const base = await square(size, hue).ensureAlpha().toBuffer();
+async function writeCircle(source, target, size, hue) {
+  const base = await square(source, size, hue).ensureAlpha().toBuffer();
   const masked = await sharp(base)
     .composite([{ input: circleMask(size), blend: 'dest-in' }])
     .png()
@@ -56,22 +64,28 @@ async function writeAndroidIcons(resDir, hue) {
     const dir = path.join(resDir, `mipmap-${density}`);
     await mkdir(dir, { recursive: true });
 
-    await writeSquare(path.join(dir, 'ic_launcher.png'), launcher, hue);
-    await writeCircle(path.join(dir, 'ic_launcher_round.png'), launcher, hue);
-    await writeSquare(path.join(dir, 'ic_launcher_foreground.png'), foreground, hue);
+    await writeSquare(ANDROID_SOURCE, path.join(dir, 'ic_launcher.png'), launcher, hue);
+    await writeCircle(ANDROID_SOURCE, path.join(dir, 'ic_launcher_round.png'), launcher, hue);
+    await writeSquare(ANDROID_SOURCE, path.join(dir, 'ic_launcher_foreground.png'), foreground, hue);
     console.log(`${path.basename(path.dirname(resDir))} mipmap-${density} — ${launcher}px значок, ${foreground}px слой адаптивной иконки`);
   }
 }
 
-async function main() {
-  const meta = await sharp(SOURCE).metadata();
+async function assertSquare(source) {
+  const meta = await sharp(source).metadata();
   if (meta.width !== meta.height) {
-    console.error(`${SOURCE}: ожидался квадрат, получено ${meta.width}x${meta.height}`);
+    console.error(`${source}: ожидался квадрат, получено ${meta.width}x${meta.height}`);
     process.exit(1);
   }
+}
 
-  for (const { file, size } of WEB_ICONS) {
-    await writeSquare(path.join(webDir, file), size);
+async function main() {
+  await assertSquare(WEB_SOURCE);
+  await assertSquare(ANDROID_SOURCE);
+  await assertSquare(FAVICON_DARK_SOURCE);
+
+  for (const { file, size, source } of [...WEB_ICONS, ...FAVICONS]) {
+    await writeSquare(source, path.join(webDir, file), size);
     console.log(`client/public/${file} — ${size}x${size}`);
   }
 

@@ -28,7 +28,7 @@ export default defineConfig(() => {
           description: 'Мессенджер — чаты, группы, файлы',
           start_url: '/',
           display: 'standalone',
-          background_color: '#f6f4fb',
+          background_color: '#eef1f6',
           theme_color: '#8c52ff',
           icons: [
             { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
