@@ -51,7 +51,11 @@ export function MessageBubble({ message, own, read, showAuthor, children }: Mess
             {emojiOnly.map((emoji, i) => (
               <Emoji key={i} emoji={emoji} size={48} />
             ))}
-            <span className={styles.pad} style={{ width: own ? 62 : 40 }} aria-hidden="true" />
+            <span
+              className={styles.pad}
+              style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
+              aria-hidden="true"
+            />
           </span>
           <MessageMeta createdAt={message.createdAt} own={own} edited={Boolean(message.editedAt)} status={status} read={read} />
         </span>
@@ -131,7 +135,11 @@ export function MessageBubble({ message, own, read, showAuthor, children }: Mess
               <span className={styles.textRow}>
                 <span className={styles.text} data-selectable="true">
                   {message.content ? parseEmoji(message.content) : null}
-                  <span className={styles.pad} style={{ width: own ? 62 : 40 }} aria-hidden="true" />
+                  <span
+                    className={styles.pad}
+                    style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
+                    aria-hidden="true"
+                  />
                 </span>
                 <MessageMeta
                   createdAt={message.createdAt}

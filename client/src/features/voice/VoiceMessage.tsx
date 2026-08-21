@@ -178,7 +178,7 @@ export function VoiceMessage({ attachment, own, createdAt, edited, status, read 
         </div>
       </div>
 
-      <div className={styles.foot} style={{ paddingRight: own ? 62 : 40 }}>
+      <div className={styles.foot} style={{ paddingRight: `var(--meta-w, ${own ? 62 : 40}px)` }}>
         <span className={styles.duration}>{formatTime(progress > 0 ? progress * durationMs : durationMs)}</span>
         <span className={`${styles.dot} ${unheard ? styles.dotUnheard : ''}`} aria-hidden="true" />
         <button

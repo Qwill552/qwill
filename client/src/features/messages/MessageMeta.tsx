@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import { Icon } from '../../ui/Icon';
 import styles from './MessageMeta.module.css';
 
@@ -18,6 +20,19 @@ function formatTime(iso: string): string {
  *  углу пузыря. Текст резервирует под них место невидимой распоркой (см. .pad в
  *  MessageBubble), а не float/обтеканием. */
 export function MessageMeta({ createdAt, own, edited, status, read }: MessageMetaProps) {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    const observer = new ResizeObserver(() => {
+      parent.style.setProperty('--meta-w', `${el.offsetWidth}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const classes = [
     styles.meta,
     own ? styles.onOut : '',
@@ -26,7 +41,7 @@ export function MessageMeta({ createdAt, own, edited, status, read }: MessageMet
   ].join(' ');
 
   return (
-    <span className={classes}>
+    <span className={classes} ref={ref}>
       {edited && <span className={styles.edited}>изм.</span>}
       {status === 'failed' ? 'не отправлено' : formatTime(createdAt)}
       {own && status === 'sending' && <Icon name="clock" size={13} className={styles.check} />}
