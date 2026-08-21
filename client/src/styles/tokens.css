@@ -240,6 +240,9 @@
   --menu-border: var(--chrome-border);
   --menu-shadow: var(--shadow-lg);
 
+  --menu-scrim-bg: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
+  --menu-scrim-blur: blur(30px);
+
   --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
   --scrim-blur: blur(14px);
 }
@@ -276,6 +279,8 @@
     --sheet-blur: none;
     --menu-bg: var(--surface-2);
     --menu-blur: none;
+    --menu-scrim-bg: color-mix(in srgb, #000 55%, transparent);
+    --menu-scrim-blur: none;
     --scrim-bg: color-mix(in srgb, #000 55%, transparent);
     --scrim-blur: none;
     --auth-card-bg: var(--surface);
