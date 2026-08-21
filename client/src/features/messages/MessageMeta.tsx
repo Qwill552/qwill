@@ -12,6 +12,8 @@ interface MessageMetaProps {
   read: boolean;
 }
 
+const GAP_BEFORE_META = 12;
+
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
@@ -27,7 +29,7 @@ export function MessageMeta({ createdAt, own, edited, status, read }: MessageMet
     const parent = el?.parentElement;
     if (!el || !parent) return;
     const observer = new ResizeObserver(() => {
-      parent.style.setProperty('--meta-w', `${el.offsetWidth}px`);
+      parent.style.setProperty('--meta-w', `${el.offsetWidth + GAP_BEFORE_META}px`);
     });
     observer.observe(el);
     return () => observer.disconnect();
