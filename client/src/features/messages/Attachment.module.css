@@ -1,11 +1,11 @@
 .image,
 .video {
   display: block;
-  max-width: 280px;
-  max-height: 320px;
+  max-width: min(100%, calc(60dvh * var(--media-ratio, 100)));
+  max-height: 60dvh;
   border-radius: calc(var(--radius-bubble) - 4px);
   background: var(--bg);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .file {

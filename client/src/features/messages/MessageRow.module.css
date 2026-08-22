@@ -182,3 +182,7 @@
   max-width: var(--bubble-max-w);
   flex-direction: column;
 }
+
+.bubbleColMedia {
+  max-width: min(78vw, var(--bubble-media-max-w));
+}

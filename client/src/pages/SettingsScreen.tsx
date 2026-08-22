@@ -8,6 +8,7 @@ import { uploadFile } from '../api/files';
 import { isApkUpdateSupported, selectUpdateAvailable, useAppUpdateStore } from '../app/appUpdate';
 import { countPendingOutbox } from '../cache/outbox';
 import { formatBytes } from '../features/messages/Attachment';
+import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
@@ -54,6 +55,7 @@ export function SettingsScreen() {
    *  профиля (не доезжая до @username), по прямой просьбе пользователя, см. ux-ui.md. */
   const nameRef = useRef<HTMLSpanElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingOutboxCount, setPendingOutboxCount] = useState<number | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -63,15 +65,20 @@ export function SettingsScreen() {
   const currentVersionName = useAppUpdateStore((s) => s.currentVersionName);
   const openUpdateModal = useAppUpdateStore((s) => s.openModal);
 
-  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setError(null);
+    setCropSource(file);
+  }
 
+  async function handleAvatarCropped(cropped: File): Promise<void> {
+    setCropSource(null);
     setAvatarUploading(true);
     setError(null);
     try {
-      const uploaded = await uploadFile(file, 'avatar');
+      const uploaded = await uploadFile(cropped, 'avatar');
       updateUser(await setAvatarRequest(uploaded.id, uploaded.sha256));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить аватар');
@@ -123,7 +130,7 @@ export function SettingsScreen() {
             className={styles.hiddenInput}
             type="file"
             accept={AVATAR_MIME_TYPES.join(',')}
-            onChange={(e) => void handleAvatarChange(e)}
+            onChange={handleAvatarChange}
           />
           <span ref={nameRef} className={styles.name}>{user?.displayName}</span>
           <span className={styles.username}>@{user?.username}</span>
@@ -264,6 +271,14 @@ export function SettingsScreen() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {cropSource && (
+        <AvatarCropSheet
+          file={cropSource}
+          onClose={() => setCropSource(null)}
+          onCropped={(cropped) => void handleAvatarCropped(cropped)}
+        />
       )}
     </div>
   );

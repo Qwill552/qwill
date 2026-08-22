@@ -15,8 +15,7 @@ import { ScrollIndicator } from '../ui/ScrollIndicator';
 import styles from './ChatInfoScreen.module.css';
 
 function MediaThumb({ attachment }: { attachment: AttachmentDto }) {
-  const thumbId = attachment.thumbnail?.id ?? attachment.file.id;
-  const src = useFileSrc(thumbId, 'thumb');
+  const src = useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, attachment.thumbnail ? 'thumb' : 'full');
   return <img className={styles.mediaThumb} src={src} alt={attachment.originalName} loading="lazy" />;
 }
 

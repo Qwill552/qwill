@@ -1,4 +1,5 @@
 import type { AttachmentDto } from '@messenger/shared';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import type { LocalAttachmentState } from '../../stores/chatStore';
 import { useFileSrc } from '../../api/useFileSrc';
@@ -21,36 +22,94 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+const ORIGINAL_PRELOAD_MARGIN = '300px';
+
+function useReachedViewport(ref: RefObject<Element | null>): boolean {
+  const [reached, setReached] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || reached) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setReached(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setReached(true);
+      },
+      { rootMargin: ORIGINAL_PRELOAD_MARGIN },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ref, reached]);
+
+  return reached;
+}
+
+function useLoadedSrc(src: string | undefined): string | undefined {
+  const [loaded, setLoaded] = useState<string>();
+
+  useEffect(() => {
+    if (!src) {
+      setLoaded(undefined);
+      return;
+    }
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (!cancelled) setLoaded(src);
+    };
+    probe.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  return loaded;
+}
+
+function mediaBoxStyle(attachment: AttachmentDto): React.CSSProperties | undefined {
+  if (!attachment.width || !attachment.height) return undefined;
+  return {
+    aspectRatio: `${attachment.width} / ${attachment.height}`,
+    ['--media-ratio' as string]: attachment.width / attachment.height,
+  };
+}
+
+function ImageAttachment({ attachment }: { attachment: AttachmentDto }) {
+  const ref = useRef<HTMLImageElement>(null);
+  const reached = useReachedViewport(ref);
+
+  const previewSrc = useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, attachment.thumbnail ? 'thumb' : 'full');
+  const originalSrc = useLoadedSrc(useFileSrc(reached ? attachment.file.id : null, 'full'));
+
+  return (
+    <img
+      ref={ref}
+      className={styles.image}
+      src={originalSrc ?? previewSrc}
+      alt={attachment.originalName}
+      decoding="async"
+      style={mediaBoxStyle(attachment)}
+    />
+  );
+}
+
 export function AttachmentView({ attachment }: { attachment: AttachmentDto }) {
   const isImage = attachment.file.mimeType.startsWith('image/');
   const isVideo = attachment.file.mimeType.startsWith('video/');
 
-  const thumbFileId = attachment.thumbnail?.id ?? (isImage ? attachment.file.id : null);
+  const thumbFileId = attachment.thumbnail?.id ?? null;
   const thumbSrc = useFileSrc(thumbFileId, 'thumb');
   const fileSrc = useFileSrc(isImage ? null : attachment.file.id, 'stream');
 
-  const aspectRatio = attachment.width && attachment.height ? `${attachment.width} / ${attachment.height}` : undefined;
-
-  if (isImage) {
-    return (
-      <img
-        className={styles.image}
-        src={thumbSrc}
-        alt={attachment.originalName}
-        style={aspectRatio ? { aspectRatio } : undefined}
-      />
-    );
-  }
+  if (isImage) return <ImageAttachment attachment={attachment} />;
 
   if (isVideo) {
     return (
-      <video
-        className={styles.video}
-        controls
-        poster={thumbSrc}
-        src={fileSrc}
-        style={aspectRatio ? { aspectRatio } : undefined}
-      />
+      <video className={styles.video} controls poster={thumbSrc} src={fileSrc} style={mediaBoxStyle(attachment)} />
     );
   }
 

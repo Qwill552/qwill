@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 
 import { ApiError } from '../../api/client';
 import { uploadFile } from '../../api/files';
+import { AvatarCropSheet } from '../media/AvatarCropSheet';
 import { Avatar } from '../../ui/Avatar';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
@@ -40,6 +41,7 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [titleDraft, setTitleDraft] = useState(chat?.title ?? '');
   const [titleEditing, setTitleEditing] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
@@ -60,15 +62,20 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
   const canManage = myRole === 'OWNER' || myRole === 'ADMIN';
   const isOwner = myRole === 'OWNER';
 
-  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setError(null);
+    setCropSource(file);
+  }
 
+  async function handleAvatarCropped(cropped: File): Promise<void> {
+    setCropSource(null);
     setAvatarUploading(true);
     setError(null);
     try {
-      const uploaded = await uploadFile(file, 'avatar');
+      const uploaded = await uploadFile(cropped, 'avatar');
       await updateGroupInfo(chatId, { avatar: { fileId: uploaded.id, sha256: uploaded.sha256 } });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить аватар');
@@ -193,7 +200,7 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
             className={styles.hiddenInput}
             type="file"
             accept={AVATAR_MIME_TYPES.join(',')}
-            onChange={(e) => void handleAvatarChange(e)}
+            onChange={handleAvatarChange}
           />
         )}
 
@@ -316,6 +323,14 @@ export function GroupPanel({ chatId, onClose }: GroupPanelProps) {
         <Icon name="logout" size={18} />
         {confirmLeave ? 'Точно покинуть группу?' : 'Покинуть группу'}
       </button>
+
+      {cropSource && (
+        <AvatarCropSheet
+          file={cropSource}
+          onClose={() => setCropSource(null)}
+          onCropped={(cropped) => void handleAvatarCropped(cropped)}
+        />
+      )}
     </Modal>
   );
 }

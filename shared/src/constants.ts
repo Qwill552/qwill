@@ -57,7 +57,11 @@ export const DEFAULT_UPLOAD_CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
 export const UPLOAD_OFFSET_HEADER = 'x-upload-offset';
 
 /** Не больше стольки пикселей по длинной стороне у превью, снятого клиентом через canvas (секция 7). */
-export const THUMBNAIL_MAX_DIMENSION = 320;
+export const THUMBNAIL_MAX_DIMENSION = 1280;
+export const THUMBNAIL_JPEG_QUALITY = 0.85;
+
+export const AVATAR_MAX_DIMENSION = 512;
+export const AVATAR_JPEG_QUALITY = 0.9;
 
 /** Дефолты быстрой панели реакций и двойного тапа (этап 8, ux-ui/08-emoji.md). Реакция
  *  сама по себе больше не ограничена этим набором — любой эмодзи из панели годится

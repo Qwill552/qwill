@@ -6,6 +6,7 @@ import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
 import { updateProfileRequest } from '../api/users';
+import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { useAuthStore } from '../stores/authStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -36,20 +37,26 @@ export function ProfileScreen() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [nameDraft, setNameDraft] = useState(user?.displayName ?? '');
   const [nameEditing, setNameEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setError(null);
+    setCropSource(file);
+  }
 
+  async function handleAvatarCropped(cropped: File): Promise<void> {
+    setCropSource(null);
     setAvatarUploading(true);
     setError(null);
     try {
-      const uploaded = await uploadFile(file, 'avatar');
+      const uploaded = await uploadFile(cropped, 'avatar');
       updateUser(await setAvatarRequest(uploaded.id, uploaded.sha256));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить аватар');
@@ -142,7 +149,7 @@ export function ProfileScreen() {
           className={styles.hiddenInput}
           type="file"
           accept={AVATAR_MIME_TYPES.join(',')}
-          onChange={(e) => void handleAvatarChange(e)}
+          onChange={handleAvatarChange}
         />
 
         <div className={styles.actions}>
@@ -168,6 +175,14 @@ export function ProfileScreen() {
           <Card.Row title="15 дек. 1998" subtitle="День рождения" />
         </Card>
       </div>
+
+      {cropSource && (
+        <AvatarCropSheet
+          file={cropSource}
+          onClose={() => setCropSource(null)}
+          onCropped={(cropped) => void handleAvatarCropped(cropped)}
+        />
+      )}
     </div>
   );
 }

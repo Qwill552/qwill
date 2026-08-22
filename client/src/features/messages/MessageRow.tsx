@@ -127,6 +127,11 @@ export function MessageRow({
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
 
+  const hasMediaBubble =
+    /^(image|video)\//.test(message.attachment?.file.mimeType ?? '') ||
+    message.localAttachment?.kind === 'image' ||
+    message.localAttachment?.kind === 'video';
+
   const canAct = message.id > 0 && !message.deletedAt;
 
   const longPress = useLongPress({
@@ -312,7 +317,7 @@ export function MessageRow({
             )}
           </span>
         )}
-        <div className={styles.bubbleCol} ref={bubbleRef}>
+        <div className={`${styles.bubbleCol} ${hasMediaBubble ? styles.bubbleColMedia : ''}`} ref={bubbleRef}>
           {children}
         </div>
       </div>

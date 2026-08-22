@@ -1,5 +1,11 @@
 import type { ErrorCode, FileDto, InitUploadInput, InitUploadResponse, UploadChunkResponse } from '@messenger/shared';
-import { THUMBNAIL_MAX_DIMENSION, UPLOAD_OFFSET_HEADER } from '@messenger/shared';
+import {
+  AVATAR_JPEG_QUALITY,
+  AVATAR_MAX_DIMENSION,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_MAX_DIMENSION,
+  UPLOAD_OFFSET_HEADER,
+} from '@messenger/shared';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
@@ -103,13 +109,50 @@ export async function uploadFile(
   }
 }
 
+export interface SourceRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function fitDimensions(width: number, height: number, maxDimension: number): { width: number; height: number } {
   if (width <= maxDimension && height <= maxDimension) return { width, height };
   const scale = maxDimension / Math.max(width, height);
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
-function canvasToJpegFile(canvas: HTMLCanvasElement, name: string): Promise<File> {
+function drawScaled(source: CanvasImageSource, rect: SourceRect, width: number, height: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas недоступен');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height, 0, 0, width, height);
+  return canvas;
+}
+
+function downscaleInSteps(
+  source: CanvasImageSource,
+  rect: SourceRect,
+  target: { width: number; height: number },
+): HTMLCanvasElement {
+  let current = source;
+  let currentRect = rect;
+
+  while (currentRect.width > target.width * 2 && currentRect.height > target.height * 2) {
+    const width = Math.max(target.width, Math.round(currentRect.width / 2));
+    const height = Math.max(target.height, Math.round(currentRect.height / 2));
+    current = drawScaled(current, currentRect, width, height);
+    currentRect = { x: 0, y: 0, width, height };
+  }
+
+  return drawScaled(current, currentRect, target.width, target.height);
+}
+
+function canvasToJpegFile(canvas: HTMLCanvasElement, name: string, quality: number): Promise<File> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -120,9 +163,15 @@ function canvasToJpegFile(canvas: HTMLCanvasElement, name: string): Promise<File
         resolve(new File([blob], name, { type: 'image/jpeg' }));
       },
       'image/jpeg',
-      0.75,
+      quality,
     );
   });
+}
+
+export function cropImageToAvatarFile(image: HTMLImageElement, rect: SourceRect): Promise<File> {
+  const side = Math.min(AVATAR_MAX_DIMENSION, Math.round(rect.width));
+  const canvas = downscaleInSteps(image, rect, { width: side, height: side });
+  return canvasToJpegFile(canvas, 'avatar.jpg', AVATAR_JPEG_QUALITY);
 }
 
 export interface ThumbnailResult {
@@ -139,18 +188,17 @@ export function generateImageThumbnail(source: File): Promise<ThumbnailResult> {
 
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const { width, height } = fitDimensions(img.naturalWidth, img.naturalHeight, THUMBNAIL_MAX_DIMENSION);
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas недоступен'));
+      const source = { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight };
+      const target = fitDimensions(source.width, source.height, THUMBNAIL_MAX_DIMENSION);
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = downscaleInSteps(img, source, target);
+      } catch (error) {
+        reject(error);
         return;
       }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvasToJpegFile(canvas, 'thumb.jpg')
-        .then((file) => resolve({ file, width: img.naturalWidth, height: img.naturalHeight }))
+      canvasToJpegFile(canvas, 'thumb.jpg', THUMBNAIL_JPEG_QUALITY)
+        .then((file) => resolve({ file, width: source.width, height: source.height }))
         .catch(reject);
     };
     img.onerror = () => {
@@ -185,19 +233,18 @@ export function generateVideoThumbnail(source: File): Promise<VideoThumbnailResu
     };
 
     video.onseeked = () => {
-      const { width, height } = fitDimensions(video.videoWidth, video.videoHeight, THUMBNAIL_MAX_DIMENSION);
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
+      const frame = { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight };
+      const target = fitDimensions(frame.width, frame.height, THUMBNAIL_MAX_DIMENSION);
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = downscaleInSteps(video, frame, target);
+      } catch (error) {
         cleanup();
-        reject(new Error('Canvas недоступен'));
+        reject(error);
         return;
       }
-      ctx.drawImage(video, 0, 0, width, height);
       const duration = Math.round((Number.isFinite(video.duration) ? video.duration : 0) * 1000);
-      canvasToJpegFile(canvas, 'thumb.jpg')
+      canvasToJpegFile(canvas, 'thumb.jpg', THUMBNAIL_JPEG_QUALITY)
         .then((file) => {
           cleanup();
           resolve({ file, width: video.videoWidth, height: video.videoHeight, duration });

@@ -1,0 +1,83 @@
+.stage {
+  display: grid;
+  place-items: center;
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  width: min(280px, 70vw, 40dvh);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+}
+
+.image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  transform-origin: center;
+  user-select: none;
+}
+
+.hint {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  text-align: center;
+}
+
+.error {
+  margin: 0 0 var(--space-3);
+  color: var(--danger);
+  font-size: var(--font-caption);
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.primaryButton,
+.secondaryButton {
+  flex: 1;
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--font-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.primaryButton:active {
+  background: var(--primary-press);
+}
+
+.primaryButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.secondaryButton {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
