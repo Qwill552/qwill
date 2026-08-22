@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { CallOverlay } from '../features/calls/CallOverlay';
+import { MediaViewer } from '../features/media/MediaViewer';
 import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
 import { AmbientBlobs } from './AmbientBlobs';
 import { useAppUpdateStore } from './appUpdate';
@@ -28,6 +29,7 @@ export function AppShell() {
       <TabBar />
       <UpdateBanner />
       <CallOverlay />
+      <MediaViewer />
       {updateModalOpen && <UpdateModal onClose={closeUpdateModal} />}
       <RequiredUpdateModal />
     </div>

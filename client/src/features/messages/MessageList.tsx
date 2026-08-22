@@ -8,6 +8,7 @@ import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
 import { Icon } from '../../ui/Icon';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { isServiceChat } from '../chat/serviceChat';
+import { groupAlbums } from '../media/albums';
 import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
@@ -191,9 +192,16 @@ export function MessageList({
   }
 
   const rows = useMemo(() => {
-    return messages.map((message, index) => {
-      const prev = messages[index - 1];
-      const next = messages[index + 1];
+    const albums = groupAlbums(messages);
+
+    return albums.flatMap((album, index) => {
+      const message = album[0];
+      const last = album[album.length - 1];
+      if (!message || !last) return [];
+
+      const previousAlbum = albums[index - 1];
+      const prev = previousAlbum?.[previousAlbum.length - 1];
+      const next = albums[index + 1]?.[0];
 
       const sameAuthorAsPrev =
         !!prev &&
@@ -207,12 +215,17 @@ export function MessageList({
         isSameDay(next.createdAt, message.createdAt) &&
         new Date(next.createdAt).getTime() - new Date(message.createdAt).getTime() < GROUP_WINDOW_MS;
 
-      return {
-        message,
-        sameAuthorAsPrev,
-        sameAuthorAsNext,
-        showDay: !prev || !isSameDay(prev.createdAt, message.createdAt),
-      };
+      return [
+        {
+          message,
+          lastId: last.id,
+          groupIds: album.map((item) => item.id),
+          attachments: album.length > 1 ? album.flatMap((item) => (item.attachment ? [item.attachment] : [])) : null,
+          sameAuthorAsPrev,
+          sameAuthorAsNext,
+          showDay: !prev || !isSameDay(prev.createdAt, message.createdAt),
+        },
+      ];
     });
   }, [messages]);
 
@@ -245,17 +258,19 @@ export function MessageList({
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
         )}
 
-        {rows.map(({ message, sameAuthorAsPrev, sameAuthorAsNext, showDay }) => {
+        {rows.map(({ message, lastId, groupIds, attachments, sameAuthorAsPrev, sameAuthorAsNext, showDay }) => {
           const own = message.sender?.id === myId;
           const delivered = message.status !== 'sending' && message.status !== 'failed';
-          const read = own && delivered && isReadByOthers(readCursors, myId, message.id);
+          const read = own && delivered && isReadByOthers(readCursors, myId, lastId);
           const isReal = message.id > 0;
           const canAct = isReal && !message.deletedAt;
 
           return (
             <Fragment key={message.clientId ?? message.id}>
               {showDay && <DateDivider iso={message.createdAt} />}
-              {unreadAnchor.current === message.id && <UnreadDivider count={unreadCount} />}
+              {unreadAnchor.current !== null && groupIds.includes(unreadAnchor.current) && (
+                <UnreadDivider count={unreadCount} />
+              )}
 
               <MessageRow
                 own={own}
@@ -263,6 +278,7 @@ export function MessageList({
                 withAvatarColumn={isGroup}
                 showAvatar={!sameAuthorAsNext}
                 message={message}
+                groupIds={groupIds}
                 chatId={chatId}
                 myId={myId}
                 read={read}
@@ -271,12 +287,18 @@ export function MessageList({
                 canPin={canPinBase && canAct}
                 canReply={!isService}
                 canReact={!isService}
-                isPinned={pinnedMessage?.id === message.id}
+                isPinned={pinnedMessage !== null && groupIds.includes(pinnedMessage.id)}
                 onReply={onReply}
                 onEdit={onEdit}
                 onForwardRequest={onForwardRequest}
               >
-                <MessageBubble message={message} own={own} read={read} showAuthor={isGroup && !own && !sameAuthorAsPrev}>
+                <MessageBubble
+                  message={message}
+                  own={own}
+                  read={read}
+                  showAuthor={isGroup && !own && !sameAuthorAsPrev}
+                  album={attachments ?? undefined}
+                >
                   {isReal && !message.deletedAt && (
                     <MessageReactions
                       reactions={message.reactions}

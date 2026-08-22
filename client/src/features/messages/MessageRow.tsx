@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { useReactionPrefsStore } from '../../stores/reactionPrefsStore';
 import { Avatar } from '../../ui/Avatar';
+import { currentScrollEpoch, exceedsMoveThreshold } from '../../ui/gestures/gestureReducer';
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { useSwipeAction } from '../../ui/gestures/useSwipeAction';
 import { useTapGesture } from '../../ui/gestures/useTapGesture';
@@ -13,6 +14,7 @@ import { haptic } from '../../ui/haptic';
 import { Icon } from '../../ui/Icon';
 import { Emoji } from '../emoji/Emoji';
 import { EmojiPanel } from '../emoji/EmojiPanel';
+import { openMediaViewer } from '../media/mediaViewerStore';
 import { MessageContextMenu, type MessageMenuItem } from './MessageContextMenu';
 import styles from './MessageRow.module.css';
 
@@ -26,6 +28,7 @@ interface MessageRowProps {
   withAvatarColumn: boolean;
   showAvatar: boolean;
   message: LocalMessage;
+  groupIds: number[];
   chatId: string;
   myId: string | null;
   /** Прочитано всеми, кроме автора — тот же расчёт, что уходит в MessageBubble. */
@@ -94,6 +97,7 @@ export function MessageRow({
   withAvatarColumn,
   showAvatar,
   message,
+  groupIds,
   chatId,
   myId,
   read,
@@ -114,6 +118,7 @@ export function MessageRow({
   const toggleSelected = useChatStore((s) => s.toggleSelected);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
+  const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
   const pinMessage = useChatStore((s) => s.pinMessage);
   const doubleTapReaction = useReactionPrefsStore((s) => s.doubleTapReaction);
 
@@ -123,6 +128,7 @@ export function MessageRow({
    *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
    *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
   const onBubbleActionRef = useRef(false);
+  const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
@@ -134,12 +140,32 @@ export function MessageRow({
 
   const canAct = message.id > 0 && !message.deletedAt;
 
+  function selectGroup(): void {
+    enterSelection(message.id);
+    for (const id of groupIds) {
+      if (id !== message.id) toggleSelected(id);
+    }
+  }
+
+  function deleteGroup(): Promise<void> {
+    if (groupIds.length > 1) return deleteMessagesBatch(chatId, groupIds);
+    return deleteMessage(chatId, message.id);
+  }
+
+  function toggleGroupSelected(): void {
+    const { selectedIds } = useChatStore.getState();
+    const target = !selectedIds.has(message.id);
+    for (const id of groupIds) {
+      if (selectedIds.has(id) !== target) toggleSelected(id);
+    }
+  }
+
   const longPress = useLongPress({
     onLongPress: () => {
       suppressTapRef.current = true;
       tap.cancel();
       haptic();
-      enterSelection(message.id);
+      selectGroup();
     },
     disabled: () => selectionMode || menuAnchor !== null || !canAct,
   });
@@ -151,7 +177,7 @@ export function MessageRow({
         return;
       }
       if (selectionMode) {
-        toggleSelected(message.id);
+        toggleGroupSelected();
         return;
       }
       if (!canAct) return;
@@ -180,8 +206,14 @@ export function MessageRow({
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
     suppressTapRef.current = false;
-    onBubbleActionRef.current = (event.target as HTMLElement).closest('button') !== null;
+    const target = event.target as HTMLElement;
+    onBubbleActionRef.current = target.closest('button:not([data-media-tile]), a[download]') !== null;
     if (onBubbleActionRef.current) return;
+
+    const tile = target.closest<HTMLElement>('[data-media-tile]');
+    mediaTapRef.current = tile
+      ? { tile, x: event.clientX, y: event.clientY, epoch: currentScrollEpoch() }
+      : null;
 
     longPress.onPointerDown(event);
     swipe.onPointerDown(event);
@@ -201,6 +233,8 @@ export function MessageRow({
 
     longPress.onPointerUp();
     const wasDrag = swipe.onPointerUp();
+    const mediaTap = mediaTapRef.current;
+    mediaTapRef.current = null;
     // Свайп-ответ уже сработал — тап-жест не проверяет пройденное расстояние сам по себе,
     // и без этой проверки отпускание пальца после свайпа открывало контекстное меню
     // повторно (ux-ui.md, журнал, этап 6).
@@ -208,10 +242,27 @@ export function MessageRow({
       tap.cancel();
       return;
     }
+
+    if (mediaTap) {
+      tap.cancel();
+      const suppressed = suppressTapRef.current;
+      suppressTapRef.current = false;
+      const strayed = exceedsMoveThreshold(event.clientX - mediaTap.x, event.clientY - mediaTap.y);
+      if (suppressed || strayed || mediaTap.epoch !== currentScrollEpoch()) return;
+      if (selectionMode) {
+        toggleGroupSelected();
+        return;
+      }
+      const mediaId = mediaTap.tile.dataset.mediaId;
+      if (mediaId && canAct) openMediaViewer(chatId, mediaId);
+      return;
+    }
+
     tap.onPointerUp(event);
   }
 
   function handlePointerCancel(): void {
+    mediaTapRef.current = null;
     if (onBubbleActionRef.current) {
       onBubbleActionRef.current = false;
       return;
@@ -233,7 +284,7 @@ export function MessageRow({
       label: 'Удалить',
       danger: true,
       onSelect: () => {
-        deleteMessage(chatId, message.id).catch(() => {
+        deleteGroup().catch(() => {
           // Удаление своего сообщения почти никогда не падает — тихо не ломаем интерфейс.
         });
       },
@@ -241,10 +292,10 @@ export function MessageRow({
 
     if (message.type === 'CALL' || message.announcement) {
       if (message.announcement) {
-        list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest([message.id]) });
+        list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest(groupIds) });
       }
       if (canDelete) list.push(deleteItem);
-      list.push({ id: 'select', icon: 'check', label: 'Выделить', onSelect: () => enterSelection(message.id) });
+      list.push({ id: 'select', icon: 'check', label: 'Выделить', onSelect: selectGroup });
       return list;
     }
 
@@ -252,7 +303,7 @@ export function MessageRow({
       list.push({ id: 'copy', icon: 'copy', label: 'Копировать', onSelect: () => void copyToClipboard(message.content!) });
     }
 
-    list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest([message.id]) });
+    list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest(groupIds) });
 
     if (canPin) {
       list.push({
@@ -270,6 +321,7 @@ export function MessageRow({
     return list;
   }, [
     message,
+    groupIds,
     chatId,
     canPin,
     canEdit,
@@ -281,6 +333,7 @@ export function MessageRow({
     onForwardRequest,
     pinMessage,
     deleteMessage,
+    deleteMessagesBatch,
     enterSelection,
   ]);
 

@@ -1,0 +1,22 @@
+.grid {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  max-height: 60dvh;
+  flex-direction: column;
+  border-radius: calc(var(--radius-bubble) - 4px);
+  gap: 2px;
+}
+
+.row {
+  display: flex;
+  min-height: 0;
+  flex-basis: 0;
+  gap: 2px;
+}
+
+.cell {
+  min-width: 0;
+  flex-basis: 0;
+  border-radius: 0;
+}

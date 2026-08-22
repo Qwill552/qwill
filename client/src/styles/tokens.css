@@ -245,6 +245,13 @@
 
   --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
   --scrim-blur: blur(14px);
+
+  --viewer-bg: #000;
+  --viewer-ink: #fff;
+  --viewer-ink-soft: color-mix(in srgb, #fff 65%, transparent);
+  --viewer-chrome-bg: color-mix(in srgb, #000 55%, transparent);
+
+  --media-placeholder: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 /* В светлой теме белая граница на белой поверхности невидима — берём обычный бордюр. */

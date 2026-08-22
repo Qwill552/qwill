@@ -2,8 +2,9 @@ import type { AttachmentDto } from '@messenger/shared';
 import { useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { useFileSrc } from '../api/useFileSrc';
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import { MediaTile } from '../features/media/MediaTile';
+import { isViewableMedia } from '../features/media/mediaKind';
 import { useChatStore } from '../stores/chatStore';
 import { formatLastSeen } from '../utils/presence';
 import { Avatar } from '../ui/Avatar';
@@ -13,11 +14,6 @@ import { GlassButton } from '../ui/chrome/GlassButton';
 import { Icon } from '../ui/Icon';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import styles from './ChatInfoScreen.module.css';
-
-function MediaThumb({ attachment }: { attachment: AttachmentDto }) {
-  const src = useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, attachment.thumbnail ? 'thumb' : 'full');
-  return <img className={styles.mediaThumb} src={src} alt={attachment.originalName} loading="lazy" />;
-}
 
 /** Профиль собеседника — открывается тапом по капсуле шапки чата (см. ChatScreen).
  *  Раскладка и состав действий скопированы с профиля контакта Telegram, но без звонков и
@@ -39,7 +35,7 @@ export function ChatInfoScreen() {
   const media = useMemo(() => {
     if (!messages) return [];
     return messages
-      .filter((m) => m.attachment && /^(image|video)\//.test(m.attachment.file.mimeType))
+      .filter((m) => m.attachment && !m.deletedAt && isViewableMedia(m.attachment))
       .map((m) => m.attachment as AttachmentDto)
       .reverse();
   }, [messages]);
@@ -74,7 +70,13 @@ export function ChatInfoScreen() {
           <Card caption="Медиа">
             <div className={styles.mediaGrid}>
               {media.map((attachment) => (
-                <MediaThumb key={attachment.id} attachment={attachment} />
+                <MediaTile
+                  key={attachment.id}
+                  attachment={attachment}
+                  chatId={chatId}
+                  className={styles.mediaThumb}
+                  standalone
+                />
               ))}
             </div>
           </Card>

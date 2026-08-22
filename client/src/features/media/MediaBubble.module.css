@@ -1,0 +1,11 @@
+.single {
+  display: flex;
+  max-width: min(100%, calc(60dvh * var(--media-ratio, 1)));
+  max-height: 60dvh;
+  border-radius: calc(var(--radius-bubble) - 4px);
+}
+
+.auto {
+  display: flex;
+  border-radius: calc(var(--radius-bubble) - 4px);
+}

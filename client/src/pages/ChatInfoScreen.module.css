@@ -100,7 +100,6 @@
 .mediaThumb {
   aspect-ratio: 1;
   width: 100%;
-  object-fit: cover;
   background: var(--surface-3);
 }
 

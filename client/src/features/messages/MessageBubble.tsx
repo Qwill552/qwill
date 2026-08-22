@@ -1,3 +1,4 @@
+import type { AttachmentDto } from '@messenger/shared';
 import type { ReactNode } from 'react';
 
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
@@ -6,6 +7,7 @@ import { tintVar } from '../../ui/tint';
 import { AnnouncementBubble } from '../chat/AnnouncementBubble';
 import { Emoji } from '../emoji/Emoji';
 import { emojiOnlyContent, parseEmoji } from '../emoji/parseEmoji';
+import { MediaGrid } from '../media/MediaGrid';
 import { VoiceMessage } from '../voice/VoiceMessage';
 import { AttachmentView, isVoiceAttachment, LocalAttachmentPreview } from './Attachment';
 import { CallMessage } from './CallMessage';
@@ -19,6 +21,7 @@ interface MessageBubbleProps {
   read: boolean;
   /** Показывать имя автора (группа, первое сообщение серии). */
   showAuthor: boolean;
+  album?: AttachmentDto[];
   /** Чипы реакций и прочее, что рисуется под текстом внутри пузыря. */
   children?: ReactNode;
 }
@@ -27,7 +30,7 @@ interface MessageBubbleProps {
  *  20/20/20/7 (чужие) — без поджатия углов в сериях, без хвостиков. Метаданные —
  *  абсолютом в правом нижнем углу (строка 333), текст резервирует под них место
  *  невидимой распоркой после себя (строка 339: `{{ m.pad }}`), а не float. */
-export function MessageBubble({ message, own, read, showAuthor, children }: MessageBubbleProps) {
+export function MessageBubble({ message, own, read, showAuthor, album, children }: MessageBubbleProps) {
   const status: 'sending' | 'sent' | 'failed' =
     message.status === 'sending' ? 'sending' : message.status === 'failed' ? 'failed' : 'sent';
   const isVoice = message.attachment !== null && isVoiceAttachment(message.attachment);
@@ -120,7 +123,11 @@ export function MessageBubble({ message, own, read, showAuthor, children }: Mess
             <>
               {message.attachment && (
                 <div className={`${styles.attachment} ${message.content ? '' : styles.attachmentOnly}`}>
-                  <AttachmentView attachment={message.attachment} />
+                  {album && album.length > 1 ? (
+                    <MediaGrid attachments={album} chatId={message.chatId} />
+                  ) : (
+                    <AttachmentView attachment={message.attachment} chatId={message.chatId} />
+                  )}
                 </div>
               )}
               {message.localAttachment && (

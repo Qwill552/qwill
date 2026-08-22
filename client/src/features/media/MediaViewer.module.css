@@ -1,0 +1,151 @@
+.viewer {
+  position: fixed;
+  z-index: 150;
+  inset: 0;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--viewer-bg);
+  transition: opacity var(--dur-screen) var(--ease-screen);
+}
+
+.stage {
+  position: absolute;
+  overflow: hidden;
+  inset: 0;
+  touch-action: none;
+}
+
+.track {
+  position: absolute;
+  inset: 0;
+  transition: transform var(--dur-screen) var(--ease-screen);
+}
+
+.trackLive {
+  transition: none;
+}
+
+.page {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.media {
+  position: absolute;
+  will-change: transform;
+}
+
+.mediaAnimated {
+  transition: transform var(--dur-screen) var(--ease-screen);
+}
+
+.image,
+.video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding: calc(var(--safe-top) + var(--space-2)) var(--space-2) var(--space-4);
+  background: linear-gradient(var(--viewer-chrome-bg), transparent);
+  color: var(--viewer-ink);
+  gap: var(--space-2);
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.chromeHidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.strip.chromeHidden {
+  transform: translateY(8px);
+}
+
+.iconButton {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--viewer-ink);
+  cursor: pointer;
+}
+
+.caption {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.author {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stamp {
+  color: var(--viewer-ink-soft);
+  font-size: var(--font-caption);
+}
+
+.strip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  overflow-x: auto;
+  padding: var(--space-4) var(--space-3) calc(var(--safe-bottom) + var(--space-3));
+  background: linear-gradient(transparent, var(--viewer-chrome-bg));
+  gap: var(--space-1);
+  touch-action: pan-x;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.thumb {
+  display: block;
+  overflow: hidden;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-tile);
+  background: var(--media-placeholder);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity var(--transition), border-color var(--transition);
+}
+
+.thumbActive {
+  border-color: var(--viewer-ink);
+  opacity: 1;
+}
+
+.thumbImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
