@@ -17,5 +17,5 @@
   mask-image: var(--chat-pattern-src);
   mask-size: 375px 812px;
   mask-repeat: repeat;
-  mix-blend-mode: soft-light;
+  mix-blend-mode: var(--chat-pattern-blend);
 }

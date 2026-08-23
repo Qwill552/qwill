@@ -6,7 +6,17 @@
 }
 
 .logo {
+  width: 112px;
+  height: 112px;
   border-radius: var(--radius-card);
+  background-image: url('/logo-pastel.png');
+  background-position: center;
+  background-size: cover;
+}
+
+:global(:root[data-theme='dark']) .logo,
+:global([data-theme='dark']) .logo {
+  background-image: url('/icon-192.png');
 }
 
 .center {

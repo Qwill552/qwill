@@ -70,8 +70,13 @@
   --surface-2: #ffffff;
   --surface-3: #e4e9f4;
   --chat-bg: #e7ebf4;
-  --chat-pattern-ink: rgb(0 0 0 / 40%);
-  --wallpaper-default: linear-gradient(#d8e2ed, #d8e2ed);
+  --chat-pattern-ink: rgb(60 70 120 / 18%);
+  --chat-pattern-blend: multiply;
+  --wallpaper-default:
+    radial-gradient(76.8% 87.87% at 100% 100%, #dde9ce 0%, rgb(221 233 206 / 0%) 100%),
+    radial-gradient(87.56% 59.69% at 0% 100%, #a5b3f9 0%, rgb(165 179 249 / 0%) 100%),
+    radial-gradient(85.81% 77.46% at 0% 12.68%, #e7ccfb 0%, rgb(231 204 251 / 0%) 100%),
+    linear-gradient(#c1e1fc, #c1e1fc);
   --message-in: #ffffff;
   --message-out: #dbe6ff;
   --message-out-from: #5b8dff;
@@ -139,6 +144,7 @@
   --surface-3: #232c46;
   --chat-bg: #0d0f18;
   --chat-pattern-ink: rgb(255 255 255 / 24%);
+  --chat-pattern-blend: soft-light;
   --wallpaper-default:
     radial-gradient(107.51% 72.48% at 0% 100%, #21414e 0%, rgb(33 65 78 / 0%) 100%),
     radial-gradient(127.72% 73.03% at 100% 0%, #39305a 0%, rgb(57 48 90 / 0%) 100%),

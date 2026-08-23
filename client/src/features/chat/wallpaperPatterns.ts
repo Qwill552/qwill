@@ -8,10 +8,11 @@ function pattern(id: string, title: string): WallpaperPattern {
   return { id, title, src: `/wallpaper/patterns/${id}.svg` };
 }
 
-const DEFAULT_PATTERN = pattern('free-time', 'Досуг');
+const DEFAULT_PATTERN = pattern('cats', 'Коты');
 
 export const WALLPAPER_PATTERNS: WallpaperPattern[] = [
   DEFAULT_PATTERN,
+  pattern('free-time', 'Досуг'),
   pattern('sport', 'Спорт'),
   pattern('t-city', 'Город'),
   pattern('magic', 'Магия'),
@@ -31,7 +32,6 @@ export const WALLPAPER_PATTERNS: WallpaperPattern[] = [
   pattern('wizard-world', 'Волшебный мир'),
   pattern('unicorn', 'Единорог'),
   pattern('zoo', 'Зоопарк'),
-  pattern('cats', 'Коты'),
   pattern('woodland', 'Лес'),
   pattern('sea-world', 'Подводный мир'),
   pattern('snowflakes', 'Снежинки'),
