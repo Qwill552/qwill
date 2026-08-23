@@ -5,6 +5,7 @@ import { Icon } from '../../ui/Icon';
 import { FileBubble } from '../media/FileBubble';
 import { MediaBubble } from '../media/MediaBubble';
 import { isViewableMedia } from '../media/mediaKind';
+import { ProgressRing } from './ProgressRing';
 import styles from './Attachment.module.css';
 
 export function isVoiceAttachment(attachment: AttachmentDto): boolean {
@@ -26,25 +27,6 @@ export function formatBytes(bytes: number): string {
 export function AttachmentView({ attachment, chatId }: { attachment: AttachmentDto; chatId: string }) {
   if (isViewableMedia(attachment)) return <MediaBubble attachment={attachment} chatId={chatId} />;
   return <FileBubble attachment={attachment} />;
-}
-
-const RING_RADIUS = 15;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-function ProgressRing({ progress }: { progress: number }) {
-  return (
-    <svg className={styles.ring} viewBox="0 0 36 36" aria-hidden="true">
-      <circle className={styles.ringTrack} cx="18" cy="18" r={RING_RADIUS} />
-      <circle
-        className={styles.ringFill}
-        cx="18"
-        cy="18"
-        r={RING_RADIUS}
-        strokeDasharray={RING_CIRCUMFERENCE}
-        strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress)}
-      />
-    </svg>
-  );
 }
 
 function localIcon(kind: LocalAttachmentState['kind']): 'image' | 'file' | 'mic' {

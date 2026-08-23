@@ -1,7 +1,6 @@
 .single {
   display: flex;
-  max-width: min(100%, calc(60dvh * var(--media-ratio, 1)));
-  max-height: 60dvh;
+  width: min(78vw, var(--bubble-media-max-w), calc(60dvh * var(--media-ratio)), var(--media-natural-w));
   border-radius: calc(var(--radius-bubble) - 4px);
 }
 

@@ -63,26 +63,6 @@
   transform: translate(-50%, -50%);
 }
 
-.ring {
-  width: 44px;
-  height: 44px;
-  transform: rotate(-90deg);
-}
-
-.ringTrack {
-  fill: var(--scrim-bg);
-  stroke: color-mix(in srgb, var(--lift) 30%, transparent);
-  stroke-width: 2.5;
-}
-
-.ringFill {
-  fill: none;
-  stroke: var(--lift);
-  stroke-linecap: round;
-  stroke-width: 2.5;
-  transition: stroke-dashoffset var(--transition);
-}
-
 .cancelButton {
   display: grid;
   width: var(--tap-min);

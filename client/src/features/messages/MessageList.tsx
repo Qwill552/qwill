@@ -8,7 +8,7 @@ import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
 import { Icon } from '../../ui/Icon';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { isServiceChat } from '../chat/serviceChat';
-import { groupAlbums } from '../media/albums';
+import { groupAlbums, mergeReactions } from '../media/albums';
 import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
@@ -220,7 +220,8 @@ export function MessageList({
           message,
           lastId: last.id,
           groupIds: album.map((item) => item.id),
-          attachments: album.length > 1 ? album.flatMap((item) => (item.attachment ? [item.attachment] : [])) : null,
+          album: album.length > 1 ? album : null,
+          reactions: mergeReactions(album),
           sameAuthorAsPrev,
           sameAuthorAsNext,
           showDay: !prev || !isSameDay(prev.createdAt, message.createdAt),
@@ -258,7 +259,7 @@ export function MessageList({
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
         )}
 
-        {rows.map(({ message, lastId, groupIds, attachments, sameAuthorAsPrev, sameAuthorAsNext, showDay }) => {
+        {rows.map(({ message, lastId, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext, showDay }) => {
           const own = message.sender?.id === myId;
           const delivered = message.status !== 'sending' && message.status !== 'failed';
           const read = own && delivered && isReadByOthers(readCursors, myId, lastId);
@@ -279,6 +280,7 @@ export function MessageList({
                 showAvatar={!sameAuthorAsNext}
                 message={message}
                 groupIds={groupIds}
+                reactions={reactions}
                 chatId={chatId}
                 myId={myId}
                 read={read}
@@ -297,11 +299,11 @@ export function MessageList({
                   own={own}
                   read={read}
                   showAuthor={isGroup && !own && !sameAuthorAsPrev}
-                  album={attachments ?? undefined}
+                  album={album ?? undefined}
                 >
                   {isReal && !message.deletedAt && (
                     <MessageReactions
-                      reactions={message.reactions}
+                      reactions={reactions}
                       myId={myId}
                       chatId={chatId}
                       onToggle={(emoji) => toggleReaction(chatId, message.id, emoji)}

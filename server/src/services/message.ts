@@ -120,6 +120,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
     id: message.id,
     chatId: message.chatId,
     clientId: message.clientId,
+    albumId: message.albumId,
     sender: message.sender
       ? {
           id: message.sender.id,
@@ -164,6 +165,7 @@ export interface SendMessageInput {
   content?: string;
   replyToId?: number;
   attachment?: MessageAttachmentInput;
+  albumId?: string;
   /** Заполняется только рассылкой объявлений (services/announcements.ts): сообщение получает
    *  тип ANNOUNCEMENT и ссылку на выпуск, из которой пузырь собирает себя сам. */
   announcementId?: string;
@@ -195,6 +197,7 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
       chatId: input.chatId,
       senderId: input.senderId,
       clientId: input.clientId,
+      albumId: input.albumId ?? null,
       content: input.content ?? null,
       type: input.announcementId ? 'ANNOUNCEMENT' : input.attachment ? 'MEDIA' : 'TEXT',
       announcementId: input.announcementId,

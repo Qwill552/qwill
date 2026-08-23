@@ -28,6 +28,7 @@ export interface OutboxAttachment {
 export interface OutboxEntry {
   clientId: string;
   chatId: string;
+  albumId?: string | null;
   content: string | null;
   replyToId: number | null;
   attachment: OutboxAttachment | null;

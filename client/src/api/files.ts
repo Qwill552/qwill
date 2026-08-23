@@ -209,6 +209,48 @@ export function generateImageThumbnail(source: File): Promise<ThumbnailResult> {
   });
 }
 
+export interface MediaSize {
+  width: number;
+  height: number;
+}
+
+export function measureMediaSize(source: File): Promise<MediaSize | null> {
+  if (source.type.startsWith('image/')) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      const url = URL.createObjectURL(source);
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(image.naturalWidth > 0 ? { width: image.naturalWidth, height: image.naturalHeight } : null);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      image.src = url;
+    });
+  }
+
+  if (source.type.startsWith('video/')) {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      const url = URL.createObjectURL(source);
+      function finish(size: MediaSize | null): void {
+        URL.revokeObjectURL(url);
+        video.remove();
+        resolve(size);
+      }
+      video.onloadedmetadata = () => finish(video.videoWidth > 0 ? { width: video.videoWidth, height: video.videoHeight } : null);
+      video.onerror = () => finish(null);
+      video.src = url;
+    });
+  }
+
+  return Promise.resolve(null);
+}
+
 export interface VideoThumbnailResult extends ThumbnailResult {
   /** Миллисекунды. */
   duration: number;

@@ -32,6 +32,7 @@ export const messageSendSchema = z
     content: z.string().trim().max(MESSAGE_MAX_LENGTH).optional(),
     replyToId: z.number().int().positive().optional(),
     attachment: messageAttachmentInputSchema.optional(),
+    albumId: z.string().min(1).max(64).optional(),
   })
   .refine((data) => (data.content && data.content.length > 0) || data.attachment, {
     message: 'Пустое сообщение',
@@ -218,6 +219,7 @@ export interface MessageDto {
   id: number;
   chatId: string;
   clientId: string | null;
+  albumId: string | null;
   sender: ChatMemberSummary | null;
   type: MessageType;
   content: string | null;

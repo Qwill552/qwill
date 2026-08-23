@@ -1,7 +1,7 @@
 .grid {
   display: flex;
   overflow: hidden;
-  width: 100%;
+  width: min(78vw, var(--bubble-media-max-w));
   max-height: 60dvh;
   flex-direction: column;
   border-radius: calc(var(--radius-bubble) - 4px);
@@ -19,4 +19,27 @@
   min-width: 0;
   flex-basis: 0;
   border-radius: 0;
+}
+
+.uploading {
+  position: absolute;
+  display: grid;
+  inset: 0;
+  place-items: center;
+}
+
+.uploading > * {
+  grid-area: 1 / 1;
+}
+
+.tileButton {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lift);
+  cursor: pointer;
 }

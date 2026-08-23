@@ -171,6 +171,8 @@ model Message {
   /// не создаёт дубль — сервер возвращает уже существующую запись (секция 3).
   clientId String? @unique
 
+  albumId String?
+
   type    MessageType @default(TEXT)
   content String?
 

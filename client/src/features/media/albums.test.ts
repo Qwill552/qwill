@@ -2,9 +2,19 @@ import type { AttachmentDto, ChatMemberSummary } from '@messenger/shared';
 import { describe, expect, it } from 'vitest';
 
 import type { LocalMessage } from '../../stores/chatStore';
-import { groupAlbums } from './albums';
+import { groupAlbums, mergeReactions } from './albums';
 
 const START = Date.parse('2026-08-23T10:00:00.000Z');
+
+const ME: ChatMemberSummary = {
+  id: 'me',
+  username: 'me',
+  displayName: 'Я',
+  avatarUrl: null,
+  avatarColor: 'blue',
+  lastSeenAt: '',
+  isService: false,
+};
 
 function photo(id: string): AttachmentDto {
   return {
@@ -24,8 +34,9 @@ function message(id: number, patch: Partial<LocalMessage> = {}): LocalMessage {
     id,
     chatId: 'chat',
     clientId: null,
-    sender: { id: 'me', username: 'me', displayName: 'Я', avatarUrl: null, avatarColor: 'blue', lastSeenAt: '', isService: false },
-    type: 'TEXT',
+    albumId: 'album',
+    sender: ME,
+    type: 'MEDIA',
     content: null,
     attachment: photo(`a${id}`),
     replyToId: null,
@@ -46,12 +57,21 @@ function shape(messages: LocalMessage[]): number[] {
 }
 
 describe('groupAlbums', () => {
-  it('соседние фото одного автора собирает в один альбом', () => {
+  it('фото одной отправки собирает в один альбом', () => {
     expect(shape([message(1), message(2), message(3)])).toEqual([3]);
   });
 
+  it('фото разных отправок не склеивает, даже отправленные подряд', () => {
+    expect(shape([message(1, { albumId: 'first' }), message(2, { albumId: 'second' })])).toEqual([1, 1]);
+  });
+
+  it('одиночное фото без albumId ни с чем не склеивается', () => {
+    expect(shape([message(1, { albumId: null }), message(2, { albumId: null })])).toEqual([1, 1]);
+  });
+
   it('текстовое сообщение между фото разрывает альбом', () => {
-    expect(shape([message(1), message(2, { attachment: null, content: 'привет' }), message(3)])).toEqual([1, 1, 1]);
+    const text = message(2, { attachment: null, content: 'привет', albumId: null, type: 'TEXT' });
+    expect(shape([message(1), text, message(3)])).toEqual([1, 1, 1]);
   });
 
   it('подпись у первого фото альбом не разрывает, у следующего — разрывает', () => {
@@ -60,37 +80,55 @@ describe('groupAlbums', () => {
   });
 
   it('разные авторы в один альбом не попадают', () => {
-    const other: ChatMemberSummary = {
-      id: 'other',
-      username: 'o',
-      displayName: 'О',
-      avatarUrl: null,
-      avatarColor: 'violet',
-      lastSeenAt: '',
-      isService: false,
-    };
+    const other: ChatMemberSummary = { ...ME, id: 'other', username: 'o', displayName: 'О' };
     expect(shape([message(1), message(2, { sender: other })])).toEqual([1, 1]);
   });
 
-  it('разрыв больше минуты начинает новый альбом', () => {
-    const late = message(2, { createdAt: new Date(START + 120 * 1000).toISOString() });
-    expect(shape([message(1), late])).toEqual([1, 1]);
-  });
-
-  it('фото с реакцией стоит отдельным пузырём', () => {
+  it('реакция на снимке альбом не разрывает', () => {
     const reacted = message(2, { reactions: [{ emoji: '❤️', userIds: ['me'] }] });
-    expect(shape([message(1), reacted, message(3)])).toEqual([1, 1, 1]);
+    expect(shape([message(1), reacted, message(3)])).toEqual([3]);
   });
 
   it('в альбом попадает не больше десяти фото', () => {
     expect(shape(Array.from({ length: 13 }, (_, index) => message(index + 1)))).toEqual([10, 3]);
   });
 
-  it('неотправленное сообщение и файл в альбом не идут', () => {
+  it('ещё не отправленное фото уже стоит в альбоме, а файл — нет', () => {
+    const uploading = message(2, {
+      id: -2,
+      attachment: null,
+      localAttachment: { kind: 'image', name: 'a.jpg', size: 10, progress: 0.4 },
+    });
+    expect(shape([message(1), uploading, message(3)])).toEqual([3]);
+
     const file = message(2, {
       attachment: { ...photo('a2'), file: { id: 'f', mimeType: 'application/pdf', size: 10, url: '' } },
     });
     expect(shape([message(1), file, message(3)])).toEqual([1, 1, 1]);
-    expect(shape([message(1), message(-2)])).toEqual([1, 1]);
+  });
+
+  it('удалённое сообщение выпадает из альбома', () => {
+    expect(shape([message(1), message(2, { deletedAt: new Date().toISOString() }), message(3)])).toEqual([1, 1, 1]);
+  });
+});
+
+describe('mergeReactions', () => {
+  it('одиночному сообщению отдаёт его собственные реакции', () => {
+    const single = message(1, { reactions: [{ emoji: '❤️', userIds: ['me'] }] });
+    expect(mergeReactions([single])).toEqual([{ emoji: '❤️', userIds: ['me'] }]);
+  });
+
+  it('складывает реакции всех снимков альбома без повторов', () => {
+    const first = message(1, { reactions: [{ emoji: '❤️', userIds: ['me'] }] });
+    const second = message(2, {
+      reactions: [
+        { emoji: '❤️', userIds: ['other'] },
+        { emoji: '🔥', userIds: ['me'] },
+      ],
+    });
+    expect(mergeReactions([first, second])).toEqual([
+      { emoji: '❤️', userIds: ['me', 'other'] },
+      { emoji: '🔥', userIds: ['me'] },
+    ]);
   });
 });

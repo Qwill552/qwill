@@ -36,3 +36,20 @@
 .failed {
   color: var(--danger);
 }
+
+.overlay {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--media-meta-bg);
+  color: var(--media-meta-ink);
+  font-size: 11px;
+  gap: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.overlay.failed {
+  color: var(--danger);
+}

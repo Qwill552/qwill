@@ -18,7 +18,11 @@ export function MediaBubble({ attachment, chatId }: { attachment: AttachmentDto;
   return (
     <div
       className={styles.single}
-      style={{ aspectRatio: `${attachment.width} / ${attachment.height}`, ['--media-ratio' as string]: ratio }}
+      style={{
+        aspectRatio: `${attachment.width} / ${attachment.height}`,
+        ['--media-ratio' as string]: ratio,
+        ['--media-natural-w' as string]: `${attachment.width}px`,
+      }}
     >
       <MediaTile attachment={attachment} chatId={chatId} wantOriginal />
     </div>

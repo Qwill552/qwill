@@ -9,6 +9,7 @@ function message(id: number, chatId = 'c1'): MessageDto {
     id,
     chatId,
     clientId: null,
+    albumId: null,
     sender: null,
     type: 'TEXT',
     content: `сообщение ${id}`,

@@ -252,6 +252,8 @@
   --viewer-chrome-bg: color-mix(in srgb, #000 55%, transparent);
 
   --media-placeholder: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --media-meta-bg: color-mix(in srgb, #000 45%, transparent);
+  --media-meta-ink: #fff;
 }
 
 /* В светлой теме белая граница на белой поверхности невидима — берём обычный бордюр. */

@@ -45,7 +45,7 @@ import {
   updateMemberRoleRequest,
 } from '../api/chats';
 import { NetworkError } from '../api/client';
-import { generateImageThumbnail, generateVideoThumbnail, uploadFile } from '../api/files';
+import { generateImageThumbnail, generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
 import { openCacheDb, type OutboxAttachment } from '../cache/db';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import {
@@ -76,6 +76,8 @@ export interface LocalAttachmentState {
   previewUrl?: string;
   name: string;
   size: number;
+  width?: number;
+  height?: number;
   progress: number;
   error?: string;
 }
@@ -166,7 +168,7 @@ interface ChatState {
     chatId: string,
     sender: PublicUser,
     file: File,
-    options?: { caption?: string; replyTo?: MessageDto; duration?: number; peaks?: number[] },
+    options?: { caption?: string; replyTo?: MessageDto; duration?: number; peaks?: number[]; albumId?: string },
   ) => Promise<void>;
   /** Отмена во время загрузки — убирает оптимистичный пузырь целиком, а не переводит в failed. */
   cancelAttachmentUpload: (chatId: string, clientId: string) => void;
@@ -479,6 +481,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: -Date.now(),
       chatId,
       clientId,
+      albumId: null,
       sender: asSender(sender),
       type: attachment ? 'MEDIA' : 'TEXT',
       content: content || null,
@@ -558,6 +561,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: -Date.now(),
       chatId,
       clientId,
+      albumId: options.albumId ?? null,
       sender: asSender(sender),
       type: 'MEDIA',
       content: options.caption || null,
@@ -586,6 +590,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await enqueueOutbox({
       clientId,
       chatId,
+      albumId: options.albumId ?? null,
       content: options.caption || null,
       replyToId: replyTo?.id ?? null,
       attachment: {
@@ -605,6 +610,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
       },
     }));
+
+    if (kind === 'image' || kind === 'video') {
+      void measureMediaSize(file).then((size) => {
+        if (size) get().updateLocalAttachment(chatId, clientId, size);
+      });
+    }
 
     void get().runAttachmentUpload(chatId, clientId);
   },
@@ -684,7 +695,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       socket.emit(
         SocketEvent.MessageSend,
-        { chatId, clientId, content: message.content || undefined, attachment, replyToId: message.replyToId ?? undefined },
+        {
+          chatId,
+          clientId,
+          content: message.content || undefined,
+          attachment,
+          replyToId: message.replyToId ?? undefined,
+          albumId: message.albumId ?? undefined,
+        },
         (ack: MessageSendAck) => {
           uploadAbortControllers.delete(clientId);
           if (ack.ok && ack.message) {
@@ -807,6 +825,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: -entry.createdAt,
         chatId: entry.chatId,
         clientId: entry.clientId,
+        albumId: entry.albumId ?? null,
         sender: me ? asSender(me) : null,
         type: entry.attachment ? 'MEDIA' : 'TEXT',
         content: entry.content,

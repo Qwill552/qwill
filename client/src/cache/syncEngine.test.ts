@@ -8,6 +8,7 @@ function message(id: number, content: string, deletedAt: string | null = null): 
     id,
     chatId: 'c1',
     clientId: null,
+    albumId: null,
     sender: null,
     type: 'TEXT',
     content,

@@ -271,10 +271,12 @@ export function MessageComposer({
   function handleMediaSend(caption: string): void {
     if (!user || !pickedFiles) return;
     const replyTo = context?.mode === 'reply' ? context.message : undefined;
+    const albumId = pickedFiles.length > 1 ? crypto.randomUUID() : undefined;
     pickedFiles.forEach((file, index) => {
       sendAttachmentMessage(chatId, user, file, {
         caption: index === 0 ? caption || undefined : undefined,
         replyTo: index === 0 ? replyTo : undefined,
+        albumId,
       });
     });
     setPickedFiles(null);

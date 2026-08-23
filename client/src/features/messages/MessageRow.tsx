@@ -1,4 +1,4 @@
-import type { ChatMemberSummary } from '@messenger/shared';
+import type { ChatMemberSummary, MessageReactionDto } from '@messenger/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,6 +29,7 @@ interface MessageRowProps {
   showAvatar: boolean;
   message: LocalMessage;
   groupIds: number[];
+  reactions: MessageReactionDto[];
   chatId: string;
   myId: string | null;
   /** Прочитано всеми, кроме автора — тот же расчёт, что уходит в MessageBubble. */
@@ -98,6 +99,7 @@ export function MessageRow({
   showAvatar,
   message,
   groupIds,
+  reactions,
   chatId,
   myId,
   read,
@@ -339,8 +341,8 @@ export function MessageRow({
 
   const myReactions = useMemo(() => {
     if (!myId) return new Set<string>();
-    return new Set(message.reactions.filter((r) => r.userIds.includes(myId)).map((r) => r.emoji));
-  }, [message.reactions, myId]);
+    return new Set(reactions.filter((r) => r.userIds.includes(myId)).map((r) => r.emoji));
+  }, [reactions, myId]);
 
   return (
     <div

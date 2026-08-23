@@ -10,6 +10,7 @@ interface MessageMetaProps {
   status: 'sending' | 'sent' | 'failed';
   /** Прочитано всеми, кроме автора, — двойная галочка вместо одинарной. */
   read: boolean;
+  overlay?: boolean;
 }
 
 const GAP_BEFORE_META = 12;
@@ -21,10 +22,11 @@ function formatTime(iso: string): string {
 /** Метаданные внутри пузыря — буквально строка 333 референса: абсолютом в правом нижнем
  *  углу пузыря. Текст резервирует под них место невидимой распоркой (см. .pad в
  *  MessageBubble), а не float/обтеканием. */
-export function MessageMeta({ createdAt, own, edited, status, read }: MessageMetaProps) {
+export function MessageMeta({ createdAt, own, edited, status, read, overlay = false }: MessageMetaProps) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
+    if (overlay) return;
     const el = ref.current;
     const parent = el?.parentElement;
     if (!el || !parent) return;
@@ -33,11 +35,11 @@ export function MessageMeta({ createdAt, own, edited, status, read }: MessageMet
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [overlay]);
 
   const classes = [
-    styles.meta,
-    own ? styles.onOut : '',
+    overlay ? styles.overlay : styles.meta,
+    own && !overlay ? styles.onOut : '',
     status === 'sending' ? styles.pending : '',
     status === 'failed' ? styles.failed : '',
   ].join(' ');

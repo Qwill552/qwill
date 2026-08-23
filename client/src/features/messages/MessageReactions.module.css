@@ -14,7 +14,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: var(--reaction-bg, var(--surface-3));
-  color: var(--text-secondary);
+  color: var(--reaction-ink, var(--text-secondary));
   font: inherit;
   font-size: var(--font-caption);
   line-height: 1;
