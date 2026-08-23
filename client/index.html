@@ -36,6 +36,7 @@
         root.dataset.theme = theme;
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', BG[theme]);
+        if (window.qwill && window.qwill.isDesktop) root.dataset.desktop = 'true';
       })();
     </script>
   </head>

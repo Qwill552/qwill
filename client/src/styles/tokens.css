@@ -430,6 +430,12 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  --titlebar-h: 0px;
+}
+
+[data-desktop='true'] {
+  --titlebar-h: 32px;
 }
 
 /* ─────────────────────────────────  Движение  ───────────────────────────────── */
@@ -486,6 +492,10 @@ html,
 body,
 #root {
   height: 100dvh;
+}
+
+#root {
+  padding-top: var(--titlebar-h);
 }
 
 html {

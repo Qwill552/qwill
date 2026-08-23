@@ -2,7 +2,7 @@ import { app, ipcMain } from 'electron';
 
 import { configureApiSession } from './apiSession';
 import { APP_ENTRY_URL, handleAppProtocol, registerAppScheme, resolveClientRoot } from './protocol';
-import { createMainWindow, focusExistingWindow } from './window';
+import { createMainWindow, focusExistingWindow, setWindowTitleTheme } from './window';
 
 registerAppScheme();
 
@@ -16,6 +16,11 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   ipcMain.handle('qwill:app-version', () => app.getVersion());
+
+  ipcMain.handle('qwill:set-title-theme', (_event, theme: unknown) => {
+    if (theme !== 'light' && theme !== 'dark') return;
+    setWindowTitleTheme(theme);
+  });
 
   void app.whenReady().then(async () => {
     configureApiSession();

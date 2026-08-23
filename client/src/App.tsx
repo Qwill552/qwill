@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
 import { AppRouter } from './app/AppRouter';
+import { DesktopTitleBar } from './app/DesktopTitleBar';
 import { registerServiceWorker } from './app/serviceWorker';
+import { isDesktopShell } from './native/desktop';
 import { useAuthStore } from './stores/authStore';
 
 /**
@@ -20,15 +22,21 @@ export function App() {
 
   if (status === 'idle' || status === 'loading') {
     return (
-      <main style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Загрузка…</p>
-      </main>
+      <>
+        {isDesktopShell() && <DesktopTitleBar />}
+        <main style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Загрузка…</p>
+        </main>
+      </>
     );
   }
 
   return (
-    <BrowserRouter>
-      <AppRouter />
-    </BrowserRouter>
+    <>
+      {isDesktopShell() && <DesktopTitleBar />}
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
+    </>
   );
 }

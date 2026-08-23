@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import { updateSettingsRequest } from '../api/users';
 import { setCallBackgroundStyle, type CallBackgroundStyle } from '../calls/nativeCall';
+import { setDesktopTitleTheme } from '../native/desktop';
 
 const THEME_KEY = 'messenger.theme';
 const FONT_SIZE_KEY = 'messenger.fontSize';
@@ -46,6 +47,7 @@ function applyTheme(preference: ThemePreference): 'light' | 'dark' {
   const resolved = resolveTheme(preference);
   document.documentElement.dataset.theme = resolved;
   applyThemeColor(resolved);
+  setDesktopTitleTheme(resolved);
   localStorage.setItem(THEME_KEY, preference);
   return resolved;
 }
@@ -84,14 +86,18 @@ export const useUiStore = create<UiState>((set, get) => {
       const resolved = systemTheme();
       document.documentElement.dataset.theme = resolved;
       applyThemeColor(resolved);
+      setDesktopTitleTheme(resolved);
       set({ theme: resolved });
     });
   }
 
   const initialPreference = readStoredPreference();
+  const initialTheme =
+    (document.documentElement.dataset.theme as 'light' | 'dark' | undefined) ?? resolveTheme(initialPreference);
+  setDesktopTitleTheme(initialTheme);
 
   return {
-    theme: (document.documentElement.dataset.theme as 'light' | 'dark' | undefined) ?? resolveTheme(initialPreference),
+    theme: initialTheme,
     themePreference: initialPreference,
     fontSize: readStoredFontSize(),
     callBackground: readStoredCallBackground(),

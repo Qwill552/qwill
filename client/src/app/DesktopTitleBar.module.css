@@ -1,0 +1,10 @@
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-h);
+  background: var(--surface);
+  -webkit-app-region: drag;
+  z-index: 2147483001;
+}

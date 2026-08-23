@@ -5,19 +5,41 @@ import { BrowserWindow, app, screen, shell } from 'electron';
 
 import { APP_ORIGIN } from './protocol';
 
+type Theme = 'light' | 'dark';
+
 interface WindowState {
   width: number;
   height: number;
   x: number | null;
   y: number | null;
   maximized: boolean;
+  theme: Theme;
 }
 
-const DEFAULT_STATE: WindowState = { width: 1280, height: 840, x: null, y: null, maximized: false };
+const DEFAULT_STATE: WindowState = {
+  width: 1280,
+  height: 840,
+  x: null,
+  y: null,
+  maximized: false,
+  theme: 'light',
+};
 const MIN_WIDTH = 420;
 const MIN_HEIGHT = 560;
 const SAVE_DEBOUNCE_MS = 400;
-const INITIAL_BACKGROUND = '#eef1f6';
+const TITLEBAR_HEIGHT = 32;
+
+const BACKGROUND_BY_THEME: Record<Theme, string> = {
+  light: '#eef1f6',
+  dark: '#0a0c12',
+};
+
+const TITLEBAR_SYMBOL_BY_THEME: Record<Theme, string> = {
+  light: '#1c202d',
+  dark: '#eef1f7',
+};
+
+let activeTheme: Theme = DEFAULT_STATE.theme;
 
 function stateFilePath(): string {
   return path.join(app.getPath('userData'), 'window-state.json');
@@ -40,6 +62,7 @@ function parseState(raw: unknown): WindowState {
     x: isCoordinate(candidate.x) ? candidate.x : null,
     y: isCoordinate(candidate.y) ? candidate.y : null,
     maximized: candidate.maximized === true,
+    theme: candidate.theme === 'dark' ? 'dark' : 'light',
   };
 }
 
@@ -72,6 +95,7 @@ function collectState(window: BrowserWindow): WindowState {
     x: bounds.x,
     y: bounds.y,
     maximized: window.isMaximized(),
+    theme: activeTheme,
   };
 }
 
@@ -121,6 +145,7 @@ function keepNavigationInside(window: BrowserWindow): void {
 export async function createMainWindow(entryUrl: string): Promise<BrowserWindow> {
   const state = readState();
   const usePosition = fitsOnSomeDisplay(state);
+  activeTheme = state.theme;
 
   const window = new BrowserWindow({
     width: state.width,
@@ -130,7 +155,13 @@ export async function createMainWindow(entryUrl: string): Promise<BrowserWindow>
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     show: false,
-    backgroundColor: INITIAL_BACKGROUND,
+    backgroundColor: BACKGROUND_BY_THEME[state.theme],
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#00000000',
+      symbolColor: TITLEBAR_SYMBOL_BY_THEME[state.theme],
+      height: TITLEBAR_HEIGHT,
+    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -147,6 +178,23 @@ export async function createMainWindow(entryUrl: string): Promise<BrowserWindow>
 
   await window.loadURL(entryUrl);
   return window;
+}
+
+export function setWindowTitleTheme(theme: Theme): void {
+  activeTheme = theme;
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.setTitleBarOverlay({
+      color: '#00000000',
+      symbolColor: TITLEBAR_SYMBOL_BY_THEME[theme],
+      height: TITLEBAR_HEIGHT,
+    });
+    window.setBackgroundColor(BACKGROUND_BY_THEME[theme]);
+  }
+  try {
+    writeFileSync(stateFilePath(), JSON.stringify({ ...readState(), theme }), 'utf8');
+  } catch {
+    return;
+  }
 }
 
 export function focusExistingWindow(): void {
