@@ -16,7 +16,7 @@ import { signFileToken, verifyFileToken } from '../../lib/tokens.js';
 import * as fileService from '../../services/file.js';
 import { requireUserFromAccessToken } from '../../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
-import { uploadLimiter } from '../middleware/rateLimit.js';
+import { uploadChunkLimiter, uploadLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const filesRouter: Router = Router();
@@ -38,7 +38,7 @@ filesRouter.post('/upload', requireAuth, uploadLimiter, validateBody(initUploadS
 filesRouter.patch(
   '/upload/:id',
   requireAuth,
-  uploadLimiter,
+  uploadChunkLimiter,
   raw({ type: () => true, limit: env.UPLOAD_CHUNK_SIZE_BYTES + 64 * 1024 }),
   (req, res, next) => {
     const offsetHeader = req.header(UPLOAD_OFFSET_HEADER);

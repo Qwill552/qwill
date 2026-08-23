@@ -26,14 +26,33 @@ export const authLimiter = rateLimit({
   handler: sendRateLimited,
 });
 
-/** Загрузка файлов — 20/мин на пользователя; requireAuth должен идти раньше в цепочке (секция 8). */
+/**
+ * Открытие сессии загрузки — 120/мин на пользователя; requireAuth должен идти раньше в цепочке
+ * (секция 8). Одно фото это два файла (превью и оригинал), то есть два открытия: прежние 20/мин
+ * означали пять фото в минуту и валили любую отправку альбома.
+ */
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 20,
+  limit: 120,
   standardHeaders: true,
   legacyHeaders: false,
   // Сырой IPv6-адрес как ключ обходится сменой адреса внутри своей /64 —
   // ipKeyGenerator сводит подсеть к одному ключу (ERR_ERL_KEY_GEN_IPV6).
+  keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
+/**
+ * Куски уже открытой сессии — 1200/мин на пользователя. Это данные, а не операции: при куске
+ * в 5 МБ потолок упирается в скорость канала задолго до лимита, а размер самого куска и права
+ * на сессию проверяются отдельно.
+ */
+export const uploadChunkLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 1200,
+  standardHeaders: true,
+  legacyHeaders: false,
   keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
   skip: skipInTest,
   handler: sendRateLimited,

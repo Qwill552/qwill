@@ -105,7 +105,13 @@ function UploadingTile({
         ))}
       <span className={styles.uploading}>
         {failed ? (
-          <button type="button" className={styles.tileButton} onClick={onRetry} aria-label="Повторить отправку">
+          <button
+            type="button"
+            className={styles.tileButton}
+            onClick={onRetry}
+            aria-label="Повторить отправку"
+            title={local?.error}
+          >
             <Icon name="retry" size={20} />
           </button>
         ) : (

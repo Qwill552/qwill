@@ -9,7 +9,7 @@
 }
 
 .imagePlaceholder {
-  width: min(60vw, 240px);
+  width: min(78vw, var(--bubble-media-max-w));
   aspect-ratio: 4 / 3;
   border-radius: calc(var(--radius-bubble) - 4px);
   background: var(--media-placeholder);

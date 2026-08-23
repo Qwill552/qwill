@@ -41,6 +41,36 @@ async function uploadChunk(sessionId: string, offset: number, chunk: Blob, signa
   return data as UploadChunkResponse;
 }
 
+const RATE_LIMIT_ATTEMPTS = 4;
+const RATE_LIMIT_BASE_DELAY_MS = 1500;
+
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    function onAbort(): void {
+      clearTimeout(timer);
+      reject(signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError'));
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/** 429 на загрузке — не отказ, а «подожди»: сессия на сервере жива, докачка продолжится с того же смещения. */
+async function withRateLimitRetry<T>(run: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      const limited = error instanceof ApiError && error.status === 429;
+      if (!limited || attempt + 1 >= RATE_LIMIT_ATTEMPTS) throw error;
+      await wait(RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt, signal);
+    }
+  }
+}
+
 export type UploadPurpose = 'message' | 'avatar';
 
 export interface UploadedFile extends FileDto {
@@ -61,13 +91,17 @@ export async function uploadFile(
   const sha256Hex = knownSha256 ?? (await hashBlob(file));
   const mimeType = file.type || 'application/octet-stream';
 
-  const init = await initUploadRequest({
-    sha256: sha256Hex,
-    size: file.size,
-    mimeType,
-    originalName: file.name,
-    purpose,
-  });
+  const init = await withRateLimitRetry(
+    () =>
+      initUploadRequest({
+        sha256: sha256Hex,
+        size: file.size,
+        mimeType,
+        originalName: file.name,
+        purpose,
+      }),
+    signal,
+  );
 
   if (init.status === 'exists') {
     onProgress?.(file.size, file.size);
@@ -83,7 +117,7 @@ export async function uploadFile(
     signal?.throwIfAborted();
     const end = Math.min(offset + chunkSize, file.size);
     const chunk = file.slice(offset, end);
-    const result = await uploadChunk(sessionId, offset, chunk, signal);
+    const result = await withRateLimitRetry(() => uploadChunk(sessionId, offset, chunk, signal), signal);
 
     stuckStreak = result.receivedBytes === offset ? stuckStreak + 1 : 0;
     if (stuckStreak > 3) throw new Error('Не удаётся синхронизировать загрузку с сервером');
