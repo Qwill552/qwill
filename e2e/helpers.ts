@@ -33,10 +33,9 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
   await expect(page.getByText('Qwill')).toBeVisible();
 }
 
-/** Открывает приватный чат: FAB «Написать» → «Найти человека» → единый поиск → клик по результату. */
+/** Открывает приватный чат: строка поиска в шапке → единый поиск → клик по результату. */
 export async function startPrivateChatWith(page: Page, username: string): Promise<void> {
-  await page.getByRole('button', { name: 'Написать' }).click();
-  await page.getByRole('button', { name: 'Найти человека' }).click();
+  await page.getByRole('button', { name: 'Поиск чатов и людей' }).click();
   await page.getByRole('textbox', { name: 'Поиск чатов и людей' }).fill(username);
   await page.getByRole('button', { name: new RegExp(username) }).first().click();
   await page.waitForURL(/\/chats\/.+/);

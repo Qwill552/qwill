@@ -116,3 +116,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.popping {
+  animation: pop var(--dur-menu) var(--ease-screen) forwards;
+  pointer-events: none;
+}
+
+@keyframes pop {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}

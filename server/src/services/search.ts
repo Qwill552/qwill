@@ -5,6 +5,10 @@ import { prisma } from '../db/prisma.js';
 import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { pairKeyFor } from './chat.js';
+import type { Prisma } from '../generated/prisma/client.js';
+
+const PREFIX_MIN_LENGTH = 2;
+const insensitive = 'insensitive' as const;
 
 const lastMessageInclude = {
   orderBy: { id: 'desc' as const },
@@ -39,35 +43,64 @@ function previewOf(message: LastMessage | undefined): string | null {
   return 'Файл';
 }
 
-function normalize(query: string): { needle: string; usernamesOnly: boolean } {
-  const usernamesOnly = query.startsWith('@');
-  return { needle: (usernamesOnly ? query.slice(1) : query).trim(), usernamesOnly };
+interface Query {
+  needle: string;
+  usernamesOnly: boolean;
+  exactOnly: boolean;
 }
 
-async function searchChats(needle: string, usernamesOnly: boolean, userId: string): Promise<ChatSearchResult[]> {
-  const byMember = {
-    some: {
-      userId: { not: userId },
-      user: usernamesOnly
-        ? { username: { contains: needle, mode: 'insensitive' as const } }
-        : {
-            OR: [
-              { displayName: { contains: needle, mode: 'insensitive' as const } },
-              { username: { contains: needle, mode: 'insensitive' as const } },
-            ],
-          },
-    },
+function parseQuery(raw: string): Query {
+  const usernamesOnly = raw.startsWith('@');
+  const needle = (usernamesOnly ? raw.slice(1) : raw).trim();
+  return { needle, usernamesOnly, exactOnly: needle.length < PREFIX_MIN_LENGTH };
+}
+
+function startsWithWord(needle: string): Prisma.StringFilter {
+  return { contains: ` ${needle}`, mode: insensitive };
+}
+
+function userMatches({ needle, usernamesOnly, exactOnly }: Query): Prisma.UserWhereInput {
+  if (exactOnly) {
+    const byUsername = { username: { equals: needle, mode: insensitive } };
+    if (usernamesOnly) return byUsername;
+    return { OR: [byUsername, { displayName: { equals: needle, mode: insensitive } }] };
+  }
+
+  const byUsername = { username: { startsWith: needle, mode: insensitive } };
+  if (usernamesOnly) return byUsername;
+  return {
+    OR: [byUsername, { displayName: { startsWith: needle, mode: insensitive } }, { displayName: startsWithWord(needle) }],
   };
+}
+
+function titleMatches({ needle, exactOnly }: Query): Prisma.ChatWhereInput {
+  if (exactOnly) return { title: { equals: needle, mode: insensitive } };
+  return { OR: [{ title: { startsWith: needle, mode: insensitive } }, { title: startsWithWord(needle) }] };
+}
+
+function rankOf(candidate: { username: string; displayName: string }, needle: string): number {
+  const query = needle.toLowerCase();
+  const username = candidate.username.toLowerCase();
+  const displayName = candidate.displayName.toLowerCase();
+
+  if (username === query || displayName === query) return 0;
+  if (username.startsWith(query)) return 1;
+  if (displayName.startsWith(query)) return 2;
+  return 3;
+}
+
+async function searchChats(query: Query, userId: string): Promise<ChatSearchResult[]> {
+  const byOtherMember = { some: { userId: { not: userId }, user: userMatches(query) } };
 
   const memberships = await prisma.chatMember.findMany({
     where: {
       userId,
-      chat: usernamesOnly
-        ? { type: 'PRIVATE', members: byMember }
+      chat: query.usernamesOnly
+        ? { type: 'PRIVATE', members: byOtherMember }
         : {
             OR: [
-              { type: 'GROUP', title: { contains: needle, mode: 'insensitive' } },
-              { type: 'PRIVATE', members: byMember },
+              { type: 'GROUP', ...titleMatches(query) },
+              { type: 'PRIVATE', members: byOtherMember },
             ],
           },
     },
@@ -97,24 +130,12 @@ async function searchChats(needle: string, usernamesOnly: boolean, userId: strin
   });
 }
 
-async function searchUsers(
-  needle: string,
-  usernamesOnly: boolean,
-  userId: string,
-  excludeIds: Set<string>,
-): Promise<UserSearchResult[]> {
+async function searchUsers(query: Query, userId: string, excludeIds: Set<string>): Promise<UserSearchResult[]> {
   const candidates = await prisma.user.findMany({
     where: {
       id: { not: userId, notIn: [...excludeIds] },
       isService: false,
-      ...(usernamesOnly
-        ? { username: { contains: needle, mode: 'insensitive' } }
-        : {
-            OR: [
-              { username: { contains: needle, mode: 'insensitive' } },
-              { displayName: { contains: needle, mode: 'insensitive' } },
-            ],
-          }),
+      ...userMatches(query),
     },
     orderBy: { displayName: 'asc' },
     take: SEARCH_PAGE_SIZE,
@@ -127,22 +148,27 @@ async function searchUsers(
   });
   const existingPairKeys = new Set(existingChats.map((chat) => chat.pairKey));
 
-  return candidates.map((candidate) => ({
-    id: candidate.id,
-    username: candidate.username,
-    displayName: candidate.displayName,
-    avatarUrl: fileUrl(candidate.avatarFileId),
-    avatarColor: toAvatarColor(candidate.avatarColor),
-    lastSeenAt: candidate.lastSeenAt.toISOString(),
-    isContact: existingPairKeys.has(pairKeyFor(userId, candidate.id)),
-  }));
+  return candidates
+    .sort((a, b) => {
+      const byRank = rankOf(a, query.needle) - rankOf(b, query.needle);
+      return byRank !== 0 ? byRank : a.displayName.localeCompare(b.displayName, 'ru');
+    })
+    .map((candidate) => ({
+      id: candidate.id,
+      username: candidate.username,
+      displayName: candidate.displayName,
+      avatarUrl: fileUrl(candidate.avatarFileId),
+      avatarColor: toAvatarColor(candidate.avatarColor),
+      lastSeenAt: candidate.lastSeenAt.toISOString(),
+      isContact: existingPairKeys.has(pairKeyFor(userId, candidate.id)),
+    }));
 }
 
-export async function search(query: string, userId: string): Promise<SearchResultsDto> {
-  const { needle, usernamesOnly } = normalize(query);
-  if (needle.length === 0) return { chats: [], users: [] };
+export async function search(raw: string, userId: string): Promise<SearchResultsDto> {
+  const query = parseQuery(raw);
+  if (query.needle.length === 0) return { chats: [], users: [] };
 
-  const chats = await searchChats(needle, usernamesOnly, userId);
+  const chats = await searchChats(query, userId);
 
   const alreadyShown = new Set<string>();
   for (const membership of await prisma.chatMember.findMany({
@@ -152,6 +178,6 @@ export async function search(query: string, userId: string): Promise<SearchResul
     if (membership.userId !== userId) alreadyShown.add(membership.userId);
   }
 
-  const users = await searchUsers(needle, usernamesOnly, userId, alreadyShown);
+  const users = await searchUsers(query, userId, alreadyShown);
   return { chats, users };
 }

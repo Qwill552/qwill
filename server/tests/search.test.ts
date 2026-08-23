@@ -28,6 +28,14 @@ async function registerUser(suffix: string, name: string): Promise<TestUser> {
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username, displayName };
 }
 
+async function registerOneLetterUser(suffix: string, displayName: string): Promise<TestUser> {
+  const username = `srch_${RUN_ID}_${suffix}`;
+  const res = await request.post('/api/auth/register').send({ username, password: 'password123', displayName });
+  expect(res.status).toBe(201);
+  createdUserIds.push(res.body.user.id as string);
+  return { token: res.body.accessToken as string, userId: res.body.user.id as string, username, displayName };
+}
+
 async function startPrivateChat(actor: TestUser, withUser: TestUser): Promise<string> {
   const res = await request
     .post('/api/chats/private')
@@ -70,6 +78,7 @@ describe('GET /api/search (этап 4, R-10)', () => {
   let known: TestUser;
   let stranger: TestUser;
   let strangerFriend: TestUser;
+  let solo: TestUser;
   let strangerChatId: string;
 
   beforeAll(async () => {
@@ -77,6 +86,7 @@ describe('GET /api/search (этап 4, R-10)', () => {
     known = await registerUser('known', 'Знакомый');
     stranger = await registerUser('stranger', 'Чужой');
     strangerFriend = await registerUser('friend', 'Подруга');
+    solo = await registerOneLetterUser('solo', 'ЙЙЙ');
 
     await startPrivateChat(me, known);
     strangerChatId = await startPrivateChat(stranger, strangerFriend);
@@ -111,14 +121,27 @@ describe('GET /api/search (этап 4, R-10)', () => {
     expect(userIds(results)).not.toContain(me.userId);
   });
 
-  it('одной буквы достаточно, чтобы получить выдачу', async () => {
-    const results = await search(me, 'ч');
+  it('одна буква ищет только точное совпадение целиком', async () => {
+    const exact = await search(me, 'ЙЙЙ');
+    expect(userIds(exact)).toContain(solo.userId);
 
-    expect(results.users.length + results.chats.length).toBeGreaterThan(0);
+    const single = await search(me, 'ч');
+    expect(userIds(single)).not.toContain(stranger.userId);
+  });
+
+  it('ищет по началу имени и по началу слова, но не по середине', async () => {
+    const byStart = await search(me, 'Чуж');
+    expect(userIds(byStart)).toContain(stranger.userId);
+
+    const byWordStart = await search(me, RUN_ID.slice(0, 3));
+    expect(userIds(byWordStart)).toContain(stranger.userId);
+
+    const byMiddle = await search(me, 'ужой');
+    expect(userIds(byMiddle)).not.toContain(stranger.userId);
   });
 
   it('находит человека по username — и без ведущего @, и с ним', async () => {
-    const plain = await search(me, `srch_${RUN_ID}_stranger`);
+    const plain = await search(me, `srch_${RUN_ID}_str`);
     expect(userIds(plain)).toContain(stranger.userId);
 
     const at = await search(me, `@srch_${RUN_ID}_stranger`);

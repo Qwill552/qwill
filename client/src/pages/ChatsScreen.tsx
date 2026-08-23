@@ -50,8 +50,6 @@ export function ChatsScreen() {
   const listRef = useRef<ChatListHandle>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
-  const searchTriggerRef = useRef<HTMLButtonElement>(null);
-  const searchIconRef = useRef<HTMLButtonElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -151,12 +149,6 @@ export function ChatsScreen() {
     }
   }
 
-  function openSearchFromHeader(): void {
-    const target = searchHidden ? searchIconRef.current : searchTriggerRef.current;
-    if (!target) return;
-    openSearchReveal(target, searchHidden ? SEARCH_BUTTON_RADIUS : SEARCH_PILL_RADIUS, searchHidden);
-  }
-
   /** Круговое раскрытие из пункта меню — растёт (на ночную) или стягивается (на дневную)
    *  в точку нажатия; при повторных нажатиях (меню теперь не закрывается, keepOpen) точка
    *  каждый раз та же. */
@@ -186,7 +178,6 @@ export function ChatsScreen() {
           <div className={styles.actions}>
             <span className={`${styles.searchToggleSlot} ${searchHidden ? styles.searchToggleVisible : ''}`}>
               <button
-                ref={searchIconRef}
                 type="button"
                 className={styles.iconBtn}
                 aria-label="Поиск"
@@ -218,7 +209,6 @@ export function ChatsScreen() {
           className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
         >
           <button
-            ref={searchTriggerRef}
             type="button"
             className={styles.searchTrigger}
             tabIndex={searchHidden ? -1 : 0}
@@ -273,16 +263,6 @@ export function ChatsScreen() {
         <Sheet title="Новое сообщение" onClose={() => setComposeOpen(false)}>
           <div className={styles.sheetBody}>
             <Card>
-              <Card.Row
-                icon="search"
-                tint="violet"
-                title="Найти человека"
-                subtitle="По имени или @username"
-                onClick={() => {
-                  setComposeOpen(false);
-                  openSearchFromHeader();
-                }}
-              />
               <Card.Row
                 icon="users"
                 tint="blue"

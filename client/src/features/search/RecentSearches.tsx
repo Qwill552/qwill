@@ -16,12 +16,14 @@ interface RecentSearchesProps {
 
 interface RecentItemProps {
   className: string | undefined;
+  popping: boolean;
   children: ReactNode;
   onOpen: () => void;
   onForgetRequest: (anchor: DOMRect) => void;
+  onPopEnd: () => void;
 }
 
-function RecentItem({ className, children, onOpen, onForgetRequest }: RecentItemProps) {
+function RecentItem({ className, popping, children, onOpen, onForgetRequest, onPopEnd }: RecentItemProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const longPress = useLongPress({
     onLongPress: () => {
@@ -36,11 +38,14 @@ function RecentItem({ className, children, onOpen, onForgetRequest }: RecentItem
     <button
       ref={buttonRef}
       type="button"
-      className={className}
+      className={`${className ?? ''} ${popping ? styles.popping : ''}`}
       onClick={onOpen}
       onContextMenu={(event) => {
         event.preventDefault();
         onForgetRequest(event.currentTarget.getBoundingClientRect());
+      }}
+      onAnimationEnd={(event) => {
+        if (popping && event.target === event.currentTarget) onPopEnd();
       }}
       {...longPress}
     >
@@ -53,6 +58,7 @@ export function RecentSearches({ onOpenChat }: RecentSearchesProps) {
   const entries = useRecentSearchStore((s) => s.entries);
   const forget = useRecentSearchStore((s) => s.forget);
   const [forgetTarget, setForgetTarget] = useState<{ chatId: string; anchor: DOMRect } | null>(null);
+  const [popping, setPopping] = useState<string | null>(null);
 
   const people = entries.filter((entry) => entry.kind === 'user');
   const chats = entries.filter((entry) => entry.kind === 'chat');
@@ -84,8 +90,13 @@ export function RecentSearches({ onOpenChat }: RecentSearchesProps) {
               <RecentItem
                 key={entry.chatId}
                 className={styles.person}
+                popping={popping === entry.chatId}
                 onOpen={() => onOpenChat(entry.chatId)}
                 onForgetRequest={(anchor) => setForgetTarget({ chatId: entry.chatId, anchor })}
+                onPopEnd={() => {
+                  setPopping(null);
+                  forget(entry.chatId);
+                }}
               >
                 {avatarOf(entry, 54)}
                 <span className={styles.personName}>{entry.title}</span>
@@ -102,8 +113,13 @@ export function RecentSearches({ onOpenChat }: RecentSearchesProps) {
             <RecentItem
               key={entry.chatId}
               className={styles.row}
+              popping={popping === entry.chatId}
               onOpen={() => onOpenChat(entry.chatId)}
               onForgetRequest={(anchor) => setForgetTarget({ chatId: entry.chatId, anchor })}
+              onPopEnd={() => {
+                setPopping(null);
+                forget(entry.chatId);
+              }}
             >
               {avatarOf(entry, 44)}
               <span className={styles.rowName}>
@@ -125,7 +141,7 @@ export function RecentSearches({ onOpenChat }: RecentSearchesProps) {
               label: 'Убрать из недавних',
               icon: 'trash',
               danger: true,
-              onSelect: () => forget(forgetTarget.chatId),
+              onSelect: () => setPopping(forgetTarget.chatId),
             },
           ]}
         />

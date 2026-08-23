@@ -13,6 +13,7 @@ import { EmptyState } from '../chats/EmptyState';
 import styles from './SearchResults.module.css';
 
 const DEBOUNCE_MS = 250;
+const WORD_BOUNDARY = /[\s_.@-]/;
 
 interface SearchResultsProps {
   query: string;
@@ -29,14 +30,16 @@ export function highlight(text: string, needle: string): ReactNode {
   let at = haystack.indexOf(target);
 
   while (at !== -1) {
-    if (at > from) parts.push(text.slice(from, at));
-    parts.push(
-      <mark key={at} className={styles.hit}>
-        {text.slice(at, at + needle.length)}
-      </mark>,
-    );
-    from = at + needle.length;
-    at = haystack.indexOf(target, from);
+    if (at === 0 || WORD_BOUNDARY.test(text[at - 1] ?? '')) {
+      if (at > from) parts.push(text.slice(from, at));
+      parts.push(
+        <mark key={at} className={styles.hit}>
+          {text.slice(at, at + needle.length)}
+        </mark>,
+      );
+      from = at + needle.length;
+    }
+    at = haystack.indexOf(target, at + 1);
   }
   if (parts.length === 0) return text;
   if (from < text.length) parts.push(text.slice(from));
@@ -165,7 +168,7 @@ export function SearchResults({ query, onOpenChat }: SearchResultsProps) {
               />
               <span className={styles.body}>
                 <span className={styles.name}>
-                  {highlight(chat.title, needle)}
+                  <span className={styles.nameText}>{highlight(chat.title, needle)}</span>
                   {chat.isService && <OfficialMark size={14} />}
                 </span>
                 {chat.lastMessagePreview && <span className={styles.meta}>{chat.lastMessagePreview}</span>}
@@ -190,7 +193,9 @@ export function SearchResults({ query, onOpenChat }: SearchResultsProps) {
               >
                 <Avatar label={user.displayName} avatarUrl={user.avatarUrl} size={44} color={user.avatarColor} />
                 <span className={styles.body}>
-                  <span className={styles.name}>{highlight(user.displayName, needle)}</span>
+                  <span className={styles.name}>
+                    <span className={styles.nameText}>{highlight(user.displayName, needle)}</span>
+                  </span>
                   <span className={styles.meta}>
                     <span className={styles.username}>@{highlight(user.username, needle)}</span>
                     <span className={status.online ? styles.online : undefined}>{status.text}</span>
