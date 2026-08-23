@@ -5,6 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+const PHONE_VIEWPORT = { width: 420, height: 900 };
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: 'offline.spec.ts',
@@ -22,7 +24,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], viewport: PHONE_VIEWPORT },
     },
   ],
   webServer: [

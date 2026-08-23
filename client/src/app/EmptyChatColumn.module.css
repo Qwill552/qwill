@@ -1,0 +1,15 @@
+.column {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  background: var(--chat-bg);
+}
+
+.center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  height: 100%;
+  padding: 0 var(--space-6);
+  place-items: center;
+}
