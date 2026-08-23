@@ -4,12 +4,17 @@ const STORAGE_KEY = 'messenger.desktopListWidth';
 
 export const DESKTOP_LIST_WIDTH_DEFAULT = 460;
 export const DESKTOP_LIST_WIDTH_MIN = 360;
-export const DESKTOP_LIST_WIDTH_MAX = 560;
+export const DESKTOP_LIST_WIDTH_BASE_MAX = 560;
+export const DESKTOP_LIST_WIDTH_SHARE = 0.4;
 export const DESKTOP_CHAT_MIN_WIDTH = 480;
 
-export function clampDesktopListWidth(px: number, maxWidth = DESKTOP_LIST_WIDTH_MAX): number {
-  const upper = Math.max(DESKTOP_LIST_WIDTH_MIN, Math.min(DESKTOP_LIST_WIDTH_MAX, maxWidth));
-  return Math.min(upper, Math.max(DESKTOP_LIST_WIDTH_MIN, Math.round(px)));
+export function maxDesktopListWidth(available: number): number {
+  const proportional = Math.max(DESKTOP_LIST_WIDTH_BASE_MAX, available * DESKTOP_LIST_WIDTH_SHARE);
+  return Math.max(DESKTOP_LIST_WIDTH_MIN, Math.min(available - DESKTOP_CHAT_MIN_WIDTH, proportional));
+}
+
+export function clampDesktopListWidth(px: number, available = window.innerWidth): number {
+  return Math.min(maxDesktopListWidth(available), Math.max(DESKTOP_LIST_WIDTH_MIN, Math.round(px)));
 }
 
 export function applyDesktopListWidth(px: number): void {
@@ -18,7 +23,9 @@ export function applyDesktopListWidth(px: number): void {
 
 function readStored(): number {
   const stored = Number(localStorage.getItem(STORAGE_KEY));
-  return Number.isFinite(stored) && stored > 0 ? clampDesktopListWidth(stored) : DESKTOP_LIST_WIDTH_DEFAULT;
+  return Number.isFinite(stored) && stored > 0
+    ? Math.max(DESKTOP_LIST_WIDTH_MIN, Math.round(stored))
+    : DESKTOP_LIST_WIDTH_DEFAULT;
 }
 
 interface DesktopColumnsState {

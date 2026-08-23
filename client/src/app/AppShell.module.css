@@ -22,7 +22,8 @@
 }
 
 .desktop {
-  --list-column-w: clamp(360px, var(--desktop-list-w, 460px), max(360px, 100% - 480px));
+  --list-column-max: max(360px, min(100% - 480px, max(560px, 40%)));
+  --list-column-w: clamp(360px, var(--desktop-list-w, 460px), var(--list-column-max));
 }
 
 .desktop .canvas {

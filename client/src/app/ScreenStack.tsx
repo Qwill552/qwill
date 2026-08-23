@@ -22,7 +22,6 @@ import { StubScreen } from '../pages/StubScreen';
 import {
   applyDesktopListWidth,
   clampDesktopListWidth,
-  DESKTOP_CHAT_MIN_WIDTH,
   DESKTOP_LIST_WIDTH_DEFAULT,
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
@@ -160,7 +159,7 @@ export function ScreenStack() {
   const stackRef = useRef<HTMLDivElement>(null);
   const columnsRef = useRef<HTMLDivElement>(null);
   const listColumnRef = useRef<HTMLDivElement>(null);
-  const resizeRef = useRef<{ pointerId: number; startX: number; startWidth: number; maxWidth: number; width: number } | null>(
+  const resizeRef = useRef<{ pointerId: number; startX: number; startWidth: number; available: number; width: number } | null>(
     null,
   );
 
@@ -524,7 +523,7 @@ export function ScreenStack() {
     function handleMove(event: globalThis.PointerEvent): void {
       const resize = resizeRef.current;
       if (!resize || event.pointerId !== resize.pointerId) return;
-      const width = clampDesktopListWidth(resize.startWidth + (event.clientX - resize.startX), resize.maxWidth);
+      const width = clampDesktopListWidth(resize.startWidth + (event.clientX - resize.startX), resize.available);
       resize.width = width;
       applyDesktopListWidth(width);
     }
@@ -555,7 +554,7 @@ export function ScreenStack() {
       pointerId: event.pointerId,
       startX: event.clientX,
       startWidth,
-      maxWidth: available - DESKTOP_CHAT_MIN_WIDTH,
+      available,
       width: startWidth,
     };
     document.body.style.setProperty('cursor', 'col-resize');
