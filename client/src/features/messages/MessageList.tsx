@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
 import { useAuthStore } from '../../stores/authStore';
@@ -22,6 +23,17 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
+
+interface MessageRowData {
+  message: LocalMessage;
+  lastId: number;
+  groupIds: number[];
+  album: LocalMessage[] | null;
+  reactions: MessageReactionDto[];
+  sameAuthorAsPrev: boolean;
+  sameAuthorAsNext: boolean;
+  showDay: boolean;
+}
 
 function isSameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
@@ -259,59 +271,35 @@ export function MessageList({
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
         )}
 
-        {rows.map(({ message, lastId, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext, showDay }) => {
-          const own = message.sender?.id === myId;
-          const delivered = message.status !== 'sending' && message.status !== 'failed';
-          const read = own && delivered && isReadByOthers(readCursors, myId, lastId);
-          const isReal = message.id > 0;
-          const canAct = isReal && !message.deletedAt;
+        {rows.map((row) => {
+          const own = row.message.sender?.id === myId;
+          const delivered = row.message.status !== 'sending' && row.message.status !== 'failed';
+          const isReal = row.message.id > 0;
+          const canAct = isReal && !row.message.deletedAt;
 
           return (
-            <Fragment key={message.clientId ?? message.id}>
-              {showDay && <DateDivider iso={message.createdAt} />}
-              {unreadAnchor.current !== null && groupIds.includes(unreadAnchor.current) && (
-                <UnreadDivider count={unreadCount} />
-              )}
-
-              <MessageRow
-                own={own}
-                sender={message.sender}
-                withAvatarColumn={isGroup}
-                showAvatar={!sameAuthorAsNext}
-                message={message}
-                groupIds={groupIds}
-                reactions={reactions}
-                chatId={chatId}
-                myId={myId}
-                read={read}
-                canEdit={own && canAct}
-                canDelete={(own || isGroupAdmin) && canAct}
-                canPin={canPinBase && canAct}
-                canReply={!isService}
-                canReact={!isService}
-                isPinned={pinnedMessage !== null && groupIds.includes(pinnedMessage.id)}
-                onReply={onReply}
-                onEdit={onEdit}
-                onForwardRequest={onForwardRequest}
-              >
-                <MessageBubble
-                  message={message}
-                  own={own}
-                  read={read}
-                  showAuthor={isGroup && !own && !sameAuthorAsPrev}
-                  album={album ?? undefined}
-                >
-                  {isReal && !message.deletedAt && (
-                    <MessageReactions
-                      reactions={reactions}
-                      myId={myId}
-                      chatId={chatId}
-                      onToggle={(emoji) => toggleReaction(chatId, message.id, emoji)}
-                    />
-                  )}
-                </MessageBubble>
-              </MessageRow>
-            </Fragment>
+            <MessageListRow
+              key={row.message.clientId ?? row.message.id}
+              row={row}
+              chatId={chatId}
+              myId={myId}
+              isGroup={isGroup}
+              own={own}
+              read={own && delivered && isReadByOthers(readCursors, myId, row.lastId)}
+              isReal={isReal}
+              canEdit={own && canAct}
+              canDelete={(own || isGroupAdmin) && canAct}
+              canPin={canPinBase && canAct}
+              canReply={!isService}
+              canReact={!isService}
+              isPinned={pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id)}
+              showUnread={unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current)}
+              unreadCount={unreadCount}
+              onReply={onReply}
+              onEdit={onEdit}
+              onForwardRequest={onForwardRequest}
+              onToggleReaction={toggleReaction}
+            />
           );
         })}
 
@@ -341,3 +329,93 @@ export function MessageList({
     </>
   );
 }
+
+const MessageListRow = memo(function MessageListRow({
+  row,
+  chatId,
+  myId,
+  isGroup,
+  own,
+  read,
+  isReal,
+  canEdit,
+  canDelete,
+  canPin,
+  canReply,
+  canReact,
+  isPinned,
+  showUnread,
+  unreadCount,
+  onReply,
+  onEdit,
+  onForwardRequest,
+  onToggleReaction,
+}: {
+  row: MessageRowData;
+  chatId: string;
+  myId: string | null;
+  isGroup: boolean;
+  own: boolean;
+  read: boolean;
+  isReal: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canPin: boolean;
+  canReply: boolean;
+  canReact: boolean;
+  isPinned: boolean;
+  showUnread: boolean;
+  unreadCount: number;
+  onReply: (message: LocalMessage) => void;
+  onEdit: (message: LocalMessage) => void;
+  onForwardRequest: (messageIds: number[]) => void;
+  onToggleReaction: (chatId: string, messageId: number, emoji: string) => void;
+}) {
+  const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext, showDay } = row;
+
+  return (
+    <>
+      {showDay && <DateDivider iso={message.createdAt} />}
+      {showUnread && <UnreadDivider count={unreadCount} />}
+
+      <MessageRow
+        own={own}
+        sender={message.sender}
+        withAvatarColumn={isGroup}
+        showAvatar={!sameAuthorAsNext}
+        message={message}
+        groupIds={groupIds}
+        reactions={reactions}
+        chatId={chatId}
+        myId={myId}
+        read={read}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        canPin={canPin}
+        canReply={canReply}
+        canReact={canReact}
+        isPinned={isPinned}
+        onReply={onReply}
+        onEdit={onEdit}
+        onForwardRequest={onForwardRequest}
+      >
+        <MessageBubble
+          message={message}
+          own={own}
+          read={read}
+          showAuthor={isGroup && !own && !sameAuthorAsPrev}
+          album={album ?? undefined}
+        >
+          {isReal && !message.deletedAt && (
+            <MessageReactions
+              reactions={reactions}
+              myId={myId}
+              chatId={chatId}
+              onToggle={(emoji) => onToggleReaction(chatId, message.id, emoji)}
+            />
+          )}
+        </MessageBubble>
+      </MessageRow>
+    </>
+  );
+});

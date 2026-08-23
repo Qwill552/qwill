@@ -45,7 +45,8 @@ import {
   updateMemberRoleRequest,
 } from '../api/chats';
 import { NetworkError } from '../api/client';
-import { generateImageThumbnail, generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
+import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
+import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment } from '../cache/db';
 import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import {
@@ -243,6 +244,48 @@ function seedPresence(
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const uploadAbortControllers = new Map<string, AbortController>();
+
+interface PreparedImage {
+  thumb: File;
+  thumbSha256: string;
+  preview: Blob;
+  width: number;
+  height: number;
+}
+
+const preparedImages = new Map<string, Promise<PreparedImage>>();
+
+const UPLOAD_SLOTS = 2;
+
+let activeUploads = 0;
+const uploadQueue: (() => void)[] = [];
+
+async function takeUploadSlot(): Promise<void> {
+  if (activeUploads >= UPLOAD_SLOTS) await new Promise<void>((resolve) => uploadQueue.push(resolve));
+  activeUploads += 1;
+}
+
+function freeUploadSlot(): void {
+  activeUploads -= 1;
+  uploadQueue.shift()?.();
+}
+
+function prepareImage(clientId: string, file: File): Promise<PreparedImage> {
+  const ready = preparedImages.get(clientId);
+  if (ready) return ready;
+
+  const task = buildImageAssets(file).then((assets) => ({
+    thumb: new File([assets.thumb], 'thumb.jpg', { type: 'image/jpeg' }),
+    thumbSha256: assets.thumbHash,
+    preview: assets.preview,
+    width: assets.width,
+    height: assets.height,
+  }));
+
+  task.catch(() => preparedImages.delete(clientId));
+  preparedImages.set(clientId, task);
+  return task;
+}
 
 const CALL_START_SYNC_TIMEOUT_MS = 8000;
 
@@ -554,7 +597,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const clientId = crypto.randomUUID();
     const kind = attachmentKind(file.type, Boolean(options.peaks));
-    const previewUrl = kind === 'image' || kind === 'video' ? URL.createObjectURL(file) : undefined;
+    const previewUrl = kind === 'video' ? URL.createObjectURL(file) : undefined;
     const replyTo = options.replyTo;
 
     const optimistic: LocalMessage = {
@@ -611,7 +654,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    if (kind === 'image' || kind === 'video') {
+    if (kind === 'image') {
+      void prepareImage(clientId, file)
+        .then((prepared) => {
+          get().updateLocalAttachment(chatId, clientId, {
+            previewUrl: URL.createObjectURL(prepared.preview),
+            width: prepared.width,
+            height: prepared.height,
+          });
+        })
+        .catch(() => undefined);
+    } else if (kind === 'video') {
       void measureMediaSize(file).then((size) => {
         if (size) get().updateLocalAttachment(chatId, clientId, size);
       });
@@ -641,7 +694,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
+    await takeUploadSlot();
+
     try {
+      controller.signal.throwIfAborted();
+
       const isImage = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
 
@@ -652,12 +709,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       let videoDuration: number | undefined;
 
       if (isImage) {
-        const thumb = await generateImageThumbnail(file);
-        const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
+        const prepared = await prepareImage(clientId, file);
+        const uploadedThumb = await uploadFile(
+          prepared.thumb,
+          'message',
+          undefined,
+          controller.signal,
+          prepared.thumbSha256,
+        );
         thumbnailFileId = uploadedThumb.id;
         thumbnailSha256 = uploadedThumb.sha256;
-        width = thumb.width;
-        height = thumb.height;
+        width = prepared.width;
+        height = prepared.height;
       } else if (isVideo) {
         const thumb = await generateVideoThumbnail(file);
         const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
@@ -705,6 +768,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
         (ack: MessageSendAck) => {
           uploadAbortControllers.delete(clientId);
+          preparedImages.delete(clientId);
           if (ack.ok && ack.message) {
             void dequeueOutbox(clientId);
             get().applyIncomingMessage(ack.message);
@@ -722,12 +786,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         error: error instanceof Error ? error.message : 'Не удалось загрузить файл',
       });
       get().setMessageFailed(chatId, clientId);
+    } finally {
+      freeUploadSlot();
     }
   },
 
   cancelAttachmentUpload(chatId, clientId) {
     uploadAbortControllers.get(clientId)?.abort();
     uploadAbortControllers.delete(clientId);
+    preparedImages.delete(clientId);
     void dequeueOutbox(clientId);
 
     set((state) => {

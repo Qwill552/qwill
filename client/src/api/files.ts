@@ -6,22 +6,10 @@ import {
   THUMBNAIL_MAX_DIMENSION,
   UPLOAD_OFFSET_HEADER,
 } from '@messenger/shared';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { API_URL, apiFetch, apiRequest, ApiError } from './client';
-
-/** Читает файл кусками, а не целиком — иначе 2 ГБ пришлось бы держать в памяти вкладки целиком (секция 7). */
-const HASH_CHUNK_SIZE = 8 * 1024 * 1024;
-
-async function hashFile(file: File): Promise<string> {
-  const hasher = sha256.create();
-  for (let offset = 0; offset < file.size; offset += HASH_CHUNK_SIZE) {
-    const slice = file.slice(offset, Math.min(offset + HASH_CHUNK_SIZE, file.size));
-    hasher.update(new Uint8Array(await slice.arrayBuffer()));
-  }
-  return bytesToHex(hasher.digest());
-}
+import { canvasToJpegBlob, downscaleInSteps, fitDimensions, type SourceRect } from './imageCanvas';
+import { hashBlob } from './mediaTasks';
 
 function initUploadRequest(input: InitUploadInput): Promise<InitUploadResponse> {
   return apiRequest<InitUploadResponse>('/api/files/upload', { method: 'POST', body: input });
@@ -68,8 +56,9 @@ export async function uploadFile(
   purpose: UploadPurpose,
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal,
+  knownSha256?: string,
 ): Promise<UploadedFile> {
-  const sha256Hex = await hashFile(file);
+  const sha256Hex = knownSha256 ?? (await hashBlob(file));
   const mimeType = file.type || 'application/octet-stream';
 
   const init = await initUploadRequest({
@@ -109,63 +98,8 @@ export async function uploadFile(
   }
 }
 
-export interface SourceRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-function fitDimensions(width: number, height: number, maxDimension: number): { width: number; height: number } {
-  if (width <= maxDimension && height <= maxDimension) return { width, height };
-  const scale = maxDimension / Math.max(width, height);
-  return { width: Math.round(width * scale), height: Math.round(height * scale) };
-}
-
-function drawScaled(source: CanvasImageSource, rect: SourceRect, width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas недоступен');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height, 0, 0, width, height);
-  return canvas;
-}
-
-function downscaleInSteps(
-  source: CanvasImageSource,
-  rect: SourceRect,
-  target: { width: number; height: number },
-): HTMLCanvasElement {
-  let current = source;
-  let currentRect = rect;
-
-  while (currentRect.width > target.width * 2 && currentRect.height > target.height * 2) {
-    const width = Math.max(target.width, Math.round(currentRect.width / 2));
-    const height = Math.max(target.height, Math.round(currentRect.height / 2));
-    current = drawScaled(current, currentRect, width, height);
-    currentRect = { x: 0, y: 0, width, height };
-  }
-
-  return drawScaled(current, currentRect, target.width, target.height);
-}
-
-function canvasToJpegFile(canvas: HTMLCanvasElement, name: string, quality: number): Promise<File> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error('Не удалось создать превью'));
-          return;
-        }
-        resolve(new File([blob], name, { type: 'image/jpeg' }));
-      },
-      'image/jpeg',
-      quality,
-    );
-  });
+async function canvasToJpegFile(canvas: HTMLCanvasElement, name: string, quality: number): Promise<File> {
+  return new File([await canvasToJpegBlob(canvas, quality)], name, { type: 'image/jpeg' });
 }
 
 export function cropImageToAvatarFile(image: HTMLImageElement, rect: SourceRect): Promise<File> {
@@ -178,35 +112,6 @@ export interface ThumbnailResult {
   file: File;
   width: number;
   height: number;
-}
-
-/** Уменьшенная копия снимается канвасом на клиенте — сервер обходится без ffmpeg (секция 7). */
-export function generateImageThumbnail(source: File): Promise<ThumbnailResult> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(source);
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const source = { x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight };
-      const target = fitDimensions(source.width, source.height, THUMBNAIL_MAX_DIMENSION);
-      let canvas: HTMLCanvasElement;
-      try {
-        canvas = downscaleInSteps(img, source, target);
-      } catch (error) {
-        reject(error);
-        return;
-      }
-      canvasToJpegFile(canvas, 'thumb.jpg', THUMBNAIL_JPEG_QUALITY)
-        .then((file) => resolve({ file, width: source.width, height: source.height }))
-        .catch(reject);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Не удалось прочитать изображение'));
-    };
-    img.src = url;
-  });
 }
 
 export interface MediaSize {

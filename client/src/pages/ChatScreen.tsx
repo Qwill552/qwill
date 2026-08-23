@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useBackHandler } from '../app/useBackHandler';
@@ -20,7 +20,7 @@ import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
 import { useAuthStore } from '../stores/authStore';
 import { useCallStore } from '../stores/callStore';
-import { useChatStore } from '../stores/chatStore';
+import { type LocalMessage, useChatStore } from '../stores/chatStore';
 import { formatLastSeen } from '../utils/presence';
 import styles from './ChatScreen.module.css';
 
@@ -95,6 +95,9 @@ export function ChatScreen() {
    *  а на первом рендере узла ещё нет; `useState` даёт лишний ре-рендер в момент коммита,
    *  когда узел появляется, и `MessageList` получает валидный контейнер, а не `null`. */
   const [pinnedSlot, setPinnedSlot] = useState<HTMLDivElement | null>(null);
+
+  const handleReply = useCallback((message: LocalMessage) => setComposerContext({ mode: 'reply', message }), []);
+  const handleEdit = useCallback((message: LocalMessage) => setComposerContext({ mode: 'edit', message }), []);
 
   // Кнопка/жест «назад» выходит из мультивыбора раньше, чем уходит из чата (ux-ui/06,
   // «Готово когда»). Контекстное меню регистрируется отдельно, внутри MessageContextMenu —
@@ -267,8 +270,8 @@ export function ChatScreen() {
         isGroup={isGroup}
         typing={isTyping}
         emojiPanelOpen={emojiPanelOpen}
-        onReply={(message) => setComposerContext({ mode: 'reply', message })}
-        onEdit={(message) => setComposerContext({ mode: 'edit', message })}
+        onReply={handleReply}
+        onEdit={handleEdit}
         onForwardRequest={setForwardRequest}
         pinnedSlot={pinnedSlot}
       />

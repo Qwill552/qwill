@@ -97,7 +97,12 @@ function UploadingTile({
 
   return (
     <div className={`${tileStyles.tile} ${styles.cell}`} style={style}>
-      {local?.previewUrl && <img className={tileStyles.cover} src={local.previewUrl} alt="" draggable={false} />}
+      {local?.previewUrl &&
+        (local.kind === 'video' ? (
+          <video className={tileStyles.cover} src={local.previewUrl} muted playsInline />
+        ) : (
+          <img className={tileStyles.cover} src={local.previewUrl} alt="" draggable={false} />
+        ))}
       <span className={styles.uploading}>
         {failed ? (
           <button type="button" className={styles.tileButton} onClick={onRetry} aria-label="Повторить отправку">

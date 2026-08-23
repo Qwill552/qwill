@@ -51,6 +51,8 @@ export function LocalAttachmentPreview({
       <img className={styles.image} src={local.previewUrl} alt={local.name} />
     ) : local.previewUrl && local.kind === 'video' ? (
       <video className={styles.video} src={local.previewUrl} muted />
+    ) : local.kind === 'image' ? (
+      <div className={styles.imagePlaceholder} />
     ) : (
       <div className={styles.file}>
         <Icon name={localIcon(local.kind)} size={22} className={styles.fileIcon} />
