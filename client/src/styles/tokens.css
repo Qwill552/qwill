@@ -70,7 +70,8 @@
   --surface-2: #ffffff;
   --surface-3: #e4e9f4;
   --chat-bg: #e7ebf4;
-  --chat-pattern-ink: rgb(28 32 45 / 9%);
+  --chat-pattern-ink: rgb(0 0 0 / 30%);
+  --wallpaper-default: linear-gradient(#d8e2ed, #d8e2ed);
   --message-in: #ffffff;
   --message-out: #dbe6ff;
   --message-out-from: #5b8dff;
@@ -137,7 +138,11 @@
   --surface-2: #1b2338;
   --surface-3: #232c46;
   --chat-bg: #0d0f18;
-  --chat-pattern-ink: rgb(190 205 255 / 7%);
+  --chat-pattern-ink: rgb(255 255 255 / 14%);
+  --wallpaper-default:
+    radial-gradient(107.51% 72.48% at 0% 100%, #21414e 0%, rgb(33 65 78 / 0%) 100%),
+    radial-gradient(127.72% 73.03% at 100% 0%, #39305a 0%, rgb(57 48 90 / 0%) 100%),
+    linear-gradient(#111233, #111233);
   --message-in: #1c2336;
   --message-out: #6a7de0;
   --message-out-from: #4d8dff;
@@ -189,6 +194,14 @@
    и нарушать правило «цвет только через var()». */
 :root {
   --lift: #ffffff;
+}
+
+:root {
+  --wallpaper-summer:
+    radial-gradient(65.98% 75.49% at 0% 100%, rgb(238 228 146 / 72%) 0%, rgb(238 228 146 / 0%) 100%),
+    radial-gradient(76.8% 87.87% at 100% 100%, rgb(224 166 118 / 86%) 0%, rgb(224 166 118 / 22.4%) 100%),
+    radial-gradient(125.47% 77.59% at 0% 15.76%, #ff7cb2 0%, rgb(230 162 190 / 0%) 100%),
+    linear-gradient(#e2c27a, #e2c27a);
 }
 
 /* Тона цветных плиток в списках настроек: одна светлота и одна насыщенность на все восемь,
