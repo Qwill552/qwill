@@ -39,6 +39,7 @@ export default defineConfig(() => {
         injectManifest: {
           // API — отдельный origin (секция 6), в прекэш статики попадать не должен.
           globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+          globIgnores: ['**/wallpaper/patterns/*.svg'],
         },
         // Без этого SW не обслуживается в `npm run dev` — пуши было бы нельзя проверить без сборки.
         devOptions: {

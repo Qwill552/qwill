@@ -70,6 +70,7 @@
   --surface-2: #ffffff;
   --surface-3: #e4e9f4;
   --chat-bg: #e7ebf4;
+  --chat-pattern-ink: rgb(28 32 45 / 9%);
   --message-in: #ffffff;
   --message-out: #dbe6ff;
   --message-out-from: #5b8dff;
@@ -136,6 +137,7 @@
   --surface-2: #1b2338;
   --surface-3: #232c46;
   --chat-bg: #0d0f18;
+  --chat-pattern-ink: rgb(190 205 255 / 7%);
   --message-in: #1c2336;
   --message-out: #6a7de0;
   --message-out-from: #4d8dff;

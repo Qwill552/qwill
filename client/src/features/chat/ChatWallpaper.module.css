@@ -17,10 +17,24 @@
   background-image: url('/wallpaper/wall-day.jpg');
 }
 
+.pattern {
+  display: none;
+}
+
 @media (min-width: 900px) {
   .wallpaper,
   :global(:root[data-theme='light']) .wallpaper {
     background-image: none;
+  }
+
+  .pattern {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background-color: var(--chat-pattern-ink);
+    mask-image: var(--chat-pattern-src);
+    mask-size: 375px 812px;
+    mask-repeat: repeat;
   }
 
   .edge,
