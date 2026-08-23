@@ -1,11 +1,9 @@
-import { searchUsersQuerySchema, setAvatarSchema, updateProfileSchema, updateSettingsSchema } from '@messenger/shared';
+import { setAvatarSchema, updateProfileSchema, updateSettingsSchema } from '@messenger/shared';
 import { Router } from 'express';
 
-import { parseOrThrow } from '../../lib/validate.js';
 import {
   getSettings,
   getUserById,
-  searchUsers,
   setAvatar,
   toPublicUser,
   updateProfile,
@@ -46,15 +44,4 @@ usersRouter.patch('/me/settings', validateBody(updateSettingsSchema), (req, res,
   updateSettings(req.userId!, req.body)
     .then((settings) => res.json(settings))
     .catch(next);
-});
-
-usersRouter.get('/search', (req, res, next) => {
-  try {
-    const { q } = parseOrThrow(searchUsersQuerySchema, req.query);
-    searchUsers(q, req.userId!)
-      .then((results) => res.json({ results }))
-      .catch(next);
-  } catch (error) {
-    next(error);
-  }
 });

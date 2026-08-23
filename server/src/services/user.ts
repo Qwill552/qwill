@@ -1,12 +1,11 @@
-import type { PublicUser, UpdateProfileDTO, UpdateSettingsInput, UserSearchResult, UserSettingsDTO } from '@messenger/shared';
-import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES, USER_SEARCH_PAGE_SIZE } from '@messenger/shared';
+import type { PublicUser, UpdateProfileDTO, UpdateSettingsInput, UserSettingsDTO } from '@messenger/shared';
+import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
 import { AppError } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
-import { pairKeyFor } from './chat.js';
 import { assertAvatarEligible } from './file.js';
 import type { User } from '../generated/prisma/client.js';
 
@@ -107,34 +106,4 @@ export async function updateSettings(userId: string, data: UpdateSettingsInput):
     },
   });
   return toUserSettingsDto(user);
-}
-
-/** Поиск по подстроке username, себя исключаем; isContact — уже есть приватный чат с этим пользователем (этап 8). */
-export async function searchUsers(query: string, requesterId: string): Promise<UserSearchResult[]> {
-  const candidates = await prisma.user.findMany({
-    where: {
-      username: { contains: query.toLowerCase() },
-      id: { not: requesterId },
-      isService: false,
-    },
-    take: USER_SEARCH_PAGE_SIZE,
-    orderBy: { username: 'asc' },
-  });
-  if (candidates.length === 0) return [];
-
-  const pairKeys = candidates.map((candidate) => pairKeyFor(requesterId, candidate.id));
-  const existingChats = await prisma.chat.findMany({
-    where: { type: 'PRIVATE', pairKey: { in: pairKeys } },
-    select: { pairKey: true },
-  });
-  const existingPairKeys = new Set(existingChats.map((chat) => chat.pairKey));
-
-  return candidates.map((candidate) => ({
-    id: candidate.id,
-    username: candidate.username,
-    displayName: candidate.displayName,
-    avatarUrl: fileUrl(candidate.avatarFileId),
-    avatarColor: toAvatarColor(candidate.avatarColor),
-    isContact: existingPairKeys.has(pairKeyFor(requesterId, candidate.id)),
-  }));
 }

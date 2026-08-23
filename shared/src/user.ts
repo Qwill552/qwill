@@ -47,19 +47,3 @@ export interface UserSettingsDTO {
   fontSize: FontSize;
   surface: SurfaceMode;
 }
-
-/** Поиск по подстроке username — минимум 2 символа против полного скана таблицы на каждое нажатие (этап 8). */
-export const searchUsersQuerySchema = z.object({
-  q: z.string().trim().min(2, 'Минимум 2 символа'),
-});
-export type SearchUsersQuery = z.infer<typeof searchUsersQuerySchema>;
-
-/** isContact — уже есть приватный чат с этим пользователем (в приложении нет отдельного понятия «контакт»). */
-export interface UserSearchResult {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  avatarColor: AvatarColor;
-  isContact: boolean;
-}

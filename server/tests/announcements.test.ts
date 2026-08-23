@@ -91,11 +91,9 @@ describe('чат Qwill с объявлениями об обновлениях (
 
     it('не находится поиском людей', async () => {
       const { token } = await registerUser('search');
-      const res = await request
-        .get('/api/users/search?q=qwill')
-        .set('Authorization', `Bearer ${token}`);
+      const res = await request.get('/api/search?q=qwill').set('Authorization', `Bearer ${token}`);
       expect(res.status).toBe(200);
-      expect((res.body.results as { username: string }[]).some((u) => u.username === SERVICE_USERNAME)).toBe(false);
+      expect((res.body.users as { username: string }[]).some((u) => u.username === SERVICE_USERNAME)).toBe(false);
     });
 
     it('чат с ним нельзя начать вручную по @username', async () => {

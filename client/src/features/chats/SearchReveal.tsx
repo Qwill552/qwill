@@ -3,7 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { AmbientBlobs } from '../../app/AmbientBlobs';
 import { useBackHandler } from '../../app/useBackHandler';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
-import { EmptyState } from './EmptyState';
+import { RecentSearches } from '../search/RecentSearches';
+import { SearchResults } from '../search/SearchResults';
 import styles from './SearchReveal.module.css';
 
 export interface RevealOrigin {
@@ -29,6 +30,7 @@ interface SearchRevealProps {
    *  визуально несвязанным фейдом — выглядело как рывок). */
   onRetreatStart: () => void;
   onClose: () => void;
+  onOpenChat: (chatId: string) => void;
 }
 
 type Phase = 'dock' | 'wave-open' | 'open' | 'wave-close' | 'retreat';
@@ -63,8 +65,9 @@ const LABEL_FADE_MS = 160;
  *     маской с мягким, тающим краем (не жёсткой шторкой: пользователь настоял на дисолве).
  *  Закрытие — то же самое в обратном порядке: сперва уезжает волна, потом капсула возвращается
  *  в origin. За пределами референса — там поле поиска ничего не открывает. */
-export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }: SearchRevealProps) {
+export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose, onOpenChat }: SearchRevealProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const waveRef = useRef<HTMLDivElement>(null);
   const waveBodyRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('dock');
@@ -74,6 +77,7 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }
   // Высота .root (== .screen): по ней слой капель внутри панели растягивается на весь экран,
   // чтобы капли встали там же, где настоящие капли фона (см. waveBlobsStyle ниже).
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
 
   // ChatsScreen.tsx передаёт эти колбэки инлайн-стрелками — новая ссылка на каждый его рендер.
   // Через ref, а не в зависимостях эффекта: посторонний ререндер ChatsScreen (например, от
@@ -87,6 +91,7 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }
   const retreatMs = fromIcon ? RETREAT_MS_ICON : RETREAT_MS_PILL;
 
   const startClose = useCallback(() => {
+    inputRef.current?.blur();
     setPhase((p) => (p === 'wave-close' || p === 'retreat' ? p : 'wave-close'));
   }, []);
 
@@ -127,6 +132,11 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }
     if (phase !== 'wave-open') return;
     const timer = window.setTimeout(() => setPhase('open'), WAVE_OPEN_MS);
     return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'open') return;
+    inputRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
@@ -231,9 +241,18 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }
           <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
           <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
-        <span className={styles.dockLabel} style={labelStyle}>
-          Поиск чатов и людей
-        </span>
+        <input
+          ref={inputRef}
+          className={styles.dockInput}
+          style={labelStyle}
+          type="text"
+          value={query}
+          placeholder="Поиск чатов и людей"
+          aria-label="Поиск чатов и людей"
+          autoComplete="off"
+          enterKeyHint="search"
+          onChange={(event) => setQuery(event.target.value)}
+        />
         <button type="button" className={styles.close} aria-label="Закрыть" onClick={startClose}>
           <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
             <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -248,7 +267,11 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose }
           </div>
           <div ref={waveBodyRef} className={`${styles.waveBody} hide-native-scrollbar`} style={waveBodyStyle}>
             <ScrollIndicator target={waveBodyRef} />
-            <EmptyState title="Напиши что-то, чтобы я мог это найти" />
+            {query.trim().length > 0 ? (
+              <SearchResults query={query} onOpenChat={onOpenChat} />
+            ) : (
+              <RecentSearches onOpenChat={onOpenChat} />
+            )}
           </div>
         </div>
       )}

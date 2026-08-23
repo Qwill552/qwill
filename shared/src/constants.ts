@@ -17,8 +17,8 @@ export const MESSAGE_MAX_LENGTH = 4096;
 /** Курсорная пагинация истории (секция 4: виртуализация не нужна при таком шаге). */
 export const MESSAGES_PAGE_SIZE = 50;
 
-/** Максимум строк в ответе на GET /users/search (этап 8). */
-export const USER_SEARCH_PAGE_SIZE = 20;
+/** Максимум строк на секцию в ответе на GET /search (этап 4). */
+export const SEARCH_PAGE_SIZE = 20;
 
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;

@@ -5,7 +5,6 @@ import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
-import { UserSearch } from '../features/users/UserSearch';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { useChatStore } from '../stores/chatStore';
@@ -51,6 +50,8 @@ export function ChatsScreen() {
   const listRef = useRef<ChatListHandle>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -59,7 +60,6 @@ export function ChatsScreen() {
   const [filter, setFilter] = useState<ChatFilter>('all');
   const [composeOpen, setComposeOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [searchHidden, setSearchHidden] = useState(savedScrollTop > SEARCH_HIDE_AT);
   const [searchReveal, setSearchReveal] = useState<RevealOrigin | null>(null);
@@ -151,6 +151,12 @@ export function ChatsScreen() {
     }
   }
 
+  function openSearchFromHeader(): void {
+    const target = searchHidden ? searchIconRef.current : searchTriggerRef.current;
+    if (!target) return;
+    openSearchReveal(target, searchHidden ? SEARCH_BUTTON_RADIUS : SEARCH_PILL_RADIUS, searchHidden);
+  }
+
   /** Круговое раскрытие из пункта меню — растёт (на ночную) или стягивается (на дневную)
    *  в точку нажатия; при повторных нажатиях (меню теперь не закрывается, keepOpen) точка
    *  каждый раз та же. */
@@ -163,7 +169,6 @@ export function ChatsScreen() {
   function openChat(chatId: string): void {
     setComposeOpen(false);
     setGroupOpen(false);
-    setSearchOpen(false);
     navigate(`/chats/${chatId}`);
   }
 
@@ -181,6 +186,7 @@ export function ChatsScreen() {
           <div className={styles.actions}>
             <span className={`${styles.searchToggleSlot} ${searchHidden ? styles.searchToggleVisible : ''}`}>
               <button
+                ref={searchIconRef}
                 type="button"
                 className={styles.iconBtn}
                 aria-label="Поиск"
@@ -212,6 +218,7 @@ export function ChatsScreen() {
           className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
         >
           <button
+            ref={searchTriggerRef}
             type="button"
             className={styles.searchTrigger}
             tabIndex={searchHidden ? -1 : 0}
@@ -240,6 +247,7 @@ export function ChatsScreen() {
             setSearchReveal(null);
             setSearchDock(null);
           }}
+          onOpenChat={openChat}
         />
       )}
 
@@ -272,7 +280,7 @@ export function ChatsScreen() {
                 subtitle="По имени или @username"
                 onClick={() => {
                   setComposeOpen(false);
-                  setSearchOpen(true);
+                  openSearchFromHeader();
                 }}
               />
               <Card.Row
@@ -291,8 +299,6 @@ export function ChatsScreen() {
       )}
 
       {groupOpen && <CreateGroupModal onClose={() => setGroupOpen(false)} onCreated={openChat} />}
-
-      {searchOpen && <UserSearch onClose={() => setSearchOpen(false)} onOpenChat={openChat} />}
     </div>
   );
 }

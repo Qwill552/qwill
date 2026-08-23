@@ -77,6 +77,11 @@ interface RequestOptions {
   body?: unknown;
   /** Не повторять запрос после обновления токена — используется самими auth-эндпоинтами. */
   skipAuthRetry?: boolean;
+  signal?: AbortSignal;
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> {
@@ -90,8 +95,10 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: options.signal,
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error;
     throw new NetworkError();
   }
 

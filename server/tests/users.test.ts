@@ -1,5 +1,5 @@
 import supertest from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
@@ -30,7 +30,7 @@ async function registerUser(suffix: string, displayName: string): Promise<{ toke
   return { token: res.body.accessToken as string, userId: res.body.user.id as string };
 }
 
-describe('users profile/settings/search (этап 8)', () => {
+describe('users profile/settings (этап 8)', () => {
   afterAll(async () => {
     await prisma.file.deleteMany({ where: { id: { in: createdFileIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
@@ -138,40 +138,6 @@ describe('users profile/settings/search (этап 8)', () => {
         .send({ theme: 'purple' });
 
       expect(res.status).toBe(400);
-    });
-  });
-
-  describe('GET /users/search', () => {
-    let token: string;
-    let selfUsername: string;
-
-    beforeAll(async () => {
-      const self = await registerUser('search_me', 'Искатель');
-      token = self.token;
-      selfUsername = `stage8_${RUN_ID}_search_me`;
-
-      await registerUser('search_target', 'Найденный');
-    });
-
-    it('находит по частичному username и не находит себя', async () => {
-      const res = await request
-        .get(`/api/users/search?q=stage8_${RUN_ID}_search`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-      const usernames: string[] = res.body.results.map((u: { username: string }) => u.username);
-      expect(usernames).toContain(`stage8_${RUN_ID}_search_target`);
-      expect(usernames).not.toContain(selfUsername);
-    });
-
-    it('отвечает 400 при запросе короче 2 символов', async () => {
-      const res = await request.get('/api/users/search?q=a').set('Authorization', `Bearer ${token}`);
-      expect(res.status).toBe(400);
-    });
-
-    it('требует авторизацию', async () => {
-      const res = await request.get(`/api/users/search?q=stage8_${RUN_ID}_search`);
-      expect(res.status).toBe(401);
     });
   });
 });

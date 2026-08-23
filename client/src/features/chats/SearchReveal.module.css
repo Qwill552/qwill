@@ -42,17 +42,30 @@
   flex-shrink: 0;
 }
 
-.dockLabel {
+.dockInput {
   position: relative;
   z-index: 2;
   overflow: hidden;
   flex: 1;
+  width: 100%;
   min-width: 0;
-  color: rgba(var(--pulse-ink), 0.42);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgb(var(--pulse-ink));
+  font: inherit;
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition-property: opacity;
+}
+
+.dockInput::placeholder {
+  color: rgba(var(--pulse-ink), 0.42);
+}
+
+.dockInput:focus {
+  outline: none;
 }
 
 .close {
@@ -124,7 +137,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dockBar,
   .wave,
-  .dockLabel {
+  .dockInput {
     transition-duration: 1ms !important;
     transition-delay: 0ms !important;
   }
