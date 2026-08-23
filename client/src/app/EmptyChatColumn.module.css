@@ -5,6 +5,10 @@
   background: var(--chat-bg);
 }
 
+.logo {
+  border-radius: var(--radius-card);
+}
+
 .center {
   position: relative;
   z-index: 1;
