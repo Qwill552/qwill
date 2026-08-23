@@ -1,6 +1,28 @@
-import { session } from 'electron';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
-const DEFAULT_API_URL = 'http://localhost:3000';
+import { app, session } from 'electron';
+
+const DEFAULT_API_URL = 'https://localhost:3000';
+
+function configuredApiUrl(): string {
+  const fromEnv = process.env.QWILL_API_URL;
+  if (fromEnv) return fromEnv;
+
+  const configFile = app.isPackaged
+    ? path.join(process.resourcesPath, 'api-origin.json')
+    : path.resolve(__dirname, '..', 'api-origin.json');
+
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(configFile, 'utf8'));
+    const apiUrl = (parsed as { apiUrl?: unknown }).apiUrl;
+    if (typeof apiUrl === 'string' && apiUrl !== '') return apiUrl;
+  } catch {
+    return DEFAULT_API_URL;
+  }
+
+  return DEFAULT_API_URL;
+}
 
 function normalizeOrigin(value: string): string {
   try {
@@ -10,7 +32,7 @@ function normalizeOrigin(value: string): string {
   }
 }
 
-export const API_ORIGIN = normalizeOrigin(process.env.QWILL_API_URL ?? DEFAULT_API_URL);
+export const API_ORIGIN = normalizeOrigin(configuredApiUrl());
 
 const ALLOWED_PERMISSIONS = new Set(['media', 'clipboard-sanitized-write', 'fullscreen']);
 

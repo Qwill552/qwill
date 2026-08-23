@@ -42,6 +42,7 @@ ds-bundle/
 release.tar.gz
 
 desktop/renderer/
+desktop/api-origin.json
 
 client/android/.gradle/
 client/android/local.properties

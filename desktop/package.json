@@ -6,7 +6,7 @@
   "type": "commonjs",
   "main": "dist/main.js",
   "scripts": {
-    "build": "node scripts/copy-client.mjs && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "electron ."
   },
