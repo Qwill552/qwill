@@ -18,11 +18,12 @@
 }
 
 @media (min-width: 900px) {
-  .wallpaper {
-    background-size: auto 100%;
-    background-repeat: repeat-x;
+  .wallpaper,
+  :global(:root[data-theme='light']) .wallpaper {
+    background-image: none;
   }
 
+  .edge,
   .glow {
     display: none;
   }
