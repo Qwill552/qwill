@@ -1,12 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-  type PointerEvent,
-  type TransitionEvent,
-} from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type TransitionEvent } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
 
 import { AppearanceScreen } from '../pages/AppearanceScreen';
@@ -19,16 +11,8 @@ import { DeveloperScreen } from '../pages/DeveloperScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StubScreen } from '../pages/StubScreen';
-import {
-  applyDesktopListWidth,
-  clampDesktopListWidth,
-  DESKTOP_LIST_WIDTH_DEFAULT,
-  useDesktopColumnsStore,
-} from '../stores/desktopColumnsStore';
-import { EmptyChatColumn } from './EmptyChatColumn';
 import { hasOpenOverlay } from './useBackHandler';
-import { useLayoutMode } from './useLayoutMode';
-import { isTabRoot, parentPathOf, tabOf, transitionKind, type TransitionKind } from './routing';
+import { parentPathOf, transitionKind, type TransitionKind } from './routing';
 import { rememberTabPath } from './tabNav';
 import styles from './ScreenStack.module.css';
 
@@ -60,10 +44,6 @@ const SETTLE_EASE = 'cubic-bezier(.18,1.1,.32,1)';
 function emptyLocation(pathname: string): Location {
   return { pathname, search: '', hash: '', state: null, key: 'preview' };
 }
-
-const CHATS_ROOT_LOCATION = emptyLocation('/chats');
-const RESIZE_STEP = 16;
-const RESIZE_STEP_LARGE = 48;
 
 /** Экраны стека — обе анимируемые прослойки (уходящая/приходящая) рисуют один и тот же
  *  набор маршрутов с разным `location`, отсюда и живой предпросмотр экрана под пальцем
@@ -155,13 +135,7 @@ export function ScreenStack() {
    *  'PUSH'/'REPLACE' — навигация изнутри приложения. Нужен только там, где родство путей
    *  не читается (см. transitionKind). */
   const navigationType = useNavigationType();
-  const layout = useLayoutMode();
   const stackRef = useRef<HTMLDivElement>(null);
-  const columnsRef = useRef<HTMLDivElement>(null);
-  const listColumnRef = useRef<HTMLDivElement>(null);
-  const resizeRef = useRef<{ pointerId: number; startX: number; startWidth: number; available: number; width: number } | null>(
-    null,
-  );
 
   const [displayLocation, setDisplayLocation] = useState<Location>(location);
   const [anim, setAnim] = useState<AnimState | null>(null);
@@ -259,15 +233,6 @@ export function ScreenStack() {
 
   // Настоящая навигация (клик, программный navigate) — запускает таймированный переход.
   useEffect(() => {
-    if (layout === 'desktop') {
-      pendingCommit.current = null;
-      cancelFallback();
-      setAnim(null);
-      setTabAnim(null);
-      setDisplayLocation(location);
-      return;
-    }
-
     if (location.pathname === displayLocation.pathname) {
       if (location !== displayLocation) setDisplayLocation(location);
       return;
@@ -315,7 +280,7 @@ export function ScreenStack() {
       });
     });
     return () => cancelAnimationFrame(raf);
-  }, [location, layout]);
+  }, [location]);
 
   function handleAnimEnd(event: TransitionEvent<HTMLDivElement>): void {
     if (event.target !== event.currentTarget) return;
@@ -508,95 +473,6 @@ export function ScreenStack() {
       startTime: event.timeStamp,
       taken: false,
     };
-  }
-
-  useEffect(() => {
-    function finishResize(): void {
-      const resize = resizeRef.current;
-      if (!resize) return;
-      resizeRef.current = null;
-      document.body.style.removeProperty('cursor');
-      document.body.style.removeProperty('user-select');
-      useDesktopColumnsStore.getState().setListWidth(resize.width);
-    }
-
-    function handleMove(event: globalThis.PointerEvent): void {
-      const resize = resizeRef.current;
-      if (!resize || event.pointerId !== resize.pointerId) return;
-      const width = clampDesktopListWidth(resize.startWidth + (event.clientX - resize.startX), resize.available);
-      resize.width = width;
-      applyDesktopListWidth(width);
-    }
-
-    function handleUp(event: globalThis.PointerEvent): void {
-      if (resizeRef.current && event.pointerId !== resizeRef.current.pointerId) return;
-      finishResize();
-    }
-
-    window.addEventListener('pointermove', handleMove, { passive: true });
-    window.addEventListener('pointerup', handleUp);
-    window.addEventListener('pointercancel', handleUp);
-    return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-      window.removeEventListener('pointercancel', handleUp);
-      finishResize();
-    };
-  }, []);
-
-  function handleResizerPointerDown(event: PointerEvent<HTMLDivElement>): void {
-    if (!event.isPrimary || event.button !== 0) return;
-    const available = columnsRef.current?.getBoundingClientRect().width;
-    const startWidth = listColumnRef.current?.getBoundingClientRect().width;
-    if (!available || !startWidth) return;
-    event.preventDefault();
-    resizeRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startWidth,
-      available,
-      width: startWidth,
-    };
-    document.body.style.setProperty('cursor', 'col-resize');
-    document.body.style.setProperty('user-select', 'none');
-  }
-
-  function handleResizerKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    const step = event.shiftKey ? RESIZE_STEP_LARGE : RESIZE_STEP;
-    const { listWidth, setListWidth } = useDesktopColumnsStore.getState();
-    if (event.key === 'ArrowLeft') setListWidth(listWidth - step);
-    else if (event.key === 'ArrowRight') setListWidth(listWidth + step);
-    else if (event.key === 'Home') setListWidth(DESKTOP_LIST_WIDTH_DEFAULT);
-    else return;
-    event.preventDefault();
-  }
-
-  if (layout === 'desktop') {
-    const inChatsTab = tabOf(location.pathname) === 'chats';
-    const leftLocation = inChatsTab ? CHATS_ROOT_LOCATION : location;
-    const rightLocation = inChatsTab && !isTabRoot(location.pathname) ? location : null;
-
-    return (
-      <div className={styles.stack} ref={stackRef}>
-        <div className={styles.columns} ref={columnsRef}>
-          <div className={styles.listColumn} ref={listColumnRef}>
-            <RouteSwitch location={leftLocation} />
-          </div>
-          <div className={styles.chatColumn}>
-            {rightLocation ? <RouteSwitch location={rightLocation} /> : <EmptyChatColumn />}
-          </div>
-          <div
-            className={styles.resizer}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Ширина списка чатов"
-            tabIndex={0}
-            onPointerDown={handleResizerPointerDown}
-            onKeyDown={handleResizerKeyDown}
-          />
-        </div>
-      </div>
-    );
   }
 
   const toLocation = anim?.to ?? displayLocation;

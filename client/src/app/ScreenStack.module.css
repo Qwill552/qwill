@@ -16,59 +16,6 @@
   will-change: transform;
 }
 
-.columns {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: var(--list-column-w, 460px) 1fr;
-}
-
-.listColumn,
-.chatColumn {
-  position: relative;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.resizer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--list-column-w, 460px);
-  z-index: 6;
-  width: 11px;
-  margin-left: -5px;
-  cursor: col-resize;
-  touch-action: none;
-}
-
-.resizer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 5px;
-  width: 1px;
-  background: var(--border);
-  transition: background var(--dur-tab) ease;
-}
-
-.resizer:focus-visible {
-  outline: none;
-}
-
-@media (hover: hover) {
-  .resizer:hover::after {
-    background: var(--primary);
-  }
-}
-
-.resizer:focus-visible::after {
-  left: 4px;
-  width: 3px;
-  background: var(--primary);
-}
-
 /* Буквально slideR/slideL из референса: переключение вкладки — вход новой вкладки с
    отступом 76px, без анимации уходящей (референс её вообще не рисует — sc-if размонтирует
    мгновенно). */

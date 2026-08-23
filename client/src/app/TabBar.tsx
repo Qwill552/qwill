@@ -7,7 +7,6 @@ import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { emitTabReactivate, lastPathForTab } from './tabNav';
 import styles from './TabBar.module.css';
 import { isTabRoot, tabOf } from './routing';
-import { useLayoutMode } from './useLayoutMode';
 
 /** Пути `d` — буквально ICON.chat/person/sliders/profile из референса (viewBox 0 0 20 20,
  *  stroke-width 1.6), не общий набор иконок приложения: там другая сетка (24, вес 2). */
@@ -39,11 +38,6 @@ const CAPSULE_POSITION = {
   padding: 0,
 };
 
-const DESKTOP_CAPSULE_POSITION = {
-  ...CAPSULE_POSITION,
-  right: 'calc(100% - var(--list-column-w, 460px) + 26px)',
-};
-
 /** Нижний таб-бар: Сообщения · Контакты · Настройки · Профиль. Скрывается на вложенных экранах —
  *  чат, инфо, раздел настроек — и появляется обратно (ux-ui/02-shell.md). */
 export function TabBar() {
@@ -51,10 +45,8 @@ export function TabBar() {
   const navigate = useNavigate();
   const unreadTotal = useChatStore((s) => s.chats.reduce((sum, c) => sum + c.unreadCount, 0));
 
-  const layout = useLayoutMode();
-
   const activeTab = tabOf(location.pathname);
-  const hidden = layout === 'mobile' && !isTabRoot(location.pathname);
+  const hidden = !isTabRoot(location.pathname);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>, root: string): void {
     event.currentTarget.blur();
@@ -69,7 +61,7 @@ export function TabBar() {
     <ChromeBar
       side="bottom"
       className={`${styles.wrap} ${hidden ? styles.hidden : ''}`}
-      style={layout === 'desktop' ? DESKTOP_CAPSULE_POSITION : CAPSULE_POSITION}
+      style={CAPSULE_POSITION}
     >
       <nav className={styles.capsule} aria-hidden={hidden}>
         {TABS.map((tab) => {
