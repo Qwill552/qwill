@@ -1,0 +1,17 @@
+{
+  "name": "@messenger/desktop",
+  "productName": "Qwill",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node scripts/copy-client.mjs && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "electron": "^40.0.0"
+  }
+}

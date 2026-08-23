@@ -41,6 +41,8 @@ ds-bundle/
 
 release.tar.gz
 
+desktop/renderer/
+
 client/android/.gradle/
 client/android/local.properties
 *.keystore

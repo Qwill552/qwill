@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { isDesktopShell } from '../native/desktop';
 import { isNativeShell } from '../native/shell';
 import { useCallStore } from '../stores/callStore';
 import { stashPendingDraft } from './pendingDraft';
@@ -26,6 +27,7 @@ export function useAppUpdate(): AppUpdate {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
 
   useEffect(() => {
+    if (isDesktopShell()) return;
     if (!('serviceWorker' in navigator)) return;
 
     const shell = isNativeShell();

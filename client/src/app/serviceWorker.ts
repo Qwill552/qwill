@@ -1,8 +1,11 @@
+import { isDesktopShell } from '../native/desktop';
+
 const SW_URL = import.meta.env.DEV ? '/dev-sw.js?dev-sw' : '/sw.js';
 
 let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null;
 
 export function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (isDesktopShell()) return Promise.resolve(null);
   if (!('serviceWorker' in navigator)) return Promise.resolve(null);
 
   if (!registrationPromise) {

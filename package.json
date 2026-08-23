@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "desktop"
   ],
   "engines": {
     "node": ">=22.12"
@@ -16,6 +17,10 @@
     "predev": "npm run build -w @messenger/shared",
     "dev": "concurrently -k -n shared,server,client -c gray,magenta,cyan \"npm run dev -w @messenger/shared\" \"npm run dev -w @messenger/server\" \"npm run dev -w @messenger/client\"",
     "build": "npm run build -w @messenger/shared && npm run build -w @messenger/server && npm run build -w @messenger/client",
+    "desktop:client": "cross-env VITE_API_URL=http://localhost:3000 npm run build -w @messenger/client",
+    "desktop:build": "npm run desktop:client && npm run build -w @messenger/desktop",
+    "desktop:start": "npm run start -w @messenger/desktop",
+    "desktop": "npm run desktop:build && npm run desktop:start",
     "build:emoji": "node scripts/build-emoji.mjs",
     "icons": "node scripts/make-icons.mjs",
     "release:manifest": "node scripts/make-release-manifest.mjs",

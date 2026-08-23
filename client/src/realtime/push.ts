@@ -1,5 +1,6 @@
 import { subscribePushRequest, unsubscribePushRequest } from '../api/push';
 import { registerServiceWorker } from '../app/serviceWorker';
+import { isDesktopShell } from '../native/desktop';
 import { isNativePushAvailable, registerNativePush, unregisterNativePush } from './nativePush';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
@@ -25,6 +26,8 @@ function subscriptionToDto(subscription: PushSubscription): { endpoint: string; 
 /** Вызывается после логина — если разрешение уже дано или ещё не спрошено (не 'denied'), см. authStore (этап 9).
  *  В оболочке Capacitor уходит по нативному каналу (FCM) — web push там недоступен в принципе (секция 10А). */
 export async function subscribeToPush(): Promise<void> {
+  if (isDesktopShell()) return;
+
   if (isNativePushAvailable()) {
     await registerNativePush().catch((error) => console.error('registerNativePush failed', error));
     return;

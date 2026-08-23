@@ -11,6 +11,7 @@ export default tseslint.config(
       'legacy/**',
       'design-archive/**',
       'client/android/**',
+      'desktop/renderer/**',
       'ds-bundle/**',
       '.ds-sync/**',
       '.design-sync/**',
@@ -35,7 +36,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'desktop/scripts/**/*.mjs'],
     languageOptions: {
       globals: { console: 'readonly', process: 'readonly', fetch: 'readonly', URL: 'readonly', Buffer: 'readonly' },
     },
