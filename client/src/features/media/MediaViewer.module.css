@@ -37,6 +37,9 @@
 
 .media {
   position: absolute;
+}
+
+.mediaActive {
   will-change: transform;
 }
 

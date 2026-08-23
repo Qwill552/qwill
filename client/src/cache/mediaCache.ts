@@ -1,4 +1,4 @@
-import { buildFileSrc, fetchFileToken } from '../api/files';
+import { buildFileSrc, getFileToken } from '../api/files';
 import { openCacheDb, type MediaTier } from './db';
 
 const GIGABYTE = 1024 ** 3;
@@ -77,9 +77,27 @@ async function writeToCache(fileId: string, tier: MediaTier, blob: Blob): Promis
   }
 }
 
+const MAX_PARALLEL_DOWNLOADS = 4;
+
+let activeDownloads = 0;
+const downloadQueue: (() => void)[] = [];
+
+async function withDownloadSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeDownloads >= MAX_PARALLEL_DOWNLOADS) {
+    await new Promise<void>((resolve) => downloadQueue.push(resolve));
+  }
+  activeDownloads += 1;
+  try {
+    return await task();
+  } finally {
+    activeDownloads -= 1;
+    downloadQueue.shift()?.();
+  }
+}
+
 async function download(fileId: string): Promise<Blob | null> {
   try {
-    const token = await fetchFileToken(fileId);
+    const token = await getFileToken(fileId);
     const res = await fetch(buildFileSrc(fileId, token));
     if (!res.ok) return null;
     return await res.blob();
@@ -88,14 +106,25 @@ async function download(fileId: string): Promise<Blob | null> {
   }
 }
 
-export async function resolveMedia(fileId: string, tier: MediaTier): Promise<Blob | null> {
+async function loadMedia(fileId: string, tier: MediaTier): Promise<Blob | null> {
   const cached = await readFromCache(fileId);
   if (cached) return cached;
 
-  const blob = await download(fileId);
+  const blob = await withDownloadSlot(() => download(fileId));
   if (!blob) return null;
 
   await writeToCache(fileId, tier, blob);
   void evictToBudget();
   return blob;
+}
+
+const inflight = new Map<string, Promise<Blob | null>>();
+
+export function resolveMedia(fileId: string, tier: MediaTier): Promise<Blob | null> {
+  const pending = inflight.get(fileId);
+  if (pending) return pending;
+
+  const task = loadMedia(fileId, tier).finally(() => inflight.delete(fileId));
+  inflight.set(fileId, task);
+  return task;
 }

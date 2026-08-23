@@ -314,3 +314,26 @@ export async function fetchFileToken(fileId: string): Promise<string> {
 export function buildFileSrc(fileId: string, token: string): string {
   return `${API_URL}/api/files/${fileId}?token=${encodeURIComponent(token)}`;
 }
+
+const FILE_TOKEN_TTL_MS = 45 * 60 * 1000;
+
+const fileTokens = new Map<string, { token: string; issuedAt: number }>();
+const tokenRequests = new Map<string, Promise<string>>();
+
+export function getFileToken(fileId: string): Promise<string> {
+  const cached = fileTokens.get(fileId);
+  if (cached && Date.now() - cached.issuedAt < FILE_TOKEN_TTL_MS) return Promise.resolve(cached.token);
+
+  const pending = tokenRequests.get(fileId);
+  if (pending) return pending;
+
+  const request = fetchFileToken(fileId)
+    .then((token) => {
+      fileTokens.set(fileId, { token, issuedAt: Date.now() });
+      return token;
+    })
+    .finally(() => tokenRequests.delete(fileId));
+
+  tokenRequests.set(fileId, request);
+  return request;
+}

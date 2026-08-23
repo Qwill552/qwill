@@ -10,7 +10,6 @@ import styles from './MediaTile.module.css';
 interface MediaTileProps {
   attachment: AttachmentDto;
   chatId: string;
-  wantOriginal?: boolean;
   className?: string;
   style?: CSSProperties;
   fit?: 'cover' | 'natural';
@@ -27,7 +26,6 @@ export function formatMediaDuration(seconds: number): string {
 export function MediaTile({
   attachment,
   chatId,
-  wantOriginal = false,
   className,
   style,
   fit = 'cover',
@@ -35,7 +33,7 @@ export function MediaTile({
   standalone = false,
 }: MediaTileProps) {
   const ref = useRef<HTMLButtonElement>(null);
-  const src = useProgressiveSrc(attachment, ref, wantOriginal);
+  const src = useProgressiveSrc(attachment, ref);
   const video = isVideoAttachment(attachment);
   const natural = fit === 'natural';
 

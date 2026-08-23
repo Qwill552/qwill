@@ -4,6 +4,9 @@ import { useEffect, useState, type RefObject } from 'react';
 import { useFileSrc } from '../../api/useFileSrc';
 
 const ORIGINAL_PRELOAD_MARGIN = '300px';
+export function needsOriginalInList(attachment: AttachmentDto): boolean {
+  return attachment.file.mimeType === 'image/gif';
+}
 
 export function useReachedViewport(ref: RefObject<Element | null>): boolean {
   const [reached, setReached] = useState(false);
@@ -37,12 +40,19 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
       setDecoded(undefined);
       return;
     }
+
     let cancelled = false;
     const probe = new Image();
-    probe.onload = () => {
-      if (!cancelled) setDecoded(src);
-    };
     probe.src = src;
+    probe
+      .decode()
+      .then(() => {
+        if (!cancelled) setDecoded(src);
+      })
+      .catch(() => {
+        if (!cancelled) setDecoded(undefined);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -55,14 +65,10 @@ export function usePreviewSrc(attachment: AttachmentDto): string | undefined {
   return useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, attachment.thumbnail ? 'thumb' : 'full');
 }
 
-export function useProgressiveSrc(
-  attachment: AttachmentDto,
-  ref: RefObject<Element | null>,
-  wantOriginal: boolean,
-): string | undefined {
+export function useProgressiveSrc(attachment: AttachmentDto, ref: RefObject<Element | null>): string | undefined {
   const reached = useReachedViewport(ref);
   const preview = usePreviewSrc(attachment);
-  const wanted = wantOriginal && reached && attachment.thumbnail ? attachment.file.id : null;
+  const wanted = needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
   const original = useDecodedSrc(useFileSrc(wanted, 'full'));
   return original ?? preview;
 }
@@ -72,8 +78,9 @@ export function mediaRatio(attachment: AttachmentDto): number | null {
   return attachment.width / attachment.height;
 }
 
-export function useOriginalSrc(attachment: AttachmentDto): string | undefined {
+export function useViewerSrc(attachment: AttachmentDto, wantOriginal: boolean): string | undefined {
   const preview = usePreviewSrc(attachment);
-  const original = useDecodedSrc(useFileSrc(attachment.file.id, 'full'));
+  const wanted = wantOriginal && attachment.thumbnail ? attachment.file.id : null;
+  const original = useDecodedSrc(useFileSrc(wanted, 'full'));
   return original ?? preview;
 }

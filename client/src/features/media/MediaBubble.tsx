@@ -10,7 +10,7 @@ export function MediaBubble({ attachment, chatId }: { attachment: AttachmentDto;
   if (ratio === null) {
     return (
       <div className={styles.auto}>
-        <MediaTile attachment={attachment} chatId={chatId} wantOriginal fit="natural" />
+        <MediaTile attachment={attachment} chatId={chatId} fit="natural" />
       </div>
     );
   }
@@ -24,7 +24,7 @@ export function MediaBubble({ attachment, chatId }: { attachment: AttachmentDto;
         ['--media-natural-w' as string]: `${attachment.width}px`,
       }}
     >
-      <MediaTile attachment={attachment} chatId={chatId} wantOriginal />
+      <MediaTile attachment={attachment} chatId={chatId} />
     </div>
   );
 }

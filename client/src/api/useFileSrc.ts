@@ -1,27 +1,14 @@
 import { useEffect, useState } from 'react';
 
-import { resolveMedia } from '../cache/mediaCache';
-import { buildFileSrc, fetchFileToken } from './files';
+import { acquireObjectUrl, peekObjectUrl, releaseObjectUrl, retainObjectUrl } from '../cache/objectUrls';
+import { buildFileSrc, getFileToken } from './files';
 
 export type FileSrcTier = 'thumb' | 'full' | 'stream';
 
-const tokenCache = new Map<string, string>();
-
-async function resolveStreamUrl(fileId: string): Promise<string | undefined> {
-  const cached = tokenCache.get(fileId);
-  if (cached) return buildFileSrc(fileId, cached);
-
-  try {
-    const token = await fetchFileToken(fileId);
-    tokenCache.set(fileId, token);
-    return buildFileSrc(fileId, token);
-  } catch {
-    return undefined;
-  }
-}
-
 export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier = 'full'): string | undefined {
-  const [src, setSrc] = useState<string | undefined>(undefined);
+  const [src, setSrc] = useState<string | undefined>(() =>
+    fileId && tier !== 'stream' ? peekObjectUrl(fileId) : undefined,
+  );
 
   useEffect(() => {
     if (!fileId) {
@@ -30,23 +17,42 @@ export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier 
     }
 
     let cancelled = false;
-    let objectUrl: string | undefined;
 
     if (tier === 'stream') {
-      void resolveStreamUrl(fileId).then((url) => {
-        if (!cancelled) setSrc(url);
-      });
-    } else {
-      void resolveMedia(fileId, tier).then((blob) => {
-        if (cancelled || !blob) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      });
+      void getFileToken(fileId)
+        .then((token) => {
+          if (!cancelled) setSrc(buildFileSrc(fileId, token));
+        })
+        .catch(() => {
+          if (!cancelled) setSrc(undefined);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
+
+    const ready = retainObjectUrl(fileId);
+    if (ready) {
+      setSrc(ready);
+      return () => releaseObjectUrl(fileId);
+    }
+
+    setSrc(undefined);
+    let held = false;
+
+    void acquireObjectUrl(fileId, tier).then((url) => {
+      if (!url) return;
+      if (cancelled) {
+        releaseObjectUrl(fileId);
+        return;
+      }
+      held = true;
+      setSrc(url);
+    });
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (held) releaseObjectUrl(fileId);
     };
   }, [fileId, tier]);
 
