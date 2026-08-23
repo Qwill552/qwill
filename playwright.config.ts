@@ -5,6 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+const PHONE_VIEWPORT = { width: 420, height: 900 };
+
 /** E2E-тесты гоняются против настоящего dev-стека (shared+server+client), см. STAGES.md, этап 10-A. */
 export default defineConfig({
   testDir: './e2e',
@@ -25,6 +27,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: PHONE_VIEWPORT,
         launchOptions: {
           args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
         },
