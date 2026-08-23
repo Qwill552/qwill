@@ -4,7 +4,7 @@ import type { LocalAttachmentState, LocalMessage } from '../../stores/chatStore'
 import { Icon } from '../../ui/Icon';
 import { ProgressRing } from '../messages/ProgressRing';
 import { MediaTile } from './MediaTile';
-import { mosaicLayout, MOSAIC_MAX_ITEMS } from './mosaicLayout';
+import { mosaicLayout, normalizeRatio, MOSAIC_MAX_ITEMS } from './mosaicLayout';
 import { mediaRatio } from './useMediaSrc';
 import styles from './MediaGrid.module.css';
 import tileStyles from './MediaTile.module.css';
@@ -48,39 +48,43 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
       className={styles.grid}
       style={{ aspectRatio: `${layout.ratio}`, ['--grid-ratio' as string]: layout.ratio }}
     >
-      {layout.rows.map((row) => (
-        <div key={row.indexes.join('-')} className={styles.row} style={{ flexGrow: row.weight }}>
-          {row.indexes.map((index) => {
-            const tile = shown[index];
-            if (!tile) return null;
-            const style = { flexGrow: tile.ratio ?? 1 };
-            const overlay = extra > 0 && index === shown.length - 1 ? `+${extra}` : undefined;
+      {layout.rows.map((row) => {
+        const rowRatio = row.indexes.reduce((sum, index) => sum + normalizeRatio(shown[index]?.ratio), 0);
 
-            if (tile.attachment) {
+        return (
+          <div key={row.indexes.join('-')} className={styles.row} style={{ flexGrow: row.weight }}>
+            {row.indexes.map((index) => {
+              const tile = shown[index];
+              if (!tile) return null;
+              const style = { flexGrow: normalizeRatio(tile.ratio) / rowRatio };
+              const overlay = extra > 0 && index === shown.length - 1 ? `+${extra}` : undefined;
+
+              if (tile.attachment) {
+                return (
+                  <MediaTile
+                    key={tile.key}
+                    attachment={tile.attachment}
+                    chatId={chatId}
+                    className={styles.cell}
+                    style={style}
+                    overlay={overlay}
+                  />
+                );
+              }
+
               return (
-                <MediaTile
+                <UploadingTile
                   key={tile.key}
-                  attachment={tile.attachment}
-                  chatId={chatId}
-                  className={styles.cell}
+                  local={tile.local}
                   style={style}
-                  overlay={overlay}
+                  onCancel={() => tile.clientId && onCancel(tile.clientId)}
+                  onRetry={() => tile.clientId && onRetry(tile.clientId)}
                 />
               );
-            }
-
-            return (
-              <UploadingTile
-                key={tile.key}
-                local={tile.local}
-                style={style}
-                onCancel={() => tile.clientId && onCancel(tile.clientId)}
-                onRetry={() => tile.clientId && onRetry(tile.clientId)}
-              />
-            );
-          })}
-        </div>
-      ))}
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }

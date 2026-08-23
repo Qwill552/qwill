@@ -59,4 +59,20 @@ describe('mosaicLayout', () => {
       expect(ratio).toBeLessThanOrEqual(1.9);
     }
   });
+
+  it('веса строк в сумме дают единицу — иначе flex раздаёт только их долю высоты', () => {
+    for (let count = 1; count <= 10; count += 1) {
+      const wide = mosaicLayout(Array.from({ length: count }, () => 1.78));
+      const tall = mosaicLayout(Array.from({ length: count }, () => 0.56));
+      expect(wide.rows.reduce((sum, row) => sum + row.weight, 0)).toBeCloseTo(1);
+      expect(tall.rows.reduce((sum, row) => sum + row.weight, 0)).toBeCloseTo(1);
+    }
+  });
+
+  it('панорамные кадры кладёт по двое в ряд, 4:3 — по трое', () => {
+    expect(sizes([1.78, 1.78, 1.78, 1.78])).toEqual([2, 2]);
+    expect(sizes([1.78, 1.78, 1.78, 1.78, 1.78])).toEqual([2, 2, 1]);
+    expect(sizes(Array.from({ length: 7 }, () => 1.33))).toEqual([3, 2, 2]);
+    expect(sizes(square(5))).toEqual([3, 2]);
+  });
 });
