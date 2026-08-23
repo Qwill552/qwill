@@ -1,3 +1,4 @@
+import { Badge } from './Badge';
 import styles from './Chip.module.css';
 
 interface ChipProps {
@@ -9,6 +10,7 @@ interface ChipProps {
 }
 
 export function Chip({ label, active, count, onClick }: ChipProps) {
+  const hasCount = count != null && count > 0;
   return (
     <button
       type="button"
@@ -17,7 +19,12 @@ export function Chip({ label, active, count, onClick }: ChipProps) {
       onClick={onClick}
     >
       {label}
-      {count != null && count > 0 && <span className={styles.count}>{count}</span>}
+      {hasCount && <span className={styles.count}>{count}</span>}
+      {hasCount && (
+        <span className={styles.tabBadge}>
+          <Badge count={count as number} small className={styles.tabBadgeInner} />
+        </span>
+      )}
     </button>
   );
 }

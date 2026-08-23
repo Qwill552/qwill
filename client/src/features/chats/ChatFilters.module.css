@@ -12,3 +12,12 @@
 .row::-webkit-scrollbar {
   display: none;
 }
+
+@media (min-width: 900px) {
+  .row {
+    align-items: stretch;
+    gap: 2px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--border);
+  }
+}

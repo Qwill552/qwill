@@ -28,6 +28,40 @@
   }
 }
 
+@media (min-width: 900px) {
+  .row {
+    padding: 9px 10px;
+    border-radius: 16px;
+    transition:
+      background var(--dur-tab) var(--ease-screen),
+      transform var(--dur-press) var(--ease-spring);
+  }
+
+  .active {
+    transform: none;
+    background: var(--primary-soft);
+  }
+
+  .row:active {
+    transform: scale(0.98);
+    background: transparent;
+  }
+
+  .active:active {
+    background: var(--primary-soft);
+  }
+}
+
+@media (min-width: 900px) and (hover: hover) {
+  .row:hover {
+    background: var(--surface-2);
+  }
+
+  .active:hover {
+    background: var(--primary-soft);
+  }
+}
+
 @keyframes rowIn {
   from {
     opacity: 0;
@@ -84,10 +118,22 @@
   white-space: nowrap;
 }
 
+@media (min-width: 900px) {
+  .title {
+    font-size: var(--font-name);
+  }
+}
+
 .time {
   flex-shrink: 0;
   color: rgba(var(--pulse-ink), 0.4);
   font-size: 12px;
+}
+
+@media (min-width: 900px) {
+  .time {
+    font-size: var(--font-caption);
+  }
 }
 
 /* Галочка своего последнего сообщения стоит слева от времени, как в референсе. */
@@ -106,6 +152,12 @@
   white-space: nowrap;
 }
 
+@media (min-width: 900px) {
+  .preview {
+    font-size: var(--font-meta);
+  }
+}
+
 .author {
   color: rgba(var(--pulse-ink), 0.55);
 }
@@ -120,6 +172,13 @@
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .typing {
+    color: var(--primary);
+    font-size: var(--font-meta);
+  }
 }
 
 .attachIcon {

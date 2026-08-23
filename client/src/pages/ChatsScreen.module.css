@@ -17,6 +17,18 @@
   padding: calc(6px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left));
 }
 
+@media (min-width: 900px) {
+  .top {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .headerRow,
+  .searchWrap {
+    padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+  }
+}
+
 .headerRow {
   display: flex;
   align-items: center;

@@ -469,6 +469,7 @@
   --dur-tab: 120ms; /* переключение вкладок */
   --dur-check: 140ms; /* чекбокс мультивыбора */
   --dur-reaction: 320ms; /* «прилетевшая» реакция */
+  --dur-press: 320ms; /* пружинное нажатие строки/вкладки на десктопе */
   --dur-scrollbar: 220ms; /* проявление/скрытие индикатора прокрутки */
   --dur-pulse: 1000ms; /* кольцо потерянной связи на экране звонка */
 
@@ -497,6 +498,7 @@
     --dur-tab: 1ms;
     --dur-check: 1ms;
     --dur-reaction: 1ms;
+    --dur-press: 1ms;
     --dur-scrollbar: 1ms;
     --dur-pulse: 1ms;
     --transition: 1ms linear;

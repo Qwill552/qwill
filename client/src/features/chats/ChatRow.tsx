@@ -7,6 +7,7 @@ import { OfficialMark } from '../chat/OfficialMark';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../chat/serviceChat';
 import { parseEmoji } from '../emoji/parseEmoji';
 import { isVoiceAttachment } from '../messages/Attachment';
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from '../../ui/Avatar';
 import { Badge } from '../../ui/Badge';
@@ -85,6 +86,7 @@ function previewText(chat: ChatListItemDto, own: boolean): string {
 
 export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowProps) {
   const navigate = useNavigate();
+  const layout = useLayoutMode();
   const setChatMuted = useChatStore((s) => s.setChatMuted);
   const rowRef = useRef<HTMLAnchorElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
@@ -167,7 +169,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
           label={chat.title}
           avatarUrl={chat.avatarUrl}
           imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
-          size={52}
+          size={layout === 'desktop' ? 48 : 52}
           online={online}
           color={chat.otherMember?.avatarColor}
           colorKey={chat.id}
