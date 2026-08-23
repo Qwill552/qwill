@@ -411,7 +411,7 @@
   --avatar-header: 40px;
 
   --bubble-max-w: 76%;
-  --bubble-media-max-w: 480px;
+  --bubble-media-max-w: 560px;
   --bubble-pad-y: 8px;
   --bubble-pad-x: 12px;
 
@@ -453,6 +453,14 @@
 }
 
 /* Одно место, где глушится всё движение. */
+/* Широкий экран: 560 px рассчитаны на телефон, где ширину и так держит 78vw. На мониторе
+   мозаика из четырёх кадров при таком пределе давала плитки по 240 px. */
+@media (min-width: 900px) {
+  :root {
+    --bubble-media-max-w: 640px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-screen: 1ms;

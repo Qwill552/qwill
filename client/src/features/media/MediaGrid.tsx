@@ -44,7 +44,10 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
   const layout = mosaicLayout(shown.map((tile) => tile.ratio));
 
   return (
-    <div className={styles.grid} style={{ aspectRatio: `${layout.ratio}` }}>
+    <div
+      className={styles.grid}
+      style={{ aspectRatio: `${layout.ratio}`, ['--grid-ratio' as string]: layout.ratio }}
+    >
       {layout.rows.map((row) => (
         <div key={row.indexes.join('-')} className={styles.row} style={{ flexGrow: row.weight }}>
           {row.indexes.map((index) => {
