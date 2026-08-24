@@ -5,18 +5,19 @@ interface IconProps {
   /** Сетка иконки — 24; другой размер только масштабирует, штрих остаётся пропорциональным. */
   size?: number;
   className?: string;
+  solid?: boolean;
   /** Задан — иконка становится картинкой с подписью; не задан — она декоративная и скрыта от скринридера. */
   title?: string;
 }
 
-export function Icon({ name, size = 24, className, title }: IconProps) {
+export function Icon({ name, size = 24, className, solid, title }: IconProps) {
   return (
     <svg
       className={className}
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={solid ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"

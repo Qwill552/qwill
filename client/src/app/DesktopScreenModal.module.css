@@ -37,7 +37,7 @@
 
 .cardChromeless {
   height: auto;
-  max-height: min(680px, 86dvh);
+  max-height: 86dvh;
 }
 
 .cardClosing {

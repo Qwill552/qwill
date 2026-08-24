@@ -7,7 +7,8 @@ import { useChatStore } from '../../stores/chatStore';
 import { formatLastSeen } from '../../utils/presence';
 import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
-import { Icon, type IconName } from '../../ui/Icon';
+import { Icon } from '../../ui/Icon';
+import type { IconName } from '../../ui/icons/paths';
 import { Menu, type MenuItem } from '../../ui/Menu';
 import styles from './ChatInfoCard.module.css';
 
@@ -47,13 +48,17 @@ function tally(attachments: AttachmentDto[]): AttachmentTally[] {
 
   return [
     { icon: 'image', label: `${photos} ${plural(photos, 'фотография', 'фотографии', 'фотографий')}`, count: photos },
-    { icon: 'play', label: `${videos} видео`, count: videos },
+    { icon: 'video', label: `${videos} видео`, count: videos },
     {
       icon: 'mic',
       label: `${voices} ${plural(voices, 'голосовое сообщение', 'голосовых сообщения', 'голосовых сообщений')}`,
       count: voices,
     },
-    { icon: 'speaker', label: `${audios} ${plural(audios, 'аудиофайл', 'аудиофайла', 'аудиофайлов')}`, count: audios },
+    {
+      icon: 'headphones',
+      label: `${audios} ${plural(audios, 'аудиофайл', 'аудиофайла', 'аудиофайлов')}`,
+      count: audios,
+    },
     { icon: 'file', label: `${files} ${plural(files, 'файл', 'файла', 'файлов')}`, count: files },
   ];
 }
@@ -101,7 +106,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
 
       <div className={styles.actions}>
         <button type="button" className={styles.action} onClick={() => navigate(`/chats/${chatId}`)}>
-          <Icon name="chats" size={22} className={styles.actionIcon} />
+          <Icon name="chats" size={22} solid className={styles.actionIcon} />
           Чат
         </button>
         <button
@@ -112,11 +117,11 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
             setChatMuted(chatId, !muted).catch(() => undefined);
           }}
         >
-          <Icon name={muted ? 'mute' : 'bell'} size={22} className={styles.actionIcon} />
+          <Icon name={muted ? 'mute' : 'bell'} size={22} solid={!muted} className={styles.actionIcon} />
           Звук
         </button>
         <button type="button" className={styles.action} onClick={() => void startCall(chatId, 'AUDIO')}>
-          <Icon name="phone" size={22} className={styles.actionIcon} />
+          <Icon name="phone" size={22} solid className={styles.actionIcon} />
           Звонок
         </button>
         <button
@@ -128,7 +133,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
             setMenuAnchor(event.currentTarget.getBoundingClientRect())
           }
         >
-          <Icon name="more" size={22} className={styles.actionIcon} />
+          <Icon name="more-horizontal" size={22} className={styles.actionIcon} />
           Ещё
         </button>
       </div>
@@ -143,7 +148,9 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
             <Card.Row
               key={row.icon}
               title={row.label}
-              leading={<Icon name={row.icon} size={22} className={styles.tallyIcon} />}
+              icon={row.icon}
+              tint="blue"
+              className={styles.tallyRow}
             />
           ))}
         </Card>

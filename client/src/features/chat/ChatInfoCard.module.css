@@ -1,7 +1,7 @@
 .scroller {
   height: 100%;
+  --tile-ink-override: var(--text-primary);
   overflow-y: auto;
-  padding-bottom: var(--space-4);
   overscroll-behavior: contain;
 }
 
@@ -75,10 +75,9 @@
 }
 
 .actionIcon {
-  color: var(--primary);
+  color: var(--text-primary);
 }
 
-.tallyIcon {
-  flex-shrink: 0;
-  color: var(--text-secondary);
+.tallyRow.tallyRow {
+  --row-divider-inset: 0;
 }
