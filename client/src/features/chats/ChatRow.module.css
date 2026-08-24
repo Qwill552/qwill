@@ -54,7 +54,7 @@
 
 @media (min-width: 900px) and (hover: hover) {
   .row:hover {
-    background: var(--surface-2);
+    background: var(--surface-3);
   }
 
   .active:hover {
