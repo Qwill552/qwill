@@ -15,9 +15,9 @@
 
 .card {
   overflow: hidden;
-  border: 1px solid rgba(var(--pulse-glass), 0.08);
+  border: 1px solid var(--card-surface-border-override, rgba(var(--pulse-glass), 0.08));
   border-radius: 22px;
-  background: rgba(var(--pulse-glass), 0.055);
+  background: var(--card-surface-override, rgba(var(--pulse-glass), 0.055));
   backdrop-filter: blur(10px);
 }
 

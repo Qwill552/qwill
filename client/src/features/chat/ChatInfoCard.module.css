@@ -88,7 +88,13 @@
 
 :global(:root[data-theme='light']) .tallyRow,
 :global([data-theme='light']) .tallyRow {
-  --tile-ink-override: var(--text-secondary);
+  --tile-ink-override: color-mix(in srgb, var(--text-primary) 65%, var(--text-secondary));
+}
+
+:global(:root[data-theme='light']) .scroller,
+:global([data-theme='light']) .scroller {
+  --card-surface-override: var(--card-bg);
+  --card-surface-border-override: var(--card-border);
 }
 
 .username {
