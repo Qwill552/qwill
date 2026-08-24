@@ -15,7 +15,7 @@ import { Icon } from '../../ui/Icon';
 import { Emoji } from '../emoji/Emoji';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { openMediaViewer } from '../media/mediaViewerStore';
-import { MessageContextMenu, type MessageMenuItem } from './MessageContextMenu';
+import { MessageContextMenu, type MenuOrigin, type MessageMenuItem } from './MessageContextMenu';
 import styles from './MessageRow.module.css';
 
 interface MessageRowProps {
@@ -130,10 +130,10 @@ export function MessageRow({
    *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
    *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
   const skipGesturesRef = useRef(false);
-  const pointerTypeRef = useRef<string>('');
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
-  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const menuSeqRef = useRef(0);
+  const [menu, setMenu] = useState<{ rect: DOMRect; origin: MenuOrigin | null; seq: number } | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
@@ -172,11 +172,11 @@ export function MessageRow({
       haptic();
       selectGroup();
     },
-    disabled: () => selectionMode || menuAnchor !== null || !canAct,
+    disabled: () => selectionMode || menu !== null || !canAct,
   });
 
   const tap = useTapGesture({
-    onSingleTap: () => {
+    onSingleTap: (pointerType) => {
       if (suppressTapRef.current) {
         suppressTapRef.current = false;
         return;
@@ -185,10 +185,9 @@ export function MessageRow({
         toggleGroupSelected();
         return;
       }
-      if (pointerTypeRef.current === 'mouse') return;
+      if (pointerType === 'mouse') return;
       if (!canAct) return;
-      const rect = bubbleRef.current?.getBoundingClientRect();
-      if (rect) setMenuAnchor(rect);
+      openMenu(null);
     },
     onDoubleTap: (point) => {
       if (suppressTapRef.current) {
@@ -196,7 +195,7 @@ export function MessageRow({
         return;
       }
       if (selectionMode || !canAct || !canReact) return;
-      if (pointerTypeRef.current === 'mouse' && onSelectableRef.current) return;
+      if (point.pointerType === 'mouse' && onSelectableRef.current) return;
       haptic();
       toggleReaction(chatId, message.id, doubleTapReaction);
       setReactionFly({ x: point.x, y: point.y, emoji: doubleTapReaction, key: Date.now() });
@@ -215,8 +214,6 @@ export function MessageRow({
     suppressTapRef.current = false;
     const target = event.target as HTMLElement;
     const isMouse = event.pointerType === 'mouse';
-    pointerTypeRef.current = event.pointerType;
-    onSelectableRef.current = target.closest('[data-selectable]') !== null;
     skipGesturesRef.current =
       (isMouse && event.button !== 0) || target.closest('button:not([data-media-tile]), a[download]') !== null;
     if (skipGesturesRef.current) return;
@@ -269,18 +266,26 @@ export function MessageRow({
       return;
     }
 
+    onSelectableRef.current = (event.target as HTMLElement).closest('[data-selectable]') !== null;
     tap.onPointerUp(event);
+  }
+
+  function openMenu(origin: MenuOrigin | null): void {
+    const rect = bubbleRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    menuSeqRef.current += 1;
+    setMenu({ rect, origin, seq: menuSeqRef.current });
   }
 
   function handleContextMenu(event: React.MouseEvent<HTMLDivElement>): void {
     const bubble = bubbleRef.current;
-    if (pointerTypeRef.current !== 'mouse' || !bubble) return;
+    if (event.button !== 2 || !bubble) return;
     if (!bubble.contains(event.target as Node)) return;
     event.preventDefault();
-    if (selectionMode || menuAnchor !== null || !canAct) return;
+    if (selectionMode || !canAct) return;
     tap.cancel();
     longPress.onPointerCancel();
-    setMenuAnchor(bubble.getBoundingClientRect());
+    openMenu({ x: event.clientX, y: event.clientY });
   }
 
   function handlePointerCancel(): void {
@@ -402,21 +407,23 @@ export function MessageRow({
         <Icon name="reply" size={16} />
       </span>
 
-      {menuAnchor && (
+      {menu && (
         <MessageContextMenu
-          anchorRect={menuAnchor}
+          key={menu.seq}
+          anchorRect={menu.rect}
+          origin={menu.origin}
           bubble={children}
           own={own}
           statusLabel={statusLabelFor(message, own, read)}
           myReactions={myReactions}
           onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
           onExpandReactions={() => {
-            setEmojiAnchor(menuAnchor);
+            setEmojiAnchor(menu.rect);
             setEmojiPanelOpen(true);
           }}
           reactable={canReact}
           items={items}
-          onClose={() => setMenuAnchor(null)}
+          onClose={() => setMenu((current) => (current?.seq === menu.seq ? null : current))}
         />
       )}
 

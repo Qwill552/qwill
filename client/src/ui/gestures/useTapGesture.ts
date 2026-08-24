@@ -6,11 +6,12 @@ import { DOUBLE_TAP_WINDOW_MS, currentScrollEpoch, resolveTap } from './gestureR
 interface TapPoint {
   x: number;
   y: number;
+  pointerType: string;
 }
 
 interface TapGestureOptions {
   /** Таймер истёк без второго тапа — открыть контекстное меню. */
-  onSingleTap: () => void;
+  onSingleTap: (pointerType: string) => void;
   /** Второй тап в окне DOUBLE_TAP_WINDOW_MS — реакция по умолчанию из точки касания. */
   onDoubleTap: (point: TapPoint) => void;
   disabled?: () => boolean;
@@ -45,17 +46,18 @@ export function useTapGesture({ onSingleTap, onDoubleTap, disabled }: TapGesture
 
       if (outcome === 'double') {
         cancel();
-        doubleRef.current({ x: event.clientX, y: event.clientY });
+        doubleRef.current({ x: event.clientX, y: event.clientY, pointerType: event.pointerType });
         return;
       }
 
       lastTapAtRef.current = now;
       const epoch = currentScrollEpoch();
+      const { pointerType } = event;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         lastTapAtRef.current = null;
         if (epoch !== currentScrollEpoch()) return;
-        singleRef.current();
+        singleRef.current(pointerType);
       }, DOUBLE_TAP_WINDOW_MS);
     },
     [cancel, disabled],

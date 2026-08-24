@@ -8,6 +8,11 @@ import { Icon, type IconName } from '../../ui/Icon';
 import { ReactionPicker } from './ReactionPicker';
 import styles from './MessageContextMenu.module.css';
 
+export interface MenuOrigin {
+  x: number;
+  y: number;
+}
+
 export interface MessageMenuItem {
   id: string;
   icon: IconName;
@@ -19,6 +24,7 @@ export interface MessageMenuItem {
 interface MessageContextMenuProps {
   /** Прямоугольник самого пузыря (не всей строки) — по нему клон встаёт след в след. */
   anchorRect: DOMRect;
+  origin: MenuOrigin | null;
   bubble: ReactNode;
   own: boolean;
   /** «✓✓ прочитано в 20:10» и подобное — null для чужих сообщений (ux-ui/06, секция 2). */
@@ -43,6 +49,7 @@ const EDGE = 12;
  */
 export function MessageContextMenu({
   anchorRect,
+  origin,
   bubble,
   own,
   statusLabel,
@@ -85,6 +92,17 @@ export function MessageContextMenu({
     const minY = bounds ? bounds.top : 0;
     const maxY = bounds ? bounds.bottom : window.innerHeight;
 
+    if (origin) {
+      const flipX = origin.x + width + EDGE > maxX;
+      const flipY = origin.y + height + EDGE > maxY;
+      setPanelStyle({
+        top: flipY ? Math.max(minY + EDGE, origin.y - height) : Math.min(origin.y, maxY - height - EDGE),
+        left: flipX ? Math.max(minX + EDGE, origin.x - width) : Math.min(origin.x, maxX - width - EDGE),
+        ['--menu-origin' as string]: `${flipY ? 'bottom' : 'top'} ${flipX ? 'right' : 'left'}`,
+      });
+      return;
+    }
+
     const spaceBelow = maxY - anchorRect.bottom;
     const spaceAbove = anchorRect.top - minY;
     const dropUp = spaceBelow < height + GAP + EDGE && spaceAbove > spaceBelow;
@@ -102,7 +120,32 @@ export function MessageContextMenu({
       left,
       ['--menu-origin' as string]: `${dropUp ? 'bottom' : 'top'} ${own ? 'right' : 'left'}`,
     });
-  }, [anchorRect, own]);
+  }, [anchorRect, origin, own]);
+
+  useEffect(() => {
+    if (!origin) return;
+
+    function onPointerDown(event: PointerEvent): void {
+      if (panelRef.current?.contains(event.target as Node)) return;
+      if (event.button === 0) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      startClose();
+    }
+
+    function onWheel(event: WheelEvent): void {
+      if (panelRef.current?.contains(event.target as Node)) return;
+      startClose();
+    }
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('wheel', onWheel, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('wheel', onWheel, true);
+    };
+  }, [origin]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -134,19 +177,23 @@ export function MessageContextMenu({
       onPointerCancel={stopPointerBubble}
       onContextMenu={swallowContextMenu}
     >
-      <div
-        className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`}
-        onClick={startClose}
-        aria-hidden="true"
-      />
+      {!origin && (
+        <div
+          className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`}
+          onClick={startClose}
+          aria-hidden="true"
+        />
+      )}
 
-      <div
-        className={`${styles.bubbleClone} ${closing ? styles.bubbleCloneClosing : ''}`}
-        style={{ top: anchorRect.top, left: anchorRect.left, width: anchorRect.width, height: anchorRect.height }}
-        aria-hidden="true"
-      >
-        {bubble}
-      </div>
+      {!origin && (
+        <div
+          className={`${styles.bubbleClone} ${closing ? styles.bubbleCloneClosing : ''}`}
+          style={{ top: anchorRect.top, left: anchorRect.left, width: anchorRect.width, height: anchorRect.height }}
+          aria-hidden="true"
+        >
+          {bubble}
+        </div>
+      )}
 
       <div ref={panelRef} className={`${styles.panel} ${closing ? styles.panelClosing : ''}`} style={panelStyle}>
         {reactable && (
@@ -164,7 +211,7 @@ export function MessageContextMenu({
         )}
 
         <div className={styles.list} role="menu">
-          {statusLabel && <div className={styles.status}>{statusLabel}</div>}
+          {!origin && statusLabel && <div className={styles.status}>{statusLabel}</div>}
           {items.map((item) => (
             <button
               key={item.id}
