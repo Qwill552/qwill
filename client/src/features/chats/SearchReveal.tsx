@@ -215,24 +215,33 @@ export function SearchReveal({
     top: 0,
     height: containerHeight ?? window.innerHeight,
   };
-  // Маска — непрозрачная полоса [offset, offset + height − FEATHER_PX], тающая к
-  // offset + height. Закрытое состояние: её нижняя кромка стоит ровно под капсулой, то есть
-  // панель уже нарисована за капсулой, но ещё никуда не «наплыла». Открытое: кромка ушла за
-  // нижний край экрана. Раньше полоса целиком выезжала из-за верха экрана (offset = −height),
-  // потому что и сама панель начиналась под капсулой.
-  const offset = waveOpen ? 0 : waveTop + FEATHER_PX - height;
+  // Маска — непрозрачная полоса [offset, offset + maskHeight − FEATHER_PX], тающая к
+  // offset + maskHeight. Закрытое состояние: её нижняя кромка стоит ровно под капсулой, то
+  // есть панель уже нарисована за капсулой, но ещё никуда не «наплыла». Открытое: кромка ушла
+  // за нижний край экрана.
+  //
+  // Маска на FEATHER_PX выше самой панели нарочно: будь она вровень, в открытом положении
+  // тающая кромка съедала бы последние 28px панели — та навсегда оставалась бы там
+  // полупрозрачной. На телефоне под этой полосой ничего не было и никто не замечал, а на
+  // десктопе в неё попало свечение кнопки «+» и торчало сквозь фон поиска. Теперь при
+  // открытой панели кромка растворяется уже за её нижним краем.
+  const maskHeight = height + FEATHER_PX;
+  const offset = waveOpen ? 0 : waveTop - height;
   const waveStyle: CSSProperties = {
     top: 0,
-    maskSize: `100% ${height}px`,
-    WebkitMaskSize: `100% ${height}px`,
+    maskSize: `100% ${maskHeight}px`,
+    WebkitMaskSize: `100% ${maskHeight}px`,
     maskPosition: `0 ${offset}px`,
     WebkitMaskPosition: `0 ${offset}px`,
     transitionDuration: `${phase === 'wave-close' ? WAVE_CLOSE_MS : WAVE_OPEN_MS}ms`,
     transitionTimingFunction: phase === 'wave-close' ? 'var(--ease-close)' : 'var(--ease-screen)',
   };
   // Содержимое панели остаётся под капсулой — полосу за ней панель закрывает собой, но
-  // не занимает текстом.
-  const waveBodyStyle: CSSProperties = { paddingTop: `calc(${waveTop}px + var(--space-6))` };
+  // не занимает текстом. Зазор до выдачи задаёт контейнер: на десктопе полоса поиска
+  // сплошная, и выдача начинается сразу под ней (SearchReveal.module.css).
+  const waveBodyStyle: CSSProperties = {
+    paddingTop: `calc(${waveTop}px + var(--search-body-gap, var(--space-6)))`,
+  };
 
   // При возврате в лупу подпись тоже должна уйти — иначе текст на мгновение виден
   // сплющенным внутри сжимающейся до кружка капсулы (та же причина, что и при появлении).

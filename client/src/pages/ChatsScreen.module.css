@@ -29,11 +29,23 @@
 
   /* Не пилюля во всю высоту, а скруглённый прямоугольник: пилюля читалась мобильным
      элементом посреди прямоугольной десктопной хромы. Число держать в синхроне с
-     SEARCH_PILL_RADIUS_DESKTOP в ChatsScreen.tsx — им же едет капсула SearchReveal. */
+     SEARCH_PILL_RADIUS_DESKTOP в ChatsScreen.tsx — им же едет капсула SearchReveal.
+     Заливка и кромка — общий с раскрытой полосой токен (SearchReveal .dockBar): порознь они
+     разъезжались, и цвет менялся прямо посреди превращения. Блюра нет — под строкой
+     непрозрачная колонка, размывать нечего. */
   .searchTrigger {
     border-radius: 14px;
+    border-color: var(--search-field-border);
+    background: var(--search-field-bg);
+    backdrop-filter: none;
+    box-shadow: none;
+    font-size: var(--font-screen-title);
   }
 
+  .searchTrigger svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 /* Шапка списка на десктопе: одна строка ☰ + поле поиска, без вордмарка и аватара —
