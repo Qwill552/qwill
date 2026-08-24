@@ -154,8 +154,7 @@ export function SearchResults({ query, onOpenChat }: SearchResultsProps) {
   return (
     <div className={styles.list}>
       {results.chats.length > 0 && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Чаты</h2>
+        <section className={styles.section} aria-label="Чаты">
           {results.chats.map((chat) => (
             <button key={chat.id} type="button" className={styles.row} onClick={() => openChat(chat)}>
               <Avatar
@@ -179,8 +178,7 @@ export function SearchResults({ query, onOpenChat }: SearchResultsProps) {
       )}
 
       {results.users.length > 0 && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Глобальный поиск</h2>
+        <section className={styles.section} aria-label="Глобальный поиск">
           {results.users.map((user) => {
             const status = statusOf(user);
             return (
