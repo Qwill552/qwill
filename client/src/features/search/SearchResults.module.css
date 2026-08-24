@@ -10,6 +10,23 @@
   flex-direction: column;
 }
 
+.sectionTitle {
+  margin: 0;
+  padding: var(--space-2) 15px var(--space-1);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 900px) {
+  .sectionTitle {
+    display: none;
+  }
+}
+
 .row {
   display: flex;
   width: 100%;
