@@ -18,13 +18,17 @@
 }
 
 @media (min-width: 900px) {
+  .screen {
+    --chats-header-pad-b: 8px;
+  }
+
   .top {
     padding-right: 0;
     padding-left: 0;
   }
 
   .desktopHeaderRow {
-    padding: 10px calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
+    padding: 10px calc(12px + var(--safe-right)) var(--chats-header-pad-b) calc(12px + var(--safe-left));
   }
 
   /* Не пилюля во всю высоту, а скруглённый прямоугольник: пилюля читалась мобильным

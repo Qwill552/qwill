@@ -157,15 +157,8 @@
     display: none;
   }
 
-  /* Раскрытая строка — полоса во всю ширину колонки, а не плавающая стеклянная капсула: то
-     же решение, что и у шапки чата на шаге 3 (ux-ui/14-desktop/03). Скругление приходит
-     инлайн-стилем нулём (ChatsScreen.tsx, dockRadius). Заливка и кромка — общий с
-     кнопкой-триггером токен (ChatsScreen .searchTrigger), иначе цвет менялся бы прямо
-     посреди превращения; блюра нет — под полосой непрозрачная панель. */
   .dockBar {
-    padding: 0 16px;
-    border: none;
-    border-bottom: 1px solid var(--search-field-border);
+    border-color: var(--search-field-border);
     background: var(--search-field-bg);
     backdrop-filter: none;
     box-shadow: none;
@@ -194,10 +187,8 @@
     background: var(--surface-3);
   }
 
-  /* Выдача начинается сразу под полосой: --space-6 из мобильной ветки оставлял между ними
-     пустой провал в треть экрана (свой отступ у секции «Глобальный поиск» уже есть). */
   .waveBody {
-    --search-body-gap: 0px;
+    --search-body-gap: var(--chats-header-pad-b, 0px);
   }
 
   /* Заглушка «Напиши что-то…» в раскрытом поиске: без иллюстрации и по центру колонки —

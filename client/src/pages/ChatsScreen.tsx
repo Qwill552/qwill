@@ -139,14 +139,6 @@ export function ChatsScreen() {
     const headerRect = headerRowRef.current?.getBoundingClientRect();
     const originTop = screenRect?.top ?? 0;
     const originLeft = screenRect?.left ?? 0;
-    // На десктопе шапка списка — одна строка (☰ + поле), а не две стопкой: докнутая строка
-    // поиска встаёт прямо на её место, без мобильного зазора до второй строки под ней.
-    const dockGap = layout === 'desktop' ? 0 : SEARCH_DOCK_TOP_GAP;
-    // Раскрытый поиск на десктопе — прямоугольная полоса во всю ширину и высоту шапки списка,
-    // как в Telegram Desktop: скругления нет вовсе, и капсула-триггер (радиус 14) на глазах
-    // разворачивается в неё. На телефоне поиск остаётся пилюлей той же высоты, что и строка.
-    const dockRadius = layout === 'desktop' ? 0 : SEARCH_PILL_RADIUS;
-    const dockHeight = layout === 'desktop' ? headerRect?.height ?? SEARCH_PILL_HEIGHT : SEARCH_PILL_HEIGHT;
 
     setSearchReveal({
       top: rect.top - originTop,
@@ -157,15 +149,27 @@ export function ChatsScreen() {
     });
     setSearchFromIcon(fromIcon);
     setSearchRetreating(false);
-    if (headerRect) {
+    if (!headerRect) return;
+
+    if (layout === 'desktop') {
+      const sideInset = headerRect.right - rect.right;
       setSearchDock({
-        top: headerRect.top - originTop + dockGap,
-        left: headerRect.left - originLeft,
-        width: headerRect.width,
-        height: dockHeight,
-        radius: dockRadius,
+        top: rect.top - originTop,
+        left: headerRect.left - originLeft + sideInset,
+        width: headerRect.width - sideInset * 2,
+        height: rect.height,
+        radius,
       });
+      return;
     }
+
+    setSearchDock({
+      top: headerRect.top - originTop + SEARCH_DOCK_TOP_GAP,
+      left: headerRect.left - originLeft,
+      width: headerRect.width,
+      height: SEARCH_PILL_HEIGHT,
+      radius: SEARCH_PILL_RADIUS,
+    });
   }
 
   /** Круговое раскрытие из пункта меню — растёт (на ночную) или стягивается (на дневную)
