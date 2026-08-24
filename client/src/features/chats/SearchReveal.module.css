@@ -156,4 +156,43 @@
   .waveBlobs {
     display: none;
   }
+
+  /* Раскрытая строка — сплошная полоса во всю ширину колонки, а не плавающая стеклянная
+     капсула: то же решение, что и у шапки чата на шаге 3 (ux-ui/14-desktop/03). Скругление
+     приходит инлайн-стилем нулём (ChatsScreen.tsx, dockRadius), поэтому здесь только заливка
+     и разделитель снизу — размывать под непрозрачной полосой всё равно нечего. */
+  .dockBar {
+    padding: 0 16px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    backdrop-filter: none;
+    box-shadow: none;
+    color: var(--text-secondary);
+  }
+
+  .dockInput {
+    color: var(--text-primary);
+  }
+
+  .dockInput::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .close {
+    color: var(--text-secondary);
+  }
+
+  .close:hover {
+    background: var(--surface-3);
+  }
+
+  /* Заглушка «Напиши что-то…» в раскрытом поиске: без иллюстрации и по центру колонки —
+     круг с облаком посреди узкой колонки читался тяжелее самой подписи. Обе переменные
+     объявлены в EmptyState.module.css со значениями по умолчанию, то есть на телефоне и в
+     остальных местах заглушка прежняя. */
+  .waveBody {
+    --empty-illustration: none;
+    --empty-min-h: 100%;
+  }
 }

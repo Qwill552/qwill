@@ -7,7 +7,14 @@ export function EmptyState({ title, subtitle, illustration }: { title: string; s
   return (
     <div className={styles.wrap}>
       {illustration ?? (
-        <svg width="112" height="112" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+        <svg
+          className={styles.illustration}
+          width="112"
+          height="112"
+          viewBox="0 0 120 120"
+          fill="none"
+          aria-hidden="true"
+        >
           <circle cx="60" cy="60" r="56" fill="var(--primary-soft)" />
           <path
             d="M34 46a10 10 0 0 1 10-10h32a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10H52l-12 10v-10h-6a10 10 0 0 1-10-10V46Z"
