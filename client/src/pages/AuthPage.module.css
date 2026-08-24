@@ -127,9 +127,11 @@
   color: var(--text-on-primary);
 }
 
-.buttonPrimary:hover:not(:disabled) {
-  background: var(--primary);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .buttonPrimary:hover:not(:disabled) {
+    background: var(--primary);
+    transform: translateY(-1px);
+  }
 }
 
 .buttonSecondary {
@@ -138,8 +140,10 @@
   border: 2px solid var(--primary);
 }
 
-.buttonSecondary:hover:not(:disabled) {
-  background: var(--primary-soft);
+@media (hover: hover) {
+  .buttonSecondary:hover:not(:disabled) {
+    background: var(--primary-soft);
+  }
 }
 
 .tooltip {
@@ -186,8 +190,10 @@
   transition: transform var(--transition);
 }
 
-.themeToggle:hover {
-  transform: scale(1.08) rotate(10deg);
+@media (hover: hover) {
+  .themeToggle:hover {
+    transform: scale(1.08) rotate(10deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

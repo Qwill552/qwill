@@ -127,8 +127,10 @@
   transition: background var(--dur-menu) var(--ease-screen);
 }
 
-.item:hover {
-  background: var(--primary-soft);
+@media (hover: hover) {
+  .item:hover {
+    background: var(--surface-3);
+  }
 }
 
 .item:focus-visible {
@@ -140,8 +142,10 @@
   color: var(--danger);
 }
 
-.danger:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+@media (hover: hover) {
+  .danger:hover {
+    background: var(--danger-soft);
+  }
 }
 
 .glyph {
@@ -175,5 +179,15 @@
 
   .list {
     border-radius: 22px;
+  }
+
+  .item {
+    transition:
+      background var(--dur-tab) var(--ease-screen),
+      transform var(--dur-press) var(--ease-spring);
+  }
+
+  .item:active {
+    transform: scale(0.93);
   }
 }

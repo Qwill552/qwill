@@ -70,13 +70,13 @@
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen),
+  transition: background var(--dur-tab) var(--ease-screen), color var(--dur-tab) var(--ease-screen),
     transform var(--dur-press) var(--ease-spring);
 }
 
 @media (hover: hover) {
   .plain:hover:not(:disabled) {
-    background: var(--surface-2);
+    background: var(--hover-row);
     color: var(--text-primary);
   }
 }

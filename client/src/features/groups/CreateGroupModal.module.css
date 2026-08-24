@@ -70,8 +70,10 @@
   cursor: pointer;
 }
 
-.chipRemove:hover {
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
+@media (hover: hover) {
+  .chipRemove:hover {
+    background: color-mix(in srgb, var(--primary) 18%, transparent);
+  }
 }
 
 .error {

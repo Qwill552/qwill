@@ -73,9 +73,11 @@
     color var(--dur-tab) ease;
 }
 
-.closeButton:hover {
-  background: var(--surface-2);
-  color: var(--text-primary);
+@media (hover: hover) {
+  .closeButton:hover {
+    background: var(--hover-row);
+    color: var(--text-primary);
+  }
 }
 
 .closeButton:focus-visible {

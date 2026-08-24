@@ -58,8 +58,10 @@
   transition: background 0.18s;
 }
 
-.item:hover {
-  background: rgba(var(--pulse-glass), 0.09);
+@media (hover: hover) {
+  .item:hover {
+    background: rgba(var(--pulse-glass), 0.09);
+  }
 }
 
 .item:focus-visible {
@@ -77,8 +79,10 @@
   color: #ff5d73;
 }
 
-.danger:hover {
-  background: rgba(255, 93, 115, 0.12);
+@media (hover: hover) {
+  .danger:hover {
+    background: rgba(255, 93, 115, 0.12);
+  }
 }
 
 .label {
@@ -125,8 +129,10 @@
   transition: background 0.18s;
 }
 
-.header:hover {
-  background: rgba(var(--pulse-glass), 0.09);
+@media (hover: hover) {
+  .header:hover {
+    background: rgba(var(--pulse-glass), 0.09);
+  }
 }
 
 .header:focus-visible {
@@ -198,10 +204,13 @@
     border-radius: 16px;
     font-size: var(--font-name);
     font-weight: 500;
+    transition:
+      background var(--dur-tab) var(--ease-screen),
+      transform var(--dur-press) var(--ease-spring);
   }
 
-  .item:hover {
-    background: var(--surface-3);
+  .item:active {
+    transform: scale(0.93);
   }
 
   .item:focus-visible {
@@ -213,10 +222,6 @@
     color: var(--danger);
   }
 
-  .danger:hover {
-    background: var(--danger-soft);
-  }
-
   .divider {
     margin: 6px 10px;
     background: var(--border);
@@ -225,10 +230,13 @@
   .header {
     padding: 8px 10px;
     border-radius: 16px;
+    transition:
+      background var(--dur-tab) var(--ease-screen),
+      transform var(--dur-press) var(--ease-spring);
   }
 
-  .header:hover {
-    background: var(--surface-3);
+  .header:active {
+    transform: scale(0.93);
   }
 
   .header:focus-visible {
@@ -246,6 +254,20 @@
 
   .menuClosing {
     animation: qMenuOut var(--dur-close) ease-in forwards;
+  }
+}
+
+@media (min-width: 900px) and (hover: hover) {
+  .item:hover {
+    background: var(--surface-3);
+  }
+
+  .danger:hover {
+    background: var(--danger-soft);
+  }
+
+  .header:hover {
+    background: var(--surface-3);
   }
 }
 

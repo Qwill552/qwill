@@ -161,10 +161,6 @@
     color: inherit;
   }
 
-  .close:hover {
-    background: var(--surface-3);
-  }
-
   .waveBody {
     --search-body-gap: var(--chats-header-pad-b, 0px);
   }
@@ -176,5 +172,11 @@
   .waveBody {
     --empty-illustration: none;
     --empty-min-h: 100%;
+  }
+}
+
+@media (min-width: 900px) and (hover: hover) {
+  .close:hover {
+    background: var(--surface-3);
   }
 }

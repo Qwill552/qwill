@@ -70,8 +70,10 @@
   transition: background var(--dur-tab);
 }
 
-.action:hover {
-  background: var(--primary-press);
+@media (hover: hover) {
+  .action:hover {
+    background: var(--primary-press);
+  }
 }
 
 .action:active {

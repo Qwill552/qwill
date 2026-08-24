@@ -16,9 +16,11 @@
   transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen);
 }
 
-.button:hover:not(:disabled) {
-  background: var(--primary-soft);
-  color: var(--primary);
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
 }
 
 .button:disabled {
@@ -37,9 +39,11 @@
   color: var(--text-on-primary);
 }
 
-.primary:hover:not(:disabled) {
-  background: var(--primary-press);
-  color: var(--text-on-primary);
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    background: var(--primary-press);
+    color: var(--text-on-primary);
+  }
 }
 
 .plain {
@@ -50,9 +54,11 @@
   color: var(--danger);
 }
 
-.danger:hover:not(:disabled) {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (hover: hover) {
+  .danger:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .glyph {

@@ -59,8 +59,10 @@
   cursor: pointer;
 }
 
-.closeButton:hover {
-  background: var(--primary-soft);
+@media (hover: hover) {
+  .closeButton:hover {
+    background: var(--primary-soft);
+  }
 }
 
 .body {

@@ -69,6 +69,7 @@
   --surface: #ffffff;
   --surface-2: #ffffff;
   --surface-3: #e4e9f4;
+  --hover-row: #f2f5fa;
   --chat-bg: #e7ebf4;
   --chat-pattern-ink: rgb(60 70 120 / 18%);
   --chat-pattern-blend: multiply;
@@ -142,6 +143,7 @@
   --surface: #141a2b;
   --surface-2: #1b2338;
   --surface-3: #232c46;
+  --hover-row: #1b2338;
   --chat-bg: #0d0f18;
   --chat-pattern-ink: rgb(255 255 255 / 24%);
   --chat-pattern-blend: soft-light;

@@ -129,7 +129,9 @@ export function MessageRow({
   /** Касание началось на кнопке внутри пузыря («Обновить» в объявлении, «Повторить» у
    *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
    *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
-  const onBubbleActionRef = useRef(false);
+  const skipGesturesRef = useRef(false);
+  const pointerTypeRef = useRef<string>('');
+  const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
@@ -183,6 +185,7 @@ export function MessageRow({
         toggleGroupSelected();
         return;
       }
+      if (pointerTypeRef.current === 'mouse') return;
       if (!canAct) return;
       const rect = bubbleRef.current?.getBoundingClientRect();
       if (rect) setMenuAnchor(rect);
@@ -193,6 +196,7 @@ export function MessageRow({
         return;
       }
       if (selectionMode || !canAct || !canReact) return;
+      if (pointerTypeRef.current === 'mouse' && onSelectableRef.current) return;
       haptic();
       toggleReaction(chatId, message.id, doubleTapReaction);
       setReactionFly({ x: point.x, y: point.y, emoji: doubleTapReaction, key: Date.now() });
@@ -210,8 +214,12 @@ export function MessageRow({
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
     suppressTapRef.current = false;
     const target = event.target as HTMLElement;
-    onBubbleActionRef.current = target.closest('button:not([data-media-tile]), a[download]') !== null;
-    if (onBubbleActionRef.current) return;
+    const isMouse = event.pointerType === 'mouse';
+    pointerTypeRef.current = event.pointerType;
+    onSelectableRef.current = target.closest('[data-selectable]') !== null;
+    skipGesturesRef.current =
+      (isMouse && event.button !== 0) || target.closest('button:not([data-media-tile]), a[download]') !== null;
+    if (skipGesturesRef.current) return;
 
     const tile = target.closest<HTMLElement>('[data-media-tile]');
     mediaTapRef.current = tile
@@ -219,18 +227,18 @@ export function MessageRow({
       : null;
 
     longPress.onPointerDown(event);
-    swipe.onPointerDown(event);
+    if (!isMouse) swipe.onPointerDown(event);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
-    if (onBubbleActionRef.current) return;
+    if (skipGesturesRef.current) return;
     longPress.onPointerMove(event);
     swipe.onPointerMove(event);
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>): void {
-    if (onBubbleActionRef.current) {
-      onBubbleActionRef.current = false;
+    if (skipGesturesRef.current) {
+      skipGesturesRef.current = false;
       return;
     }
 
@@ -264,10 +272,21 @@ export function MessageRow({
     tap.onPointerUp(event);
   }
 
+  function handleContextMenu(event: React.MouseEvent<HTMLDivElement>): void {
+    const bubble = bubbleRef.current;
+    if (pointerTypeRef.current !== 'mouse' || !bubble) return;
+    if (!bubble.contains(event.target as Node)) return;
+    event.preventDefault();
+    if (selectionMode || menuAnchor !== null || !canAct) return;
+    tap.cancel();
+    longPress.onPointerCancel();
+    setMenuAnchor(bubble.getBoundingClientRect());
+  }
+
   function handlePointerCancel(): void {
     mediaTapRef.current = null;
-    if (onBubbleActionRef.current) {
-      onBubbleActionRef.current = false;
+    if (skipGesturesRef.current) {
+      skipGesturesRef.current = false;
       return;
     }
 
@@ -354,6 +373,7 @@ export function MessageRow({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
+      onContextMenu={handleContextMenu}
     >
       <span className={styles.highlight} aria-hidden="true" />
 

@@ -121,12 +121,18 @@ export function MessageContextMenu({
     event.stopPropagation();
   }
 
+  function swallowContextMenu(event: React.MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   return createPortal(
     <div
       onPointerDown={stopPointerBubble}
       onPointerMove={stopPointerBubble}
       onPointerUp={stopPointerBubble}
       onPointerCancel={stopPointerBubble}
+      onContextMenu={swallowContextMenu}
     >
       <div
         className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`}

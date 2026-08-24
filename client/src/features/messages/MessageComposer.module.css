@@ -127,11 +127,27 @@
   .round {
     width: var(--tap-min);
     height: var(--tap-min);
+    transition:
+      background var(--dur-tab) var(--ease-screen),
+      color var(--dur-tab) var(--ease-screen),
+      transform var(--dur-press) var(--ease-spring);
+  }
+
+  .round:not(:disabled):active {
+    color: var(--primary);
+    transform: scale(0.86);
   }
 
   .round:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: -2px;
+  }
+}
+
+@media (min-width: 900px) and (hover: hover) {
+  .round:not(:disabled):hover {
+    background: var(--hover-row);
+    color: var(--text-primary);
   }
 }
 
@@ -178,6 +194,11 @@
 @media (min-width: 900px) {
   .send {
     box-shadow: var(--shadow-md);
+    transition: transform var(--dur-press) var(--ease-spring);
+  }
+
+  .send:not(:disabled):hover {
+    transform: none;
   }
 
   .send:not(:disabled):active {
