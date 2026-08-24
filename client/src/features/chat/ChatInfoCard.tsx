@@ -1,5 +1,5 @@
 import type { AttachmentDto } from '@messenger/shared';
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useCallStore } from '../../stores/callStore';
@@ -15,6 +15,8 @@ import styles from './ChatInfoCard.module.css';
 interface ChatInfoCardProps {
   chatId: string;
 }
+
+const COPIED_MS = 1500;
 
 interface AttachmentTally {
   icon: IconName;
@@ -66,6 +68,7 @@ function tally(attachments: AttachmentDto[]): AttachmentTally[] {
 export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const navigate = useNavigate();
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const [usernameCopied, setUsernameCopied] = useState(false);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
@@ -85,7 +88,24 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
     return tally(attachments).filter((row) => row.count > 0);
   }, [messages]);
 
+  useEffect(() => {
+    if (!usernameCopied) return;
+    const timer = window.setTimeout(() => setUsernameCopied(false), COPIED_MS);
+    return () => window.clearTimeout(timer);
+  }, [usernameCopied]);
+
   if (!other) return null;
+
+  const usernameHandle = `@${other.username}`;
+
+  async function copyUsername(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(usernameHandle);
+      setUsernameCopied(true);
+    } catch {
+      setUsernameCopied(false);
+    }
+  }
 
   const menuItems: MenuItem[] = [
     { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
@@ -106,7 +126,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
 
       <div className={styles.actions}>
         <button type="button" className={styles.action} onClick={() => navigate(`/chats/${chatId}`)}>
-          <Icon name="chats" size={22} solid className={styles.actionIcon} />
+          <Icon name="chat-filled" size={22} solid className={styles.actionIcon} />
           Чат
         </button>
         <button
@@ -117,11 +137,11 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
             setChatMuted(chatId, !muted).catch(() => undefined);
           }}
         >
-          <Icon name={muted ? 'mute' : 'bell'} size={22} solid={!muted} className={styles.actionIcon} />
+          <Icon name={muted ? 'mute' : 'bell-filled'} size={22} solid={!muted} className={styles.actionIcon} />
           Звук
         </button>
         <button type="button" className={styles.action} onClick={() => void startCall(chatId, 'AUDIO')}>
-          <Icon name="phone" size={22} solid className={styles.actionIcon} />
+          <Icon name="phone-filled" size={22} solid className={styles.actionIcon} />
           Звонок
         </button>
         <button
@@ -139,7 +159,16 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
       </div>
 
       <Card>
-        <Card.Row title={`@${other.username}`} subtitle="Имя пользователя" icon="user" tint="blue" />
+        <Card.Row
+          title={
+            <button type="button" className={styles.username} onClick={() => void copyUsername()}>
+              {usernameHandle}
+            </button>
+          }
+          subtitle={usernameCopied ? 'Скопировано' : 'Имя пользователя'}
+          icon="user"
+          tint="blue"
+        />
       </Card>
 
       {tallies.length > 0 && (

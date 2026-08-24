@@ -81,3 +81,34 @@
 .tallyRow.tallyRow {
   --row-divider-inset: 0;
 }
+
+.tallyRow svg {
+  stroke-width: 1.5;
+}
+
+:global(:root[data-theme='light']) .tallyRow,
+:global([data-theme='light']) .tallyRow {
+  --tile-ink-override: var(--text-secondary);
+}
+
+.username {
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+@media (hover: hover) {
+  .username:hover {
+    text-decoration: underline;
+  }
+}
+
+.username:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
