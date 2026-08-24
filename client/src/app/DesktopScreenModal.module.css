@@ -35,8 +35,20 @@
   animation: popIn var(--dur-menu) var(--ease-spring);
 }
 
+.cardChromeless {
+  height: auto;
+  max-height: min(680px, 86dvh);
+}
+
 .cardClosing {
   animation: popOut var(--dur-close) ease-in both;
+}
+
+.closeFloating {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-2);
+  right: var(--space-2);
 }
 
 .header {

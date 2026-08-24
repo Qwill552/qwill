@@ -7,7 +7,16 @@ import {
   type PointerEvent,
   type TransitionEvent,
 } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
+import {
+  matchPath,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  type Location,
+} from 'react-router-dom';
 
 import { AppearanceScreen } from '../pages/AppearanceScreen';
 import { CallTraceScreen } from '../pages/CallTraceScreen';
@@ -25,6 +34,7 @@ import {
   DESKTOP_LIST_WIDTH_DEFAULT,
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
+import { ChatInfoCard } from '../features/chat/ChatInfoCard';
 import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
 import { hasOpenOverlay } from './useBackHandler';
@@ -597,7 +607,9 @@ export function ScreenStack() {
     const overlayTab = currentTab === 'chats' ? null : currentTab;
     const chatsLocation = overlayTab ? emptyLocation(lastPathForTab('/chats')) : location;
     const leftLocation = CHATS_ROOT_LOCATION;
-    const rightLocation = !isTabRoot(chatsLocation.pathname) ? chatsLocation : null;
+    const chatInfoId = matchPath('/chats/:chatId/info', chatsLocation.pathname)?.params.chatId ?? null;
+    const chatLocation = chatInfoId ? emptyLocation(`/chats/${chatInfoId}`) : chatsLocation;
+    const rightLocation = !isTabRoot(chatLocation.pathname) ? chatLocation : null;
 
     return (
       <div className={styles.stack} ref={stackRef}>
@@ -624,6 +636,11 @@ export function ScreenStack() {
             onClose={() => navigate(lastPathForTab('/chats'))}
           >
             <RouteSwitch location={location} />
+          </DesktopScreenModal>
+        )}
+        {!overlayTab && chatInfoId && (
+          <DesktopScreenModal chromeless title="Профиль" onClose={() => navigate(`/chats/${chatInfoId}`)}>
+            <ChatInfoCard chatId={chatInfoId} />
           </DesktopScreenModal>
         )}
       </div>

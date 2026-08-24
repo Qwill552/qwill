@@ -8,6 +8,7 @@ import styles from './DesktopScreenModal.module.css';
 interface DesktopScreenModalProps {
   title: string;
   onClose: () => void;
+  chromeless?: boolean;
   children: ReactNode;
 }
 
@@ -23,7 +24,7 @@ interface DesktopScreenModalProps {
  * кнопка «назад» и так закрывает карточку — просто без exit-анимации, потому что ScreenStack
  * перестаёт её рендерить в тот же кадр, где меняется location.
  */
-export function DesktopScreenModal({ title, onClose, children }: DesktopScreenModalProps) {
+export function DesktopScreenModal({ title, onClose, chromeless, children }: DesktopScreenModalProps) {
   const [closing, setClosing] = useState(false);
 
   function startClose(): void {
@@ -46,17 +47,28 @@ export function DesktopScreenModal({ title, onClose, children }: DesktopScreenMo
   return createPortal(
     <div className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`} onClick={handleScrimClick}>
       <div
-        className={`${styles.card} ${closing ? styles.cardClosing : ''}`}
+        className={`${styles.card} ${chromeless ? styles.cardChromeless : ''} ${closing ? styles.cardClosing : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.closeButton} onClick={startClose} aria-label="Закрыть">
+        {chromeless ? (
+          <button
+            type="button"
+            className={`${styles.closeButton} ${styles.closeFloating}`}
+            onClick={startClose}
+            aria-label="Закрыть"
+          >
             <Icon name="close" size={18} />
           </button>
-        </div>
+        ) : (
+          <div className={styles.header}>
+            <h2 className={styles.title}>{title}</h2>
+            <button type="button" className={styles.closeButton} onClick={startClose} aria-label="Закрыть">
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+        )}
         <div className={styles.body}>{children}</div>
       </div>
     </div>,

@@ -1,0 +1,157 @@
+import type { AttachmentDto } from '@messenger/shared';
+import { useMemo, useState, type MouseEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { useCallStore } from '../../stores/callStore';
+import { useChatStore } from '../../stores/chatStore';
+import { formatLastSeen } from '../../utils/presence';
+import { Avatar } from '../../ui/Avatar';
+import { Card } from '../../ui/Card';
+import { Icon, type IconName } from '../../ui/Icon';
+import { Menu, type MenuItem } from '../../ui/Menu';
+import styles from './ChatInfoCard.module.css';
+
+interface ChatInfoCardProps {
+  chatId: string;
+}
+
+interface AttachmentTally {
+  icon: IconName;
+  label: string;
+  count: number;
+}
+
+function plural(count: number, one: string, few: string, many: string): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+function tally(attachments: AttachmentDto[]): AttachmentTally[] {
+  let photos = 0;
+  let videos = 0;
+  let voices = 0;
+  let audios = 0;
+  let files = 0;
+
+  for (const attachment of attachments) {
+    const mimeType = attachment.file.mimeType;
+    if (attachment.peaks !== null) voices += 1;
+    else if (mimeType.startsWith('image/')) photos += 1;
+    else if (mimeType.startsWith('video/')) videos += 1;
+    else if (mimeType.startsWith('audio/')) audios += 1;
+    else files += 1;
+  }
+
+  return [
+    { icon: 'image', label: `${photos} ${plural(photos, 'фотография', 'фотографии', 'фотографий')}`, count: photos },
+    { icon: 'play', label: `${videos} видео`, count: videos },
+    {
+      icon: 'mic',
+      label: `${voices} ${plural(voices, 'голосовое сообщение', 'голосовых сообщения', 'голосовых сообщений')}`,
+      count: voices,
+    },
+    { icon: 'speaker', label: `${audios} ${plural(audios, 'аудиофайл', 'аудиофайла', 'аудиофайлов')}`, count: audios },
+    { icon: 'file', label: `${files} ${plural(files, 'файл', 'файла', 'файлов')}`, count: files },
+  ];
+}
+
+export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
+  const navigate = useNavigate();
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+
+  const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
+  const presenceByUser = useChatStore((s) => s.presenceByUser);
+  const messages = useChatStore((s) => s.messagesByChat[chatId]);
+  const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const startCall = useCallStore((s) => s.startCall);
+
+  const other = chat?.otherMember ?? null;
+  const presence = other ? presenceByUser[other.id] : undefined;
+  const online = presence?.online ?? false;
+  const muted = chat?.muted ?? false;
+
+  const tallies = useMemo(() => {
+    const attachments = (messages ?? [])
+      .filter((m) => m.attachment && !m.deletedAt)
+      .map((m) => m.attachment as AttachmentDto);
+    return tally(attachments).filter((row) => row.count > 0);
+  }, [messages]);
+
+  if (!other) return null;
+
+  const menuItems: MenuItem[] = [
+    { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
+    { id: 'edit', label: 'Изменить контакт', icon: 'edit', onSelect: () => {} },
+    { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} },
+    { id: 'delete', label: 'Удалить контакт', icon: 'trash', danger: true, onSelect: () => {} },
+  ];
+
+  return (
+    <div className={`${styles.scroller} hide-native-scrollbar`}>
+      <div className={styles.hero}>
+        <Avatar label={other.displayName} avatarUrl={other.avatarUrl} size={108} color={other.avatarColor} />
+        <span className={styles.name}>{other.displayName}</span>
+        <span className={online ? styles.statusOnline : styles.status}>
+          {online ? 'в сети' : formatLastSeen(presence?.lastSeenAt ?? other.lastSeenAt)}
+        </span>
+      </div>
+
+      <div className={styles.actions}>
+        <button type="button" className={styles.action} onClick={() => navigate(`/chats/${chatId}`)}>
+          <Icon name="chats" size={22} className={styles.actionIcon} />
+          Чат
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          aria-pressed={muted}
+          onClick={() => {
+            setChatMuted(chatId, !muted).catch(() => undefined);
+          }}
+        >
+          <Icon name={muted ? 'mute' : 'bell'} size={22} className={styles.actionIcon} />
+          Звук
+        </button>
+        <button type="button" className={styles.action} onClick={() => void startCall(chatId, 'AUDIO')}>
+          <Icon name="phone" size={22} className={styles.actionIcon} />
+          Звонок
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          aria-haspopup="menu"
+          aria-expanded={menuAnchor !== null}
+          onClick={(event: MouseEvent<HTMLButtonElement>) =>
+            setMenuAnchor(event.currentTarget.getBoundingClientRect())
+          }
+        >
+          <Icon name="more" size={22} className={styles.actionIcon} />
+          Ещё
+        </button>
+      </div>
+
+      <Card>
+        <Card.Row title={`@${other.username}`} subtitle="Имя пользователя" icon="user" tint="blue" />
+      </Card>
+
+      {tallies.length > 0 && (
+        <Card caption="Медиа">
+          {tallies.map((row) => (
+            <Card.Row
+              key={row.icon}
+              title={row.label}
+              leading={<Icon name={row.icon} size={22} className={styles.tallyIcon} />}
+            />
+          ))}
+        </Card>
+      )}
+
+      {menuAnchor && (
+        <Menu anchor={menuAnchor} onClose={() => setMenuAnchor(null)} items={menuItems} desktopWidth={246} />
+      )}
+    </div>
+  );
+}
