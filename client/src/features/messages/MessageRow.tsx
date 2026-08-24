@@ -27,6 +27,7 @@ interface MessageRowProps {
   /** Колонка аватаров нужна только в группе; в личном чате пузырь стоит у самого края. */
   withAvatarColumn: boolean;
   showAvatar: boolean;
+  continuesSeries: boolean;
   message: LocalMessage;
   groupIds: number[];
   reactions: MessageReactionDto[];
@@ -97,6 +98,7 @@ export function MessageRow({
   sender,
   withAvatarColumn,
   showAvatar,
+  continuesSeries,
   message,
   groupIds,
   reactions,
@@ -347,7 +349,9 @@ export function MessageRow({
 
   return (
     <div
-      className={`message-wrap ${styles.row} ${own ? styles.own : ''} ${selected ? styles.selected : ''}`}
+      className={`message-wrap ${styles.row} ${own ? styles.own : ''} ${selected ? styles.selected : ''} ${
+        continuesSeries ? styles.series : ''
+      }`}
       data-message-id={message.id}
       ref={swipe.ref}
       onPointerDown={handlePointerDown}

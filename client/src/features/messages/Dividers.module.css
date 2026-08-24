@@ -50,7 +50,13 @@
    (ux-ui/14-desktop/05-overlays.md, решение пользователя). */
 @media (min-width: 900px) {
   .day {
+    padding: 4px 12px;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-pill);
     background: var(--surface-3);
     backdrop-filter: none;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font-size: var(--font-caption);
   }
 }

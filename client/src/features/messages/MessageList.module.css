@@ -9,7 +9,6 @@
   display: flex;
   height: 100%;
   flex-direction: column;
-  gap: 4px;
   overflow-x: clip;
   overflow-y: auto;
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
@@ -23,11 +22,28 @@
   user-select: none;
 }
 
+.track {
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (min-width: 900px) {
+  .track {
+    max-width: 812px;
+    margin: 0 auto;
+  }
+}
+
 /* Скроллящаяся флекс-колонка сжимает детей, когда их суммарная высота превышает
    контент-бокс: строка становится ниже своего пузыря, пузырь вылезает за неё и
    накладывается на следующий. Видно тем сильнее, чем больше padding-bottom, поэтому
    вылезло вместе с резервом места под панель эмодзи. */
-.list > * {
+.list > *,
+.track > * {
   flex-shrink: 0;
 }
 
