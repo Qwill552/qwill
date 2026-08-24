@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 
 import { desktopColumnRect, desktopOverlayBounds } from '../../app/desktopOverlay';
+import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { haptic } from '../../ui/haptic';
@@ -131,14 +132,8 @@ export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
   }, [closing, onClose]);
 
   useBackHandler(!closing, startClose);
+  useEscapeKey(!closing, startClose);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   useEffect(() => {
     const el = categoryInnerRef.current;

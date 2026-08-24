@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { desktopOverlayBounds } from '../../app/desktopOverlay';
+import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { Icon, type IconName } from '../../ui/Icon';
 import { ReactionPicker } from './ReactionPicker';
@@ -79,6 +80,7 @@ export function MessageContextMenu({
 
   // Кнопка/жест «назад» закрывает меню раньше, чем уходит из чата (ux-ui/06, «Готово когда»).
   useBackHandler(!closing, startClose);
+  useEscapeKey(!closing, startClose);
 
   // Позиция считается после отрисовки, когда известны реальные размеры панели, но до кадра
   // (тот же приём, что в Menu.tsx) — иначе панель дёрнется от начальных 0/0 к месту.
@@ -147,13 +149,6 @@ export function MessageContextMenu({
     };
   }, [origin]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   // React порталит DOM-узлы в document.body, но синтетические события всё равно всплывают
   // по ДЕРЕВУ React, а не по DOM: этот компонент — JSX-ребёнок MessageRow, у которой на

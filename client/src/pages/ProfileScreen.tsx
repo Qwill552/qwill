@@ -125,7 +125,10 @@ export function ProfileScreen() {
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void handleNameSave();
-                  if (e.key === 'Escape') setNameEditing(false);
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setNameEditing(false);
+                  }
                 }}
               />
               <button

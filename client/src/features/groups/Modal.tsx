@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 
+import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { Icon } from '../../ui/Icon';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
@@ -17,14 +18,7 @@ interface ModalProps {
 export function Modal({ title, onClose, children, opaque }: ModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   useBackHandler(true, onClose);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(true, onClose);
 
   function handleOverlayClick(event: MouseEvent<HTMLDivElement>): void {
     if (event.target === event.currentTarget) onClose();

@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
 import { desktopOverlayBounds } from '../app/desktopOverlay';
 import { registerMenuOpen, unregisterMenuOpen } from '../app/menuCoordinator';
@@ -93,6 +94,7 @@ export function Menu({ anchor, items, onClose, header, desktopWidth }: MenuProps
   }, [closing, onClose]);
 
   useBackHandler(!closing, startClose);
+  useEscapeKey(!closing, startClose);
 
   useEffect(() => {
     registerMenuOpen(menuId, startClose);
@@ -130,13 +132,6 @@ export function Menu({ anchor, items, onClose, header, desktopWidth }: MenuProps
     });
   }, [anchor, desktopWidth]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [startClose]);
 
   function select(item: MenuItem, event: MouseEvent<HTMLElement>): void {
     item.onSelect(event);

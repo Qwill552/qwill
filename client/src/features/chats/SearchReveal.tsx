@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 
 import { AmbientBlobs } from '../../app/AmbientBlobs';
+import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { RecentSearches } from '../search/RecentSearches';
@@ -107,6 +108,7 @@ export function SearchReveal({
   }, []);
 
   useBackHandler(phase !== 'wave-close' && phase !== 'retreat', startClose);
+  useEscapeKey(phase !== 'wave-close' && phase !== 'retreat', startClose);
 
   useLayoutEffect(() => {
     const rect = rootRef.current?.getBoundingClientRect();

@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from 'react-dom';
 
 import { useFileSrc } from '../../api/useFileSrc';
+import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
@@ -148,6 +149,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   const startClose = useCallback(() => setClosing(true), []);
   useBackHandler(!closing, startClose);
+  useEscapeKey(!closing, startClose);
 
   const registerMedia = useCallback((node: HTMLElement | null) => {
     mediaRef.current = node;
@@ -222,7 +224,6 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
       if (event.key === 'ArrowRight') setIndex(index + 1);
       if (event.key === 'ArrowLeft') setIndex(index - 1);
     }

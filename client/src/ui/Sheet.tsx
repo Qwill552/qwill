@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { ScrollIndicator } from './ScrollIndicator';
@@ -35,14 +36,8 @@ export function Sheet({ title, onClose, children }: SheetProps) {
   }, []);
 
   useBackHandler(phase !== 'closing', startClose);
+  useEscapeKey(phase !== 'closing', startClose);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [startClose]);
 
   useEffect(() => {
     if (phase !== 'closing') return;

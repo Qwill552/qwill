@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
@@ -122,10 +123,20 @@ export function ChatScreen() {
   const handleReply = useCallback((message: LocalMessage) => setComposerContext({ mode: 'reply', message }), []);
   const handleEdit = useCallback((message: LocalMessage) => setComposerContext({ mode: 'edit', message }), []);
 
+  const handleEditLast = useCallback(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]!;
+      if (message.sender?.id !== myId || message.id <= 0 || message.deletedAt) continue;
+      setComposerContext({ mode: 'edit', message });
+      return;
+    }
+  }, [messages, myId]);
+
   // Кнопка/жест «назад» выходит из мультивыбора раньше, чем уходит из чата (ux-ui/06,
   // «Готово когда»). Контекстное меню регистрируется отдельно, внутри MessageContextMenu —
   // оно открывается позже (из выбранной строки), поэтому в истории окажется выше и закроется первым.
   useBackHandler(selectionMode, exitSelection);
+  useEscapeKey(selectionMode, exitSelection);
 
   useEffect(() => {
     if (!chatId) return;
@@ -419,6 +430,7 @@ export function ChatScreen() {
               context={composerContext}
               onClearContext={() => setComposerContext(null)}
               onEmojiPanelToggle={setEmojiPanelOpen}
+              onEditLast={isDesktop ? handleEditLast : undefined}
             />
           )}
         </div>

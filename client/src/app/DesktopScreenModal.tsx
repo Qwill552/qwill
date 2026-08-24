@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useEscapeKey } from './hotkeys';
 import { Icon } from '../ui/Icon';
 import styles from './DesktopScreenModal.module.css';
 
@@ -36,13 +37,7 @@ export function DesktopScreenModal({ title, onClose, children }: DesktopScreenMo
     return () => window.clearTimeout(timer);
   }, [closing, onClose]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') startClose();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  useEscapeKey(!closing, startClose);
 
   function handleScrimClick(event: MouseEvent<HTMLDivElement>): void {
     if (event.target === event.currentTarget) startClose();

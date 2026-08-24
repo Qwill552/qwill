@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 
+import { isTypingTarget } from '../../app/hotkeys';
 import { useChatStore } from '../../stores/chatStore';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { Skeleton } from '../../ui/Skeleton';
@@ -7,6 +8,7 @@ import { ChatRow } from './ChatRow';
 import type { ChatFilter } from './ChatFilters';
 import styles from './ChatList.module.css';
 import { EmptyState } from './EmptyState';
+import { selectVisibleChats } from './visibleChats';
 
 export interface ChatListHandle {
   /** Тап по активной вкладке «Сообщения» в таб-баре — первый раз наверх (этап 2). */
@@ -14,6 +16,7 @@ export interface ChatListHandle {
   /** Тап по активной вкладке второй раз подряд — к первому непрочитанному (этап 2). */
   scrollToFirstUnread: () => void;
   restoreScrollTop: (top: number) => void;
+  revealChat: (chatId: string) => void;
 }
 
 interface ChatListProps {
@@ -52,19 +55,15 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
     restoreScrollTop(top) {
       if (listRef.current) listRef.current.scrollTop = top;
     },
+    revealChat(chatId) {
+      const row = listRef.current?.querySelector<HTMLElement>(`[data-chat-id="${chatId}"]`);
+      if (!row) return;
+      if (!isTypingTarget(document.activeElement)) row.focus({ preventScroll: true });
+      row.scrollIntoView({ block: 'nearest' });
+    },
   }));
 
-  const visible = useMemo(() => {
-    const filtered =
-      filter === 'unread'
-        ? chats.filter((c) => c.unreadCount > 0)
-        : filter === 'private'
-          ? chats.filter((c) => c.type === 'PRIVATE')
-          : filter === 'groups'
-            ? chats.filter((c) => c.type === 'GROUP')
-            : chats;
-    return [...filtered].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
-  }, [chats, filter]);
+  const visible = useMemo(() => selectVisibleChats(chats, filter), [chats, filter]);
 
   const loading = !chatsLoaded && chats.length === 0;
 

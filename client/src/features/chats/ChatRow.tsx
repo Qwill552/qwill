@@ -146,6 +146,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
         ref={rowRef}
         to={`/chats/${chat.id}`}
         className={({ isActive }) => `${styles.row} ${isActive ? styles.active : ''}`}
+        data-chat-id={chat.id}
         data-unread={chat.unreadCount > 0 ? 'true' : undefined}
         style={{ animationDelay: `${index * 0.045}s` }}
         onPointerDown={(event) => {

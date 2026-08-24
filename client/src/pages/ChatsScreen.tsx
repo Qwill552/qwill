@@ -5,6 +5,7 @@ import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
+import { selectVisibleChats } from '../features/chats/visibleChats';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { useChatStore } from '../stores/chatStore';
@@ -18,6 +19,7 @@ import { Sheet } from '../ui/Sheet';
 import { Switch } from '../ui/Switch';
 import { onTabReactivate } from '../app/tabNav';
 import { revealTransition } from '../app/viewTransition';
+import { useHotkey } from '../app/hotkeys';
 import { useLayoutMode } from '../app/useLayoutMode';
 import styles from './ChatsScreen.module.css';
 
@@ -50,6 +52,7 @@ export function ChatsScreen() {
   const navigate = useNavigate();
   const loadChats = useChatStore((s) => s.loadChats);
   const chats = useChatStore((s) => s.chats);
+  const activeChatId = useChatStore((s) => s.activeChatId);
   const me = useAuthStore((s) => s.user);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
@@ -57,6 +60,7 @@ export function ChatsScreen() {
   const listRef = useRef<ChatListHandle>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const themeSwitchRef = useRef<HTMLSpanElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -89,6 +93,10 @@ export function ChatsScreen() {
     }),
     [chats],
   );
+
+  useHotkey(layout === 'desktop', { code: 'KeyK', mod: true, allowInInput: true }, () => openSearchByHotkey());
+  useHotkey(layout === 'desktop', { key: 'ArrowDown', mod: true, allowInInput: true }, () => stepChat(1));
+  useHotkey(layout === 'desktop', { key: 'ArrowUp', mod: true, allowInInput: true }, () => stepChat(-1));
 
   useEffect(() => {
     void loadChats();
@@ -208,6 +216,26 @@ export function ChatsScreen() {
     },
   ];
 
+  const navigableChats = useMemo(() => selectVisibleChats(chats, effectiveFilter), [chats, effectiveFilter]);
+
+  function stepChat(delta: number): void {
+    if (navigableChats.length === 0) return;
+    const current = navigableChats.findIndex((chat) => chat.id === activeChatId);
+    const target =
+      current < 0
+        ? navigableChats[delta > 0 ? 0 : navigableChats.length - 1]
+        : navigableChats[Math.min(navigableChats.length - 1, Math.max(0, current + delta))];
+    if (!target || target.id === activeChatId) return;
+    navigate(`/chats/${target.id}`);
+    listRef.current?.revealChat(target.id);
+  }
+
+  function openSearchByHotkey(): void {
+    const trigger = searchTriggerRef.current;
+    if (!trigger || searchReveal) return;
+    openSearchReveal(trigger, SEARCH_PILL_RADIUS, false);
+  }
+
   function openChat(chatId: string): void {
     setComposeOpen(false);
     setGroupOpen(false);
@@ -232,6 +260,7 @@ export function ChatsScreen() {
             </button>
             <button
               type="button"
+              ref={searchTriggerRef}
               className={`${styles.searchTrigger} ${searchReveal ? styles.searchTriggerCovered : ''}`}
               onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
             >

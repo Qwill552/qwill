@@ -8,6 +8,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 
+import { useEscapeKey, useHotkey } from '../../app/hotkeys';
 import { setPendingDraftProvider, takePendingDraft } from '../../app/pendingDraft';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -40,11 +41,13 @@ export function MessageComposer({
   context,
   onClearContext,
   onEmojiPanelToggle,
+  onEditLast,
 }: {
   chatId: string;
   context: ComposerContext | null;
   onClearContext: () => void;
   onEmojiPanelToggle?: (open: boolean) => void;
+  onEditLast?: () => void;
 }) {
   const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -225,6 +228,11 @@ export function MessageComposer({
     onClearContext();
   }
 
+  const canEditLast = Boolean(onEditLast) && !context && !recording && value.length === 0;
+
+  useEscapeKey(context !== null, handleCancelContext);
+  useHotkey(canEditLast, { key: 'ArrowUp' }, () => onEditLast?.());
+
   async function submit(): Promise<void> {
     const content = value.trim();
     if (!content || !user) return;
@@ -253,9 +261,9 @@ export function MessageComposer({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (event.key === 'Escape' && context) {
+    if (event.key === 'ArrowUp' && canEditLast) {
       event.preventDefault();
-      handleCancelContext();
+      onEditLast?.();
       return;
     }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
