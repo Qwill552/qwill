@@ -10,8 +10,9 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
+  /* Лёгкое затемнение, без размытия фона — по прямой просьбе пользователя (не тот же
+     рецепт, что у Modal.tsx/features/groups/Modal, там как раз стекло с блюром). */
   background: var(--scrim-bg);
-  backdrop-filter: var(--scrim-blur);
   animation: fadeIn var(--dur-menu) var(--ease-screen);
 }
 
@@ -87,10 +88,10 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  /* Telegram Desktop красит все плитки-иконки одним нейтральным тоном — мобильный радужный
+  /* Telegram Desktop рисует иконки настроек без цветной подложки вовсе — мобильный радужный
      ряд (Card.Row tint) тут неуместен (референс пользователя, ux-ui/14-desktop/04). Точка
      подмены — IconTile.module.css, каскадные переменные без !important. */
-  --tile-tint-override: var(--surface-3);
+  --tile-tint-override: transparent;
   --tile-ink-override: var(--text-secondary);
 }
 

@@ -228,7 +228,15 @@
 /* Единственный визуальный язык — liquid glass (референс «Пульс»): хрома отрывается от краёв
    и распадается на куски, полоса пуста, залиты куски. Одновременно размывающих слоёв не
    больше четырёх — куски шапки, таб-бар, оверлей, шит. Альтернативный режим «Строгий»
-   убран — см. журнал ux-ui.md. */
+   убран — см. журнал ux-ui.md.
+
+   Тема-независимые метрики — здесь, в обычном :root. Заливки/тени ниже зависят от палитры
+   (--surface-2, --scrim-tint, --shadow-*), поэтому объявлены дважды, в обоих блоках
+   [data-theme=…] ниже — тем же приёмом, что и вся палитра выше (комментарий у строки 61):
+   единственный :root-блок матчит только <html>, а оверлей кругового раскрытия темы
+   (app/viewTransition.ts) рисует копию в противоположной теме на обычном контейнере —
+   без второго селектора эти токены не наследовались бы в копию и «зависали» бы на кадре
+   до конца анимации (найдено на ☰-меню, капсуле композера, ux-ui.md, этап 14, шаг 4). */
 :root {
   --chrome-inset: 8px;
   --chrome-gap: 8px;
@@ -240,31 +248,14 @@
   --chrome-bar-shadow: none;
   --chrome-divider: transparent;
 
-  --chrome-bg: color-mix(in srgb, var(--surface-2) 56%, transparent);
   --chrome-blur: blur(14px) saturate(190%);
-  --chrome-border: color-mix(in srgb, var(--lift) 9%, transparent);
-  --chrome-shadow: var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--lift) 14%, transparent);
 
   --card-inset: 12px;
   --card-radius: 18px;
-  --card-bg: var(--surface);
-  --card-border: color-mix(in srgb, var(--lift) 5%, transparent);
-  --card-shadow: var(--shadow-sm);
 
-  --sheet-bg: color-mix(in srgb, var(--surface-2) 74%, transparent);
   --sheet-blur: blur(16px) saturate(180%);
-  --sheet-border: var(--chrome-border);
-  --sheet-shadow: var(--shadow-lg);
-
-  --menu-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
   --menu-blur: blur(14px) saturate(180%);
-  --menu-border: var(--chrome-border);
-  --menu-shadow: var(--shadow-lg);
-
-  --menu-scrim-bg: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
   --menu-scrim-blur: blur(30px);
-
-  --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
   --scrim-blur: blur(14px);
 
   --viewer-bg: #000;
@@ -272,7 +263,6 @@
   --viewer-ink-soft: color-mix(in srgb, #fff 65%, transparent);
   --viewer-chrome-bg: color-mix(in srgb, #000 55%, transparent);
 
-  --media-placeholder: color-mix(in srgb, var(--text-primary) 8%, transparent);
   --media-meta-bg: color-mix(in srgb, #000 45%, transparent);
   --media-meta-ink: #fff;
 }
@@ -280,10 +270,50 @@
 /* В светлой теме белая граница на белой поверхности невидима — берём обычный бордюр. */
 :root[data-theme='light'],
 [data-theme='light'] {
-  --chrome-border: color-mix(in srgb, var(--border) 85%, transparent);
   --chrome-bg: color-mix(in srgb, var(--surface) 62%, transparent);
+  --chrome-border: color-mix(in srgb, var(--border) 85%, transparent);
   --chrome-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--lift) 70%, transparent);
+
+  --card-bg: var(--surface);
   --card-border: var(--border);
+  --card-shadow: var(--shadow-sm);
+
+  --sheet-bg: color-mix(in srgb, var(--surface-2) 74%, transparent);
+  --sheet-border: var(--chrome-border);
+  --sheet-shadow: var(--shadow-lg);
+
+  --menu-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  --menu-border: var(--chrome-border);
+  --menu-shadow: var(--shadow-lg);
+
+  --menu-scrim-bg: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
+  --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
+
+  --media-placeholder: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --chrome-bg: color-mix(in srgb, var(--surface-2) 56%, transparent);
+  --chrome-border: color-mix(in srgb, var(--lift) 9%, transparent);
+  --chrome-shadow: var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--lift) 14%, transparent);
+
+  --card-bg: var(--surface);
+  --card-border: color-mix(in srgb, var(--lift) 5%, transparent);
+  --card-shadow: var(--shadow-sm);
+
+  --sheet-bg: color-mix(in srgb, var(--surface-2) 74%, transparent);
+  --sheet-border: var(--chrome-border);
+  --sheet-shadow: var(--shadow-lg);
+
+  --menu-bg: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  --menu-border: var(--chrome-border);
+  --menu-shadow: var(--shadow-lg);
+
+  --menu-scrim-bg: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
+  --scrim-bg: color-mix(in srgb, var(--scrim-tint) 30%, transparent);
+
+  --media-placeholder: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 /* Минималистичный индикатор прокрутки (ScrollIndicator): овал без подложки и трека, той
