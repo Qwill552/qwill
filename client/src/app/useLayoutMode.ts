@@ -11,7 +11,7 @@ function subscribe(onChange: () => void): () => void {
   return () => desktopQuery.removeEventListener('change', onChange);
 }
 
-function isDesktopViewport(): boolean {
+export function isDesktopViewport(): boolean {
   return desktopQuery.matches;
 }
 

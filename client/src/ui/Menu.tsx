@@ -13,6 +13,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import { useBackHandler } from '../app/useBackHandler';
+import { desktopOverlayBounds } from '../app/desktopOverlay';
 import { registerMenuOpen, unregisterMenuOpen } from '../app/menuCoordinator';
 import { Avatar } from './Avatar';
 import { Icon, type IconName } from './Icon';
@@ -103,14 +104,23 @@ export function Menu({ anchor, items, onClose, header, desktopWidth }: MenuProps
     const menu = menuRef.current;
     if (!menu) return;
     const { offsetWidth: width, offsetHeight: height } = menu;
-    const { innerWidth: vw, innerHeight: vh } = window;
+    const bounds = desktopOverlayBounds(anchor);
+    const minX = bounds ? bounds.left : 0;
+    const maxX = bounds ? bounds.right : window.innerWidth;
+    const minY = bounds ? bounds.top : 0;
+    const maxY = bounds ? bounds.bottom : window.innerHeight;
 
-    const spaceBelow = vh - anchor.bottom;
-    const dropUp = spaceBelow < height + GAP + EDGE && anchor.top > spaceBelow;
-    const top = dropUp ? Math.max(EDGE, anchor.top - height - GAP) : Math.min(anchor.bottom + GAP, vh - height - EDGE);
+    const spaceBelow = maxY - anchor.bottom;
+    const spaceAbove = anchor.top - minY;
+    const dropUp = spaceBelow < height + GAP + EDGE && spaceAbove > spaceBelow;
+    const top = dropUp
+      ? Math.max(minY + EDGE, anchor.top - height - GAP)
+      : Math.min(anchor.bottom + GAP, maxY - height - EDGE);
 
-    const openLeft = anchor.left + width + EDGE > vw;
-    const left = openLeft ? Math.max(EDGE, anchor.right - width) : Math.min(anchor.left, vw - width - EDGE);
+    const openLeft = anchor.left + width + EDGE > maxX;
+    const left = openLeft
+      ? Math.max(minX + EDGE, anchor.right - width)
+      : Math.min(anchor.left, maxX - width - EDGE);
 
     setStyle({
       top,

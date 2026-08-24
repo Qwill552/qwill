@@ -134,6 +134,7 @@ export function MessageRow({
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
 
   const hasMediaBubble =
     /^(image|video)\//.test(message.attachment?.file.mimeType ?? '') ||
@@ -389,7 +390,10 @@ export function MessageRow({
           statusLabel={statusLabelFor(message, own, read)}
           myReactions={myReactions}
           onReact={(emoji) => toggleReaction(chatId, message.id, emoji)}
-          onExpandReactions={() => setEmojiPanelOpen(true)}
+          onExpandReactions={() => {
+            setEmojiAnchor(menuAnchor);
+            setEmojiPanelOpen(true);
+          }}
           reactable={canReact}
           items={items}
           onClose={() => setMenuAnchor(null)}
@@ -398,6 +402,7 @@ export function MessageRow({
 
       {emojiPanelOpen && (
         <EmojiPanel
+          anchor={emojiAnchor}
           onSelect={(emoji) => {
             toggleReaction(chatId, message.id, emoji);
             setEmojiPanelOpen(false);

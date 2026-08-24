@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
+import { desktopColumnRect, desktopOverlayBounds } from '../../app/desktopOverlay';
 import { useBackHandler } from '../../app/useBackHandler';
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { haptic } from '../../ui/haptic';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { SearchField } from '../../ui/SearchField';
@@ -17,6 +19,9 @@ type PanelTab = 'emoji' | 'stickers' | 'gif';
 interface EmojiPanelProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  /** Якорь поповера на десктопе — кнопка эмодзи композера или пузырь сообщения. На мобильной
+   *  ветке не используется: там панель по-прежнему выезжает снизу во всю ширину. */
+  anchor?: DOMRect | null;
 }
 
 function buildSections(index: EmojiIndex | null | undefined, recent: string[], query: string): EmojiSection[] {
@@ -55,8 +60,10 @@ interface DragState {
 }
 
 const SETTLE_DUR_MS = 500;
+const POPOVER_GAP = 8;
+const POPOVER_EDGE = 12;
 
-export function EmojiPanel({ onSelect, onClose }: EmojiPanelProps) {
+export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
   const index = useEmojiIndex();
   const recent = useEmojiUsageStore((s) => s.recent);
   const recordUsage = useEmojiUsageStore((s) => s.recordUsage);
@@ -72,6 +79,7 @@ export function EmojiPanel({ onSelect, onClose }: EmojiPanelProps) {
   const [categoryNaturalH, setCategoryNaturalH] = useState(0);
   const [tabsNaturalH, setTabsNaturalH] = useState(0);
 
+  const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const categoryInnerRef = useRef<HTMLDivElement>(null);
   const tabsInnerRef = useRef<HTMLDivElement>(null);
@@ -81,6 +89,35 @@ export function EmojiPanel({ onSelect, onClose }: EmojiPanelProps) {
   const sections = useMemo(() => buildSections(index, recent, query), [index, recent, query]);
   const layout = useMemo(() => buildEmojiLayout(sections), [sections]);
   const showCategories = query.trim().length === 0;
+
+  const popover = useLayoutMode() === 'desktop';
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({ visibility: 'hidden' });
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!popover || !panel) return;
+    const target = anchor ?? desktopColumnRect('chat');
+    const bounds = target ? desktopOverlayBounds(target) : null;
+    if (!target || !bounds) return;
+
+    const { offsetWidth: width, offsetHeight: height } = panel;
+    const spaceAbove = target.top - bounds.top;
+    const spaceBelow = bounds.bottom - target.bottom;
+    const dropDown = spaceAbove < height + POPOVER_GAP + POPOVER_EDGE && spaceBelow > spaceAbove;
+    const top = dropDown
+      ? Math.min(target.bottom + POPOVER_GAP, bounds.bottom - height - POPOVER_EDGE)
+      : Math.max(bounds.top + POPOVER_EDGE, target.top - height - POPOVER_GAP);
+    const left = Math.max(
+      bounds.left + POPOVER_EDGE,
+      Math.min(target.left, bounds.right - width - POPOVER_EDGE),
+    );
+
+    setPopoverStyle({
+      top,
+      left,
+      ['--menu-origin' as string]: `${dropDown ? 'top' : 'bottom'} left`,
+    });
+  }, [popover, anchor]);
 
   function startClose(): void {
     setClosing((current) => current || true);
@@ -208,7 +245,9 @@ export function EmojiPanel({ onSelect, onClose }: EmojiPanelProps) {
       <div className={styles.catcher} onClick={startClose} aria-hidden="true" />
 
       <div
-        className={`${styles.panel} ${closing ? styles.panelClosing : ''}`}
+        ref={panelRef}
+        className={`${styles.panel} ${popover ? styles.popover : ''} ${closing ? styles.panelClosing : ''}`}
+        style={popover ? popoverStyle : undefined}
         role="dialog"
         aria-modal="true"
         aria-label="Эмодзи"

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 
 import { useBackHandler } from '../app/useBackHandler';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { ScrollIndicator } from './ScrollIndicator';
 import styles from './Sheet.module.css';
 
@@ -24,6 +25,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
+  const desktop = useLayoutMode() === 'desktop';
 
   // Жест живёт в ref, а не в состоянии: перерисовывать на каждое движение пальца незачем.
   const gesture = useRef({ active: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
@@ -100,9 +102,10 @@ export function Sheet({ title, onClose, children }: SheetProps) {
 
   const sheetClass = [
     styles.sheet,
+    desktop ? styles.dialog : '',
     phase === 'dragging' ? styles.dragging : '',
     phase === 'settling' ? styles.settling : '',
-    phase === 'closing' ? styles.sheetClosing : '',
+    phase === 'closing' ? (desktop ? styles.dialogClosing : styles.sheetClosing) : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -110,7 +113,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
   return createPortal(
     <>
       <div
-        className={`${styles.scrim} ${phase === 'closing' ? styles.scrimClosing : ''}`}
+        className={`${styles.scrim} ${desktop ? styles.scrimPlain : ''} ${phase === 'closing' ? styles.scrimClosing : ''}`}
         onClick={startClose}
         aria-hidden="true"
       />
@@ -122,15 +125,17 @@ export function Sheet({ title, onClose, children }: SheetProps) {
         aria-label={title}
         onTransitionEnd={() => setPhase((current) => (current === 'settling' ? 'open' : current))}
       >
-        <div
-          className={styles.grip}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-        >
-          <span className={styles.gripBar} />
-        </div>
+        {!desktop && (
+          <div
+            className={styles.grip}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          >
+            <span className={styles.gripBar} />
+          </div>
+        )}
         {title && <h2 className={styles.title}>{title}</h2>}
         <div ref={bodyRef} className={`${styles.body} hide-native-scrollbar`}>
           <ScrollIndicator target={bodyRef} />

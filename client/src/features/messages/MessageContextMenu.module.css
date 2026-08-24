@@ -164,3 +164,16 @@
     animation-duration: 1ms;
   }
 }
+
+/* Десктоп: тот же рецепт поповера, что у меню чата (ux-ui/14-desktop/05-overlays.md).
+   Ширина фиксированная — от колонки, а не от вьюпорта; границы для переворота приходят
+   из getBoundingClientRect() колонки (MessageContextMenu.tsx → desktopOverlayBounds). */
+@media (min-width: 900px) {
+  .panel {
+    width: 246px;
+  }
+
+  .list {
+    border-radius: 22px;
+  }
+}

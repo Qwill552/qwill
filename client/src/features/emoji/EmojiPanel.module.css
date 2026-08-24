@@ -105,3 +105,42 @@
     animation-duration: 1ms;
   }
 }
+
+/* Десктоп: панель эмодзи — поповер над кнопкой композера, привязанный к колонке
+   (ux-ui/14-desktop/05-overlays.md, «Осталось решить», п. 2, решение пользователя).
+   Позицию считает EmojiPanel.tsx; здесь только размеры и рецепт поверхности. Ширина —
+   ровно восемь ячеек сетки плюс поля .body, чтобы space-between не растягивал ряды.
+   Физика «тянется за пальцем» висит на Touch Events и мышью не задевается. */
+@media (min-width: 900px) {
+  .popover {
+    top: 0;
+    right: auto;
+    bottom: auto;
+    left: 0;
+    width: calc(var(--emoji-cell) * 8 + 2 * var(--space-4));
+    height: var(--emoji-panel-h);
+    padding-bottom: 0;
+    border: 1px solid var(--sheet-border);
+    border-radius: var(--radius-card);
+    transform-origin: var(--menu-origin, bottom left);
+    animation: popoverIn var(--dur-menu) var(--ease-spring) both;
+  }
+
+  .popover.panelClosing {
+    animation: popoverOut var(--dur-close) ease-in both;
+  }
+}
+
+@keyframes popoverIn {
+  from {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+}
+
+@keyframes popoverOut {
+  to {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+}

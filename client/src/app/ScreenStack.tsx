@@ -602,10 +602,10 @@ export function ScreenStack() {
     return (
       <div className={styles.stack} ref={stackRef}>
         <div className={styles.columns} ref={columnsRef}>
-          <div className={styles.listColumn} ref={listColumnRef}>
+          <div className={styles.listColumn} ref={listColumnRef} data-desktop-column="list">
             <RouteSwitch location={leftLocation} />
           </div>
-          <div className={styles.chatColumn}>
+          <div className={styles.chatColumn} data-desktop-column="chat">
             {rightLocation ? <RouteSwitch location={rightLocation} /> : <EmptyChatColumn />}
           </div>
           <div

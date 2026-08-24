@@ -176,12 +176,12 @@
 }
 
 /* Десктоп: поповер меню, привязанный к колонке (ux-ui/14-desktop/04-main-menu.md,
-   общий рецепт — им пользуются шаги 3 и 5). Позиционирование по-прежнему считается
-   от вьюпорта (Menu.tsx) — клампом по колонке займётся шаг 5, «Оверлеи привязать
-   к колонке». */
+   общий рецепт — им пользуются шаги 3 и 5). Границы для переворота приходят из
+   getBoundingClientRect() колонки (Menu.tsx → desktopOverlayBounds), а не из вьюпорта. */
 @media (min-width: 900px) {
   .menu {
     width: var(--menu-desktop-w, 246px);
+    max-width: none;
     padding: 8px;
     border-radius: 22px;
     border: 1px solid var(--menu-border);

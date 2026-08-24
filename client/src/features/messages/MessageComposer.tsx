@@ -49,6 +49,7 @@ export function MessageComposer({
   const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
   const [error, setError] = useState<string | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [pickedFiles, setPickedFiles] = useState<File[] | null>(null);
   const [recording, setRecording] = useState(false);
@@ -341,7 +342,10 @@ export function MessageComposer({
             <button
               className={styles.round}
               type="button"
-              onClick={() => setEmojiPanelOpen(!emojiPanelOpen)}
+              onClick={(event) => {
+                setEmojiAnchor(event.currentTarget.getBoundingClientRect());
+                setEmojiPanelOpen(!emojiPanelOpen);
+              }}
               aria-label="Эмодзи"
               title="Эмодзи"
               aria-pressed={emojiPanelOpen}
@@ -397,7 +401,9 @@ export function MessageComposer({
         </button>
       </form>
 
-      {emojiPanelOpen && <EmojiPanel onSelect={insertEmoji} onClose={() => setEmojiPanelOpen(false)} />}
+      {emojiPanelOpen && (
+        <EmojiPanel anchor={emojiAnchor} onSelect={insertEmoji} onClose={() => setEmojiPanelOpen(false)} />
+      )}
 
       {attachSheetOpen && <AttachSheet onClose={() => setAttachSheetOpen(false)} onFilesSelected={handleFilesFromSheet} />}
 

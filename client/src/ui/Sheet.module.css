@@ -91,3 +91,48 @@
     transform: translateY(100%);
   }
 }
+
+/* Десктоп: шит снизу во всю ширину монитора выглядит ошибкой — вместо него карточка по
+   центру окна (ux-ui/14-desktop/05-overlays.md, «Осталось решить», п. 1, решение
+   пользователя). Модель фаз open|dragging|settling|closing сохранена: ручка-грип на
+   десктопе не рендерится, поэтому dragging просто не наступает. Рецепт поверхности и
+   лёгкое затемнение без блюра — те же, что у DesktopScreenModal. */
+@media (min-width: 900px) {
+  .scrimPlain {
+    backdrop-filter: none;
+  }
+
+  .dialog {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(420px, calc(100vw - 2 * var(--space-4)));
+    max-height: min(680px, 86dvh);
+    padding-top: var(--space-4);
+    padding-bottom: 0;
+    border: 1px solid var(--sheet-border);
+    border-radius: var(--radius-card);
+    transform: translate(-50%, -50%);
+    animation: dialogIn var(--dur-menu) var(--ease-spring) both;
+    touch-action: auto;
+  }
+
+  .dialogClosing {
+    animation: dialogOut var(--dur-close) ease-in both;
+  }
+}
+
+@keyframes dialogIn {
+  from {
+    transform: translate(-50%, -50%) scale(0.94);
+    opacity: 0;
+  }
+}
+
+@keyframes dialogOut {
+  to {
+    transform: translate(-50%, -50%) scale(0.94);
+    opacity: 0;
+  }
+}

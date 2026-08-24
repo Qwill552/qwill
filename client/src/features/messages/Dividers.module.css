@@ -43,3 +43,14 @@
   height: 1px;
   background: color-mix(in srgb, var(--primary) 45%, transparent);
 }
+
+/* Десктоп: бюджет размытия правила 7 (CLAUDE.md) на широком окне не сходится — капсула
+   композера, .composerFade, открытый оверлей и чип даты дают ровно четыре слоя, а входящие
+   пузыри размывают сверх того десятком штук. Чип даты декоративен, поэтому здесь блюр гасим
+   (ux-ui/14-desktop/05-overlays.md, решение пользователя). */
+@media (min-width: 900px) {
+  .day {
+    background: var(--surface-3);
+    backdrop-filter: none;
+  }
+}

@@ -282,9 +282,10 @@ export function ChatScreen() {
       className={styles.screen}
       style={{
         ...(composerHeight ? { ['--composer-h' as string]: `${composerHeight}px` } : undefined),
-        ['--composer-inset-bottom' as string]: emojiPanelOpen
-          ? 'calc(var(--emoji-panel-h) + var(--safe-bottom) + var(--chrome-gap))'
-          : 'calc(20px + var(--safe-bottom))',
+        ['--composer-inset-bottom' as string]:
+          emojiPanelOpen && !isDesktop
+            ? 'calc(var(--emoji-panel-h) + var(--safe-bottom) + var(--chrome-gap))'
+            : 'calc(20px + var(--safe-bottom))',
         ['--call-banner-h' as string]: showCallBanner
           ? isDesktop
             ? `${CALL_BANNER_H}px`

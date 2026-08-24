@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { desktopOverlayBounds } from '../../app/desktopOverlay';
 import { useBackHandler } from '../../app/useBackHandler';
 import { Icon, type IconName } from '../../ui/Icon';
 import { ReactionPicker } from './ReactionPicker';
@@ -78,19 +79,23 @@ export function MessageContextMenu({
     const panel = panelRef.current;
     if (!panel) return;
     const { offsetHeight: height, offsetWidth: width } = panel;
-    const { innerWidth: vw, innerHeight: vh } = window;
+    const bounds = desktopOverlayBounds(anchorRect);
+    const minX = bounds ? bounds.left : 0;
+    const maxX = bounds ? bounds.right : window.innerWidth;
+    const minY = bounds ? bounds.top : 0;
+    const maxY = bounds ? bounds.bottom : window.innerHeight;
 
-    const spaceBelow = vh - anchorRect.bottom;
-    const spaceAbove = anchorRect.top;
+    const spaceBelow = maxY - anchorRect.bottom;
+    const spaceAbove = anchorRect.top - minY;
     const dropUp = spaceBelow < height + GAP + EDGE && spaceAbove > spaceBelow;
     const top = dropUp
-      ? Math.max(EDGE, anchorRect.top - height - GAP)
-      : Math.min(anchorRect.bottom + GAP, vh - height - EDGE);
+      ? Math.max(minY + EDGE, anchorRect.top - height - GAP)
+      : Math.min(anchorRect.bottom + GAP, maxY - height - EDGE);
 
     // Своя строка прижата к правому краю экрана, чужая — к левому: панель растёт от того же края.
     const left = own
-      ? Math.max(EDGE, Math.min(anchorRect.right - width, vw - width - EDGE))
-      : Math.max(EDGE, Math.min(anchorRect.left, vw - width - EDGE));
+      ? Math.max(minX + EDGE, Math.min(anchorRect.right - width, maxX - width - EDGE))
+      : Math.max(minX + EDGE, Math.min(anchorRect.left, maxX - width - EDGE));
 
     setPanelStyle({
       top,
