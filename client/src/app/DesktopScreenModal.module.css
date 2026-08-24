@@ -1,0 +1,130 @@
+/* Контакты, Настройки, Профиль на десктопе — карточка по центру, ux-ui/14-desktop/04-main-menu.md
+   («Осталось решить», п. 1, решение пользователя). Токены поверхностей и лёгкого затемнения —
+   те же sheet- и scrim-токены, что у Modal.tsx (features/groups/Modal), не свой набор чисел. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  animation: fadeIn var(--dur-menu) var(--ease-screen);
+}
+
+.scrimClosing {
+  animation: fadeOut var(--dur-close) ease-in both;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  width: min(420px, 100%);
+  height: min(680px, 86dvh);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-card);
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+  box-shadow: var(--sheet-shadow);
+  animation: popIn var(--dur-menu) var(--ease-spring);
+}
+
+.cardClosing {
+  animation: popOut var(--dur-close) ease-in both;
+}
+
+.header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--font-screen-title);
+  font-weight: 700;
+}
+
+.closeButton {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dur-tab) ease,
+    color var(--dur-tab) ease;
+}
+
+.closeButton:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  /* Telegram Desktop красит все плитки-иконки одним нейтральным тоном — мобильный радужный
+     ряд (Card.Row tint) тут неуместен (референс пользователя, ux-ui/14-desktop/04). Точка
+     подмены — IconTile.module.css, каскадные переменные без !important. */
+  --tile-tint-override: var(--surface-3);
+  --tile-ink-override: var(--text-secondary);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.94) translateY(8px);
+    opacity: 0;
+  }
+}
+
+@keyframes popOut {
+  to {
+    transform: scale(0.94) translateY(8px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .scrimClosing,
+  .card,
+  .cardClosing {
+    animation-duration: 1ms;
+  }
+}

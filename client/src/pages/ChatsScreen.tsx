@@ -12,10 +12,13 @@ import { useUiStore } from '../stores/uiStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { FAB } from '../ui/FAB';
-import { Menu } from '../ui/Menu';
+import { Icon } from '../ui/Icon';
+import { Menu, type MenuItem } from '../ui/Menu';
 import { Sheet } from '../ui/Sheet';
+import { Switch } from '../ui/Switch';
 import { onTabReactivate } from '../app/tabNav';
 import { revealTransition } from '../app/viewTransition';
+import { useLayoutMode } from '../app/useLayoutMode';
 import styles from './ChatsScreen.module.css';
 
 /** Радиус капсулы-триггера — совпадает с её собственным border-radius в CSS, но геометрию
@@ -47,9 +50,11 @@ export function ChatsScreen() {
   const me = useAuthStore((s) => s.user);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const layout = useLayoutMode();
   const listRef = useRef<ChatListHandle>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
+  const themeSwitchRef = useRef<HTMLSpanElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -128,6 +133,9 @@ export function ChatsScreen() {
     const headerRect = headerRowRef.current?.getBoundingClientRect();
     const originTop = screenRect?.top ?? 0;
     const originLeft = screenRect?.left ?? 0;
+    // На десктопе шапка списка — одна строка (☰ + поле), а не две стопкой: докнутая строка
+    // поиска встаёт прямо на её место, без мобильного зазора до второй строки под ней.
+    const dockGap = layout === 'desktop' ? 0 : SEARCH_DOCK_TOP_GAP;
 
     setSearchReveal({
       top: rect.top - originTop,
@@ -140,7 +148,7 @@ export function ChatsScreen() {
     setSearchRetreating(false);
     if (headerRect) {
       setSearchDock({
-        top: headerRect.top - originTop + SEARCH_DOCK_TOP_GAP,
+        top: headerRect.top - originTop + dockGap,
         left: headerRect.left - originLeft,
         width: headerRect.width,
         height: SEARCH_PILL_HEIGHT,
@@ -152,11 +160,41 @@ export function ChatsScreen() {
   /** Круговое раскрытие из пункта меню — растёт (на ночную) или стягивается (на дневную)
    *  в точку нажатия; при повторных нажатиях (меню теперь не закрывается, keepOpen) точка
    *  каждый раз та же. */
-  function handleThemeToggle(event: MouseEvent<HTMLButtonElement>): void {
+  function handleThemeToggle(event: MouseEvent<HTMLElement>): void {
     const rect = event.currentTarget.getBoundingClientRect();
     const toDark = theme === 'light';
     revealTransition(rect.left + rect.width / 2, rect.top + rect.height / 2, toDark, toggleTheme);
   }
+
+  /** Клик по самому Switch не всплывает до строки меню (Menu.tsx оборачивает trailing
+   *  в стоп-пропагейшен) — раскрытие темы считается от прямоугольника обёртки переключателя,
+   *  а не строки целиком, ux-ui/14-desktop/04-main-menu.md допускает такое чтение «центра
+   *  нажатой строки». */
+  function handleThemeSwitchChange(): void {
+    const rect = themeSwitchRef.current?.getBoundingClientRect();
+    const toDark = theme === 'light';
+    if (rect) revealTransition(rect.left + rect.width / 2, rect.top + rect.height / 2, toDark, toggleTheme);
+    else toggleTheme();
+  }
+
+  const desktopMenuItems: MenuItem[] = [
+    { id: 'profile', label: 'Мой профиль', icon: 'user', onSelect: () => navigate('/profile') },
+    { id: 'contacts', label: 'Контакты', icon: 'users', onSelect: () => navigate('/contacts') },
+    { id: 'settings', label: 'Настройки', icon: 'settings', onSelect: () => navigate('/settings') },
+    {
+      id: 'theme',
+      label: 'Тёмная тема',
+      icon: 'moon',
+      keepOpen: true,
+      dividerBefore: true,
+      onSelect: handleThemeToggle,
+      trailing: (
+        <span ref={themeSwitchRef}>
+          <Switch checked={theme === 'dark'} onChange={handleThemeSwitchChange} label="Тёмная тема" />
+        </span>
+      ),
+    },
+  ];
 
   function openChat(chatId: string): void {
     setComposeOpen(false);
@@ -167,60 +205,89 @@ export function ChatsScreen() {
   return (
     <div className={styles.screen} ref={screenRef}>
       <div className={styles.top}>
-        <div
-          className={`${styles.headerRow} ${searchReveal && !searchRetreating ? styles.headerRowHidden : ''}`}
-          ref={headerRowRef}
-        >
-          <div className={styles.brand}>
-            <Avatar label={me?.displayName ?? 'Q'} avatarUrl={me?.avatarUrl} size={38} color={me?.avatarColor} />
-            <span className={styles.wordmark}>Qwill</span>
+        {layout === 'desktop' ? (
+          <div
+            className={`${styles.desktopHeaderRow} ${searchReveal && !searchRetreating ? styles.headerRowHidden : ''}`}
+            ref={headerRowRef}
+          >
+            <button
+              type="button"
+              className={styles.menuBtn}
+              aria-label="Меню"
+              onClick={(e) => setMenuAnchor(e.currentTarget.getBoundingClientRect())}
+            >
+              <Icon name="menu" size={18} />
+            </button>
+            <button
+              type="button"
+              className={styles.searchTrigger}
+              onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              <span>Поиск чатов и людей</span>
+            </button>
           </div>
-          <div className={styles.actions}>
-            <span className={`${styles.searchToggleSlot} ${searchHidden ? styles.searchToggleVisible : ''}`}>
+        ) : (
+          <>
+            <div
+              className={`${styles.headerRow} ${searchReveal && !searchRetreating ? styles.headerRowHidden : ''}`}
+              ref={headerRowRef}
+            >
+              <div className={styles.brand}>
+                <Avatar label={me?.displayName ?? 'Q'} avatarUrl={me?.avatarUrl} size={38} color={me?.avatarColor} />
+                <span className={styles.wordmark}>Qwill</span>
+              </div>
+              <div className={styles.actions}>
+                <span className={`${styles.searchToggleSlot} ${searchHidden ? styles.searchToggleVisible : ''}`}>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    aria-label="Поиск"
+                    tabIndex={searchHidden ? 0 : -1}
+                    onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_BUTTON_RADIUS, true)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
+                      <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  aria-label="Меню"
+                  onClick={(e) => setMenuAnchor(e.currentTarget.getBoundingClientRect())}
+                >
+                  <svg width="4" height="16" viewBox="0 0 4 16" aria-hidden="true">
+                    <circle cx="2" cy="2" r="1.8" fill="currentColor" />
+                    <circle cx="2" cy="8" r="1.8" fill="currentColor" />
+                    <circle cx="2" cy="14" r="1.8" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
+            >
               <button
                 type="button"
-                className={styles.iconBtn}
-                aria-label="Поиск"
-                tabIndex={searchHidden ? 0 : -1}
-                onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_BUTTON_RADIUS, true)}
+                className={styles.searchTrigger}
+                tabIndex={searchHidden ? -1 : 0}
+                onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
                   <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                 </svg>
+                <span>Поиск чатов и людей</span>
               </button>
-            </span>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              aria-label="Меню"
-              onClick={(e) => setMenuAnchor(e.currentTarget.getBoundingClientRect())}
-            >
-              <svg width="4" height="16" viewBox="0 0 4 16" aria-hidden="true">
-                <circle cx="2" cy="2" r="1.8" fill="currentColor" />
-                <circle cx="2" cy="8" r="1.8" fill="currentColor" />
-                <circle cx="2" cy="14" r="1.8" fill="currentColor" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div
-          className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
-        >
-          <button
-            type="button"
-            className={styles.searchTrigger}
-            tabIndex={searchHidden ? -1 : 0}
-            onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            <span>Поиск чатов и людей</span>
-          </button>
-        </div>
+            </div>
+          </>
+        )}
 
         {folderTabsEnabled && <ChatFilters value={filter} onChange={setFilter} counts={counts} />}
       </div>
@@ -241,7 +308,23 @@ export function ChatsScreen() {
         />
       )}
 
-      {menuAnchor && (
+      {menuAnchor && layout === 'desktop' && (
+        <Menu
+          anchor={menuAnchor}
+          onClose={() => setMenuAnchor(null)}
+          desktopWidth={272}
+          header={{
+            avatarUrl: me?.avatarUrl,
+            avatarColor: me?.avatarColor,
+            label: me?.displayName ?? '',
+            username: me?.username,
+            onSelect: () => navigate('/profile'),
+          }}
+          items={desktopMenuItems}
+        />
+      )}
+
+      {menuAnchor && layout === 'mobile' && (
         <Menu
           anchor={menuAnchor}
           onClose={() => setMenuAnchor(null)}

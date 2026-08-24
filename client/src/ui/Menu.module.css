@@ -82,6 +82,7 @@
 }
 
 .label {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -89,6 +90,89 @@
 
 .glyph {
   flex-shrink: 0;
+}
+
+.group {
+  display: contents;
+}
+
+.divider {
+  height: 1px;
+  margin: 6px 10px;
+  background: var(--border);
+}
+
+.trailingSlot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 2px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.header:hover {
+  background: rgba(var(--pulse-glass), 0.09);
+}
+
+.header:focus-visible {
+  outline: 2px solid #4faaff;
+  outline-offset: -2px;
+}
+
+.headerBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.headerName {
+  overflow: hidden;
+  color: rgb(var(--pulse-ink));
+  font-size: var(--font-name);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerUsername {
+  overflow: hidden;
+  color: rgba(var(--pulse-ink), 0.5);
+  font-size: var(--font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuClosing {
+  animation: menuOut var(--dur-close) ease-in forwards;
+}
+
+@keyframes menuOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.92);
+    pointer-events: none;
+  }
 }
 
 /* Десктоп: поповер меню, привязанный к колонке (ux-ui/14-desktop/04-main-menu.md,
@@ -131,6 +215,51 @@
 
   .danger:hover {
     background: var(--danger-soft);
+  }
+
+  .divider {
+    margin: 6px 10px;
+    background: var(--border);
+  }
+
+  .header {
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .header:hover {
+    background: var(--surface-3);
+  }
+
+  .header:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+
+  .headerName {
+    color: var(--text-primary);
+  }
+
+  .headerUsername {
+    color: var(--text-secondary);
+  }
+
+  .menuClosing {
+    animation: qMenuOut var(--dur-close) ease-in forwards;
+  }
+}
+
+@keyframes qMenuOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.88) translateY(-10px);
+    pointer-events: none;
   }
 }
 

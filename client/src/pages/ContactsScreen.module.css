@@ -27,6 +27,14 @@
   letter-spacing: -0.5px;
 }
 
+/* На десктопе вкладка открывается в DesktopScreenModal, у которого уже есть заголовок
+   «Контакты» в шапке карточки (ux-ui/14-desktop/04-main-menu.md) — свой здесь был бы дублем. */
+@media (min-width: 900px) {
+  .title {
+    display: none;
+  }
+}
+
 .list {
   flex: 1;
   min-height: 0;

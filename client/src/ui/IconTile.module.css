@@ -1,5 +1,9 @@
 /* Цветная скруглённая плитка под иконку в списках настроек. Тон приходит переменной
-   --tile-tint, а не классом: тонов восемь, и заводить восемь классов ради заливки нечестно. */
+   --tile-tint, а не классом: тонов восемь, и заводить восемь классов ради заливки нечестно.
+   --tile-tint-override/--tile-ink-override — точка подмены для контейнеров, где радужный
+   ряд неуместен (десктопные модалки Настроек/Контактов/Профиля, ux-ui/14-desktop/04):
+   не заданы нигде — ведут себя как раньше, каскадом наследуются от предка, который их
+   объявил, и перебивают даже инлайновый --tile-tint, потому что тот не задаёт их сам. */
 
 .tile {
   display: grid;
@@ -8,6 +12,6 @@
   width: var(--icon-tile);
   height: var(--icon-tile);
   border-radius: var(--radius-tile);
-  background: var(--tile-tint);
-  color: var(--text-on-primary);
+  background: var(--tile-tint-override, var(--tile-tint));
+  color: var(--tile-ink-override, var(--text-on-primary));
 }

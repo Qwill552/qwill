@@ -25,11 +25,12 @@ import {
   DESKTOP_LIST_WIDTH_DEFAULT,
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
+import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
 import { hasOpenOverlay } from './useBackHandler';
 import { useLayoutMode } from './useLayoutMode';
 import { isTabRoot, parentPathOf, tabOf, transitionKind, type TransitionKind } from './routing';
-import { rememberTabPath } from './tabNav';
+import { lastPathForTab, rememberTabPath } from './tabNav';
 import styles from './ScreenStack.module.css';
 
 interface SwipePoint {
@@ -62,6 +63,16 @@ function emptyLocation(pathname: string): Location {
 }
 
 const CHATS_ROOT_LOCATION = emptyLocation('/chats');
+
+/** Заголовок карточки DesktopScreenModal — по вкладке верхнего уровня, не по конкретному
+ *  подмаршруту: «Оформление»/«Для разработчиков» показывают свой заголовок сами, через
+ *  собственный ChromeBar (StubScreen/AppearanceScreen), эта строка — «имя окна». */
+const OVERLAY_TAB_TITLE: Record<string, string> = {
+  contacts: 'Контакты',
+  settings: 'Настройки',
+  profile: 'Мой профиль',
+};
+
 const RESIZE_STEP = 16;
 const RESIZE_STEP_LARGE = 48;
 
@@ -576,9 +587,17 @@ export function ScreenStack() {
   }
 
   if (layout === 'desktop') {
-    const inChatsTab = tabOf(location.pathname) === 'chats';
-    const leftLocation = inChatsTab ? CHATS_ROOT_LOCATION : location;
-    const rightLocation = inChatsTab && !isTabRoot(location.pathname) ? location : null;
+    const currentTab = tabOf(location.pathname);
+    // Контакты/Настройки/Профиль на десктопе не занимают левую колонку — список чатов там
+    // остаётся всегда, а сама вкладка открывается карточкой поверх обеих колонок (решение
+    // пользователя, ux-ui/14-desktop/04-main-menu.md, «Осталось решить», п. 1). Правая колонка
+    // при этом не сбрасывается в пустое состояние — под лёгким затемнением остаётся тот же
+    // чат, что был открыт до перехода в оверлей (lastPathForTab запоминает его на каждый чих
+    // location в эффекте ниже).
+    const overlayTab = currentTab === 'chats' ? null : currentTab;
+    const chatsLocation = overlayTab ? emptyLocation(lastPathForTab('/chats')) : location;
+    const leftLocation = CHATS_ROOT_LOCATION;
+    const rightLocation = !isTabRoot(chatsLocation.pathname) ? chatsLocation : null;
 
     return (
       <div className={styles.stack} ref={stackRef}>
@@ -599,6 +618,14 @@ export function ScreenStack() {
             onKeyDown={handleResizerKeyDown}
           />
         </div>
+        {overlayTab && (
+          <DesktopScreenModal
+            title={OVERLAY_TAB_TITLE[overlayTab] ?? ''}
+            onClose={() => navigate(lastPathForTab('/chats'))}
+          >
+            <RouteSwitch location={location} />
+          </DesktopScreenModal>
+        )}
       </div>
     );
   }

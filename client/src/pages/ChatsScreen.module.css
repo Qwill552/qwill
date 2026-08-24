@@ -23,10 +23,57 @@
     padding-left: 0;
   }
 
-  .headerRow,
-  .searchWrap {
-    padding: 0 calc(16px + var(--safe-right)) 0 calc(16px + var(--safe-left));
+  .desktopHeaderRow {
+    padding: 10px calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
   }
+}
+
+/* Шапка списка на десктопе: одна строка ☰ + поле поиска, без вордмарка и аватара —
+   ux-ui/14-desktop/04-main-menu.md, «Строка шапки списка». Мобильная шапка (.headerRow,
+   .searchWrap) не рендерится на десктопе вовсе — вместо CSS-переопределений своя разметка. */
+.desktopHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.12s ease-out 0.14s;
+}
+
+.desktopHeaderRow .searchTrigger {
+  flex: 1;
+}
+
+.menuBtn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dur-tab) ease,
+    color var(--dur-tab) ease,
+    transform var(--dur-press) var(--ease-spring);
+}
+
+@media (hover: hover) {
+  .menuBtn:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
+}
+
+.menuBtn:active {
+  transform: scale(0.86);
+}
+
+.menuBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .headerRow {

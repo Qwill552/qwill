@@ -39,13 +39,9 @@ const CAPSULE_POSITION = {
   padding: 0,
 };
 
-const DESKTOP_CAPSULE_POSITION = {
-  ...CAPSULE_POSITION,
-  right: 'calc(100% - var(--list-column-w, 372px) + 26px)',
-};
-
 /** Нижний таб-бар: Сообщения · Контакты · Настройки · Профиль. Скрывается на вложенных экранах —
- *  чат, инфо, раздел настроек — и появляется обратно (ux-ui/02-shell.md). */
+ *  чат, инфо, раздел настроек — и появляется обратно (ux-ui/02-shell.md). На десктопе не
+ *  показывается вовсе — навигация уехала в ☰-меню шапки списка (ux-ui/14-desktop/04-main-menu.md). */
 export function TabBar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -54,7 +50,7 @@ export function TabBar() {
   const layout = useLayoutMode();
 
   const activeTab = tabOf(location.pathname);
-  const hidden = layout === 'mobile' && !isTabRoot(location.pathname);
+  const hidden = layout === 'desktop' || !isTabRoot(location.pathname);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>, root: string): void {
     event.currentTarget.blur();
@@ -66,11 +62,7 @@ export function TabBar() {
   }
 
   return (
-    <ChromeBar
-      side="bottom"
-      className={`${styles.wrap} ${hidden ? styles.hidden : ''}`}
-      style={layout === 'desktop' ? DESKTOP_CAPSULE_POSITION : CAPSULE_POSITION}
-    >
+    <ChromeBar side="bottom" className={`${styles.wrap} ${hidden ? styles.hidden : ''}`} style={CAPSULE_POSITION}>
       <nav className={styles.capsule} aria-hidden={hidden}>
         {TABS.map((tab) => {
           const active = tabOf(tab.root) === activeTab;
