@@ -33,6 +33,11 @@
   cursor: default;
 }
 
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .primary {
   border-color: transparent;
   background: linear-gradient(140deg, var(--accent-from), var(--accent-to));
@@ -55,6 +60,29 @@
   .chrome:hover:not(:disabled) {
     background: var(--chrome-bg);
   }
+}
+
+/* Десктоп: кнопка шапки/композера без своего стекла — фон и рамка появляются только
+   при наведении/нажатии (ux-ui/14-desktop/03-chat-column-chrome.md). */
+.plain {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background var(--dur-menu) var(--ease-screen), color var(--dur-menu) var(--ease-screen),
+    transform var(--dur-press) var(--ease-spring);
+}
+
+@media (hover: hover) {
+  .plain:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
+}
+
+.plain:active:not(:disabled) {
+  transform: scale(0.86);
 }
 
 .glyph {

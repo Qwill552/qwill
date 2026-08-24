@@ -70,3 +70,19 @@
     animation: none;
   }
 }
+
+/* На десктопе баннер звонка — сплошная полоса под шапкой, а не плавающая капсула
+   (ux-ui/14-desktop/03-chat-column-chrome.md, «Осталось решить»). */
+@media (min-width: 900px) {
+  .banner {
+    padding: 0 16px;
+    border: none;
+    border-radius: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .avatarItem {
+    border-color: var(--surface);
+  }
+}

@@ -91,6 +91,71 @@
   flex-shrink: 0;
 }
 
+/* Десктоп: поповер меню, привязанный к колонке (ux-ui/14-desktop/04-main-menu.md,
+   общий рецепт — им пользуются шаги 3 и 5). Позиционирование по-прежнему считается
+   от вьюпорта (Menu.tsx) — клампом по колонке займётся шаг 5, «Оверлеи привязать
+   к колонке». */
+@media (min-width: 900px) {
+  .menu {
+    width: var(--menu-desktop-w, 246px);
+    padding: 8px;
+    border-radius: 22px;
+    border: 1px solid var(--menu-border);
+    background: var(--menu-bg);
+    backdrop-filter: var(--menu-blur);
+    box-shadow: var(--menu-shadow);
+    animation: qMenuIn var(--dur-menu) var(--ease-spring) forwards;
+  }
+
+  .item {
+    gap: 14px;
+    min-height: 46px;
+    padding: 0 12px;
+    border-radius: 16px;
+    font-size: var(--font-name);
+    font-weight: 500;
+  }
+
+  .item:hover {
+    background: var(--surface-3);
+  }
+
+  .item:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+
+  .danger {
+    color: var(--danger);
+  }
+
+  .danger:hover {
+    background: var(--danger-soft);
+  }
+}
+
+@keyframes qMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(-10px);
+    pointer-events: none;
+  }
+
+  60% {
+    transform: scale(1.03) translateY(0);
+  }
+
+  92% {
+    pointer-events: none;
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+}
+
 @keyframes menuIn {
   from {
     opacity: 0;

@@ -4,13 +4,14 @@ import { Icon, type IconName } from '../Icon';
 import { Ripple } from '../Ripple';
 import styles from './GlassButton.module.css';
 
-type Variant = 'default' | 'primary' | 'danger' | 'chrome';
+type Variant = 'default' | 'primary' | 'danger' | 'chrome' | 'plain';
 
 const VARIANT_CLASS: Record<Variant, string | undefined> = {
   default: '',
   primary: styles.primary,
   danger: styles.danger,
   chrome: styles.chrome,
+  plain: styles.plain,
 };
 
 interface GlassButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {

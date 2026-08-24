@@ -12,6 +12,14 @@
   --chat-header-h: calc(6px + var(--safe-top) + 40px + 10px);
 }
 
+/* На десктопе шапка — сплошная полоса 60px, а не плавающая капсула (ux-ui/14-desktop/03).
+   Лента резервирует под неё ровно эту высоту через тот же --chat-header-h. */
+@media (min-width: 900px) {
+  .screen {
+    --chat-header-h: 60px;
+  }
+}
+
 .headerFade {
   position: absolute;
   top: 0;
@@ -24,6 +32,14 @@
   mask-image: linear-gradient(to bottom, black 0%, black 20%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 20%, transparent 100%);
   pointer-events: none;
+}
+
+/* Шапка непрозрачна на десктопе — под ней нечего размывать, а зона фейда, наоборот,
+   маскировала бы верх ленты собственным полупрозрачным слоем. */
+@media (min-width: 900px) {
+  .headerFade {
+    display: none;
+  }
 }
 
 /* Место под баннер закрепа — сидит ниже шапки, но выше .headerFade (z-index 3): та зона
@@ -50,6 +66,20 @@
   padding: 0 12px;
 }
 
+/* На десктопе баннеры — такие же сплошные полосы, как шапка: без бокового поля и без
+   зазора над ними, встык друг под другом (ux-ui/14-desktop/03, «Осталось решить»). */
+@media (min-width: 900px) {
+  .pinnedSlot {
+    top: calc(var(--chat-header-h) + var(--call-banner-h, 0px));
+    padding: 0;
+  }
+
+  .callBannerSlot {
+    top: var(--chat-header-h);
+    padding: 0;
+  }
+}
+
 .composerFade {
   position: absolute;
   right: 0;
@@ -70,6 +100,21 @@
   display: flex;
   min-width: 0;
   flex: 1;
+}
+
+/* На десктопе композер остаётся капсулой (в отличие от шапки), но внутренний ряд
+   центрируется тем же клэмпом, что и лента (ux-ui/14-desktop/03, число из шага 6). */
+@media (min-width: 900px) {
+  .composerSlot {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+}
+
+/* Кольцо точки «в сети» на аватаре шапки — цветом сплошной подложки, а не канвасом. */
+.headerAvatar {
+  --avatar-ring: var(--surface);
 }
 
 /* Название сервисного чата и пометка «официальный» — одной строкой, галочка не переносится

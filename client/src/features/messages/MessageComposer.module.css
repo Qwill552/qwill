@@ -35,6 +35,19 @@
   box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
 }
 
+/* Десктоп: капсула на токенах хромы, а не на числах «Пульса» (ux-ui/14-desktop/03). */
+@media (min-width: 900px) {
+  .field {
+    gap: 6px;
+    min-height: 0;
+    padding: 2px 6px 2px 8px;
+    border-color: var(--chrome-border);
+    background: var(--chrome-bg);
+    backdrop-filter: var(--chrome-blur);
+    box-shadow: var(--chrome-shadow);
+  }
+}
+
 /* Тот же шрифт, что и в отправленном сообщении (.text в MessageBubble.module.css) — Inter,
    а не базовый Golos Text интерфейса. */
 .input {
@@ -99,6 +112,18 @@
   color: var(--primary);
 }
 
+@media (min-width: 900px) {
+  .round {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+
+  .round:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+}
+
 /* Отдельный круг отправки — буквально строка 363 референса, единственное залитое
    пятно композера. */
 .send {
@@ -132,6 +157,21 @@
   cursor: default;
   transform: scale(0.86);
   opacity: 0.45;
+}
+
+.send:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (min-width: 900px) {
+  .send {
+    box-shadow: var(--shadow-md);
+  }
+
+  .send:not(:disabled):active {
+    transform: scale(0.82);
+  }
 }
 
 .send[data-recording] {

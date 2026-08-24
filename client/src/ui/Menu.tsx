@@ -22,6 +22,9 @@ interface MenuProps {
   anchor: DOMRect;
   items: MenuItem[];
   onClose: () => void;
+  /** Фиксированная ширина поповера на десктопе (px) — на мобильной ветке не действует,
+   *  там ширина по-прежнему считается от содержимого (ux-ui/14-desktop/04-main-menu.md). */
+  desktopWidth?: number;
 }
 
 /** Зазор между якорем и меню и минимальный отступ от краёв экрана. */
@@ -31,9 +34,14 @@ const EDGE = 8;
 /** Всплывающее меню: само решает, раскрыться вверх или вниз, влево или вправо —
  *  по тому, сколько места осталось до края экрана. Фон размывается, а не затемняется:
  *  в строгом режиме то же самое делает токен --scrim-*. */
-export function Menu({ anchor, items, onClose }: MenuProps) {
+export function Menu({ anchor, items, onClose, desktopWidth }: MenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<CSSProperties>({ visibility: 'hidden', top: 0, left: 0 });
+  const [style, setStyle] = useState<CSSProperties>({
+    visibility: 'hidden',
+    top: 0,
+    left: 0,
+    ...(desktopWidth ? { ['--menu-desktop-w' as string]: `${desktopWidth}px` } : undefined),
+  });
 
   // Позиция считается после отрисовки, когда известны реальные размеры меню, но до кадра — иначе дёрнется.
   useLayoutEffect(() => {
@@ -53,8 +61,9 @@ export function Menu({ anchor, items, onClose }: MenuProps) {
       top,
       left,
       ['--menu-origin' as string]: `${dropUp ? 'bottom' : 'top'} ${openLeft ? 'right' : 'left'}`,
+      ...(desktopWidth ? { ['--menu-desktop-w' as string]: `${desktopWidth}px` } : undefined),
     });
-  }, [anchor]);
+  }, [anchor, desktopWidth]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {

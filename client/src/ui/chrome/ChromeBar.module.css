@@ -32,3 +32,10 @@
     calc(var(--safe-bottom) + var(--chrome-inset)) calc(var(--safe-left) + var(--chrome-pad-x));
   border-top: 1px solid var(--chrome-divider);
 }
+
+/* Сплошная полоса вместо плавающего стекла — заливка и разделитель уходят из кусков
+   в саму полосу (шапка чата на десктопе, ux-ui/14-desktop/03-chat-column-chrome.md). */
+.solid {
+  --chrome-bar-bg: var(--surface);
+  --chrome-divider: var(--border);
+}

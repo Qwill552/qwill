@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useBackHandler } from '../app/useBackHandler';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
 import { OfficialMark } from '../features/chat/OfficialMark';
@@ -41,11 +42,34 @@ const COMPOSER_STYLE = {
   transition: 'bottom var(--dur-menu) var(--ease-screen)',
 };
 
+/** Десктоп (ux-ui/14-desktop/03-chat-column-chrome.md): шапка — сплошная полоса 60px
+ *  во всю ширину колонки, без полей по бокам. */
+const DESKTOP_HEADER_STYLE = {
+  padding: '0 16px',
+  gap: '12px',
+  height: '60px',
+};
+
+/** Десктоп: композер остаётся капсулой, но сама полоса — во всю ширину колонки; клэмп
+ *  до 860px и центрирование даёт `.composerSlot` (ChatScreen.module.css). */
+const DESKTOP_COMPOSER_STYLE = {
+  left: 0,
+  right: 0,
+  bottom: 'var(--composer-inset-bottom, calc(20px + var(--safe-bottom)))',
+  padding: '10px 0 16px',
+  gap: 0,
+  transition: 'bottom var(--dur-menu) var(--ease-screen)',
+};
+
+const PINNED_BANNER_H = 48;
+const CALL_BANNER_H = 52;
+
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
  *  Буквальный перенос из «Пульс» (design-archive/reference), хрома — этап 2 CLAUDE.md. */
 export function ChatScreen() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   /** Меню чата в списке умеет открыть профиль группы, а живёт панель группы здесь —
    *  переход приносит просьбу открыть её вместе с навигацией. */
   const openPanelRequested = (useLocation().state as { openPanel?: boolean } | null)?.openPanel === true;
@@ -233,6 +257,13 @@ export function ChatScreen() {
     },
   };
 
+  // Десктопное меню «ещё» повторяет состав макета (ux-ui/14-desktop/03). «Изменить» и
+  // «Заблокировать»/«Удалить чат» — задел на будущее по прямому решению пользователя:
+  // блокировки и удаления чата в продукте пока нет ни на сервере, ни на клиенте.
+  const editItem: MenuItem = { id: 'edit', label: 'Изменить', icon: 'edit', onSelect: () => {} };
+  const blockItem: MenuItem = { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} };
+  const deleteItem: MenuItem = { id: 'delete', label: 'Удалить чат', icon: 'trash', danger: true, onSelect: () => {} };
+
   if (!chatId) return null;
 
   if (chatError) {
@@ -255,10 +286,15 @@ export function ChatScreen() {
         ['--composer-inset-bottom' as string]: emojiPanelOpen
           ? 'calc(var(--emoji-panel-h) + var(--safe-bottom) + var(--chrome-gap))'
           : 'calc(20px + var(--safe-bottom))',
-        ['--call-banner-h' as string]: showCallBanner ? 'calc(52px + var(--chrome-gap))' : '0px',
-        // 8px зазор (--chrome-gap, см. ChatScreen.module.css → .pinnedSlot) + 48px сам баннер
-        // (PinnedBanner.module.css → .banner) — держать в синхроне при правке любого из трёх мест.
-        ['--pinned-h' as string]: `calc(${pinnedMessage ? '56px' : '0px'} + var(--call-banner-h))`,
+        ['--call-banner-h' as string]: showCallBanner
+          ? isDesktop
+            ? `${CALL_BANNER_H}px`
+            : `calc(${CALL_BANNER_H}px + var(--chrome-gap))`
+          : '0px',
+        // На десктопе баннеры — сплошные полосы встык, без --chrome-gap между ними и шапкой
+        // (ChatScreen.module.css → .pinnedSlot/.callBannerSlot). Мобильная формула — прежняя:
+        // 8px зазор + 48px сам баннер (PinnedBanner.module.css → .banner), держать в синхроне.
+        ['--pinned-h' as string]: `calc(${pinnedMessage ? `${PINNED_BANNER_H}px` : '0px'} + var(--call-banner-h))`,
       }}
     >
       <ChatWallpaper />
@@ -286,7 +322,7 @@ export function ChatScreen() {
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
-      <ChromeBar style={HEADER_STYLE}>
+      <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
         {selectionMode ? (
           <SelectionHeader
             count={selectedIds.size}
@@ -299,9 +335,11 @@ export function ChatScreen() {
           />
         ) : (
           <>
-            <GlassButton icon="back" label="Назад к чатам" onClick={() => navigate('/chats')} />
+            {/* На десктопе список чатов виден слева всегда — кнопке «назад» там не место
+                (ux-ui/14-desktop/03, «Ответы из макета»). */}
+            {!isDesktop && <GlassButton icon="back" label="Назад к чатам" onClick={() => navigate('/chats')} />}
             <GlassPill
-              variant="cap"
+              variant={isDesktop ? 'flat' : 'cap'}
               title={
                 isService ? (
                   <span className={styles.serviceTitle}>
@@ -320,19 +358,30 @@ export function ChatScreen() {
                   avatarUrl={activeChat?.avatarUrl}
                   imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
                   size={40}
+                  online={isDesktop ? subtitleTone === 'online' : undefined}
                   color={activeChat?.otherMember?.avatarColor}
                   colorKey={chatId}
+                  className={isDesktop ? styles.headerAvatar : undefined}
                 />
               }
               onClick={
                 isService ? undefined : () => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))
               }
             />
+            {/* Поиск по чату — задел на будущее (ux-ui/14-desktop/03): функции поиска
+                внутри переписки в продукте пока нет. */}
+            {isDesktop && <GlassButton variant="plain" icon="search" label="Поиск в чате" onClick={() => {}} />}
             {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
             {!isService && (
-              <GlassButton icon="phone" label="Позвонить" onClick={() => void startCall(chatId, 'AUDIO')} />
+              <GlassButton
+                variant={isDesktop ? 'plain' : 'default'}
+                icon="phone"
+                label="Позвонить"
+                onClick={() => void startCall(chatId, 'AUDIO')}
+              />
             )}
             <GlassButton
+              variant={isDesktop ? 'plain' : 'default'}
               icon="more"
               label="Ещё"
               onClick={(event) => setHeaderMenuAnchor(event.currentTarget.getBoundingClientRect())}
@@ -345,13 +394,16 @@ export function ChatScreen() {
         <Menu
           anchor={headerMenuAnchor}
           onClose={() => setHeaderMenuAnchor(null)}
-          items={isService ? [muteItem] : [profileItem, muteItem]}
+          items={
+            isService ? [muteItem] : isDesktop ? [editItem, muteItem, blockItem, deleteItem] : [profileItem, muteItem]
+          }
+          desktopWidth={246}
         />
       )}
 
       <div className={styles.composerFade} />
 
-      <ChromeBar side="bottom" style={COMPOSER_STYLE}>
+      <ChromeBar side="bottom" style={isDesktop ? DESKTOP_COMPOSER_STYLE : COMPOSER_STYLE}>
         <div ref={composerRef} className={styles.composerSlot}>
           {selectionMode ? (
             <SelectionBar

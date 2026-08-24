@@ -28,6 +28,11 @@
   cursor: default;
 }
 
+.interactive:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .text {
   display: flex;
   min-width: 0;
@@ -88,4 +93,27 @@
 
 .subtitleAccent {
   color: var(--primary);
+}
+
+/* Десктоп: имя собеседника в шапке чата — без капсулы стекла, просто аватар и текст
+   в потоке сплошной шапки (ux-ui/14-desktop/03-chat-column-chrome.md). */
+.flat {
+  min-height: 0;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.flatTitle {
+  color: var(--text-primary);
+  font-size: var(--font-screen-title);
+  font-weight: 700;
+}
+
+.flatSubtitle {
+  font-size: var(--font-caption);
 }

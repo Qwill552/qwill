@@ -4,7 +4,7 @@ import { Ripple } from '../Ripple';
 import styles from './GlassPill.module.css';
 
 type SubtitleTone = 'default' | 'online' | 'accent';
-type Variant = 'default' | 'cap';
+type Variant = 'default' | 'cap' | 'flat';
 
 const TONE_CLASS: Record<SubtitleTone, string | undefined> = {
   default: '',
@@ -40,17 +40,17 @@ export function GlassPill({
   disabled,
   className,
 }: GlassPillProps) {
-  const variantClass = variant === 'cap' ? styles.cap : '';
+  const variantClass = variant === 'cap' ? styles.cap : variant === 'flat' ? styles.flat : '';
+  const titleVariantClass = variant === 'cap' ? styles.capTitle : variant === 'flat' ? styles.flatTitle : '';
+  const subtitleVariantClass = variant === 'cap' ? styles.capSubtitle : variant === 'flat' ? styles.flatSubtitle : '';
 
   const body = (
     <>
       {leading}
       <span className={styles.text}>
-        <span className={`${styles.title} ${variant === 'cap' ? styles.capTitle : ''}`}>{title}</span>
+        <span className={`${styles.title} ${titleVariantClass}`}>{title}</span>
         {subtitle != null && (
-          <span
-            className={`${styles.subtitle} ${variant === 'cap' ? styles.capSubtitle : ''} ${TONE_CLASS[subtitleTone]}`}
-          >
+          <span className={`${styles.subtitle} ${subtitleVariantClass} ${TONE_CLASS[subtitleTone]}`}>
             {subtitle}
           </span>
         )}
