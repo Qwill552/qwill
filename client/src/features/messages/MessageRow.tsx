@@ -73,6 +73,23 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 
+function selectedTextIn(bubble: HTMLElement): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return null;
+
+  let touchesBubble = false;
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    if (selection.getRangeAt(index).intersectsNode(bubble)) {
+      touchesBubble = true;
+      break;
+    }
+  }
+  if (!touchesBubble) return null;
+
+  const text = selection.toString();
+  return text.trim() ? text : null;
+}
+
 /** Реакция «вылетает» из точки касания и гаснет — 320 мс, пружина (ux-ui/design-system.md,
  *  «Движение»). Эфемерная, поэтому портал и собственный таймер, а не часть разметки строки. */
 function ReactionFly({ x, y, emoji, onDone }: { x: number; y: number; emoji: string; onDone: () => void }) {
@@ -133,7 +150,12 @@ export function MessageRow({
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
   const menuSeqRef = useRef(0);
-  const [menu, setMenu] = useState<{ rect: DOMRect; origin: MenuOrigin | null; seq: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    rect: DOMRect;
+    origin: MenuOrigin | null;
+    seq: number;
+    selectedText: string | null;
+  } | null>(null);
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
@@ -271,10 +293,15 @@ export function MessageRow({
   }
 
   function openMenu(origin: MenuOrigin | null): void {
-    const rect = bubbleRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const bubble = bubbleRef.current;
+    if (!bubble) return;
     menuSeqRef.current += 1;
-    setMenu({ rect, origin, seq: menuSeqRef.current });
+    setMenu({
+      rect: bubble.getBoundingClientRect(),
+      origin,
+      seq: menuSeqRef.current,
+      selectedText: selectedTextIn(bubble),
+    });
   }
 
   function handleContextMenu(event: React.MouseEvent<HTMLDivElement>): void {
@@ -327,7 +354,13 @@ export function MessageRow({
     }
 
     if (message.content) {
-      list.push({ id: 'copy', icon: 'copy', label: 'Копировать', onSelect: () => void copyToClipboard(message.content!) });
+      const selected = menu?.selectedText ?? null;
+      list.push({
+        id: 'copy',
+        icon: 'copy',
+        label: selected ? 'Копировать выделенное' : 'Копировать',
+        onSelect: () => void copyToClipboard(selected ?? message.content!),
+      });
     }
 
     list.push({ id: 'forward', icon: 'forward', label: 'Переслать', onSelect: () => onForwardRequest(groupIds) });
@@ -348,6 +381,7 @@ export function MessageRow({
     return list;
   }, [
     message,
+    menu,
     groupIds,
     chatId,
     canPin,
