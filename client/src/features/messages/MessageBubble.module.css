@@ -194,8 +194,4 @@
   .bubble {
     backdrop-filter: none;
   }
-
-  .text {
-    text-wrap: pretty;
-  }
 }

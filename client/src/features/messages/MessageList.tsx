@@ -383,7 +383,6 @@ const MessageListRow = memo(function MessageListRow({
         sender={message.sender}
         withAvatarColumn={isGroup}
         showAvatar={!sameAuthorAsNext}
-        continuesSeries={sameAuthorAsPrev && !showDay && !showUnread}
         message={message}
         groupIds={groupIds}
         reactions={reactions}

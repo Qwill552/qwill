@@ -186,13 +186,3 @@
 .bubbleColMedia {
   max-width: min(78vw, var(--bubble-media-max-w));
 }
-
-@media (min-width: 900px) {
-  .row {
-    margin-top: 10px;
-  }
-
-  .series {
-    margin-top: 2px;
-  }
-}
