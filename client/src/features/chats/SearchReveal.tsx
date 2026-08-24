@@ -24,6 +24,9 @@ interface SearchRevealProps {
   /** Открыли из маленькой кнопки-лупы, а не из полной строки — стыковка чуть длиннее,
    *  подпись проявляется отдельным отложенным фейдом, а не сразу. */
   fromIcon: boolean;
+  /** Подпись в поле — та же, что и на кнопке-триггере, с которой панель раскрылась: на
+   *  десктопе она короче (ChatsScreen.tsx, SEARCH_PLACEHOLDER_DESKTOP). */
+  placeholder: string;
   /** Момент начала полёта капсулы обратно — по этому сигналу ChatsScreen.tsx мгновенно
    *  открывает настоящую строку/лупу под капсулой-подделкой (см. комментарий у phase==='retreat'
    *  ниже: без этого настоящая строка проявлялась только после исчезновения капсулы отдельным,
@@ -65,7 +68,15 @@ const LABEL_FADE_MS = 160;
  *     маской с мягким, тающим краем (не жёсткой шторкой: пользователь настоял на дисолве).
  *  Закрытие — то же самое в обратном порядке: сперва уезжает волна, потом капсула возвращается
  *  в origin. За пределами референса — там поле поиска ничего не открывает. */
-export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose, onOpenChat }: SearchRevealProps) {
+export function SearchReveal({
+  origin,
+  dock,
+  fromIcon,
+  placeholder,
+  onRetreatStart,
+  onClose,
+  onOpenChat,
+}: SearchRevealProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const waveRef = useRef<HTMLDivElement>(null);
@@ -247,7 +258,7 @@ export function SearchReveal({ origin, dock, fromIcon, onRetreatStart, onClose, 
           style={labelStyle}
           type="text"
           value={query}
-          placeholder="Поиск чатов и людей"
+          placeholder={placeholder}
           aria-label="Поиск чатов и людей"
           autoComplete="off"
           enterKeyHint="search"

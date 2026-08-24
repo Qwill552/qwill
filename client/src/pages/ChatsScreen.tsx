@@ -26,8 +26,14 @@ import styles from './ChatsScreen.module.css';
  *  openSearchReveal) всегда получает те же радиус и высоту, что и полная строка поиска —
  *  так переход от пилюли до стыковки становится чистым вертикальным сдвигом. */
 const SEARCH_PILL_RADIUS = 22;
+/** На десктопе строка поиска не пилюля, а скруглённый прямоугольник — держать в синхроне
+ *  с `.searchTrigger` в ChatsScreen.module.css: этим же радиусом едет капсула SearchReveal. */
+const SEARCH_PILL_RADIUS_DESKTOP = 14;
 const SEARCH_BUTTON_RADIUS = 18;
 const SEARCH_PILL_HEIGHT = 44;
+/** На телефоне подпись объясняет, что поиск ищет и людей тоже, — там она первое, что видно
+ *  на вкладке. В узкой десктопной колонке рядом с ☰ та же фраза выглядит многословной. */
+const SEARCH_PLACEHOLDER_DESKTOP = 'Поиск';
 /** Строка поиска стыкуется не вплотную к самому верху экрана, а с запасом — дополнительный
  *  отступ поверх собственного отступа шапки. */
 const SEARCH_DOCK_TOP_GAP = 16;
@@ -136,6 +142,7 @@ export function ChatsScreen() {
     // На десктопе шапка списка — одна строка (☰ + поле), а не две стопкой: докнутая строка
     // поиска встаёт прямо на её место, без мобильного зазора до второй строки под ней.
     const dockGap = layout === 'desktop' ? 0 : SEARCH_DOCK_TOP_GAP;
+    const dockRadius = layout === 'desktop' ? SEARCH_PILL_RADIUS_DESKTOP : SEARCH_PILL_RADIUS;
 
     setSearchReveal({
       top: rect.top - originTop,
@@ -152,7 +159,7 @@ export function ChatsScreen() {
         left: headerRect.left - originLeft,
         width: headerRect.width,
         height: SEARCH_PILL_HEIGHT,
-        radius: SEARCH_PILL_RADIUS,
+        radius: dockRadius,
       });
     }
   }
@@ -221,13 +228,13 @@ export function ChatsScreen() {
             <button
               type="button"
               className={styles.searchTrigger}
-              onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
+              onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS_DESKTOP, false)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />
                 <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
-              <span>Поиск чатов и людей</span>
+              <span>{SEARCH_PLACEHOLDER_DESKTOP}</span>
             </button>
           </div>
         ) : (
@@ -299,6 +306,7 @@ export function ChatsScreen() {
           origin={searchReveal}
           dock={searchDock}
           fromIcon={searchFromIcon}
+          placeholder={layout === 'desktop' ? SEARCH_PLACEHOLDER_DESKTOP : 'Поиск чатов и людей'}
           onRetreatStart={() => setSearchRetreating(true)}
           onClose={() => {
             setSearchReveal(null);
