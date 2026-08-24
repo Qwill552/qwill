@@ -43,9 +43,32 @@ function applyThemeColor(resolved: 'light' | 'dark'): void {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[resolved]);
 }
 
+/** Чтение геометрии заставляет браузер пересчитать стиль немедленно — без этого атрибут
+ *  ниже снялся бы до того, как новая тема попала в хоть один пересчёт, и глушение переходов
+ *  не сработало бы вовсе. */
+function forceStyleFlush(element: HTMLElement): number {
+  return element.offsetWidth;
+}
+
+/**
+ * Единственная точка, где тема попадает на <html>. Атрибут `data-theme-swap` на время
+ * подмены глушит все CSS-переходы (tokens.css) — иначе элементы со своим `transition` на
+ * цвет или фон (вкладки списка, разделитель колонок, иконки композера) доезжали бы до нового
+ * цвета уже после кругового раскрытия темы, а не вместе с ним (ux-ui.md, этап 14, шаг 4).
+ * Ставится и снимается в одной задаче вокруг принудительного пересчёта стиля, поэтому
+ * наведение и нажатие свои переходы сохраняют.
+ */
+export function setThemeAttribute(resolved: 'light' | 'dark'): void {
+  const html = document.documentElement;
+  html.dataset.themeSwap = '';
+  html.dataset.theme = resolved;
+  forceStyleFlush(html);
+  delete html.dataset.themeSwap;
+}
+
 function applyTheme(preference: ThemePreference): 'light' | 'dark' {
   const resolved = resolveTheme(preference);
-  document.documentElement.dataset.theme = resolved;
+  setThemeAttribute(resolved);
   applyThemeColor(resolved);
   setDesktopTitleTheme(resolved);
   localStorage.setItem(THEME_KEY, preference);
@@ -84,7 +107,7 @@ export const useUiStore = create<UiState>((set, get) => {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (get().themePreference !== 'system') return;
       const resolved = systemTheme();
-      document.documentElement.dataset.theme = resolved;
+      setThemeAttribute(resolved);
       applyThemeColor(resolved);
       setDesktopTitleTheme(resolved);
       set({ theme: resolved });

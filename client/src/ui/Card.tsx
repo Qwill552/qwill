@@ -70,10 +70,13 @@ function CardRow({
     className ?? '',
   ].join(' ');
 
-  if (!onClick) return <div className={classes}>{body}</div>;
+  // data-danger, а не только класс: по нему контейнер (десктопная карточка Настроек, где
+  // плитка под иконкой прозрачная) перекрашивает и сам глиф — на цветной подложке он белый
+  // и красным быть не должен. Хешированный класс модуля снаружи не адресуется.
+  if (!onClick) return <div className={classes} data-danger={danger ? '' : undefined}>{body}</div>;
 
   return (
-    <button type="button" className={classes} onClick={onClick}>
+    <button type="button" className={classes} data-danger={danger ? '' : undefined} onClick={onClick}>
       {body}
       <Ripple />
     </button>

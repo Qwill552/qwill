@@ -4,14 +4,14 @@
    `--pulse-cap`/`--pulse-capbd`, тот же blur/saturate и внутренний блик. Отличие одно —
    форма: не вытянутая капсула (24px), а прямоугольник со скруглением поменьше (по прямой
    просьбе пользователя после сверки со скриншотом референса). Позиционирование — забота
-   контейнера-портала (ChatScreen.pinnedSlot): здесь только собственная раскладка. Высота
-   фиксирована и совпадает с `--pinned-h` в ChatScreen.tsx, которым лента резервирует под
-   баннер место в padding — держать оба значения в синхроне при правке одного из них. */
+   контейнера-портала (ChatScreen.pinnedSlot): здесь только собственная раскладка. Высота —
+   токен `--pinned-banner-h`, тот же, которым `--pinned-h` в ChatScreen.tsx резервирует под
+   баннер место в padding ленты: раньше это число было записано и здесь, и в JS. */
 
 .banner {
   display: flex;
   align-items: stretch;
-  height: 48px;
+  height: var(--pinned-banner-h);
   border: 1px solid var(--pulse-capbd);
   border-radius: var(--radius-md);
   background: var(--pulse-cap);
@@ -120,8 +120,19 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .body {
+    gap: 12px;
+    padding: 8px 12px 8px 10px;
+  }
+
+  /* На полосе во всю ширину колонки обе строки читаются мелко — по ступени крупнее каждая. */
+  .label {
+    font-size: var(--font-meta);
+  }
+
   .preview {
     color: var(--text-secondary);
+    font-size: var(--font-name);
   }
 
   .close {

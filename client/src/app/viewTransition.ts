@@ -28,6 +28,8 @@
 
 import { flushSync } from 'react-dom';
 
+import { setThemeAttribute } from '../stores/uiStore';
+
 const DURATION_MS = 650;
 const EASE = 'cubic-bezier(.22,1,.36,1)';
 
@@ -105,7 +107,7 @@ export function revealTransition(x: number, y: number, toDark: boolean, mutate: 
   if (toDark) {
     // Настоящий интерфейс под копией на время анимации держим в старой теме — иначе новое
     // росло бы по новому. Вернём в новую в finish().
-    html.dataset.theme = oldTheme;
+    setThemeAttribute(oldTheme);
   } else {
     // shrink: под стягивающейся копией должно быть уже новое состояние.
     mutate();
@@ -147,8 +149,10 @@ export function revealTransition(x: number, y: number, toDark: boolean, mutate: 
     animation.cancel();
     layer.remove();
     // grow: снимаем временный откат темы — копия уже закрыла собой весь экран, под ней
-    // ровно то же новое состояние, поэтому подмены не видно.
-    if (toDark) html.dataset.theme = newTheme;
+    // ровно то же новое состояние, поэтому подмены не видно. Через setThemeAttribute, а не
+    // напрямую: иначе всё, у чего есть свой transition на цвет, доезжало бы до новой темы
+    // уже после того, как круг закончился и копия снята (ux-ui.md, этап 14, шаг 4).
+    if (toDark) setThemeAttribute(newTheme);
   };
 
   running = finish;

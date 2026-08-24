@@ -15,3 +15,11 @@
   background: var(--tile-tint-override, var(--tile-tint));
   color: var(--tile-ink-override, var(--text-on-primary));
 }
+
+/* Размер глифа перебивается из CSS, а не пропом `size` у <Icon>: контейнеру (десктопная
+   карточка Настроек, где подложки под иконкой нет вовсе) нужен свой размер, а прокидывать
+   его пропом через Card.Row пришлось бы во все места разом. */
+.tile > svg {
+  width: var(--tile-glyph, 18px);
+  height: var(--tile-glyph, 18px);
+}

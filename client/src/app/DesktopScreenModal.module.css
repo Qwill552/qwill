@@ -90,9 +90,17 @@
   overflow: hidden;
   /* Telegram Desktop рисует иконки настроек без цветной подложки вовсе — мобильный радужный
      ряд (Card.Row tint) тут неуместен (референс пользователя, ux-ui/14-desktop/04). Точка
-     подмены — IconTile.module.css, каскадные переменные без !important. */
+     подмены — IconTile.module.css, каскадные переменные без !important. Без подложки глиф
+     остаётся один на строку, поэтому он крупнее плиточных 18px. */
   --tile-tint-override: transparent;
   --tile-ink-override: var(--text-secondary);
+  --tile-glyph: 24px;
+}
+
+/* «Выйти из аккаунта»: на телефоне строка узнаётся по красной плитке с белым глифом, здесь
+   плитки нет — красным становится сам глиф, как и подпись рядом. */
+.body [data-danger] {
+  --tile-ink-override: var(--danger);
 }
 
 @keyframes fadeIn {

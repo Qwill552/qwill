@@ -61,7 +61,6 @@ const DESKTOP_COMPOSER_STYLE = {
   transition: 'bottom var(--dur-menu) var(--ease-screen)',
 };
 
-const PINNED_BANNER_H = 48;
 const CALL_BANNER_H = 52;
 
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
@@ -292,9 +291,9 @@ export function ChatScreen() {
             : `calc(${CALL_BANNER_H}px + var(--chrome-gap))`
           : '0px',
         // На десктопе баннеры — сплошные полосы встык, без --chrome-gap между ними и шапкой
-        // (ChatScreen.module.css → .pinnedSlot/.callBannerSlot). Мобильная формула — прежняя:
-        // 8px зазор + 48px сам баннер (PinnedBanner.module.css → .banner), держать в синхроне.
-        ['--pinned-h' as string]: `calc(${pinnedMessage ? `${PINNED_BANNER_H}px` : '0px'} + var(--call-banner-h))`,
+        // (ChatScreen.module.css → .pinnedSlot/.callBannerSlot). Высота самого баннера —
+        // токен --pinned-banner-h, его же ставит себе .banner в PinnedBanner.module.css.
+        ['--pinned-h' as string]: `calc(${pinnedMessage ? 'var(--pinned-banner-h)' : '0px'} + var(--call-banner-h))`,
       }}
     >
       <ChatWallpaper />
