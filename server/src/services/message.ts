@@ -276,13 +276,14 @@ export interface EditMessageInput {
   content: string;
 }
 
-/** Правка — только автор, только пока сообщение не удалено (секция 6). */
+/** Правка — только автор, только текстовое сообщение, только пока оно не удалено (секция 6). */
 export async function editMessage(input: EditMessageInput): Promise<MessageDto> {
   await assertMember(input.chatId, input.userId);
   const existing = await getMessageInChatOrThrow(input.chatId, input.messageId);
 
   if (existing.deletedAt) throw badRequest(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение удалено');
   if (existing.senderId !== input.userId) throw forbidden('Можно редактировать только свои сообщения');
+  if (existing.type !== 'TEXT') throw forbidden('Изменить можно только текстовое сообщение');
 
   const message = await prisma.message.update({
     where: { id: input.messageId },

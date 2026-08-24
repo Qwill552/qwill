@@ -17,6 +17,7 @@ import { GroupCallBanner } from '../features/calls/GroupCallBanner';
 import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
+import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
 import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
@@ -127,6 +128,7 @@ export function ChatScreen() {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index]!;
       if (message.sender?.id !== myId || message.id <= 0 || message.deletedAt) continue;
+      if (!isEditableMessage(message)) continue;
       setComposerContext({ mode: 'edit', message });
       return;
     }
@@ -215,7 +217,10 @@ export function ChatScreen() {
   }
 
   const canEditSelection =
-    selectedMessages.length === 1 && selectedMessages[0]!.sender?.id === myId && !selectedMessages[0]!.deletedAt;
+    selectedMessages.length === 1 &&
+    selectedMessages[0]!.sender?.id === myId &&
+    !selectedMessages[0]!.deletedAt &&
+    isEditableMessage(selectedMessages[0]!);
 
   function handleSelectionEdit(): void {
     const message = selectedMessages[0];

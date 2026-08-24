@@ -13,6 +13,7 @@ import { groupAlbums, mergeReactions } from '../media/albums';
 import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
+import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
 import styles from './MessageList.module.css';
@@ -287,7 +288,7 @@ export function MessageList({
               own={own}
               read={own && delivered && isReadByOthers(readCursors, myId, row.lastId)}
               isReal={isReal}
-              canEdit={own && canAct}
+              canEdit={own && canAct && isEditableMessage(row.message)}
               canDelete={(own || isGroupAdmin) && canAct}
               canPin={canPinBase && canAct}
               canReply={!isService}
