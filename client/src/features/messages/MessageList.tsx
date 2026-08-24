@@ -259,63 +259,61 @@ export function MessageList({
       <div className={`${styles.list} hide-native-scrollbar`} ref={listRef} onScroll={handleScroll}>
         <ScrollIndicator target={listRef} interactive />
 
-        <div className={styles.track}>
-          <div className={styles.filler} />
+        <div className={styles.filler} />
 
-          {hasMore && (
-            <button className={styles.loadMore} type="button" onClick={handleLoadMore}>
-              Показать историю
-            </button>
-          )}
+        {hasMore && (
+          <button className={styles.loadMore} type="button" onClick={handleLoadMore}>
+            Показать историю
+          </button>
+        )}
 
-          {messages.length === 0 && !hasMore && (
-            <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
-          )}
+        {messages.length === 0 && !hasMore && (
+          <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
+        )}
 
-          {rows.map((row) => {
-            const own = row.message.sender?.id === myId;
-            const delivered = row.message.status !== 'sending' && row.message.status !== 'failed';
-            const isReal = row.message.id > 0;
-            const canAct = isReal && !row.message.deletedAt;
+        {rows.map((row) => {
+          const own = row.message.sender?.id === myId;
+          const delivered = row.message.status !== 'sending' && row.message.status !== 'failed';
+          const isReal = row.message.id > 0;
+          const canAct = isReal && !row.message.deletedAt;
 
-            return (
-              <MessageListRow
-                key={row.message.clientId ?? row.message.id}
-                row={row}
-                chatId={chatId}
-                myId={myId}
-                isGroup={isGroup}
-                own={own}
-                read={own && delivered && isReadByOthers(readCursors, myId, row.lastId)}
-                isReal={isReal}
-                canEdit={own && canAct}
-                canDelete={(own || isGroupAdmin) && canAct}
-                canPin={canPinBase && canAct}
-                canReply={!isService}
-                canReact={!isService}
-                isPinned={pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id)}
-                showUnread={unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current)}
-                unreadCount={unreadCount}
-                onReply={onReply}
-                onEdit={onEdit}
-                onForwardRequest={onForwardRequest}
-                onToggleReaction={toggleReaction}
-              />
-            );
-          })}
+          return (
+            <MessageListRow
+              key={row.message.clientId ?? row.message.id}
+              row={row}
+              chatId={chatId}
+              myId={myId}
+              isGroup={isGroup}
+              own={own}
+              read={own && delivered && isReadByOthers(readCursors, myId, row.lastId)}
+              isReal={isReal}
+              canEdit={own && canAct}
+              canDelete={(own || isGroupAdmin) && canAct}
+              canPin={canPinBase && canAct}
+              canReply={!isService}
+              canReact={!isService}
+              isPinned={pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id)}
+              showUnread={unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current)}
+              unreadCount={unreadCount}
+              onReply={onReply}
+              onEdit={onEdit}
+              onForwardRequest={onForwardRequest}
+              onToggleReaction={toggleReaction}
+            />
+          );
+        })}
 
-          {typing && (
-            <div className={styles.typingRow}>
-              <div className={styles.typingBubble}>
-                <span className={styles.dot} />
-                <span className={styles.dot} />
-                <span className={styles.dot} />
-              </div>
+        {typing && (
+          <div className={styles.typingRow}>
+            <div className={styles.typingBubble}>
+              <span className={styles.dot} />
+              <span className={styles.dot} />
+              <span className={styles.dot} />
             </div>
-          )}
+          </div>
+        )}
 
-          <div className={styles.spacer} />
-        </div>
+        <div className={styles.spacer} />
       </div>
 
       <button

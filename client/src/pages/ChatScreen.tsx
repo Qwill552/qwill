@@ -50,8 +50,8 @@ const DESKTOP_HEADER_STYLE = {
   height: '60px',
 };
 
-/** Десктоп: композер остаётся капсулой, но сама полоса — во всю ширину колонки; клэмп
- *  до 860px и центрирование даёт `.composerSlot` (ChatScreen.module.css). */
+/** Десктоп: композер остаётся капсулой, но сама полоса — во всю ширину колонки; боковые
+ *  поля даёт `.composerSlot` (ChatScreen.module.css). */
 const DESKTOP_COMPOSER_STYLE = {
   left: 0,
   right: 0,
