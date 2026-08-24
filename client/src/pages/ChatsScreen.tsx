@@ -26,9 +26,6 @@ import styles from './ChatsScreen.module.css';
  *  openSearchReveal) всегда получает те же радиус и высоту, что и полная строка поиска —
  *  так переход от пилюли до стыковки становится чистым вертикальным сдвигом. */
 const SEARCH_PILL_RADIUS = 22;
-/** На десктопе строка поиска не пилюля, а скруглённый прямоугольник — держать в синхроне
- *  с `.searchTrigger` в ChatsScreen.module.css: этим же радиусом едет капсула SearchReveal. */
-const SEARCH_PILL_RADIUS_DESKTOP = 14;
 const SEARCH_BUTTON_RADIUS = 18;
 const SEARCH_PILL_HEIGHT = 44;
 /** На телефоне подпись объясняет, что поиск ищет и людей тоже, — там она первое, что видно
@@ -236,7 +233,7 @@ export function ChatsScreen() {
             <button
               type="button"
               className={`${styles.searchTrigger} ${searchReveal ? styles.searchTriggerCovered : ''}`}
-              onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS_DESKTOP, false)}
+              onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS, false)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.6" />

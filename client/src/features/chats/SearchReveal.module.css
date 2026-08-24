@@ -157,30 +157,8 @@
     display: none;
   }
 
-  .dockBar {
-    border-color: var(--search-field-border);
-    background: var(--search-field-bg);
-    backdrop-filter: none;
-    box-shadow: none;
-    color: var(--search-field-icon);
-  }
-
-  .dockIcon {
-    width: 20px;
-    height: 20px;
-  }
-
-  .dockInput {
-    color: var(--text-primary);
-    font-size: var(--font-screen-title);
-  }
-
-  .dockInput::placeholder {
-    color: var(--search-field-hint);
-  }
-
   .close {
-    color: var(--search-field-icon);
+    color: inherit;
   }
 
   .close:hover {

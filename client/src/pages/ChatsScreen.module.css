@@ -31,33 +31,8 @@
     padding: 10px calc(12px + var(--safe-right)) var(--chats-header-pad-b) calc(12px + var(--safe-left));
   }
 
-  /* Не пилюля во всю высоту, а скруглённый прямоугольник: пилюля читалась мобильным
-     элементом посреди прямоугольной десктопной хромы. Число держать в синхроне с
-     SEARCH_PILL_RADIUS_DESKTOP в ChatsScreen.tsx — им же едет капсула SearchReveal.
-     Заливка и кромка — общий с раскрытой полосой токен (SearchReveal .dockBar): порознь они
-     разъезжались, и цвет менялся прямо посреди превращения. Блюра нет — под строкой
-     непрозрачная колонка, размывать нечего. */
-  .searchTrigger {
-    border-radius: 14px;
-    border-color: var(--search-field-border);
-    background: var(--search-field-bg);
-    backdrop-filter: none;
-    box-shadow: none;
-    color: var(--search-field-icon);
-    font-size: var(--font-screen-title);
-  }
-
-  .searchTrigger span {
-    color: var(--search-field-hint);
-  }
-
   .searchTriggerCovered {
     visibility: hidden;
-  }
-
-  .searchTrigger svg {
-    width: 20px;
-    height: 20px;
   }
 }
 
