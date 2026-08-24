@@ -298,6 +298,8 @@
      --text-primary, в тёмной — --lift. */
   --search-field-bg: color-mix(in srgb, var(--text-primary) 7%, transparent);
   --search-field-border: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  --search-field-icon: color-mix(in srgb, var(--text-primary) 50%, transparent);
+  --search-field-hint: color-mix(in srgb, var(--text-primary) 42%, transparent);
 }
 
 :root[data-theme='dark'],
@@ -325,6 +327,8 @@
 
   --search-field-bg: color-mix(in srgb, var(--lift) 7%, transparent);
   --search-field-border: color-mix(in srgb, var(--lift) 9%, transparent);
+  --search-field-icon: color-mix(in srgb, var(--text-primary) 50%, transparent);
+  --search-field-hint: color-mix(in srgb, var(--text-primary) 42%, transparent);
 }
 
 /* Минималистичный индикатор прокрутки (ScrollIndicator): овал без подложки и трека, той

@@ -43,7 +43,16 @@
     background: var(--search-field-bg);
     backdrop-filter: none;
     box-shadow: none;
+    color: var(--search-field-icon);
     font-size: var(--font-screen-title);
+  }
+
+  .searchTrigger span {
+    color: var(--search-field-hint);
+  }
+
+  .searchTriggerCovered {
+    visibility: hidden;
   }
 
   .searchTrigger svg {

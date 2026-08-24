@@ -162,7 +162,7 @@
     background: var(--search-field-bg);
     backdrop-filter: none;
     box-shadow: none;
-    color: var(--text-secondary);
+    color: var(--search-field-icon);
   }
 
   .dockIcon {
@@ -176,11 +176,11 @@
   }
 
   .dockInput::placeholder {
-    color: var(--text-secondary);
+    color: var(--search-field-hint);
   }
 
   .close {
-    color: var(--text-secondary);
+    color: var(--search-field-icon);
   }
 
   .close:hover {

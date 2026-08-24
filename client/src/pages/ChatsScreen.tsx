@@ -235,7 +235,7 @@ export function ChatsScreen() {
             </button>
             <button
               type="button"
-              className={styles.searchTrigger}
+              className={`${styles.searchTrigger} ${searchReveal ? styles.searchTriggerCovered : ''}`}
               onClick={(e) => openSearchReveal(e.currentTarget, SEARCH_PILL_RADIUS_DESKTOP, false)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
