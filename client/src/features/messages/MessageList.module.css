@@ -4,12 +4,14 @@
    ChatScreen, измеренная высота композера) — контент обязан проезжать под ними. */
 
 .list {
+  --message-gap: 4px;
+
   position: relative;
   z-index: 2;
   display: flex;
   height: 100%;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--message-gap);
   overflow-x: clip;
   overflow-y: auto;
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
@@ -158,26 +160,24 @@
   right: -5px;
 }
 
-/* Уходящая строка (R-15): фаза 1 — прозрачность и лёгкий масштаб (--dur-close), фаза 2 —
-   схлопывание высоты (--dur-menu), соседи съезжают на освободившееся место. Высоту в фазе
-   2 задаёт инлайн-стиль из JS (LeavingMessageRow) — здесь только переход. */
-.leaving {
-  overflow: hidden;
+/* Оболочка строки есть всегда, но своих стилей в покое не имеет — в том числе намеренно
+   не позиционирована: `offsetParent` строки должен оставаться лентой, по нему считается
+   прыжок к закреплённому сообщению и компенсация прокрутки. На время ухода к ней
+   применяется распад в пыль (ui/dissolve.ts) и схлопывание высоты; переполнение остаётся
+   видимым — пыль вылетает за границы строки, высота к этому моменту уже схлопывается. */
+.shellLeaving {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.leavingFade {
+/* Отрицательный отступ гасит зазор ленты у схлопнувшейся строки: без него на месте
+   удалённого сообщения оставалось бы 8px вместо 4px, и соседи в конце дёргались бы. */
+.shellCollapsing {
+  margin-top: calc(var(--message-gap) * -1);
   transition:
-    opacity var(--dur-close) var(--ease-close),
-    transform var(--dur-close) var(--ease-close);
-  transform: scale(0.94);
-  opacity: 0;
-}
-
-.leavingCollapse {
-  transition:
-    opacity var(--dur-close) var(--ease-close),
-    transform var(--dur-close) var(--ease-close),
-    height var(--dur-menu) var(--ease-screen);
+    height var(--dur-menu) var(--ease-screen),
+    margin-top var(--dur-menu) var(--ease-screen);
 }
 
 .empty {

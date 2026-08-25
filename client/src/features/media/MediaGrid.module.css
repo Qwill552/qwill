@@ -23,14 +23,9 @@
   border-radius: 0;
 }
 
-/* Уходящая плитка (R-15): тает и слегка уменьшается, ещё занимая место в раскладке —
-   пока не истечёт --dur-close и её не уберут из расчёта мозаики совсем (см. MediaGrid.tsx). */
+/* Уходящая плитка рассыпается в пыль на своём месте (ui/dissolve.ts), ещё занимая слот
+   раскладки; из расчёта мозаики её убирают только по концу распада (см. MediaGrid.tsx). */
 .cellLeaving {
-  transition:
-    opacity var(--dur-close) var(--ease-close),
-    transform var(--dur-close) var(--ease-close);
-  transform: scale(0.94);
-  opacity: 0;
   pointer-events: none;
 }
 

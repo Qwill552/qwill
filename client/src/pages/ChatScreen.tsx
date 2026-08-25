@@ -19,6 +19,7 @@ import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
 import { DeleteMessageModal } from '../features/messages/DeleteMessageModal';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
+import { isDeletableSelection } from '../features/messages/messageDeleting';
 import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
 import { SelectionBar } from '../features/messages/SelectionBar';
@@ -109,6 +110,7 @@ export function ChatScreen() {
    *  баннер рисует и владеет им `MessageList` (там же живут права на закреп/снятие),
    *  сюда он лишь порталится, чтобы не оказаться под блюром шапки (см. ниже, pinnedSlot). */
   const pinnedMessage = useChatStore((s) => (chatId ? s.pinnedByChat[chatId] : undefined)) ?? null;
+  const members = useChatStore((s) => (chatId ? s.membersByChat[chatId] : undefined));
   const myId = useAuthStore((s) => s.user?.id) ?? null;
   const startCall = useCallStore((s) => s.startCall);
   const joinCall = useCallStore((s) => s.joinCall);
@@ -233,6 +235,10 @@ export function ChatScreen() {
     selectedMessages[0]!.sender?.id === myId &&
     !selectedMessages[0]!.deletedAt &&
     isEditableMessage(selectedMessages[0]!);
+
+  const myRole = members?.find((m) => m.userId === myId)?.role;
+  const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
+  const canDeleteSelection = isDeletableSelection(selectedMessages, myId, isGroupAdmin);
 
   function handleSelectionEdit(): void {
     const message = selectedMessages[0];
@@ -372,6 +378,7 @@ export function ChatScreen() {
           <SelectionHeader
             count={selectedIds.size}
             canEdit={canEditSelection}
+            canDelete={canDeleteSelection}
             onClose={exitSelection}
             onEdit={handleSelectionEdit}
             onCopy={handleSelectionCopy}

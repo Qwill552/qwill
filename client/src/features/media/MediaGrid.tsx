@@ -1,9 +1,10 @@
 import type { AttachmentDto } from '@messenger/shared';
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
-import { cssDurationMs } from '../../ui/motion';
 import { type LocalAttachmentState, type LocalMessage, useChatStore } from '../../stores/chatStore';
+import { startDissolve } from '../../ui/dissolve';
 import { Icon } from '../../ui/Icon';
+import { cssDurationMs } from '../../ui/motion';
 import { ProgressRing } from '../messages/ProgressRing';
 import { MediaTile } from './MediaTile';
 import { mosaicLayout, normalizeRatio, MOSAIC_MAX_ITEMS } from './mosaicLayout';
@@ -35,6 +36,11 @@ export function albumTiles(album: LocalMessage[]): AlbumTile[] {
   }));
 }
 
+interface LeavingTile {
+  tile: AlbumTile;
+  index: number;
+}
+
 interface MediaGridProps {
   tiles: AlbumTile[];
   chatId: string;
@@ -42,91 +48,129 @@ interface MediaGridProps {
   onRetry: (clientId: string) => void;
 }
 
-/** Мозаика альбома. Удаление снимка (R-15) не рвёт раскладку рывком: ушедшая плитка сама
- *  тает и уменьшается (--dur-close), пока ещё занимает своё место в сетке, а когда её и
- *  правда убирают из расчёта — соседи переезжают на новые места через FLIP: измеряется
- *  прямоугольник «до», после перерисовки — «после», разница гасится обратным `transform`
- *  без перехода и тут же снимается с переходом (--dur-menu). */
+/** Мозаика альбома. Удалённый снимок не выдёргивается из раскладки рывком: сперва он
+ *  рассыпается в пыль на своём месте (ui/dissolve.ts), и только потом, когда плитки и
+ *  правда становится меньше, оставшиеся переезжают на новые места через FLIP — обратным
+ *  `transform` без пересчёта раскладки браузером на каждый кадр. */
 export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) {
   const selectionMode = useChatStore((s) => s.selectionMode);
   const selectedIds = useChatStore((s) => s.selectedIds);
   const enterSelection = useChatStore((s) => s.enterSelection);
   const toggleSelected = useChatStore((s) => s.toggleSelected);
 
-  const [leaving, setLeaving] = useState<Map<string, AlbumTile>>(new Map());
-  const prevTilesRef = useRef<AlbumTile[]>(tiles);
   const nodesRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const rectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const dissolvingRef = useRef<Map<string, () => void>>(new Map());
 
-  // Тот же приём, что у «уходящей» строки ленты (MessageList.LeavingMessageRow): диффим
-  // в useLayoutEffect, чтобы плитка не мигнула пропаданием на один кадр до того, как
-  // попадёт в leaving.
-  useLayoutEffect(() => {
-    const nextKeys = new Set(tiles.map((t) => t.key));
-    const goneNow = prevTilesRef.current.filter((t) => !nextKeys.has(t.key) && !leaving.has(t.key));
-    prevTilesRef.current = tiles;
-    if (goneNow.length === 0) return;
+  // Тот же приём, что у ленты (MessageList): пропажу плитки диффим прямо в рендере, чтобы
+  // React не успел снять её узел — иначе картинка загружалась бы заново вместо распада.
+  const [leaving, setLeaving] = useState<Map<string, LeavingTile>>(() => new Map());
+  const prevTilesRef = useRef<AlbumTile[]>(tiles);
+  const previousTiles = prevTilesRef.current;
+  prevTilesRef.current = tiles;
 
-    setLeaving((prev) => {
-      const next = new Map(prev);
-      for (const tile of goneNow) next.set(tile.key, tile);
-      return next;
-    });
+  if (previousTiles !== tiles || leaving.size > 0) {
+    const liveKeys = new Set(tiles.map((tile) => tile.key));
+    const gone = previousTiles.filter((tile) => !liveKeys.has(tile.key) && !leaving.has(tile.key));
+    const revived = [...leaving.keys()].filter((key) => liveKeys.has(key));
 
-    const ms = cssDurationMs('--dur-close') + 80;
-    for (const tile of goneNow) {
-      setTimeout(() => {
-        setLeaving((prev) => {
-          if (!prev.has(tile.key)) return prev;
-          const next = new Map(prev);
-          next.delete(tile.key);
-          return next;
-        });
-      }, ms);
+    if (gone.length > 0 || revived.length > 0) {
+      setLeaving((current) => {
+        const next = new Map(current);
+        for (const key of revived) next.delete(key);
+        for (const tile of gone) next.set(tile.key, { tile, index: previousTiles.indexOf(tile) });
+        return next;
+      });
     }
+  }
+
+  const shown = useMemo(() => {
+    if (leaving.size === 0) return tiles.slice(0, MOSAIC_MAX_ITEMS);
+    const result = [...tiles];
+    for (const entry of [...leaving.values()].sort((a, b) => a.index - b.index)) {
+      result.splice(Math.min(entry.index, result.length), 0, entry.tile);
+    }
+    return result.slice(0, MOSAIC_MAX_ITEMS);
   }, [tiles, leaving]);
 
-  const shown = [...tiles, ...leaving.values()]
-    .sort((a, b) => (a.messageId ?? 0) - (b.messageId ?? 0))
-    .slice(0, MOSAIC_MAX_ITEMS);
-  const extra = tiles.length - tiles.slice(0, MOSAIC_MAX_ITEMS).length;
+  const extra = Math.max(0, tiles.length - MOSAIC_MAX_ITEMS);
   const layout = mosaicLayout(shown.map((tile) => tile.ratio));
+  const shownSignature = shown.map((tile) => tile.key).join('|');
+
+  useLayoutEffect(() => {
+    const cancels = dissolvingRef.current;
+
+    for (const key of leaving.keys()) {
+      if (cancels.has(key)) continue;
+      const node = nodesRef.current.get(key);
+      if (!node) continue;
+
+      cancels.set(
+        key,
+        startDissolve(node, {
+          durationMs: cssDurationMs('--dur-dissolve'),
+          onDone: () => {
+            cancels.delete(key);
+            for (const [tileKey, tileNode] of nodesRef.current) {
+              rectsRef.current.set(tileKey, tileNode.getBoundingClientRect());
+            }
+            setLeaving((current) => {
+              if (!current.has(key)) return current;
+              const next = new Map(current);
+              next.delete(key);
+              return next;
+            });
+          },
+        }),
+      );
+    }
+
+    for (const [key, cancel] of cancels) {
+      if (leaving.has(key)) continue;
+      cancel();
+      cancels.delete(key);
+    }
+  }, [leaving]);
+
+  useLayoutEffect(() => {
+    return () => {
+      for (const cancel of dissolvingRef.current.values()) cancel();
+      dissolvingRef.current.clear();
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const prevRects = rectsRef.current;
-    const nextRects = new Map<string, DOMRect>();
+    if (prevRects.size === 0) return;
+    rectsRef.current = new Map();
 
     for (const [key, node] of nodesRef.current) {
-      const rect = node.getBoundingClientRect();
-      nextRects.set(key, rect);
       const prev = prevRects.get(key);
       if (!prev) continue;
-
+      const rect = node.getBoundingClientRect();
       const dx = prev.left - rect.left;
       const dy = prev.top - rect.top;
-      const sx = prev.width / rect.width;
-      const sy = prev.height / rect.height;
+      const sx = rect.width > 0 ? prev.width / rect.width : 1;
+      const sy = rect.height > 0 ? prev.height / rect.height : 1;
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
 
       node.style.transition = 'none';
       node.style.transformOrigin = 'top left';
       node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-      // Форсируем reflow, чтобы браузер зафиксировал стартовое положение до снятия перехода.
       void node.getBoundingClientRect();
 
       requestAnimationFrame(() => {
-        node.style.transition = `transform var(--dur-menu) var(--ease-screen)`;
+        node.style.transition = 'transform var(--dur-menu) var(--ease-screen)';
         node.style.transform = '';
         const clear = (): void => {
           node.style.transition = '';
+          node.style.transformOrigin = '';
           node.removeEventListener('transitionend', clear);
         };
         node.addEventListener('transitionend', clear);
       });
     }
-
-    rectsRef.current = nextRects;
-  }, [layout, shown.length]);
+  }, [shownSignature]);
 
   return (
     <div
