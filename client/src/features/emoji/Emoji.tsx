@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { useEmojiIndex } from './emojiIndex';
+import { EMOJI_SHEET_URL, useEmojiIndex } from './emojiIndex';
 import styles from './Emoji.module.css';
 
 interface EmojiProps {
@@ -12,6 +12,17 @@ interface EmojiProps {
 export const Emoji = memo(function Emoji({ emoji, size = 20, className }: EmojiProps) {
   const index = useEmojiIndex();
   const entry = index?.byChar.get(emoji);
+
+  if (index === undefined) {
+    return (
+      <span
+        className={`${styles.pending} ${className ?? ''}`}
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={emoji}
+      />
+    );
+  }
 
   if (!index || !entry) {
     return (
@@ -37,7 +48,7 @@ export const Emoji = memo(function Emoji({ emoji, size = 20, className }: EmojiP
       style={{
         width: size,
         height: size,
-        backgroundImage: 'url(/emoji/sheet.webp)',
+        backgroundImage: `url(${EMOJI_SHEET_URL})`,
         backgroundSize: `${sheetWidth}px ${sheetHeight}px`,
         backgroundPosition: `-${entry.x * size}px -${entry.y * size}px`,
       }}

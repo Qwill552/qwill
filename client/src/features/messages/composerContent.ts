@@ -1,6 +1,6 @@
 import { matchEmojis } from '@messenger/shared';
 
-import type { EmojiIndex } from '../emoji/emojiIndex';
+import { EMOJI_SHEET_URL, type EmojiIndex } from '../emoji/emojiIndex';
 
 export type ComposerToken = { kind: 'text'; text: string } | { kind: 'emoji'; emoji: string };
 
@@ -251,7 +251,7 @@ export function createComposerEmojiElement(
   }
 
   node.setAttribute('aria-label', entry.k[0] ?? emoji);
-  node.style.backgroundImage = 'url(/emoji/sheet.webp)';
+  node.style.backgroundImage = `url(${EMOJI_SHEET_URL})`;
   node.style.backgroundRepeat = 'no-repeat';
   node.style.backgroundSize = `${index.cols * size}px ${index.rows * size}px`;
   node.style.backgroundPosition = `-${entry.x * size}px -${entry.y * size}px`;

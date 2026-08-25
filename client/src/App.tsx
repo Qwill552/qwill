@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from './app/AppRouter';
 import { DesktopTitleBar } from './app/DesktopTitleBar';
 import { registerServiceWorker } from './app/serviceWorker';
+import { warmEmojiAssets } from './features/emoji/emojiIndex';
 import { isDesktopShell } from './native/desktop';
 import { useAuthStore } from './stores/authStore';
 
@@ -18,6 +19,7 @@ export function App() {
   useEffect(() => {
     void bootstrap();
     void registerServiceWorker();
+    warmEmojiAssets();
   }, [bootstrap]);
 
   if (status === 'idle' || status === 'loading') {

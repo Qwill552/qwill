@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+
+export const EMOJI_SHEET_URL = '/emoji/sheet.webp';
 
 export interface EmojiEntry {
   e: string;
@@ -26,6 +28,8 @@ interface RawEmojiIndex {
 }
 
 let indexPromise: Promise<EmojiIndex | null> | null = null;
+let loadedIndex: EmojiIndex | null | undefined;
+const subscribers = new Set<() => void>();
 
 export function loadEmojiIndex(): Promise<EmojiIndex | null> {
   if (!indexPromise) {
@@ -36,23 +40,35 @@ export function loadEmojiIndex(): Promise<EmojiIndex | null> {
         const byChar = new Map(raw.emoji.map((entry) => [entry.e, entry]));
         return { ...raw, byChar };
       })
-      .catch(() => null);
+      .catch(() => null)
+      .then((index) => {
+        loadedIndex = index;
+        for (const notify of subscribers) notify();
+        return index;
+      });
   }
   return indexPromise;
 }
 
+export function warmEmojiAssets(): void {
+  void loadEmojiIndex();
+  if (typeof Image === 'undefined') return;
+  const sheet = new Image();
+  sheet.src = EMOJI_SHEET_URL;
+}
+
+function subscribeToEmojiIndex(notify: () => void): () => void {
+  void loadEmojiIndex();
+  subscribers.add(notify);
+  return () => {
+    subscribers.delete(notify);
+  };
+}
+
+function readEmojiIndex(): EmojiIndex | null | undefined {
+  return loadedIndex;
+}
+
 export function useEmojiIndex(): EmojiIndex | null | undefined {
-  const [index, setIndex] = useState<EmojiIndex | null | undefined>(undefined);
-
-  useEffect(() => {
-    let alive = true;
-    loadEmojiIndex().then((loaded) => {
-      if (alive) setIndex(loaded);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  return index;
+  return useSyncExternalStore(subscribeToEmojiIndex, readEmojiIndex, readEmojiIndex);
 }
