@@ -1,8 +1,10 @@
-import type { ChatListItemDto, MessageDto } from '@messenger/shared';
+import { MESSAGES_PAGE_SIZE, type ChatListItemDto, type MessageDto } from '@messenger/shared';
 
 import { openCacheDb } from './db';
 
-export const CACHED_HISTORY_LIMIT = 200;
+const CACHED_HISTORY_TARGET = 200;
+
+export const CACHED_HISTORY_LIMIT = Math.max(CACHED_HISTORY_TARGET, MESSAGES_PAGE_SIZE);
 
 export async function readCachedChats(): Promise<ChatListItemDto[]> {
   const db = await openCacheDb();

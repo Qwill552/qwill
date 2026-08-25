@@ -23,12 +23,10 @@ export function mergeSyncedMessages(
   const known = new Set(confirmed.map((message) => message.id));
   const appended = [...latestById.values()].filter((message) => !known.has(message.id) && !message.deletedAt);
 
-  return [...pending, ...confirmed, ...appended].sort((a, b) => {
-    if (a.id < 0 && b.id < 0) return 0;
-    if (a.id < 0) return -1;
-    if (b.id < 0) return 1;
-    return a.id - b.id;
-  });
+  const settled = [...confirmed, ...appended].sort((a, b) => a.id - b.id);
+  const queued = [...pending].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  return [...settled, ...queued];
 }
 
 async function readCursor(chatId: string): Promise<{ maxId: number; maxUpdatedAt: string | null }> {

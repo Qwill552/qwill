@@ -44,10 +44,19 @@ describe('mergeSyncedMessages', () => {
     expect(merged.map((m) => m.id)).toEqual([2]);
   });
 
-  it('не трогает оптимистичные сообщения', () => {
+  it('держит оптимистичные сообщения в хвосте ленты', () => {
     const merged = mergeSyncedMessages([message(-1, 'отправляется')], [message(4, 'пришло')], []);
 
-    expect(merged.map((m) => m.id)).toEqual([-1, 4]);
+    expect(merged.map((m) => m.id)).toEqual([4, -1]);
+  });
+
+  it('не переставляет оптимистичные сообщения между собой', () => {
+    const older = { ...message(-2, 'первое'), createdAt: '2026-08-25T10:00:00.000Z' };
+    const newer = { ...message(-1, 'второе'), createdAt: '2026-08-25T10:00:01.000Z' };
+
+    const merged = mergeSyncedMessages([older, newer], [message(4, 'пришло')], []);
+
+    expect(merged.map((m) => m.content)).toEqual(['пришло', 'первое', 'второе']);
   });
 
   it('обновляет уже известное сообщение, даже если оно пришло в created', () => {

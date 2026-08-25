@@ -120,6 +120,7 @@ export function MessageList({
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
+  const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
@@ -141,6 +142,7 @@ export function MessageList({
   const listRef = useRef<HTMLDivElement>(null);
   const stuckToBottom = useRef(true);
   const prevLength = useRef(0);
+  const settledChatId = useRef<string | null>(null);
   /** Высота содержимого до догрузки истории — по ней восстанавливается позиция. */
   const prependAnchor = useRef<number | null>(null);
   const [showJump, setShowJump] = useState(false);
@@ -180,10 +182,20 @@ export function MessageList({
     el.scrollTo({ top, behavior: 'smooth' });
   }
 
+  useLayoutEffect(() => {
+    if (settledChatId.current === chatId || messages.length === 0) return;
+    settledChatId.current = chatId;
+    prevLength.current = messages.length;
+    stuckToBottom.current = true;
+    scrollToBottom(false);
+  }, [chatId, messages.length]);
+
   useEffect(() => {
-    const grew = messages.length > prevLength.current;
-    const first = prevLength.current === 0;
-    if (grew && (first || stuckToBottom.current)) scrollToBottom(!first);
+    if (settledChatId.current !== chatId) {
+      prevLength.current = messages.length;
+      return;
+    }
+    if (messages.length > prevLength.current && stuckToBottom.current) scrollToBottom(true);
     prevLength.current = messages.length;
   }, [chatId, messages.length]);
 
@@ -400,8 +412,12 @@ export function MessageList({
           </button>
         )}
 
-        {displayEntries.length === 0 && !hasMore && (
+        {displayEntries.length === 0 && !hasMore && historyState === 'ready' && (
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
+        )}
+
+        {displayEntries.length === 0 && historyState === 'offline' && (
+          <p className={styles.empty}>Нет связи. История не загружена.</p>
         )}
 
         {displayEntries.map((entry) => (

@@ -113,6 +113,8 @@ function asSender(user: PublicUser): ChatMemberSummary {
   };
 }
 
+export type ChatHistoryState = 'loading' | 'ready' | 'offline';
+
 interface PresenceInfo {
   online: boolean;
   lastSeenAt: string;
@@ -127,6 +129,7 @@ interface ChatState {
   chats: ChatListItemDto[];
   messagesByChat: Record<string, LocalMessage[]>;
   hasMoreByChat: Record<string, boolean>;
+  historyByChat: Record<string, ChatHistoryState>;
   /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
   readCursorsByChat: Record<string, Record<string, number | null>>;
   /** Кто печатает в чате прямо сейчас, кроме меня самого. */
@@ -152,6 +155,7 @@ interface ChatState {
 
   loadChats: () => Promise<void>;
   openChat: (chatId: string) => Promise<void>;
+  primeChatFromCache: (chatId: string) => Promise<void>;
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
   syncChatMessages: (chatId: string) => Promise<void>;
@@ -343,6 +347,21 @@ function outboxAttachmentToLocalAttachment(attachment: OutboxAttachment): LocalA
   };
 }
 
+const cachedHistoryReads = new Map<string, Promise<LocalMessage[]>>();
+
+function readCachedHistory(chatId: string): Promise<LocalMessage[]> {
+  const pending = cachedHistoryReads.get(chatId);
+  if (pending) return pending;
+
+  const task = readCachedMessages(chatId)
+    .then((messages) => messages as LocalMessage[])
+    .catch(() => [] as LocalMessage[]);
+
+  cachedHistoryReads.set(chatId, task);
+  void task.then(() => cachedHistoryReads.delete(chatId));
+  return task;
+}
+
 let pendingEmptyChatDrop: { chatId: string; timer: ReturnType<typeof setTimeout> } | null = null;
 
 function cancelPendingEmptyChatDrop(chatId: string): void {
@@ -414,6 +433,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
   hasMoreByChat: {},
+  historyByChat: {},
   readCursorsByChat: {},
   typingByChat: {},
   presenceByUser: {},
@@ -463,42 +483,62 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   async openChat(chatId) {
     cancelPendingEmptyChatDrop(chatId);
-    set({ chatError: null, activeChatId: chatId });
+    set((state) => ({
+      chatError: null,
+      activeChatId: chatId,
+      historyByChat: {
+        ...state.historyByChat,
+        [chatId]: state.messagesByChat[chatId] ? 'ready' : (state.historyByChat[chatId] ?? 'loading'),
+      },
+    }));
 
-    try {
-      const chat = await getChatRequest(chatId);
-      get().applyChatDetail(chat);
-    } catch (error) {
-      if (!(error instanceof NetworkError)) {
-        set({ chatError: 'Чат не найден или недоступен' });
-        return;
-      }
+    if (!get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
+
+    const [detail, page] = await Promise.allSettled([getChatRequest(chatId), getMessagesRequest(chatId)]);
+
+    if (detail.status === 'fulfilled') {
+      get().applyChatDetail(detail.value);
+    } else if (!(detail.reason instanceof NetworkError)) {
+      set({ chatError: 'Чат не найден или недоступен' });
+      return;
     }
 
-    if (!get().messagesByChat[chatId]) {
-      const cached = await readCachedMessages(chatId);
-      if (cached.length > 0 && !get().messagesByChat[chatId]) {
-        set((state) => ({ messagesByChat: { ...state.messagesByChat, [chatId]: cached } }));
-        void get().restoreOutboxMessages();
+    if (page.status === 'fulfilled') {
+      set((state) => ({
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: mergeSyncedMessages(state.messagesByChat[chatId] ?? [], page.value.messages, []) as LocalMessage[],
+        },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.value.hasMore },
+        historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
+      }));
+      void writeCachedMessages(page.value.messages);
+      void get().restoreOutboxMessages();
+    } else if (page.reason instanceof NetworkError) {
+      if ((get().messagesByChat[chatId] ?? []).length === 0) {
+        set((state) => ({ historyByChat: { ...state.historyByChat, [chatId]: 'offline' } }));
       }
-
-      try {
-        const page = await getMessagesRequest(chatId);
-        set((state) => ({
-          messagesByChat: { ...state.messagesByChat, [chatId]: page.messages },
-          hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-        }));
-        void writeCachedMessages(page.messages);
-        void get().restoreOutboxMessages();
-      } catch (error) {
-        if (!(error instanceof NetworkError)) throw error;
-        return;
-      }
+      return;
+    } else {
+      throw page.reason;
     }
 
     const messages = get().messagesByChat[chatId] ?? [];
     const lastReal = [...messages].reverse().find((m) => m.id > 0);
     if (lastReal) get().markRead(chatId, lastReal.id);
+  },
+
+  async primeChatFromCache(chatId) {
+    if (get().messagesByChat[chatId]) return;
+
+    const cached = await readCachedHistory(chatId);
+    if (cached.length === 0 || get().messagesByChat[chatId]) return;
+
+    set((state) => ({
+      messagesByChat: { ...state.messagesByChat, [chatId]: cached },
+      historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
+    }));
+    void get().restoreOutboxMessages();
   },
 
   closeChat() {
@@ -1330,6 +1370,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: [],
       messagesByChat: {},
       hasMoreByChat: {},
+      historyByChat: {},
       readCursorsByChat: {},
       typingByChat: {},
       presenceByUser: {},
@@ -1492,6 +1533,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete messagesByChat[chatId];
       const hasMoreByChat = { ...state.hasMoreByChat };
       delete hasMoreByChat[chatId];
+      const historyByChat = { ...state.historyByChat };
+      delete historyByChat[chatId];
       const pinnedByChat = { ...state.pinnedByChat };
       delete pinnedByChat[chatId];
       const membersByChat = { ...state.membersByChat };
@@ -1501,6 +1544,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chats: state.chats.filter((c) => c.id !== chatId),
         messagesByChat,
         hasMoreByChat,
+        historyByChat,
         pinnedByChat,
         membersByChat,
         kickedChatId: state.activeChatId === chatId ? chatId : state.kickedChatId,

@@ -88,6 +88,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
   const navigate = useNavigate();
   const layout = useLayoutMode();
   const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const primeChatFromCache = useChatStore((s) => s.primeChatFromCache);
   const rowRef = useRef<HTMLAnchorElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -160,6 +161,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
         style={{ animationDelay: `${index * 0.045}s` }}
         onPointerDown={(event) => {
           suppressNavigationRef.current = false;
+          void primeChatFromCache(chat.id);
           longPress.onPointerDown(event);
         }}
         onPointerMove={longPress.onPointerMove}
