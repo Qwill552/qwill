@@ -336,6 +336,14 @@ function outboxAttachmentToLocalAttachment(attachment: OutboxAttachment): LocalA
   };
 }
 
+let pendingEmptyChatDrop: { chatId: string; timer: ReturnType<typeof setTimeout> } | null = null;
+
+function cancelPendingEmptyChatDrop(chatId: string): void {
+  if (pendingEmptyChatDrop?.chatId !== chatId) return;
+  clearTimeout(pendingEmptyChatDrop.timer);
+  pendingEmptyChatDrop = null;
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
@@ -388,6 +396,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async openChat(chatId) {
+    cancelPendingEmptyChatDrop(chatId);
     set({ chatError: null, activeChatId: chatId });
 
     try {
@@ -431,12 +440,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ activeChatId: null, selectionMode: false, selectedIds: new Set() });
     if (!chatId) return;
 
-    const chat = get().chats.find((c) => c.id === chatId);
-    if (!chat || chat.type !== 'PRIVATE' || chat.lastMessage) return;
-    if ((get().messagesByChat[chatId] ?? []).length > 0) return;
+    cancelPendingEmptyChatDrop(chatId);
+    const timer = setTimeout(() => {
+      pendingEmptyChatDrop = null;
+      if (get().activeChatId === chatId) return;
 
-    set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
-    dropEmptyChatRequest(chatId);
+      const chat = get().chats.find((c) => c.id === chatId);
+      if (!chat || chat.type !== 'PRIVATE' || chat.lastMessage) return;
+      if ((get().messagesByChat[chatId] ?? []).length > 0) return;
+
+      set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
+      dropEmptyChatRequest(chatId);
+    }, 0);
+    pendingEmptyChatDrop = { chatId, timer };
   },
 
   async loadMore(chatId) {

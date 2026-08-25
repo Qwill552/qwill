@@ -59,8 +59,6 @@ chatsRouter.post('/private', validateBody(createPrivateChatSchema), (req, res, n
       await Promise.all([subscribeUserToChat(userId, chatId), subscribeUserToChat(targetUserId, chatId)]);
 
       if (isNew) {
-        const dtoForTarget = await chatService.getChatDetail(chatId, targetUserId);
-        emitToUser(targetUserId, SocketEvent.ChatCreated, dtoForTarget);
         // Иначе онлайн-статус собеседника узнаётся только после переподключения (секция 3).
         await syncPresenceBetween(userId, targetUserId);
       }
