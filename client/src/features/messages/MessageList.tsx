@@ -354,16 +354,19 @@ export function MessageList({
   const [leavingRows, setLeavingRows] = useState<Map<RowKey, LeavingRow>>(() => new Map());
   const prevRenderRowsRef = useRef<RenderRow[]>(renderRows);
   const prevRowsChatIdRef = useRef<string>(chatId);
+  const prevReconciledRef = useRef<boolean>(reconciled);
   const previousRows = prevRenderRowsRef.current;
   const sameChat = prevRowsChatIdRef.current === chatId;
+  const wasReconciled = prevReconciledRef.current;
   prevRenderRowsRef.current = renderRows;
   prevRowsChatIdRef.current = chatId;
+  prevReconciledRef.current = reconciled;
 
   if (!sameChat) {
     if (leavingRows.size > 0) setLeavingRows(new Map());
   } else if (previousRows !== renderRows || leavingRows.size > 0) {
     const liveKeys = new Set(renderRows.map((entry) => entry.key));
-    const gone = reconciled
+    const gone = wasReconciled
       ? previousRows.filter((entry) => !liveKeys.has(entry.key) && !leavingRows.has(entry.key))
       : [];
     const revived = [...leavingRows.keys()].filter((key) => liveKeys.has(key));
