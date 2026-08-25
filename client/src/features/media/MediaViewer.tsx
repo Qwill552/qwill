@@ -7,6 +7,7 @@ import { useBackHandler } from '../../app/useBackHandler';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { Menu, type MenuItem } from '../../ui/Menu';
+import { DeleteMessageModal } from '../messages/DeleteMessageModal';
 import { ForwardSheet } from '../messages/ForwardSheet';
 import { fitRect, findMediaRect, flipTransform, type MediaRect } from './mediaAnchor';
 import { isVideoAttachment } from './mediaKind';
@@ -128,6 +129,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
   const [settled, setSettled] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [forwarding, setForwarding] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
 
   const current = items[index];
@@ -409,6 +411,12 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   function handleDelete(): void {
     if (!current) return;
+    setDeleteConfirm(true);
+  }
+
+  function handleConfirmDelete(): void {
+    setDeleteConfirm(false);
+    if (!current) return;
     const { messageId } = current;
     dropMessage(messageId);
     deleteMessage(chatId, messageId).catch(() => undefined);
@@ -511,6 +519,10 @@ function ViewerStage({ chatId }: { chatId: string }) {
           onClose={() => setForwarding(false)}
           onForwarded={() => setForwarding(false)}
         />
+      )}
+
+      {deleteConfirm && (
+        <DeleteMessageModal count={1} onCancel={() => setDeleteConfirm(false)} onConfirm={handleConfirmDelete} />
       )}
     </div>,
     document.body,

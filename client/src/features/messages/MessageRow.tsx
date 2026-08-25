@@ -15,6 +15,7 @@ import { Icon } from '../../ui/Icon';
 import { Emoji } from '../emoji/Emoji';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { openMediaViewer } from '../media/mediaViewerStore';
+import { DeleteMessageModal } from './DeleteMessageModal';
 import { MessageContextMenu, type MenuOrigin, type MessageMenuItem } from './MessageContextMenu';
 import styles from './MessageRow.module.css';
 
@@ -131,8 +132,12 @@ export function MessageRow({
   onForwardRequest,
   children,
 }: MessageRowProps) {
+  const isAlbum = groupIds.length > 1;
+
   const selectionMode = useChatStore((s) => s.selectionMode);
-  const selected = useChatStore((s) => s.selectedIds.has(message.id));
+  const selected = useChatStore((s) =>
+    isAlbum ? groupIds.every((id) => s.selectedIds.has(id)) : s.selectedIds.has(message.id),
+  );
   const enterSelection = useChatStore((s) => s.enterSelection);
   const toggleSelected = useChatStore((s) => s.toggleSelected);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
@@ -159,12 +164,12 @@ export function MessageRow({
   const [reactionFly, setReactionFly] = useState<{ x: number; y: number; emoji: string; key: number } | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const hasMediaBubble =
     /^(image|video)\//.test(message.attachment?.file.mimeType ?? '') ||
     message.localAttachment?.kind === 'image' ||
     message.localAttachment?.kind === 'video';
-  const isAlbum = groupIds.length > 1;
 
   const canAct = message.id > 0 && !message.deletedAt;
 
@@ -180,9 +185,14 @@ export function MessageRow({
     return deleteMessage(chatId, message.id);
   }
 
+  function handleConfirmDelete(): void {
+    setConfirmDelete(false);
+    deleteGroup().catch(() => {});
+  }
+
   function toggleGroupSelected(): void {
     const { selectedIds } = useChatStore.getState();
-    const target = !selectedIds.has(message.id);
+    const target = !groupIds.every((id) => selectedIds.has(id));
     for (const id of groupIds) {
       if (selectedIds.has(id) !== target) toggleSelected(id);
     }
@@ -341,11 +351,7 @@ export function MessageRow({
       icon: 'trash',
       label: 'Удалить',
       danger: true,
-      onSelect: () => {
-        deleteGroup().catch(() => {
-          // Удаление своего сообщения почти никогда не падает — тихо не ломаем интерфейс.
-        });
-      },
+      onSelect: () => setConfirmDelete(true),
     };
 
     if (message.type === 'CALL' || message.announcement) {
@@ -400,9 +406,6 @@ export function MessageRow({
     onEdit,
     onForwardRequest,
     pinMessage,
-    deleteMessage,
-    deleteMessagesBatch,
-    enterSelection,
     selectGroup,
   ]);
 
@@ -488,6 +491,10 @@ export function MessageRow({
           emoji={reactionFly.emoji}
           onDone={() => setReactionFly(null)}
         />
+      )}
+
+      {confirmDelete && (
+        <DeleteMessageModal count={groupIds.length} onCancel={() => setConfirmDelete(false)} onConfirm={handleConfirmDelete} />
       )}
     </div>
   );

@@ -17,6 +17,7 @@ import { Menu, type MenuItem } from '../ui/Menu';
 import { GroupCallBanner } from '../features/calls/GroupCallBanner';
 import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
+import { DeleteMessageModal } from '../features/messages/DeleteMessageModal';
 import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
 import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
@@ -80,6 +81,7 @@ export function ChatScreen() {
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState<DOMRect | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectionDeleteConfirm, setSelectionDeleteConfirm] = useState(false);
   /** Сообщения, для которых открыт шит выбора чата-получателя — из контекстного меню
    *  одной строки или из панели мультивыбора (ux-ui/06-message-interaction.md). */
   const [forwardRequest, setForwardRequest] = useState<number[] | null>(null);
@@ -241,10 +243,14 @@ export function ChatScreen() {
   }
 
   function handleSelectionDelete(): void {
+    if (selectedIds.size === 0) return;
+    setSelectionDeleteConfirm(true);
+  }
+
+  function handleConfirmSelectionDelete(): void {
+    setSelectionDeleteConfirm(false);
     if (!chatId || selectedIds.size === 0) return;
-    deleteMessagesBatch(chatId, [...selectedIds]).catch(() => {
-      // Групповое удаление почти никогда не падает (свои сообщения/права уже проверены на входе в режим) — тихо не ломаем интерфейс.
-    });
+    deleteMessagesBatch(chatId, [...selectedIds]).catch(() => {});
   }
 
   function handleSelectionReply(): void {
@@ -426,6 +432,14 @@ export function ChatScreen() {
       )}
 
       {deleteModalOpen && activeChat && <DeleteChatModal chat={activeChat} onClose={() => setDeleteModalOpen(false)} />}
+
+      {selectionDeleteConfirm && (
+        <DeleteMessageModal
+          count={selectedIds.size}
+          onCancel={() => setSelectionDeleteConfirm(false)}
+          onConfirm={handleConfirmSelectionDelete}
+        />
+      )}
 
       <div className={styles.composerFade} />
 
