@@ -142,15 +142,16 @@ export function MessageRow({
   const toggleSelected = useChatStore((s) => s.toggleSelected);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
+  const cancelMessage = useChatStore((s) => s.cancelMessage);
   const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
   const pinMessage = useChatStore((s) => s.pinMessage);
   const doubleTapReaction = useReactionPrefsStore((s) => s.doubleTapReaction);
 
   const bubbleRef = useRef<HTMLDivElement>(null);
   const suppressTapRef = useRef(false);
-  /** Касание началось на кнопке внутри пузыря («Обновить» в объявлении, «Повторить» у
-   *  неотправленного): строка не разбирает такое касание вовсе, иначе одно нажатие и
-   *  нажимало бы кнопку, и открывало контекстное меню поверх открытого ею экрана. */
+  /** Касание началось на кнопке внутри пузыря («Обновить» в объявлении): строка не
+   *  разбирает такое касание вовсе, иначе одно нажатие и нажимало бы кнопку, и
+   *  открывало контекстное меню поверх открытого ею экрана. */
   const skipGesturesRef = useRef(false);
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
@@ -172,6 +173,16 @@ export function MessageRow({
     message.localAttachment?.kind === 'video';
 
   const canAct = message.id > 0 && !message.deletedAt;
+  const canCancelSend = message.id <= 0 && Boolean(message.clientId) && !message.deletedAt;
+  const menuAvailable = canAct || canCancelSend;
+
+  function cancelPendingGroup(): void {
+    const list = useChatStore.getState().messagesByChat[chatId] ?? [];
+    for (const id of groupIds) {
+      const target = list.find((m) => m.id === id);
+      if (target?.clientId && target.id <= 0) void cancelMessage(chatId, target.clientId);
+    }
+  }
 
   function selectGroup(): void {
     enterSelection(message.id);
@@ -219,7 +230,7 @@ export function MessageRow({
         return;
       }
       if (pointerType === 'mouse') return;
-      if (!canAct) return;
+      if (!menuAvailable) return;
       openMenu(null);
     },
     onDoubleTap: (point) => {
@@ -323,7 +334,7 @@ export function MessageRow({
     if (event.button !== 2 || !bubble) return;
     if (!bubble.contains(event.target as Node)) return;
     event.preventDefault();
-    if (selectionMode || !canAct) return;
+    if (selectionMode || !menuAvailable) return;
     tap.cancel();
     longPress.onPointerCancel();
     openMenu({ x: event.clientX, y: event.clientY });
@@ -350,6 +361,26 @@ export function MessageRow({
   }
 
   const items = useMemo<MessageMenuItem[]>(() => {
+    if (canCancelSend) {
+      const pending: MessageMenuItem[] = [];
+      if (message.content) {
+        pending.push({
+          id: 'copy',
+          icon: 'copy',
+          label: 'Копировать',
+          onSelect: () => void copyToClipboard(message.content!),
+        });
+      }
+      pending.push({
+        id: 'cancel-send',
+        icon: 'close',
+        label: 'Отменить отправку',
+        danger: true,
+        onSelect: cancelPendingGroup,
+      });
+      return pending;
+    }
+
     const list: MessageMenuItem[] = canReply
       ? [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }]
       : [];
@@ -405,6 +436,8 @@ export function MessageRow({
     groupIds,
     isAlbum,
     chatId,
+    canCancelSend,
+    cancelPendingGroup,
     canPin,
     canEdit,
     canDelete,
@@ -474,7 +507,7 @@ export function MessageRow({
             setEmojiAnchor(menu.rect);
             setEmojiPanelOpen(true);
           }}
-          reactable={canReact}
+          reactable={canReact && canAct}
           items={items}
           onClose={() => setMenu((current) => (current?.seq === menu.seq ? null : current))}
         />

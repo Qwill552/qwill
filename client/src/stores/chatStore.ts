@@ -26,7 +26,7 @@ import type {
   UserPresenceEvent,
   UserTypingEvent,
 } from '@messenger/shared';
-import { SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
+import { ErrorCode, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
 import { getLiveCallsRequest } from '../api/calls';
@@ -65,6 +65,7 @@ import {
   dequeueOutbox,
   enqueueOutbox,
   MAX_OUTBOX_ATTEMPTS,
+  nextRetryDelayMs,
   outboxAttachmentToFile,
   readOutbox,
   removeOutboxByChat,
@@ -188,8 +189,7 @@ interface ChatState {
     file: File,
     options?: { caption?: string; replyTo?: MessageDto; duration?: number; peaks?: number[]; albumId?: string },
   ) => Promise<void>;
-  /** Отмена во время загрузки — убирает оптимистичный пузырь целиком, а не переводит в failed. */
-  cancelAttachmentUpload: (chatId: string, clientId: string) => void;
+  cancelMessage: (chatId: string, clientId: string) => Promise<void>;
   /** Повтор после обрыва сети — тот же clientId, сервер дедуплицирует (секция 3). */
   retryMessage: (chatId: string, clientId: string) => void;
   /** Правка и удаление резолвятся/реджектятся по ack — компонент показывает ошибку сам (секция 6). */
@@ -368,6 +368,41 @@ function cancelPendingEmptyChatDrop(chatId: string): void {
   if (pendingEmptyChatDrop?.chatId !== chatId) return;
   clearTimeout(pendingEmptyChatDrop.timer);
   pendingEmptyChatDrop = null;
+}
+
+function dropPacketQueuedForReconnect(clientId: string): void {
+  const socket = getSocket();
+  if (!socket) return;
+
+  socket.sendBuffer = socket.sendBuffer.filter((packet) => {
+    const payload = Array.isArray(packet.data) ? (packet.data[1] as { clientId?: string } | undefined) : undefined;
+    return payload?.clientId !== clientId;
+  });
+}
+
+function isRetriableSendError(ack: MessageSendAck): boolean {
+  return ack.error?.code === ErrorCode.RATE_LIMITED;
+}
+
+const OUTBOX_RETRY_LIMIT = 12;
+
+let outboxRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let outboxRetryAttempt = 0;
+
+function clearOutboxRetry(): void {
+  if (outboxRetryTimer) clearTimeout(outboxRetryTimer);
+  outboxRetryTimer = null;
+  outboxRetryAttempt = 0;
+}
+
+function scheduleOutboxRetry(drain: () => void): void {
+  if (outboxRetryTimer || outboxRetryAttempt >= OUTBOX_RETRY_LIMIT) return;
+
+  outboxRetryAttempt += 1;
+  outboxRetryTimer = setTimeout(() => {
+    outboxRetryTimer = null;
+    drain();
+  }, nextRetryDelayMs(outboxRetryAttempt));
 }
 
 interface MessageRemovalResult {
@@ -727,18 +762,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       { chatId, clientId, content: content || undefined, attachment, replyToId: replyTo?.id },
       (ack: MessageSendAck) => {
         if (ack.ok && ack.message) {
+          clearOutboxRetry();
           void dequeueOutbox(clientId);
           get().applyIncomingMessage(ack.message);
           return;
         }
-        set((state) => ({
-          messagesByChat: {
-            ...state.messagesByChat,
-            [chatId]: (state.messagesByChat[chatId] ?? []).map((m) =>
-              m.clientId === clientId ? { ...m, status: 'failed' } : m,
-            ),
-          },
-        }));
+
+        if (isRetriableSendError(ack)) {
+          scheduleOutboxRetry(() => void get().drainOutbox());
+          return;
+        }
+
+        void dequeueOutbox(clientId);
+        get().setMessageFailed(chatId, clientId);
       },
     );
   },
@@ -943,19 +979,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  cancelAttachmentUpload(chatId, clientId) {
+  async cancelMessage(chatId, clientId) {
+    const message = get().messagesByChat[chatId]?.find((m) => m.clientId === clientId);
+    if (!message || message.id > 0) return;
+
     uploadAbortControllers.get(clientId)?.abort();
     uploadAbortControllers.delete(clientId);
     preparedImages.delete(clientId);
-    void dequeueOutbox(clientId);
+    dropPacketQueuedForReconnect(clientId);
+    if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);
 
     set((state) => {
       const list = state.messagesByChat[chatId];
       if (!list) return state;
-      const target = list.find((m) => m.clientId === clientId);
-      if (target?.localAttachment?.previewUrl) URL.revokeObjectURL(target.localAttachment.previewUrl);
-      return { messagesByChat: { ...state.messagesByChat, [chatId]: list.filter((m) => m.clientId !== clientId) } };
+
+      const nextList = list.filter((m) => m.clientId !== clientId);
+      const chat = state.chats.find((c) => c.id === chatId);
+      const chats =
+        chat?.lastMessage?.clientId === clientId
+          ? state.chats.map((c) => (c.id === chatId ? { ...c, lastMessage: nextList.at(-1) ?? null } : c))
+          : state.chats;
+
+      return { messagesByChat: { ...state.messagesByChat, [chatId]: nextList }, chats };
     });
+
+    await dequeueOutbox(clientId);
   },
 
   retryMessage(chatId, clientId) {
@@ -1007,11 +1055,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         continue;
       }
 
-      const attempts = await bumpAttempts(entry.clientId);
-      if (attempts > MAX_OUTBOX_ATTEMPTS) {
-        get().setMessageFailed(entry.chatId, entry.clientId);
-        continue;
-      }
+      await bumpAttempts(entry.clientId);
 
       socket.emit(
         SocketEvent.MessageSend,
@@ -1023,9 +1067,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
         (ack: MessageSendAck) => {
           if (ack.ok && ack.message) {
+            clearOutboxRetry();
             void dequeueOutbox(entry.clientId);
             get().applyIncomingMessage(ack.message);
+            return;
           }
+
+          if (isRetriableSendError(ack)) {
+            scheduleOutboxRetry(() => void get().drainOutbox());
+            return;
+          }
+
+          void dequeueOutbox(entry.clientId);
+          get().setMessageFailed(entry.chatId, entry.clientId);
         },
       );
     }
@@ -1344,6 +1398,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         void syncAllCachedChats().then(() => {
           if (activeChatId) void get().syncChatMessages(activeChatId);
         });
+        clearOutboxRetry();
         void get().drainOutbox();
       };
 
@@ -1359,6 +1414,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset() {
     for (const timer of typingTimers.values()) clearTimeout(timer);
     typingTimers.clear();
+    clearOutboxRetry();
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
     for (const list of Object.values(get().messagesByChat)) {

@@ -40,19 +40,6 @@
   outline: 1px solid var(--danger);
 }
 
-.retryText {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--danger);
-  cursor: pointer;
-  font-size: var(--font-caption);
-}
-
 /* Имя автора над первым сообщением серии в группе — своей вёрстки в референсе нет
    (там только приватный чат), цвет — хешем от userId. */
 .author {

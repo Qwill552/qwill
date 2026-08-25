@@ -48,7 +48,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
     !message.localAttachment &&
     !message.deletedAt;
   const retryMessage = useChatStore((s) => s.retryMessage);
-  const cancelAttachmentUpload = useChatStore((s) => s.cancelAttachmentUpload);
+  const cancelMessage = useChatStore((s) => s.cancelMessage);
   const emojiOnly = bare ? emojiOnlyContent(message.content ?? '') : null;
 
   if (emojiOnly) {
@@ -135,7 +135,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
                 <MediaGrid
                   tiles={albumTiles(album)}
                   chatId={message.chatId}
-                  onCancel={(clientId) => cancelAttachmentUpload(message.chatId, clientId)}
+                  onCancel={(clientId) => void cancelMessage(message.chatId, clientId)}
                   onRetry={(clientId) => retryMessage(message.chatId, clientId)}
                 />
               ) : message.attachment ? (
@@ -143,7 +143,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
               ) : message.localAttachment ? (
                 <LocalAttachmentPreview
                   local={message.localAttachment}
-                  onCancel={() => cancelAttachmentUpload(message.chatId, message.clientId!)}
+                  onCancel={() => void cancelMessage(message.chatId, message.clientId!)}
                   onRetry={() => retryMessage(message.chatId, message.clientId!)}
                 />
               ) : null}
@@ -186,17 +186,6 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
           )}
         </>
       )}
-      {status === 'failed' && !message.localAttachment && (
-        <button
-          type="button"
-          className={styles.retryText}
-          onClick={() => retryMessage(message.chatId, message.clientId!)}
-        >
-          <Icon name="retry" size={13} />
-          Повторить
-        </button>
-      )}
-
       {!bareMedia && children}
     </div>
   );
