@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { selectEvictionVictims, type EvictionCandidate } from './mediaCache';
+import { clearAllCache, openCacheDb } from './db';
+import { removeCachedMediaByFileIds, selectEvictionVictims, type EvictionCandidate } from './mediaCache';
 
 function candidate(fileId: string, size: number, lastUsedAt: number, tier: 'thumb' | 'full'): EvictionCandidate {
   return { fileId, size, lastUsedAt, tier };
@@ -29,5 +30,22 @@ describe('selectEvictionVictims', () => {
     );
 
     expect(victims).toEqual(['full-new']);
+  });
+});
+
+describe('removeCachedMediaByFileIds', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+  });
+
+  it('удаляет только перечисленные файлы', async () => {
+    const db = await openCacheDb();
+    await db?.put('media', { fileId: 'f1', tier: 'full', blob: new Blob(['a']), size: 1, lastUsedAt: 1 });
+    await db?.put('media', { fileId: 'f2', tier: 'full', blob: new Blob(['b']), size: 1, lastUsedAt: 2 });
+
+    await removeCachedMediaByFileIds(['f1']);
+
+    expect(await db?.get('media', 'f1')).toBeUndefined();
+    expect(await db?.get('media', 'f2')).toBeDefined();
   });
 });

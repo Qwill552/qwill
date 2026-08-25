@@ -52,6 +52,10 @@ export function setChatMutedRequest(chatId: string, muted: boolean): Promise<{ m
   return apiRequest<{ muted: boolean }>(`/api/chats/${chatId}/mute`, { method: 'PATCH', body: { muted } });
 }
 
+export function deleteChatRequest(chatId: string, forEveryone: boolean): Promise<void> {
+  return apiRequest<void>(`/api/chats/${chatId}?forEveryone=${forEveryone}`, { method: 'DELETE' });
+}
+
 export function getMembersRequest(chatId: string): Promise<{ members: GroupMemberDTO[] }> {
   return apiRequest<{ members: GroupMemberDTO[] }>(`/api/chats/${chatId}/members`);
 }

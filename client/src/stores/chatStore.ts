@@ -4,6 +4,7 @@ import type {
   CallInviteEvent,
   CallLiveEvent,
   CallParticipantChangedEvent,
+  ChatDeletedEvent,
   ChatDto,
   ChatListItemDto,
   ChatMemberSummary,
@@ -33,6 +34,7 @@ import {
   addMemberRequest,
   createGroupRequest,
   createPrivateChatRequest,
+  deleteChatRequest,
   getChatRequest,
   getMembersRequest,
   getMessagesRequest,
@@ -48,7 +50,8 @@ import { NetworkError } from '../api/client';
 import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
 import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment } from '../cache/db';
-import { readCachedChats, readCachedMessages, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
+import { removeCachedMediaByFileIds } from '../cache/mediaCache';
+import { readCachedChats, readCachedMessages, removeCachedChat, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
 import {
   bumpAttempts,
   dequeueOutbox,
@@ -56,6 +59,7 @@ import {
   MAX_OUTBOX_ATTEMPTS,
   outboxAttachmentToFile,
   readOutbox,
+  removeOutboxByChat,
 } from '../cache/outbox';
 import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
 import { traceCall } from '../calls/callTrace';
@@ -155,6 +159,8 @@ interface ChatState {
   /** Уведомления по чату — оптимистично: тумблер и вид пункта меню переключаются сразу,
    *  а при отказе сервера возвращаются обратно. */
   setChatMuted: (chatId: string, muted: boolean) => Promise<void>;
+  /** Оптимистично: чат пропадает из списка сразу, а при отказе сервера возвращается (R-11). */
+  deleteChat: (chatId: string, forEveryone: boolean) => Promise<void>;
   clearKicked: () => void;
   sendMessage: (
     chatId: string,
@@ -206,6 +212,9 @@ interface ChatState {
   applyChatPinned: (event: ChatPinnedEvent) => void;
   /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
   applyChatDetail: (chat: ChatDto) => void;
+  /** Внутренний метод: убирает чат целиком из стора и всех кэшей — свой deleteChat(forEveryone)
+   *  и chat:deleted от собеседника (R-11, repair/11-delete-chat.md). */
+  applyChatDeleted: (chatId: string) => void;
   /** Внутренний метод: применяет member:changed — из REST-ответа группового действия или socket-broadcast (этап 7). */
   applyMemberChanged: (event: MemberChangedEvent) => void;
   /** Внутренний метод: применяет chat:updated — смена названия/аватара группы (этап 7). */
@@ -511,6 +520,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({ chats: state.chats.map((c) => (c.id === chatId ? { ...c, muted: previous } : c)) }));
       throw error;
     }
+  },
+
+  async deleteChat(chatId, forEveryone) {
+    const previousChats = get().chats;
+    set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
+
+    try {
+      await deleteChatRequest(chatId, forEveryone);
+    } catch (error) {
+      set({ chats: previousChats });
+      throw error;
+    }
+
+    get().applyChatDeleted(chatId);
   },
 
   clearKicked() {
@@ -1087,6 +1110,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().applyChatDetail(chat);
     });
 
+    socket.off(SocketEvent.ChatDeleted).on(SocketEvent.ChatDeleted, (event: ChatDeletedEvent) => {
+      get().applyChatDeleted(event.chatId);
+    });
+
     socket.off(SocketEvent.MemberChanged).on(SocketEvent.MemberChanged, (event: MemberChangedEvent) => {
       get().applyMemberChanged(event);
     });
@@ -1252,6 +1279,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     void writeCachedMessages([message]);
 
     const state = get();
+    // Чат, удалённый «у себя», не в state.chats — новое сообщение возвращает его в список
+    // (R-11, repair/11-delete-chat.md): getChatDetail уже отфильтрует старую историю сам.
+    if (!state.chats.some((c) => c.id === message.chatId)) {
+      void getChatRequest(message.chatId)
+        .then((chat) => get().applyChatDetail(chat))
+        .catch(() => undefined);
+    }
+
     if (state.activeChatId === message.chatId && message.sender?.id !== state.myUserId && message.id > 0) {
       get().markRead(message.chatId, message.id);
     }
@@ -1326,6 +1361,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
       presenceByUser: seedPresence(state.presenceByUser, chat.members),
       pinnedByChat: { ...state.pinnedByChat, [chat.id]: chat.pinnedMessage },
     }));
+  },
+
+  applyChatDeleted(chatId: string) {
+    const fileIds = (get().messagesByChat[chatId] ?? []).flatMap((message) => {
+      if (!message.attachment) return [];
+      const ids = [message.attachment.file.id];
+      if (message.attachment.thumbnail) ids.push(message.attachment.thumbnail.id);
+      return ids;
+    });
+
+    set((state) => {
+      const messagesByChat = { ...state.messagesByChat };
+      delete messagesByChat[chatId];
+      const hasMoreByChat = { ...state.hasMoreByChat };
+      delete hasMoreByChat[chatId];
+      const pinnedByChat = { ...state.pinnedByChat };
+      delete pinnedByChat[chatId];
+      const membersByChat = { ...state.membersByChat };
+      delete membersByChat[chatId];
+
+      return {
+        chats: state.chats.filter((c) => c.id !== chatId),
+        messagesByChat,
+        hasMoreByChat,
+        pinnedByChat,
+        membersByChat,
+        // Открытый удалённый чат выкидывает на список тем же путём, что и уход/исключение из группы.
+        kickedChatId: state.activeChatId === chatId ? chatId : state.kickedChatId,
+      };
+    });
+
+    void removeCachedChat(chatId);
+    void removeOutboxByChat(chatId);
+    void removeCachedMediaByFileIds(fileIds);
   },
 
   // Не часть публичного интерфейса стора — вызывается и из REST-ответа группового действия

@@ -14,6 +14,7 @@ export const SocketEvent = {
   MessageReact: 'message:react',
   MessageReaction: 'message:reaction',
   ChatCreated: 'chat:created',
+  ChatDeleted: 'chat:deleted',
   ChatRead: 'chat:read',
   ChatPin: 'chat:pin',
   ChatPinned: 'chat:pinned',
@@ -74,6 +75,12 @@ export interface MessageDeletedBatchEvent {
 export interface ChatPinnedEvent {
   chatId: string;
   message: MessageDto | null;
+}
+
+/** Сервер → клиент: чат удалён у обеих сторон — приходит участникам до физического удаления
+ *  строки Chat (R-11, repair/11-delete-chat.md). */
+export interface ChatDeletedEvent {
+  chatId: string;
 }
 
 /** Клиент → сервер: «прочитано всё вплоть до этого сообщения» (секция 3). */

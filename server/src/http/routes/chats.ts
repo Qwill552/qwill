@@ -3,18 +3,26 @@ import {
   chatMuteSchema,
   createGroupSchema,
   createPrivateChatSchema,
+  deleteChatQuerySchema,
   messagesQuerySchema,
   messagesSyncQuerySchema,
   SocketEvent,
   updateGroupSchema,
   updateRoleSchema,
+  type ChatDeletedEvent,
 } from '@messenger/shared';
 import type { Request } from 'express';
 import { Router } from 'express';
 
 import { parseOrThrow } from '../../lib/validate.js';
 import { emitChatUpdated, emitMemberChanged } from '../../realtime/group-handlers.js';
-import { emitToUser, subscribeUserToChat, syncPresenceBetween, unsubscribeUserFromChat } from '../../realtime/index.js';
+import {
+  emitToChat,
+  emitToUser,
+  subscribeUserToChat,
+  syncPresenceBetween,
+  unsubscribeUserFromChat,
+} from '../../realtime/index.js';
 import * as chatService from '../../services/chat.js';
 import * as groupService from '../../services/group.js';
 import * as messageService from '../../services/message.js';
@@ -112,6 +120,30 @@ chatsRouter.get('/:id/sync', (req, res, next) => {
         sinceUpdatedAt: query.sinceUpdatedAt ? new Date(query.sinceUpdatedAt) : null,
       })
       .then((result) => res.json(result))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.delete('/:id', (req, res, next) => {
+  const chatId = paramId(req, 'id');
+  const userId = req.userId!;
+
+  try {
+    const { forEveryone } = parseOrThrow(deleteChatQuerySchema, req.query);
+
+    chatService
+      .deleteChat(chatId, userId, forEveryone)
+      .then(async (result) => {
+        if (result.forEveryone) {
+          // До удаления строки — иначе рассылать будет уже некому.
+          const event: ChatDeletedEvent = { chatId };
+          emitToChat(chatId, SocketEvent.ChatDeleted, event);
+          await Promise.all(result.memberIds.map((memberId) => unsubscribeUserFromChat(memberId, chatId)));
+        }
+        res.status(204).end();
+      })
       .catch(next);
   } catch (error) {
     next(error);

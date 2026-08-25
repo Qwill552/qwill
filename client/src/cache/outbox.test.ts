@@ -9,12 +9,13 @@ import {
   nextRetryDelayMs,
   outboxAttachmentToFile,
   readOutbox,
+  removeOutboxByChat,
 } from './outbox';
 
-function entry(clientId: string, createdAt: number): OutboxEntry {
+function entry(clientId: string, createdAt: number, chatId = 'c1'): OutboxEntry {
   return {
     clientId,
-    chatId: 'c1',
+    chatId,
     content: `текст ${clientId}`,
     replyToId: null,
     attachment: null,
@@ -61,6 +62,15 @@ describe('outbox', () => {
   it('наращивает паузу между повторами и упирается в потолок', () => {
     expect(nextRetryDelayMs(1)).toBeLessThan(nextRetryDelayMs(3));
     expect(nextRetryDelayMs(99)).toBe(nextRetryDelayMs(100));
+  });
+
+  it('removeOutboxByChat удаляет только записи своего чата', async () => {
+    await enqueueOutbox(entry('a', 100, 'c1'));
+    await enqueueOutbox(entry('b', 200, 'c2'));
+
+    await removeOutboxByChat('c1');
+
+    expect((await readOutbox()).map((item) => item.clientId)).toEqual(['b']);
   });
 
   it('восстанавливает File из записи очереди', () => {

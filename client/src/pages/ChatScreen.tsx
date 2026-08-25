@@ -9,6 +9,7 @@ import { ChatWallpaper } from '../features/chat/ChatWallpaper';
 import { OfficialMark } from '../features/chat/OfficialMark';
 import { ServiceChatBar } from '../features/chat/ServiceChatBar';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
+import { DeleteChatModal } from '../features/chats/DeleteChatModal';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
@@ -78,6 +79,7 @@ export function ChatScreen() {
   const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState<DOMRect | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   /** Сообщения, для которых открыт шит выбора чата-получателя — из контекстного меню
    *  одной строки или из панели мультивыбора (ux-ui/06-message-interaction.md). */
   const [forwardRequest, setForwardRequest] = useState<number[] | null>(null);
@@ -273,11 +275,28 @@ export function ChatScreen() {
   };
 
   // Десктопное меню «ещё» повторяет состав макета (ux-ui/14-desktop/03). «Изменить» и
-  // «Заблокировать»/«Удалить чат» — задел на будущее по прямому решению пользователя:
-  // блокировки и удаления чата в продукте пока нет ни на сервере, ни на клиенте.
+  // «Заблокировать» — задел на будущее: правки чата и блокировки в продукте пока нет
+  // (R-26/R-32). «Удалить чат» реализован по-настоящему — см. deleteItem ниже.
   const editItem: MenuItem = { id: 'edit', label: 'Изменить', icon: 'edit', onSelect: () => {} };
   const blockItem: MenuItem = { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} };
-  const deleteItem: MenuItem = { id: 'delete', label: 'Удалить чат', icon: 'trash', danger: true, onSelect: () => {} };
+  const deleteItem: MenuItem = {
+    id: 'delete',
+    label: 'Удалить чат',
+    icon: 'trash',
+    danger: true,
+    onSelect: () => setDeleteModalOpen(true),
+  };
+
+  // Групп это не касается вовсе — там «Покинуть группу», а не «Удалить чат» (R-11).
+  const headerMenuItems: MenuItem[] = isService
+    ? [muteItem, deleteItem]
+    : isGroup
+      ? isDesktop
+        ? [editItem, muteItem, blockItem]
+        : [profileItem, muteItem]
+      : isDesktop
+        ? [editItem, muteItem, blockItem, deleteItem]
+        : [profileItem, muteItem, deleteItem];
 
   if (!chatId) return null;
 
@@ -407,15 +426,10 @@ export function ChatScreen() {
       </ChromeBar>
 
       {headerMenuAnchor && (
-        <Menu
-          anchor={headerMenuAnchor}
-          onClose={() => setHeaderMenuAnchor(null)}
-          items={
-            isService ? [muteItem] : isDesktop ? [editItem, muteItem, blockItem, deleteItem] : [profileItem, muteItem]
-          }
-          desktopWidth={246}
-        />
+        <Menu anchor={headerMenuAnchor} onClose={() => setHeaderMenuAnchor(null)} items={headerMenuItems} desktopWidth={246} />
       )}
+
+      {deleteModalOpen && activeChat && <DeleteChatModal chat={activeChat} onClose={() => setDeleteModalOpen(false)} />}
 
       <div className={styles.composerFade} />
 

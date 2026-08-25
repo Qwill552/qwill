@@ -50,3 +50,16 @@ export async function removeCachedMessages(chatId: string, ids: number[]): Promi
   await Promise.all(ids.map((id) => tx.store.delete([chatId, id])));
   await tx.done;
 }
+
+export async function removeCachedChat(chatId: string): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  await db.delete('chats', chatId);
+  await db.delete('syncCursors', chatId);
+
+  const keys = await db.getAllKeysFromIndex('messages', 'byChat', chatId);
+  const tx = db.transaction('messages', 'readwrite');
+  await Promise.all(keys.map((key) => tx.store.delete(key)));
+  await tx.done;
+}

@@ -23,6 +23,17 @@ export async function dequeueOutbox(clientId: string): Promise<void> {
   await db.delete('outbox', clientId);
 }
 
+/** Чат удалён — иначе очередь вечно долбится в несуществующий чат (R-11, repair/11-delete-chat.md). */
+export async function removeOutboxByChat(chatId: string): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  const all = await db.getAll('outbox');
+  const tx = db.transaction('outbox', 'readwrite');
+  await Promise.all(all.filter((entry) => entry.chatId === chatId).map((entry) => tx.store.delete(entry.clientId)));
+  await tx.done;
+}
+
 export async function readOutbox(): Promise<OutboxEntry[]> {
   const db = await openCacheDb();
   if (!db) return [];

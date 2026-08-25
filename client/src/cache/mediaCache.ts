@@ -128,3 +128,15 @@ export function resolveMedia(fileId: string, tier: MediaTier): Promise<Blob | nu
   inflight.set(fileId, task);
   return task;
 }
+
+/** Чат удалён — его вложения выкидываются из кэша, а не ждут общего вытеснения по бюджету
+ *  (R-11, repair/11-delete-chat.md). */
+export async function removeCachedMediaByFileIds(fileIds: string[]): Promise<void> {
+  if (fileIds.length === 0) return;
+  const db = await openCacheDb();
+  if (!db) return;
+
+  const tx = db.transaction('media', 'readwrite');
+  await Promise.all(fileIds.map((fileId) => tx.store.delete(fileId)));
+  await tx.done;
+}

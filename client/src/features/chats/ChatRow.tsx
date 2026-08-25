@@ -16,6 +16,7 @@ import { haptic } from '../../ui/haptic';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Menu, type MenuItem } from '../../ui/Menu';
 import styles from './ChatRow.module.css';
+import { DeleteChatModal } from './DeleteChatModal';
 
 interface ChatRowProps {
   chat: ChatListItemDto;
@@ -90,6 +91,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
   const setChatMuted = useChatStore((s) => s.setChatMuted);
   const rowRef = useRef<HTMLAnchorElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   /** Долгое нажатие уже открыло меню — отпускание пальца не должно вдобавок увести в чат. */
   const suppressNavigationRef = useRef(false);
 
@@ -127,6 +129,14 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
       if (chat.type === 'GROUP') navigate(`/chats/${chat.id}`, { state: { openPanel: true } });
       else navigate(`/chats/${chat.id}/info`);
     },
+  };
+
+  const deleteItem: MenuItem = {
+    id: 'delete',
+    label: 'Удалить чат',
+    icon: 'trash',
+    danger: true,
+    onSelect: () => setDeleteModalOpen(true),
   };
 
   const last = chat.lastMessage;
@@ -218,9 +228,11 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
         <Menu
           anchor={menuAnchor}
           onClose={() => setMenuAnchor(null)}
-          items={isService ? [muteItem] : [profileItem, muteItem]}
+          items={isService ? [muteItem, deleteItem] : chat.type === 'GROUP' ? [profileItem, muteItem] : [profileItem, muteItem, deleteItem]}
         />
       )}
+
+      {deleteModalOpen && <DeleteChatModal chat={chat} onClose={() => setDeleteModalOpen(false)} />}
     </>
   );
 }

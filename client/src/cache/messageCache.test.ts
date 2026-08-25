@@ -1,8 +1,8 @@
-import type { MessageDto } from '@messenger/shared';
+import type { ChatListItemDto, MessageDto } from '@messenger/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { clearAllCache } from './db';
-import { readCachedMessages, removeCachedMessages, writeCachedMessages } from './messageCache';
+import { clearAllCache, openCacheDb } from './db';
+import { readCachedChats, readCachedMessages, removeCachedChat, removeCachedMessages, writeCachedChats, writeCachedMessages } from './messageCache';
 
 function message(id: number, chatId = 'c1'): MessageDto {
   return {
@@ -24,6 +24,20 @@ function message(id: number, chatId = 'c1'): MessageDto {
     deletedAt: null,
     createdAt: new Date(id * 1000).toISOString(),
   } as MessageDto;
+}
+
+function chat(id: string): ChatListItemDto {
+  return {
+    id,
+    type: 'PRIVATE',
+    title: `Чат ${id}`,
+    avatarUrl: null,
+    otherMember: null,
+    lastMessage: null,
+    updatedAt: new Date().toISOString(),
+    unreadCount: 0,
+    muted: false,
+  };
 }
 
 describe('messageCache', () => {
@@ -57,5 +71,19 @@ describe('messageCache', () => {
     await removeCachedMessages('c1', [1]);
 
     expect((await readCachedMessages('c1')).map((m) => m.id)).toEqual([2]);
+  });
+
+  it('removeCachedChat убирает чат, его сообщения и курсор синка, не трогая другие чаты', async () => {
+    await writeCachedChats([chat('c1'), chat('c2')]);
+    await writeCachedMessages([message(1, 'c1'), message(1, 'c2')]);
+    const db = await openCacheDb();
+    await db?.put('syncCursors', { chatId: 'c1', maxId: 1, maxUpdatedAt: null });
+
+    await removeCachedChat('c1');
+
+    expect((await readCachedChats()).map((c) => c.id)).toEqual(['c2']);
+    expect(await readCachedMessages('c1')).toEqual([]);
+    expect(await readCachedMessages('c2')).toHaveLength(1);
+    expect(await db?.get('syncCursors', 'c1')).toBeUndefined();
   });
 });

@@ -82,6 +82,10 @@ export function emitToUser(userId: string, event: string, payload: unknown): voi
   io?.to(userRoom(userId)).emit(event, payload);
 }
 
+export function emitToChat(chatId: string, event: string, payload: unknown): void {
+  io?.to(chatId).emit(event, payload);
+}
+
 export function emitToChatExcept(chatId: string, userId: string, event: string, payload: unknown): void {
   io?.to(chatId).except(userRoom(userId)).emit(event, payload);
 }

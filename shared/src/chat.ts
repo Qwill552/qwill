@@ -134,6 +134,11 @@ export const chatMuteSchema = z.object({
 });
 export type ChatMuteInput = z.infer<typeof chatMuteSchema>;
 
+export const deleteChatQuerySchema = z.object({
+  forEveryone: z.coerce.boolean().default(false),
+});
+export type DeleteChatQuery = z.infer<typeof deleteChatQuerySchema>;
+
 export type ChatType = 'PRIVATE' | 'GROUP';
 export type MessageType = 'TEXT' | 'MEDIA' | 'SYSTEM' | 'CALL' | 'ANNOUNCEMENT';
 export type GroupRole = 'OWNER' | 'ADMIN' | 'MEMBER';
