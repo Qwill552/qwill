@@ -228,7 +228,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
         <Menu
           anchor={menuAnchor}
           onClose={() => setMenuAnchor(null)}
-          items={isService ? [muteItem, deleteItem] : chat.type === 'GROUP' ? [profileItem, muteItem] : [profileItem, muteItem, deleteItem]}
+          items={isService ? [muteItem] : chat.type === 'GROUP' ? [profileItem, muteItem] : [profileItem, muteItem, deleteItem]}
         />
       )}
 

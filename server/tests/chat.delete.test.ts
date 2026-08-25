@@ -7,8 +7,6 @@ import { ensureServiceChat } from '../src/services/announcements.js';
 import { createGroupChat, deleteChat, getMessages, getOrCreatePrivateChat, listChats } from '../src/services/chat.js';
 import { sendMessage } from '../src/services/message.js';
 
-/** Unit-тесты chat.service.deleteChat — R-11 (repair/11-delete-chat.md). */
-
 const app = createApp();
 const request = supertest(app);
 
@@ -109,16 +107,14 @@ describe('chat.service.deleteChat (R-11)', () => {
     await expect(deleteChat(chatId, owner.userId, false)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
-  it('сервисный чат — forEveryone: true отказывает, forEveryone: false работает', async () => {
+  it('сервисный чат — deleteChat отказывает и с forEveryone: true, и с forEveryone: false', async () => {
     const user = await registerUser('service_user');
     const service = await ensureServiceChat(user.userId);
     if (!service) throw new Error('Сервисный чат не создан');
     createdChatIds.push(service.chatId);
 
     await expect(deleteChat(service.chatId, user.userId, true)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-
-    const result = await deleteChat(service.chatId, user.userId, false);
-    expect(result.forEveryone).toBe(false);
-    expect((await listChats(user.userId)).some((c) => c.id === service.chatId)).toBe(false);
+    await expect(deleteChat(service.chatId, user.userId, false)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect((await listChats(user.userId)).some((c) => c.id === service.chatId)).toBe(true);
   });
 });

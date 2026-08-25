@@ -442,8 +442,6 @@ const SYNC_PAGE_SIZE = 200;
 export async function syncMessages(input: SyncMessagesInput): Promise<MessagesSyncResponse> {
   await assertMember(input.chatId, input.userId);
 
-  // Удаление «у себя» отрезает историю по clearedUpToMessageId — догон после реконнекта не
-  // должен возвращать то, что уже отрезано (R-11, repair/11-delete-chat.md).
   const member = await prisma.chatMember.findUniqueOrThrow({
     where: { chatId_userId: { chatId: input.chatId, userId: input.userId } },
   });

@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { useChatStore } from '../../stores/chatStore';
 import { Switch } from '../../ui/Switch';
-import { isServiceChat } from '../chat/serviceChat';
 import { Modal } from '../groups/Modal';
 import styles from './DeleteChatModal.module.css';
 
@@ -14,7 +13,6 @@ interface DeleteChatModalProps {
   onClose: () => void;
 }
 
-/** Диалог удаления чата — у себя или сразу у обоих (R-11, repair/11-delete-chat.md). */
 export function DeleteChatModal({ chat, onClose }: DeleteChatModalProps) {
   const deleteChat = useChatStore((s) => s.deleteChat);
   const activeChatId = useChatStore((s) => s.activeChatId);
@@ -24,7 +22,7 @@ export function DeleteChatModal({ chat, onClose }: DeleteChatModalProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const showCheckbox = !isServiceChat(chat) && chat.type === 'PRIVATE' && chat.otherMember;
+  const showCheckbox = chat.type === 'PRIVATE' && chat.otherMember;
 
   async function handleDelete(): Promise<void> {
     setPending(true);

@@ -137,7 +137,6 @@ chatsRouter.delete('/:id', (req, res, next) => {
       .deleteChat(chatId, userId, forEveryone)
       .then(async (result) => {
         if (result.forEveryone) {
-          // До удаления строки — иначе рассылать будет уже некому.
           const event: ChatDeletedEvent = { chatId };
           emitToChat(chatId, SocketEvent.ChatDeleted, event);
           await Promise.all(result.memberIds.map((memberId) => unsubscribeUserFromChat(memberId, chatId)));

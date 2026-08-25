@@ -47,8 +47,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
   };
 }
 
-/** Сообщения чужих авторов с id больше курсора прочтения (секция 2: lastReadMessageId вместо is_read)
- *  и больше clearedUpToMessageId — отрезанная удалением «у себя» история не считается (R-11). */
+/** Сообщения чужих авторов с id больше курсора прочтения (секция 2: lastReadMessageId вместо is_read). */
 function countUnread(
   chatId: string,
   userId: string,
@@ -182,8 +181,6 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
     include: { chat: { include: chatWithListRelations } },
   });
 
-  // Чат, удалённый «у себя» (hiddenAt), остаётся скрытым, пока в нём нет сообщений новее
-  // clearedUpToMessageId — так он «возвращается» с новым сообщением, без отдельного снятия флага.
   const visible = memberships.filter((membership) => {
     if (!membership.hiddenAt) return true;
     const lastMessageId = membership.chat.messages[0]?.id ?? 0;
@@ -321,8 +318,6 @@ export async function getMessages(
 ): Promise<MessagesPage> {
   await assertMember(chatId, userId);
 
-  // Удаление «у себя» отрезает историю по clearedUpToMessageId — она не должна вернуться
-  // ни при первой загрузке, ни при догрузке более старых сообщений (R-11).
   const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
   const idFilter: { gt?: number; lt?: number } = {};
   if (member.clearedUpToMessageId) idFilter.gt = member.clearedUpToMessageId;
@@ -381,13 +376,9 @@ export async function updateGroup(chatId: string, userId: string, input: UpdateG
 
 export interface DeleteChatResult {
   forEveryone: boolean;
-  /** Заполнено только при forEveryone: остальные участники, которых нужно отписать от комнаты
-   *  чата и которым уже отправлено ChatDeleted (R-11, repair/11-delete-chat.md). */
   memberIds: string[];
 }
 
-/** Группы сюда не попадают — у них есть «Покинуть группу» (groupService.leaveGroup), а пустая
- *  группа не то же самое, что пустой приватный чат. */
 export async function deleteChat(chatId: string, userId: string, forEveryone: boolean): Promise<DeleteChatResult> {
   await assertMember(chatId, userId);
 
@@ -398,10 +389,9 @@ export async function deleteChat(chatId: string, userId: string, forEveryone: bo
 
   const members = await prisma.chatMember.findMany({ where: { chatId }, include: { user: true } });
   const isServiceChat = members.some((m) => m.user.isService);
+  if (isServiceChat) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Служебный чат нельзя удалить');
 
   if (forEveryone) {
-    if (isServiceChat) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Сервисный чат нельзя удалить у обоих');
-
     const memberIds = members.map((m) => m.userId);
     await prisma.chat.delete({ where: { id: chatId } });
     return { forEveryone: true, memberIds };

@@ -77,8 +77,6 @@ export interface ChatPinnedEvent {
   message: MessageDto | null;
 }
 
-/** Сервер → клиент: чат удалён у обеих сторон — приходит участникам до физического удаления
- *  строки Chat (R-11, repair/11-delete-chat.md). */
 export interface ChatDeletedEvent {
   chatId: string;
 }

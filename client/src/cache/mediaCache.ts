@@ -129,8 +129,6 @@ export function resolveMedia(fileId: string, tier: MediaTier): Promise<Blob | nu
   return task;
 }
 
-/** Чат удалён — его вложения выкидываются из кэша, а не ждут общего вытеснения по бюджету
- *  (R-11, repair/11-delete-chat.md). */
 export async function removeCachedMediaByFileIds(fileIds: string[]): Promise<void> {
   if (fileIds.length === 0) return;
   const db = await openCacheDb();

@@ -159,7 +159,6 @@ interface ChatState {
   /** Уведомления по чату — оптимистично: тумблер и вид пункта меню переключаются сразу,
    *  а при отказе сервера возвращаются обратно. */
   setChatMuted: (chatId: string, muted: boolean) => Promise<void>;
-  /** Оптимистично: чат пропадает из списка сразу, а при отказе сервера возвращается (R-11). */
   deleteChat: (chatId: string, forEveryone: boolean) => Promise<void>;
   clearKicked: () => void;
   sendMessage: (
@@ -212,8 +211,6 @@ interface ChatState {
   applyChatPinned: (event: ChatPinnedEvent) => void;
   /** Внутренний метод: заводит/обновляет чат по ChatDto — из REST-ответа или chat:created. */
   applyChatDetail: (chat: ChatDto) => void;
-  /** Внутренний метод: убирает чат целиком из стора и всех кэшей — свой deleteChat(forEveryone)
-   *  и chat:deleted от собеседника (R-11, repair/11-delete-chat.md). */
   applyChatDeleted: (chatId: string) => void;
   /** Внутренний метод: применяет member:changed — из REST-ответа группового действия или socket-broadcast (этап 7). */
   applyMemberChanged: (event: MemberChangedEvent) => void;
@@ -1279,8 +1276,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     void writeCachedMessages([message]);
 
     const state = get();
-    // Чат, удалённый «у себя», не в state.chats — новое сообщение возвращает его в список
-    // (R-11, repair/11-delete-chat.md): getChatDetail уже отфильтрует старую историю сам.
     if (!state.chats.some((c) => c.id === message.chatId)) {
       void getChatRequest(message.chatId)
         .then((chat) => get().applyChatDetail(chat))
@@ -1387,7 +1382,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreByChat,
         pinnedByChat,
         membersByChat,
-        // Открытый удалённый чат выкидывает на список тем же путём, что и уход/исключение из группы.
         kickedChatId: state.activeChatId === chatId ? chatId : state.kickedChatId,
       };
     });

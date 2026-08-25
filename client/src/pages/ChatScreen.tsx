@@ -274,9 +274,6 @@ export function ChatScreen() {
     },
   };
 
-  // Десктопное меню «ещё» повторяет состав макета (ux-ui/14-desktop/03). «Изменить» и
-  // «Заблокировать» — задел на будущее: правки чата и блокировки в продукте пока нет
-  // (R-26/R-32). «Удалить чат» реализован по-настоящему — см. deleteItem ниже.
   const editItem: MenuItem = { id: 'edit', label: 'Изменить', icon: 'edit', onSelect: () => {} };
   const blockItem: MenuItem = { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} };
   const deleteItem: MenuItem = {
@@ -287,9 +284,8 @@ export function ChatScreen() {
     onSelect: () => setDeleteModalOpen(true),
   };
 
-  // Групп это не касается вовсе — там «Покинуть группу», а не «Удалить чат» (R-11).
   const headerMenuItems: MenuItem[] = isService
-    ? [muteItem, deleteItem]
+    ? [muteItem]
     : isGroup
       ? isDesktop
         ? [editItem, muteItem, blockItem]

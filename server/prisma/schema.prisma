@@ -151,10 +151,7 @@ model ChatMember {
   /// видно, когда именно заглушили.
   mutedAt DateTime?
 
-  /// Чат удалён этим участником «у себя»: не показывается в списке, пока в чате нет сообщений
-  /// новее clearedUpToMessageId (R-11, repair/11-delete-chat.md). Строка Chat при этом жива.
   hiddenAt DateTime?
-  /// Сообщения с id <= этого не показываются этому участнику — старая переписка отрезана.
   clearedUpToMessageId Int?
 
   @@id([chatId, userId])
