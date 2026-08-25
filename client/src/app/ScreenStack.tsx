@@ -710,6 +710,8 @@ export function ScreenStack() {
 
   const rootLocation = !shown ? null : shown.kind === 'pop' ? (shown.to ?? displayLocation) : shown.from;
   const overlayLocation = shown?.kind === 'pop' ? shown.from : displayLocation;
+  const overlayLeaving =
+    shown?.kind === 'pop' && overlayLocation.pathname !== displayLocation.pathname;
 
   const layers: ReactNode[] = [];
   if (shown && rootLocation) {
@@ -731,7 +733,13 @@ export function ScreenStack() {
       key={overlayLocation.pathname}
       ref={overlayLayerRef}
       className={`${styles.layer} ${tabAnim === 'forward' ? styles.tabForward : ''} ${tabAnim === 'back' ? styles.tabBack : ''}`}
-      style={shown ? layerStyle(shown, 'overlay') : tabAnim ? TAB_ANIM_STYLE : undefined}
+      style={
+        shown
+          ? { ...layerStyle(shown, 'overlay'), pointerEvents: overlayLeaving ? 'none' : undefined }
+          : tabAnim
+            ? TAB_ANIM_STYLE
+            : undefined
+      }
       onTransitionEnd={handleAnimEnd}
       onAnimationEnd={() => setTabAnim(null)}
     >
