@@ -6,7 +6,7 @@
   position: absolute;
   z-index: 0;
   isolation: isolate;
-  inset: 0;
+  inset: calc(-1 * var(--layer-depth-bleed, 0px)) 0;
   background: var(--chat-gradient);
   pointer-events: none;
 }

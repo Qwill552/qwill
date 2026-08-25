@@ -3,7 +3,8 @@
 
 .screen {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: var(--layer-depth-bleed, 0px);
   height: 100%;
   min-height: 0;
   background: var(--chat-bg);

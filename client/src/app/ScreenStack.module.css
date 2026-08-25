@@ -9,11 +9,12 @@
 }
 
 .layer {
+  --layer-depth-bleed: 6dvh;
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: var(--layer-depth-bleed);
   touch-action: pan-y;
-  will-change: transform;
 }
 
 .columns {
@@ -112,7 +113,7 @@
    так не расплющивает на каждый кадр вложенные compositing-слои с backdrop-filter. */
 .scrim {
   position: absolute;
-  inset: 0;
+  inset: calc(-1 * var(--layer-depth-bleed, 0px)) 0;
   /* Выше любой хромы внутри экрана (шапка/композер — z-index 4) — притемнение обязано
      закрывать весь корень целиком, как и прежний filter:brightness() на всём слое. */
   z-index: 10;
