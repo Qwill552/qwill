@@ -9,7 +9,12 @@ interface DeleteMessageModalProps {
 
 export function DeleteMessageModal({ count, onCancel, onConfirm }: DeleteMessageModalProps) {
   return (
-    <Modal title={count > 1 ? 'Удалить сообщения?' : 'Удалить это сообщение?'} onClose={onCancel}>
+    <Modal
+      title={count > 1 ? 'Удалить сообщения?' : 'Удалить это сообщение?'}
+      onClose={onCancel}
+      className={styles.overlay}
+      opaque
+    >
       <div className={styles.actions}>
         <button className={styles.cancelButton} type="button" onClick={onCancel}>
           Отмена

@@ -349,6 +349,14 @@ export function MessageRow({
     }
   }, [menu]);
 
+  // Тот же случай, что у MessageContextMenu ниже: диалог порталится в body, но синтетические
+  // события React всплывают по ДЕРЕВУ, и тап по скриму долетал до строки как обычный тап —
+  // через 250 мс он заново открывал контекстное меню поверх закрытого диалога. Кнопки
+  // «Отмена» и «крестик» этим не страдали: касание на <button> строка не разбирает вовсе.
+  function stopPointerBubble(event: React.PointerEvent): void {
+    event.stopPropagation();
+  }
+
   const items = useMemo<MessageMenuItem[]>(() => {
     const list: MessageMenuItem[] = canReply
       ? [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }]
@@ -505,7 +513,18 @@ export function MessageRow({
 
       {confirmDelete &&
         createPortal(
-          <DeleteMessageModal count={groupIds.length} onCancel={() => setConfirmDelete(false)} onConfirm={handleConfirmDelete} />,
+          <div
+            onPointerDown={stopPointerBubble}
+            onPointerMove={stopPointerBubble}
+            onPointerUp={stopPointerBubble}
+            onPointerCancel={stopPointerBubble}
+          >
+            <DeleteMessageModal
+              count={groupIds.length}
+              onCancel={() => setConfirmDelete(false)}
+              onConfirm={handleConfirmDelete}
+            />
+          </div>,
           document.body,
         )}
     </div>

@@ -6,9 +6,10 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  /* В режиме Стекло фон размывается, в Строгом — затемняется. Решает токен, не компонент. */
-  background: var(--scrim-bg);
-  backdrop-filter: var(--scrim-blur);
+  /* В режиме Стекло фон размывается, в Строгом — затемняется. Решает токен, не компонент.
+     --modal-scrim-* — крючок для отдельной модалки, которой нужен свой скрим (см. className). */
+  background: var(--modal-scrim-bg, var(--scrim-bg));
+  backdrop-filter: var(--modal-scrim-blur, var(--scrim-blur));
   animation: fadeIn var(--transition);
 }
 
@@ -55,7 +56,7 @@
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--modal-close-ink, var(--text-secondary));
   cursor: pointer;
 }
 
