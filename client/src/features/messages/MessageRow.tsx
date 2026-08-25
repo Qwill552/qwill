@@ -493,9 +493,11 @@ export function MessageRow({
         />
       )}
 
-      {confirmDelete && (
-        <DeleteMessageModal count={groupIds.length} onCancel={() => setConfirmDelete(false)} onConfirm={handleConfirmDelete} />
-      )}
+      {confirmDelete &&
+        createPortal(
+          <DeleteMessageModal count={groupIds.length} onCancel={() => setConfirmDelete(false)} onConfirm={handleConfirmDelete} />,
+          document.body,
+        )}
     </div>
   );
 }
