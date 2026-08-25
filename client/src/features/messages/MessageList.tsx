@@ -141,6 +141,7 @@ export function MessageList({
   }, [chatId, isGroup, loadMembers]);
 
   const listRef = useRef<HTMLDivElement>(null);
+  const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
   const stuckToBottom = useRef(true);
   const prevLength = useRef(0);
   const settledChatId = useRef<string | null>(null);
@@ -230,6 +231,29 @@ export function MessageList({
     el.scrollTop += el.scrollHeight - prependAnchor.current;
     prependAnchor.current = null;
   }, [messages.length]);
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const seen = appearSeen.current;
+    const appearing: HTMLElement[] = [];
+    let viewTop = 0;
+    let viewBottom = 0;
+    let measuredView = false;
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+      if (seen.has(node)) continue;
+      seen.add(node);
+      if (!measuredView) {
+        const view = el.getBoundingClientRect();
+        viewTop = view.top;
+        viewBottom = view.bottom;
+        measuredView = true;
+      }
+      const rect = node.getBoundingClientRect();
+      if (rect.bottom > viewTop && rect.top < viewBottom) appearing.push(node);
+    }
+    for (const node of appearing) node.dataset.appear = '1';
+  });
 
   useEffect(() => {
     const el = listRef.current;

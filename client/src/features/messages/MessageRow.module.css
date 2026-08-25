@@ -13,11 +13,14 @@
   /* touch-action: pan-y — жест свайпа-ответа берёт горизонтальную ось на себя через JS
      (useSwipeAction), но вертикальный скролл ленты должен продолжать работать нативно. */
   touch-action: pan-y;
-  animation: bubIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   /* --swipe-x/--swipe-progress задаются useSwipeAction императивно на этом элементе и
      наследуются потомками (.swipeContent — transform, .swipeIcon — прозрачность/поворот). */
   --swipe-x: 0px;
   --swipe-progress: 0;
+}
+
+.row[data-appear='1'] {
+  animation: bubIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes bubIn {

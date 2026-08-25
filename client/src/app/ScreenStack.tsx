@@ -117,7 +117,7 @@ const RouteSwitch = memo(
 );
 
 type AnimKind = 'push' | 'pop';
-type Layer = 'from' | 'to';
+type LayerRole = 'root' | 'overlay';
 
 interface AnimState {
   kind: AnimKind;
@@ -139,28 +139,19 @@ function openness(kind: AnimKind, progress: number): number {
   return kind === 'push' ? progress : 1 - progress;
 }
 
-/** true — этот физический слой (from/to) сейчас играет роль вложенного экрана (буквально
- *  {{hasChat}}: translateX 100%→0, поверх всего); false — роль корня-таб-контента под ним
- *  (rootShift: сдвиг −22%, сжатие до .955, притемнение до .55 brightness). */
-function isOverlayLayer(kind: AnimKind, layer: Layer): boolean {
-  return (kind === 'push' && layer === 'to') || (kind === 'pop' && layer === 'from');
-}
-
-function layerTransform(kind: AnimKind, layer: Layer, progress: number): string {
-  const o = openness(kind, progress);
-  if (isOverlayLayer(kind, layer)) return `translateX(${(100 * (1 - o)).toFixed(2)}%)`;
+function roleTransform(role: LayerRole, o: number): string {
+  if (role === 'overlay') return `translateX(${(100 * (1 - o)).toFixed(2)}%)`;
   return `translateX(${(-22 * o).toFixed(2)}%) scale(${(1 - 0.045 * o).toFixed(4)})`;
 }
 
-function scrimOpacity(kind: AnimKind, layer: Layer, progress: number): string {
-  if (isOverlayLayer(kind, layer)) return '0';
-  return (0.45 * openness(kind, progress)).toFixed(3);
+function roleScrimOpacity(role: LayerRole, o: number): string {
+  return role === 'overlay' ? '0' : (0.45 * o).toFixed(3);
 }
 
-function layerStyle(anim: AnimState, layer: Layer): CSSProperties {
+function layerStyle(anim: AnimState, role: LayerRole): CSSProperties {
   return {
-    zIndex: isOverlayLayer(anim.kind, layer) ? 2 : 1,
-    transform: layerTransform(anim.kind, layer, anim.progress),
+    zIndex: role === 'overlay' ? 2 : 1,
+    transform: roleTransform(role, openness(anim.kind, anim.progress)),
     transition: anim.transition ? `transform ${anim.durationMs}ms ${anim.easing}` : 'none',
     willChange: 'transform',
   };
@@ -173,14 +164,29 @@ function layerStyle(anim: AnimState, layer: Layer): CSSProperties {
  *  десятки (блюр у каждого пузыря, шапки, композера), из-за чего и свайп «назад», и переход
  *  в профиль собеседника заметно тормозили, а стекло на следующем экране «доезжало» с
  *  задержкой (ChatsScreen после свайпа назад, ChatInfoScreen после перехода из чата). */
-function scrimStyle(anim: AnimState, layer: Layer): CSSProperties {
+function scrimStyle(anim: AnimState, role: LayerRole): CSSProperties {
   return {
-    opacity: scrimOpacity(anim.kind, layer, anim.progress),
+    opacity: roleScrimOpacity(role, openness(anim.kind, anim.progress)),
     transition: anim.transition ? `opacity ${anim.durationMs}ms ${anim.easing}` : 'none',
   };
 }
 
 const TAB_ANIM_STYLE: CSSProperties = { willChange: 'transform' };
+
+function persistentRootPath(pathname: string): string | null {
+  const chatId = matchPath('/chats/:chatId/info', pathname)?.params.chatId;
+  return chatId ? `/chats/${chatId}` : null;
+}
+
+const IDLE_ROOT_ANIM_BASE = {
+  kind: 'push' as const,
+  to: null,
+  progress: 1,
+  transition: false,
+  mode: 'nav' as const,
+  durationMs: 0,
+  easing: '',
+};
 
 /** Оболочка стека экранов: переход «вглубь» — новый экран въезжает справа поверх всего, старый
  *  под ним сдвигается и притемняется (rootShift); между вкладками — боковой сдвиг на 76px без
@@ -195,10 +201,10 @@ export function ScreenStack() {
   const navigationType = useNavigationType();
   const layout = useLayoutMode();
   const stackRef = useRef<HTMLDivElement>(null);
-  const fromLayerRef = useRef<HTMLDivElement>(null);
-  const toLayerRef = useRef<HTMLDivElement>(null);
-  const fromScrimRef = useRef<HTMLDivElement>(null);
-  const toScrimRef = useRef<HTMLDivElement>(null);
+  const rootLayerRef = useRef<HTMLDivElement>(null);
+  const overlayLayerRef = useRef<HTMLDivElement>(null);
+  const rootScrimRef = useRef<HTMLDivElement>(null);
+  const overlayScrimRef = useRef<HTMLDivElement>(null);
   const dragFrameRef = useRef<number | null>(null);
   const columnsRef = useRef<HTMLDivElement>(null);
   const listColumnRef = useRef<HTMLDivElement>(null);
@@ -233,7 +239,6 @@ export function ScreenStack() {
     startTime: number;
     taken: boolean;
   } | null>(null);
-  const pendingCommit = useRef<string | null>(null);
   /** Дозор на случай, если `transitionend` не придёт вовсе (см. armFallback ниже). */
   const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackToken = useRef(0);
@@ -252,19 +257,18 @@ export function ScreenStack() {
   });
 
   function paintDrag(progress: number, motion: { durationMs: number; easing: string } | null): void {
-    if (!fromLayerRef.current || !toLayerRef.current) return;
-    const parts: [HTMLDivElement | null, HTMLDivElement | null, Layer][] = [
-      [fromLayerRef.current, fromScrimRef.current, 'from'],
-      [toLayerRef.current, toScrimRef.current, 'to'],
+    if (!rootLayerRef.current || !overlayLayerRef.current) return;
+    const o = openness('pop', progress);
+    const parts: [HTMLDivElement, HTMLDivElement | null, LayerRole][] = [
+      [rootLayerRef.current, rootScrimRef.current, 'root'],
+      [overlayLayerRef.current, overlayScrimRef.current, 'overlay'],
     ];
-    for (const [layerNode, scrimNode, layer] of parts) {
-      if (layerNode) {
-        layerNode.style.transition = motion ? `transform ${motion.durationMs}ms ${motion.easing}` : 'none';
-        layerNode.style.transform = layerTransform('pop', layer, progress);
-      }
+    for (const [layerNode, scrimNode, role] of parts) {
+      layerNode.style.transition = motion ? `transform ${motion.durationMs}ms ${motion.easing}` : 'none';
+      layerNode.style.transform = roleTransform(role, o);
       if (scrimNode) {
         scrimNode.style.transition = motion ? `opacity ${motion.durationMs}ms ${motion.easing}` : 'none';
-        scrimNode.style.opacity = scrimOpacity('pop', layer, progress);
+        scrimNode.style.opacity = roleScrimOpacity(role, o);
       }
     }
   }
@@ -331,24 +335,12 @@ export function ScreenStack() {
   function finishAnim(): void {
     clearFallback();
     fallbackToken.current += 1;
-    setAnim((current) => {
-      if (!current) return current;
-      if (current.mode === 'drag') {
-        const target = pendingCommit.current;
-        pendingCommit.current = null;
-        if (target) {
-          setDisplayLocation(emptyLocation(target));
-          navigate(target);
-        }
-      }
-      return null;
-    });
+    setAnim(null);
   }
 
   // Настоящая навигация (клик, программный navigate) — запускает таймированный переход.
   useEffect(() => {
     if (layout === 'desktop') {
-      pendingCommit.current = null;
       cancelFallback();
       setAnim(null);
       setTabAnim(null);
@@ -376,7 +368,6 @@ export function ScreenStack() {
       // навсегда: старый экран так и висел бы под новым сдвинутым и притемнённым слоем
       // («наложение интерфейса»), а свайп «назад» перестал бы стартовать вовсе (beginDrag
       // выходит, пока anim не null).
-      pendingCommit.current = null;
       setAnim(null);
       setDisplayLocation(location);
       setTabAnim(kind === 'tab-forward' ? 'forward' : 'back');
@@ -418,7 +409,6 @@ export function ScreenStack() {
     if (!parent) return false;
 
     cancelFallback();
-    pendingCommit.current = null;
     const width = stackRef.current?.offsetWidth || window.innerWidth;
     dragRef.current = {
       active: true,
@@ -449,7 +439,6 @@ export function ScreenStack() {
   function abandonStuckDrag(): void {
     if (!anim || anim.mode !== 'drag') return;
     cancelDragFrame();
-    pendingCommit.current = null;
     cancelFallback();
     setAnim(null);
   }
@@ -496,7 +485,6 @@ export function ScreenStack() {
     const commit = flingForward || (!flingBackward && d.progress > POP_THRESHOLD);
 
     if (commit) {
-      pendingCommit.current = d.parentPath;
       // Инерция: чем резче был бросок, тем быстрее долетает остаток пути — не фиксированные
       // 340мс всегда, а время, пропорциональное скорости самого жеста.
       const remainingPx = d.width * (1 - d.progress);
@@ -504,9 +492,10 @@ export function ScreenStack() {
       const durationMs = Math.min(400, Math.max(120, (remainingPx / pxPerSecond) * 1000));
       paintDrag(1, { durationMs, easing: POP_EASE });
       setAnim((a) => (a && a.mode === 'drag' ? { ...a, progress: 1, transition: true, durationMs, easing: POP_EASE } : a));
+      setDisplayLocation(emptyLocation(d.parentPath));
+      navigate(d.parentPath);
       armFallback(durationMs);
     } else {
-      pendingCommit.current = null;
       // Та же инерция при возврате: решительный рывок назад летит обратно со скоростью
       // самого рывка, а не всегда одной и той же пружиной SETTLE_MS. Отпускание без
       // решающей скорости в обе стороны — прежняя пружинная анимация с лёгким перелётом.
@@ -528,7 +517,6 @@ export function ScreenStack() {
     }
     d.active = false;
     cancelDragFrame();
-    pendingCommit.current = null;
     paintDrag(0, { durationMs: SETTLE_MS, easing: SETTLE_EASE });
     setAnim((a) => (a && a.mode === 'drag' ? { ...a, progress: 0, transition: true, durationMs: SETTLE_MS, easing: SETTLE_EASE } : a));
     armFallback(SETTLE_MS);
@@ -716,33 +704,39 @@ export function ScreenStack() {
     );
   }
 
-  const toLocation = anim?.to ?? displayLocation;
+  const idleRootPath = anim ? null : persistentRootPath(displayLocation.pathname);
+  const shown: AnimState | null =
+    anim ?? (idleRootPath ? { ...IDLE_ROOT_ANIM_BASE, from: emptyLocation(idleRootPath) } : null);
+
+  const rootLocation = !shown ? null : shown.kind === 'pop' ? (shown.to ?? displayLocation) : shown.from;
+  const overlayLocation = shown?.kind === 'pop' ? shown.from : displayLocation;
 
   const layers: ReactNode[] = [];
-  if (anim) {
+  if (shown && rootLocation) {
     layers.push(
       <div
-        key={anim.from.pathname}
-        ref={fromLayerRef}
+        key={rootLocation.pathname}
+        ref={rootLayerRef}
         className={styles.layer}
-        style={layerStyle(anim, 'from')}
+        style={layerStyle(shown, 'root')}
+        inert
       >
-        <RouteSwitch location={anim.from} />
-        <div ref={fromScrimRef} className={styles.scrim} style={scrimStyle(anim, 'from')} />
+        <RouteSwitch location={rootLocation} />
+        <div ref={rootScrimRef} className={styles.scrim} style={scrimStyle(shown, 'root')} />
       </div>,
     );
   }
   layers.push(
     <div
-      key={toLocation.pathname}
-      ref={toLayerRef}
+      key={overlayLocation.pathname}
+      ref={overlayLayerRef}
       className={`${styles.layer} ${tabAnim === 'forward' ? styles.tabForward : ''} ${tabAnim === 'back' ? styles.tabBack : ''}`}
-      style={anim ? layerStyle(anim, 'to') : tabAnim ? TAB_ANIM_STYLE : undefined}
+      style={shown ? layerStyle(shown, 'overlay') : tabAnim ? TAB_ANIM_STYLE : undefined}
       onTransitionEnd={handleAnimEnd}
       onAnimationEnd={() => setTabAnim(null)}
     >
-      <RouteSwitch location={toLocation} />
-      {anim && <div ref={toScrimRef} className={styles.scrim} style={scrimStyle(anim, 'to')} />}
+      <RouteSwitch location={overlayLocation} />
+      {shown && <div ref={overlayScrimRef} className={styles.scrim} style={scrimStyle(shown, 'overlay')} />}
     </div>,
   );
 
