@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
   type TransitionEvent,
 } from 'react';
 import {
@@ -251,6 +252,7 @@ export function ScreenStack() {
   });
 
   function paintDrag(progress: number, motion: { durationMs: number; easing: string } | null): void {
+    if (!fromLayerRef.current || !toLayerRef.current) return;
     const parts: [HTMLDivElement | null, HTMLDivElement | null, Layer][] = [
       [fromLayerRef.current, fromScrimRef.current, 'from'],
       [toLayerRef.current, toScrimRef.current, 'to'],
@@ -716,31 +718,37 @@ export function ScreenStack() {
 
   const toLocation = anim?.to ?? displayLocation;
 
+  const layers: ReactNode[] = [];
+  if (anim) {
+    layers.push(
+      <div
+        key={anim.from.pathname}
+        ref={fromLayerRef}
+        className={styles.layer}
+        style={layerStyle(anim, 'from')}
+      >
+        <RouteSwitch location={anim.from} />
+        <div ref={fromScrimRef} className={styles.scrim} style={scrimStyle(anim, 'from')} />
+      </div>,
+    );
+  }
+  layers.push(
+    <div
+      key={toLocation.pathname}
+      ref={toLayerRef}
+      className={`${styles.layer} ${tabAnim === 'forward' ? styles.tabForward : ''} ${tabAnim === 'back' ? styles.tabBack : ''}`}
+      style={anim ? layerStyle(anim, 'to') : tabAnim ? TAB_ANIM_STYLE : undefined}
+      onTransitionEnd={handleAnimEnd}
+      onAnimationEnd={() => setTabAnim(null)}
+    >
+      <RouteSwitch location={toLocation} />
+      {anim && <div ref={toScrimRef} className={styles.scrim} style={scrimStyle(anim, 'to')} />}
+    </div>,
+  );
+
   return (
     <div className={styles.stack} ref={stackRef} onPointerDown={handleStackPointerDown}>
-      {anim && (
-        <div
-          key={anim.from.pathname}
-          ref={fromLayerRef}
-          className={styles.layer}
-          style={layerStyle(anim, 'from')}
-        >
-          <RouteSwitch location={anim.from} />
-          <div ref={fromScrimRef} className={styles.scrim} style={scrimStyle(anim, 'from')} />
-        </div>
-      )}
-
-      <div
-        key={toLocation.pathname}
-        ref={toLayerRef}
-        className={`${styles.layer} ${tabAnim === 'forward' ? styles.tabForward : ''} ${tabAnim === 'back' ? styles.tabBack : ''}`}
-        style={anim ? layerStyle(anim, 'to') : tabAnim ? TAB_ANIM_STYLE : undefined}
-        onTransitionEnd={handleAnimEnd}
-        onAnimationEnd={() => setTabAnim(null)}
-      >
-        <RouteSwitch location={toLocation} />
-        {anim && <div ref={toScrimRef} className={styles.scrim} style={scrimStyle(anim, 'to')} />}
-      </div>
+      {layers}
     </div>
   );
 }
