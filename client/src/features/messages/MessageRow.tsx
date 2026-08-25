@@ -155,7 +155,6 @@ export function MessageRow({
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
   const menuSeqRef = useRef(0);
-  const pendingDeleteRef = useRef(false);
   const [menu, setMenu] = useState<{
     rect: DOMRect;
     origin: MenuOrigin | null;
@@ -342,13 +341,6 @@ export function MessageRow({
     tap.cancel();
   }
 
-  useEffect(() => {
-    if (menu === null && pendingDeleteRef.current) {
-      pendingDeleteRef.current = false;
-      setConfirmDelete(true);
-    }
-  }, [menu]);
-
   // Тот же случай, что у MessageContextMenu ниже: диалог порталится в body, но синтетические
   // события React всплывают по ДЕРЕВУ, и тап по скриму долетал до строки как обычный тап —
   // через 250 мс он заново открывал контекстное меню поверх закрытого диалога. Кнопки
@@ -367,9 +359,7 @@ export function MessageRow({
       icon: 'trash',
       label: 'Удалить',
       danger: true,
-      onSelect: () => {
-        pendingDeleteRef.current = true;
-      },
+      onSelect: () => setConfirmDelete(true),
     };
 
     if (message.type === 'CALL' || message.announcement) {
