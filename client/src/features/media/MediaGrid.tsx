@@ -1,6 +1,6 @@
 import type { AttachmentDto } from '@messenger/shared';
 
-import type { LocalAttachmentState, LocalMessage } from '../../stores/chatStore';
+import { type LocalAttachmentState, type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { ProgressRing } from '../messages/ProgressRing';
 import { MediaTile } from './MediaTile';
@@ -15,6 +15,7 @@ export interface AlbumTile {
   attachment: AttachmentDto | null;
   local: LocalAttachmentState | null;
   clientId: string | null;
+  messageId: number | null;
 }
 
 export function albumTiles(album: LocalMessage[]): AlbumTile[] {
@@ -28,6 +29,7 @@ export function albumTiles(album: LocalMessage[]): AlbumTile[] {
     attachment: message.attachment,
     local: message.attachment ? null : (message.localAttachment ?? null),
     clientId: message.clientId,
+    messageId: message.id > 0 ? message.id : null,
   }));
 }
 
@@ -39,6 +41,11 @@ interface MediaGridProps {
 }
 
 export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) {
+  const selectionMode = useChatStore((s) => s.selectionMode);
+  const selectedIds = useChatStore((s) => s.selectedIds);
+  const enterSelection = useChatStore((s) => s.enterSelection);
+  const toggleSelected = useChatStore((s) => s.toggleSelected);
+
   const shown = tiles.slice(0, MOSAIC_MAX_ITEMS);
   const extra = tiles.length - shown.length;
   const layout = mosaicLayout(shown.map((tile) => tile.ratio));
@@ -60,6 +67,9 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
               const overlay = extra > 0 && index === shown.length - 1 ? `+${extra}` : undefined;
 
               if (tile.attachment) {
+                const messageId = tile.messageId;
+                const selected = messageId !== null && selectedIds.has(messageId);
+
                 return (
                   <MediaTile
                     key={tile.key}
@@ -68,6 +78,18 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
                     className={styles.cell}
                     style={style}
                     overlay={overlay}
+                    selected={selected}
+                    selectionMode={selectionMode}
+                    onLongPressTile={messageId !== null ? () => enterSelection(messageId) : undefined}
+                    onTapSelect={messageId !== null ? () => toggleSelected(messageId) : undefined}
+                    checkboxSlot={
+                      selectionMode &&
+                      messageId !== null && (
+                        <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+                          {selected && <Icon name="check" size={14} />}
+                        </span>
+                      )
+                    }
                   />
                 );
               }

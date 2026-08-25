@@ -18,6 +18,13 @@
   min-height: 90px;
 }
 
+.tileSelected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-bg);
+}
+
 .cover,
 .natural {
   display: block;

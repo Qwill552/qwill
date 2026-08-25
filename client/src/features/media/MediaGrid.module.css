@@ -33,6 +33,30 @@
   grid-area: 1 / 1;
 }
 
+.checkbox {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid var(--viewer-ink);
+  border-radius: 50%;
+  background: var(--viewer-chrome-bg);
+  color: var(--viewer-ink);
+  transition:
+    background var(--dur-check) var(--ease-screen),
+    border-color var(--dur-check) var(--ease-screen);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
 .tileButton {
   display: grid;
   width: var(--tap-min);

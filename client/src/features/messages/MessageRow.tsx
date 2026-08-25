@@ -164,6 +164,7 @@ export function MessageRow({
     /^(image|video)\//.test(message.attachment?.file.mimeType ?? '') ||
     message.localAttachment?.kind === 'image' ||
     message.localAttachment?.kind === 'video';
+  const isAlbum = groupIds.length > 1;
 
   const canAct = message.id > 0 && !message.deletedAt;
 
@@ -236,8 +237,11 @@ export function MessageRow({
     suppressTapRef.current = false;
     const target = event.target as HTMLElement;
     const isMouse = event.pointerType === 'mouse';
+    const albumTileSelector = 'button, a[download]';
+    const singleTileSelector = 'button:not([data-media-tile]), a[download]';
     skipGesturesRef.current =
-      (isMouse && event.button !== 0) || target.closest('button:not([data-media-tile]), a[download]') !== null;
+      (isMouse && event.button !== 0) ||
+      target.closest(isAlbum ? albumTileSelector : singleTileSelector) !== null;
     if (skipGesturesRef.current) return;
 
     const tile = target.closest<HTMLElement>('[data-media-tile]');
@@ -378,11 +382,14 @@ export function MessageRow({
 
     if (canDelete) list.push(deleteItem);
 
+    if (isAlbum) list.push({ id: 'select', icon: 'check', label: 'Выделить всё', onSelect: selectGroup });
+
     return list;
   }, [
     message,
     menu,
     groupIds,
+    isAlbum,
     chatId,
     canPin,
     canEdit,
@@ -396,6 +403,7 @@ export function MessageRow({
     deleteMessage,
     deleteMessagesBatch,
     enterSelection,
+    selectGroup,
   ]);
 
   const myReactions = useMemo(() => {
