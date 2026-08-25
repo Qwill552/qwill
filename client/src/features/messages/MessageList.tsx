@@ -329,10 +329,15 @@ export function MessageList({
   // потерял бы загруженную картинку и заново проиграл входную анимацию `bubIn`.
   const [leavingRows, setLeavingRows] = useState<Map<RowKey, LeavingRow>>(() => new Map());
   const prevRenderRowsRef = useRef<RenderRow[]>(renderRows);
+  const prevRowsChatIdRef = useRef<string>(chatId);
   const previousRows = prevRenderRowsRef.current;
+  const sameChat = prevRowsChatIdRef.current === chatId;
   prevRenderRowsRef.current = renderRows;
+  prevRowsChatIdRef.current = chatId;
 
-  if (previousRows !== renderRows || leavingRows.size > 0) {
+  if (!sameChat) {
+    if (leavingRows.size > 0) setLeavingRows(new Map());
+  } else if (previousRows !== renderRows || leavingRows.size > 0) {
     const liveKeys = new Set(renderRows.map((entry) => entry.key));
     const gone = reconciled
       ? previousRows.filter((entry) => !liveKeys.has(entry.key) && !leavingRows.has(entry.key))
