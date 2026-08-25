@@ -16,7 +16,7 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 60_000,
   use: {
-    baseURL: 'https://127.0.0.1:5174',
+    baseURL: 'https://127.0.0.1:5173',
     ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
@@ -39,11 +39,11 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'npm run preview -w @messenger/client -- --port 5174 --strictPort',
-      url: 'https://127.0.0.1:5174',
+      command: 'npm run preview -w @messenger/client -- --port 5173 --strictPort',
+      url: 'https://127.0.0.1:5173',
       ignoreHTTPSErrors: true,
       cwd: here,
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       stdout: 'pipe',
       stderr: 'pipe',
