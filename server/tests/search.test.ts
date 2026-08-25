@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { sendMessage } from '../src/services/message.js';
 
 const app = createApp();
 const request = supertest(app);
@@ -44,6 +45,12 @@ async function startPrivateChat(actor: TestUser, withUser: TestUser): Promise<st
   expect(res.status).toBe(201);
   createdChatIds.push(res.body.id as string);
   return res.body.id as string;
+}
+
+let messageSeq = 0;
+async function sendFirstMessage(chatId: string, senderId: string): Promise<void> {
+  messageSeq += 1;
+  await sendMessage({ chatId, senderId, clientId: `srch_${RUN_ID}_${messageSeq}`, content: 'привет' });
 }
 
 async function createGroup(actor: TestUser, title: string, usernames: string[]): Promise<string> {
@@ -88,8 +95,10 @@ describe('GET /api/search (этап 4, R-10)', () => {
     strangerFriend = await registerUser('friend', 'Подруга');
     solo = await registerOneLetterUser('solo', 'ЙЙЙ');
 
-    await startPrivateChat(me, known);
+    const knownChatId = await startPrivateChat(me, known);
+    await sendFirstMessage(knownChatId, me.userId);
     strangerChatId = await startPrivateChat(stranger, strangerFriend);
+    await sendFirstMessage(strangerChatId, stranger.userId);
     await createGroup(me, groupTitle, [known.username]);
   });
 

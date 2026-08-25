@@ -5,7 +5,7 @@ import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
-import { selectVisibleChats } from '../features/chats/visibleChats';
+import { isEmptyPrivateChat, selectVisibleChats } from '../features/chats/visibleChats';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { useChatStore } from '../stores/chatStore';
@@ -84,15 +84,15 @@ export function ChatsScreen() {
 
   const effectiveFilter = folderTabsEnabled ? filter : 'all';
 
-  const counts = useMemo(
-    () => ({
-      all: chats.length,
-      unread: chats.filter((c) => c.unreadCount > 0).length,
-      private: chats.filter((c) => c.type === 'PRIVATE').length,
-      groups: chats.filter((c) => c.type === 'GROUP').length,
-    }),
-    [chats],
-  );
+  const counts = useMemo(() => {
+    const started = chats.filter((c) => !isEmptyPrivateChat(c));
+    return {
+      all: started.length,
+      unread: started.filter((c) => c.unreadCount > 0).length,
+      private: started.filter((c) => c.type === 'PRIVATE').length,
+      groups: started.filter((c) => c.type === 'GROUP').length,
+    };
+  }, [chats]);
 
   useHotkey(layout === 'desktop', { code: 'KeyK', mod: true, allowInInput: true }, () => openSearchByHotkey());
   useHotkey(layout === 'desktop', { key: 'ArrowDown', mod: true, allowInInput: true }, () => stepChat(1));

@@ -2,14 +2,19 @@ import type { ChatListItemDto } from '@messenger/shared';
 
 import type { ChatFilter } from './ChatFilters';
 
+export function isEmptyPrivateChat(chat: ChatListItemDto): boolean {
+  return chat.type === 'PRIVATE' && chat.lastMessage === null;
+}
+
 export function selectVisibleChats(chats: ChatListItemDto[], filter: ChatFilter): ChatListItemDto[] {
+  const started = chats.filter((c) => !isEmptyPrivateChat(c));
   const filtered =
     filter === 'unread'
-      ? chats.filter((c) => c.unreadCount > 0)
+      ? started.filter((c) => c.unreadCount > 0)
       : filter === 'private'
-        ? chats.filter((c) => c.type === 'PRIVATE')
+        ? started.filter((c) => c.type === 'PRIVATE')
         : filter === 'groups'
-          ? chats.filter((c) => c.type === 'GROUP')
-          : chats;
+          ? started.filter((c) => c.type === 'GROUP')
+          : started;
   return [...filtered].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }

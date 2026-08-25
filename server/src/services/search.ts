@@ -91,17 +91,15 @@ function rankOf(candidate: { username: string; displayName: string }, needle: st
 
 async function searchChats(query: Query, userId: string): Promise<ChatSearchResult[]> {
   const byOtherMember = { some: { userId: { not: userId }, user: userMatches(query) } };
+  const startedPrivate = { type: 'PRIVATE' as const, members: byOtherMember, messages: { some: {} } };
 
   const memberships = await prisma.chatMember.findMany({
     where: {
       userId,
       chat: query.usernamesOnly
-        ? { type: 'PRIVATE', members: byOtherMember }
+        ? startedPrivate
         : {
-            OR: [
-              { type: 'GROUP', ...titleMatches(query) },
-              { type: 'PRIVATE', members: byOtherMember },
-            ],
+            OR: [{ type: 'GROUP', ...titleMatches(query) }, startedPrivate],
           },
     },
     include: {
@@ -143,7 +141,11 @@ async function searchUsers(query: Query, userId: string, excludeIds: Set<string>
   if (candidates.length === 0) return [];
 
   const existingChats = await prisma.chat.findMany({
-    where: { type: 'PRIVATE', pairKey: { in: candidates.map((candidate) => pairKeyFor(userId, candidate.id)) } },
+    where: {
+      type: 'PRIVATE',
+      pairKey: { in: candidates.map((candidate) => pairKeyFor(userId, candidate.id)) },
+      messages: { some: {} },
+    },
     select: { pairKey: true },
   });
   const existingPairKeys = new Set(existingChats.map((chat) => chat.pairKey));

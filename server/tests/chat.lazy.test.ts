@@ -11,6 +11,7 @@ import {
   listChats,
 } from '../src/services/chat.js';
 import { sendMessage } from '../src/services/message.js';
+import { search } from '../src/services/search.js';
 
 const app = createApp();
 const request = supertest(app);
@@ -76,6 +77,29 @@ describe('chat.service.listChats + dropEmptyPrivateChat (R-12)', () => {
 
     expect((await listChats(owner.userId)).some((c) => c.id === chatId)).toBe(true);
     expect((await listChats(member.userId)).some((c) => c.id === chatId)).toBe(true);
+  });
+
+  it('поиск не показывает пустой приватный чат и не считает собеседника контактом', async () => {
+    const alice = await registerUser('search_alice');
+    const bob = await registerUser('search_bob');
+    await createPrivateChat(alice.userId, bob.username);
+
+    const empty = await search(bob.username, alice.userId);
+    expect(empty.chats).toHaveLength(0);
+    expect(empty.users.map((u) => u.username)).toContain(bob.username);
+    expect(empty.users.find((u) => u.username === bob.username)?.isContact).toBe(false);
+  });
+
+  it('поиск показывает чат и контакт, как только в чате есть сообщение', async () => {
+    const alice = await registerUser('searchon_alice');
+    const bob = await registerUser('searchon_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await post(chatId, alice.userId, 'привет');
+
+    const started = await search(bob.username, alice.userId);
+    expect(started.chats.map((c) => c.id)).toContain(chatId);
+    const asUser = started.users.find((u) => u.username === bob.username);
+    if (asUser) expect(asUser.isContact).toBe(true);
   });
 
   it('dropEmptyPrivateChat удаляет пустой приватный чат', async () => {

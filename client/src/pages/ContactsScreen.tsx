@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { EmptyState } from '../features/chats/EmptyState';
+import { isEmptyPrivateChat } from '../features/chats/visibleChats';
 import { useChatStore } from '../stores/chatStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -77,14 +78,14 @@ export function ContactsScreen() {
   }, [loadChats]);
 
   const hasContacts = useMemo(
-    () => chats.some((chat) => chat.type === 'PRIVATE' && chat.otherMember),
+    () => chats.some((chat) => chat.type === 'PRIVATE' && chat.otherMember && !isEmptyPrivateChat(chat)),
     [chats],
   );
 
   const contacts = useMemo(() => {
     const q = query.trim().toLowerCase();
     const sorted: Omit<Contact, 'letter'>[] = chats
-      .filter((chat) => chat.type === 'PRIVATE' && chat.otherMember)
+      .filter((chat) => chat.type === 'PRIVATE' && chat.otherMember && !isEmptyPrivateChat(chat))
       .map((chat) => {
         const member = chat.otherMember!;
         return {
