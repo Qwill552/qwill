@@ -149,6 +149,16 @@ chatsRouter.delete('/:id', (req, res, next) => {
   }
 });
 
+chatsRouter.delete('/:id/if-empty', (req, res, next) => {
+  const chatId = paramId(req, 'id');
+  const userId = req.userId!;
+
+  chatService
+    .dropEmptyPrivateChat(chatId, userId)
+    .then(() => res.status(204).end())
+    .catch(next);
+});
+
 chatsRouter.patch('/:id', validateBody(updateGroupSchema), (req, res, next) => {
   const chatId = paramId(req, 'id');
 

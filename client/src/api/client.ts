@@ -143,6 +143,12 @@ export async function apiFetch(
   return res;
 }
 
+export function apiBeacon(path: string, method: string): void {
+  const headers = new Headers();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  void fetch(`${API_URL}${path}`, { method, credentials: 'include', headers, keepalive: true }).catch(() => undefined);
+}
+
 /**
  * При 401 один раз молча обновляет токен и повторяет запрос;
  * если обновить не удалось — ошибка уходит вызывающему (секция 8).

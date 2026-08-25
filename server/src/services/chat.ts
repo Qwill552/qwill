@@ -182,6 +182,7 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
   });
 
   const visible = memberships.filter((membership) => {
+    if (membership.chat.type === 'PRIVATE' && membership.chat.messages.length === 0) return false;
     if (!membership.hiddenAt) return true;
     const lastMessageId = membership.chat.messages[0]?.id ?? 0;
     return lastMessageId > (membership.clearedUpToMessageId ?? 0);
@@ -409,4 +410,23 @@ export async function deleteChat(chatId: string, userId: string, forEveryone: bo
   });
 
   return { forEveryone: false, memberIds: [] };
+}
+
+export async function dropEmptyPrivateChat(chatId: string, userId: string): Promise<void> {
+  await assertMember(chatId, userId);
+
+  await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Chat" WHERE id = ${chatId} FOR UPDATE`;
+    if (locked.length === 0) return;
+
+    const chat = await tx.chat.findUniqueOrThrow({
+      where: { id: chatId },
+      include: { members: { include: { user: true } }, messages: { select: { id: true }, take: 1 } },
+    });
+    if (chat.type !== 'PRIVATE') return;
+    if (chat.members.some((m) => m.user.isService)) return;
+    if (chat.messages.length > 0) return;
+
+    await tx.chat.delete({ where: { id: chatId } });
+  });
 }

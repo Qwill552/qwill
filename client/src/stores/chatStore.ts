@@ -35,6 +35,7 @@ import {
   createGroupRequest,
   createPrivateChatRequest,
   deleteChatRequest,
+  dropEmptyChatRequest,
   getChatRequest,
   getMembersRequest,
   getMessagesRequest,
@@ -426,7 +427,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   closeChat() {
+    const chatId = get().activeChatId;
     set({ activeChatId: null, selectionMode: false, selectedIds: new Set() });
+    if (!chatId) return;
+
+    const chat = get().chats.find((c) => c.id === chatId);
+    if (!chat || chat.type !== 'PRIVATE' || chat.lastMessage) return;
+    if ((get().messagesByChat[chatId] ?? []).length > 0) return;
+
+    set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
+    dropEmptyChatRequest(chatId);
   },
 
   async loadMore(chatId) {

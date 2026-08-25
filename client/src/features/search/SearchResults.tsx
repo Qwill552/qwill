@@ -110,7 +110,7 @@ export function SearchResults({ query, onOpenChat }: SearchResultsProps) {
     try {
       const chat = await startPrivateChat(user.username);
       remember({
-        chatId: chat.id,
+        chatId: null,
         kind: 'user',
         title: user.displayName,
         username: user.username,

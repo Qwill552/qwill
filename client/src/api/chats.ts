@@ -11,7 +11,7 @@ import type {
   UpdateRoleInput,
 } from '@messenger/shared';
 
-import { apiRequest } from './client';
+import { apiBeacon, apiRequest } from './client';
 
 export function listChatsRequest(): Promise<ChatListResponse> {
   return apiRequest<ChatListResponse>('/api/chats');
@@ -54,6 +54,10 @@ export function setChatMutedRequest(chatId: string, muted: boolean): Promise<{ m
 
 export function deleteChatRequest(chatId: string, forEveryone: boolean): Promise<void> {
   return apiRequest<void>(`/api/chats/${chatId}?forEveryone=${forEveryone}`, { method: 'DELETE' });
+}
+
+export function dropEmptyChatRequest(chatId: string): void {
+  apiBeacon(`/api/chats/${chatId}/if-empty`, 'DELETE');
 }
 
 export function getMembersRequest(chatId: string): Promise<{ members: GroupMemberDTO[] }> {
