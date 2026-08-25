@@ -2,6 +2,7 @@
    относительно экрана и не скроллятся вместе с лентой. */
 
 .wallpaper {
+  composes: no-native-media-menu from global;
   position: absolute;
   z-index: 0;
   isolation: isolate;

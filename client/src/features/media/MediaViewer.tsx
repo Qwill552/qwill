@@ -428,7 +428,14 @@ function ViewerStage({ chatId }: { chatId: string }) {
   const wantOriginal = settled || zoom.scale > MIN_SCALE;
 
   return createPortal(
-    <div className={styles.viewer} data-no-back-swipe role="dialog" aria-modal="true" aria-label="Просмотр медиа">
+    <div
+      className={styles.viewer}
+      data-no-back-swipe
+      role="dialog"
+      aria-modal="true"
+      aria-label="Просмотр медиа"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <div ref={backdropRef} className={styles.backdrop} style={{ opacity: 0 }} aria-hidden="true" />
 
       <div

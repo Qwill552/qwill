@@ -257,7 +257,15 @@ export function MessageList({
           pinnedSlot,
         )}
 
-      <div className={`${styles.list} hide-native-scrollbar`} ref={listRef} onScroll={handleScroll}>
+      <div
+        className={`${styles.list} hide-native-scrollbar`}
+        ref={listRef}
+        onScroll={handleScroll}
+        onContextMenu={(event) => {
+          if ((event.target as HTMLElement).closest('[data-selectable]')) return;
+          event.preventDefault();
+        }}
+      >
         <ScrollIndicator target={listRef} interactive />
 
         <div className={styles.filler} />

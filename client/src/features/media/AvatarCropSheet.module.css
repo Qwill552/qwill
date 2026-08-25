@@ -18,12 +18,12 @@
 }
 
 .image {
+  composes: no-native-media-menu from global;
   position: absolute;
   top: 50%;
   left: 50%;
   max-width: none;
   transform-origin: center;
-  user-select: none;
 }
 
 .hint {

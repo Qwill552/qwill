@@ -1,4 +1,5 @@
 .grid {
+  composes: no-native-media-menu from global;
   display: flex;
   overflow: hidden;
   width: min(78vw, var(--bubble-media-max-w), calc(60dvh * var(--grid-ratio)));
