@@ -719,7 +719,7 @@ export function ScreenStack() {
         ref={rootLayerRef}
         className={styles.layer}
         style={layerStyle(shown, 'root')}
-        inert
+        inert={!anim}
       >
         <RouteSwitch location={rootLocation} />
         <div ref={rootScrimRef} className={styles.scrim} style={scrimStyle(shown, 'root')} />
