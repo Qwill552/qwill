@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
@@ -7,6 +7,7 @@ import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
 import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
 import { Icon } from '../../ui/Icon';
+import { cssDurationMs } from '../../ui/motion';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { isServiceChat } from '../chat/serviceChat';
 import { groupAlbums, mergeReactions } from '../media/albums';
@@ -24,6 +25,9 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
+/** Запас сверх длительности CSS-перехода — на случай, если transitionend не придёт вовсе
+ *  (строка размонтирована, вкладка ушла в фон), тот же приём, что и armFallback в ScreenStack. */
+const WATCHDOG_BUFFER_MS = 80;
 
 interface MessageRowData {
   message: LocalMessage;
@@ -34,6 +38,30 @@ interface MessageRowData {
   sameAuthorAsPrev: boolean;
   sameAuthorAsNext: boolean;
   showDay: boolean;
+}
+
+/** Всё, что нужно строке для рендера, вместе с её ключом — один и тот же снимок живёт и
+ *  в обычном рендере, и в «уходящей» копии (R-15), поэтому вынесен из inline-разметки. */
+interface RenderRow {
+  key: string | number;
+  row: MessageRowData;
+  own: boolean;
+  read: boolean;
+  isReal: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canPin: boolean;
+  canReply: boolean;
+  canReact: boolean;
+  isPinned: boolean;
+  showUnread: boolean;
+}
+
+/** Ключ строки — album.id, когда он есть: если из альбома вычеркнули первый снимок, ключ
+ *  на прежнем `clientId ?? id` сменился бы, и React пересоздал бы строку целиком вместо
+ *  того, чтобы плавно перестроить мозаику (R-15, журнал). */
+function rowKeyFor(row: MessageRowData): string | number {
+  return row.message.albumId ?? row.message.clientId ?? row.message.id;
 }
 
 function isSameDay(a: string, b: string): boolean {
@@ -157,7 +185,7 @@ export function MessageList({
   useEffect(() => {
     const node = listRef.current;
     if (!node || !stuckToBottom.current) return;
-    const ms = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-menu')) || 0;
+    const ms = cssDurationMs('--dur-menu');
     const until = performance.now() + ms;
     let frame = 0;
     function pinToBottom(): void {
@@ -243,6 +271,71 @@ export function MessageList({
     });
   }, [messages]);
 
+  const renderRows = useMemo<RenderRow[]>(() => {
+    return rows.map((row) => {
+      const own = row.message.sender?.id === myId;
+      const delivered = row.message.status !== 'sending' && row.message.status !== 'failed';
+      const isReal = row.message.id > 0;
+      const canAct = isReal && !row.message.deletedAt;
+
+      return {
+        key: rowKeyFor(row),
+        row,
+        own,
+        read: own && delivered && isReadByOthers(readCursors, myId, row.lastId),
+        isReal,
+        canEdit: own && canAct && isEditableMessage(row.message),
+        canDelete: (own || isGroupAdmin) && canAct,
+        canPin: canPinBase && canAct,
+        canReply: !isService,
+        canReact: !isService,
+        isPinned: pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id),
+        showUnread: unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current),
+      };
+    });
+  }, [rows, myId, readCursors, isGroupAdmin, canPinBase, isService, pinnedMessage]);
+
+  // Удалённое сообщение уходит из стора мгновенно (R-15), но не из ленты — «уходящая» строка
+  // держится тут, замороженная на момент удаления, пока не доиграет схлопывание сама
+  // (LeavingMessageRow.onDone). useLayoutEffect, а не useEffect: без него между коммитом,
+  // где React уже убрал строку, и re-render'ом, который вернёт её как «уходящую», был бы
+  // один видимый кадр без нее — мигание.
+  const [leavingRows, setLeavingRows] = useState<Map<string | number, RenderRow>>(new Map());
+  const prevRenderRowsRef = useRef<RenderRow[]>(renderRows);
+
+  useLayoutEffect(() => {
+    const nextKeys = new Set(renderRows.map((r) => r.key));
+    const goneNow = prevRenderRowsRef.current.filter((r) => !nextKeys.has(r.key) && !leavingRows.has(r.key));
+    prevRenderRowsRef.current = renderRows;
+    if (goneNow.length === 0) return;
+
+    setLeavingRows((prev) => {
+      const next = new Map(prev);
+      for (const entry of goneNow) {
+        // Замороженная строка обездвижена: удалить/закрепить/ответить на исчезающий пузырь
+        // нельзя — сервер уже не знает об этом сообщении.
+        next.set(entry.key, { ...entry, canEdit: false, canDelete: false, canPin: false, canReply: false, canReact: false });
+      }
+      return next;
+    });
+  }, [renderRows, leavingRows]);
+
+  const handleLeavingDone = useCallback((key: string | number) => {
+    setLeavingRows((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const displayEntries = useMemo(() => {
+    if (leavingRows.size === 0) return renderRows;
+    const merged = [...renderRows, ...leavingRows.values()];
+    merged.sort((a, b) => a.row.message.id - b.row.message.id);
+    return merged;
+  }, [renderRows, leavingRows]);
+
   return (
     <>
       {pinnedMessage &&
@@ -280,37 +373,38 @@ export function MessageList({
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
         )}
 
-        {rows.map((row) => {
-          const own = row.message.sender?.id === myId;
-          const delivered = row.message.status !== 'sending' && row.message.status !== 'failed';
-          const isReal = row.message.id > 0;
-          const canAct = isReal && !row.message.deletedAt;
-
-          return (
-            <MessageListRow
-              key={row.message.clientId ?? row.message.id}
-              row={row}
+        {displayEntries.map((entry) =>
+          leavingRows.has(entry.key) ? (
+            <LeavingMessageRow
+              key={entry.key}
+              entry={entry}
               chatId={chatId}
               myId={myId}
               isGroup={isGroup}
-              own={own}
-              read={own && delivered && isReadByOthers(readCursors, myId, row.lastId)}
-              isReal={isReal}
-              canEdit={own && canAct && isEditableMessage(row.message)}
-              canDelete={(own || isGroupAdmin) && canAct}
-              canPin={canPinBase && canAct}
-              canReply={!isService}
-              canReact={!isService}
-              isPinned={pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id)}
-              showUnread={unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current)}
+              unreadCount={unreadCount}
+              onReply={onReply}
+              onEdit={onEdit}
+              onForwardRequest={onForwardRequest}
+              onToggleReaction={toggleReaction}
+              listRef={listRef}
+              stuckToBottomRef={stuckToBottom}
+              onDone={() => handleLeavingDone(entry.key)}
+            />
+          ) : (
+            <MessageListRow
+              key={entry.key}
+              entry={entry}
+              chatId={chatId}
+              myId={myId}
+              isGroup={isGroup}
               unreadCount={unreadCount}
               onReply={onReply}
               onEdit={onEdit}
               onForwardRequest={onForwardRequest}
               onToggleReaction={toggleReaction}
             />
-          );
-        })}
+          ),
+        )}
 
         {typing && (
           <div className={styles.typingRow}>
@@ -339,47 +433,35 @@ export function MessageList({
   );
 }
 
-const MessageListRow = memo(function MessageListRow({
-  row,
-  chatId,
-  myId,
-  isGroup,
-  own,
-  read,
-  isReal,
-  canEdit,
-  canDelete,
-  canPin,
-  canReply,
-  canReact,
-  isPinned,
-  showUnread,
-  unreadCount,
-  onReply,
-  onEdit,
-  onForwardRequest,
-  onToggleReaction,
-}: {
-  row: MessageRowData;
+interface MessageRowBodyProps {
+  entry: RenderRow;
   chatId: string;
   myId: string | null;
   isGroup: boolean;
-  own: boolean;
-  read: boolean;
-  isReal: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canPin: boolean;
-  canReply: boolean;
-  canReact: boolean;
-  isPinned: boolean;
-  showUnread: boolean;
   unreadCount: number;
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
   onForwardRequest: (messageIds: number[]) => void;
   onToggleReaction: (chatId: string, messageId: number, emoji: string) => void;
-}) {
+}
+
+/** Строка сообщения — буквально `justify-content:{{m.align}}` из референса (строка 331):
+ *  пузырь встаёт у своего края. Этап 6 достроил вокруг неё разведение жестов из
+ *  gestures.md (тап/двойной тап/long-press/свайп-ответ), контекстное меню и мультивыбор.
+ *  Один и тот же компонент рендерит и живую строку, и «уходящую» — обёртка вокруг неё
+ *  разная (см. LeavingMessageRow ниже). */
+const MessageListRow = memo(function MessageListRow({
+  entry,
+  chatId,
+  myId,
+  isGroup,
+  unreadCount,
+  onReply,
+  onEdit,
+  onForwardRequest,
+  onToggleReaction,
+}: MessageRowBodyProps) {
+  const { row, own, read, isReal, canEdit, canDelete, canPin, canReply, canReact, isPinned, showUnread } = entry;
   const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext, showDay } = row;
 
   return (
@@ -415,7 +497,7 @@ const MessageListRow = memo(function MessageListRow({
           showAuthor={isGroup && !own && !sameAuthorAsPrev}
           album={album ?? undefined}
         >
-          {isReal && !message.deletedAt && (
+          {isReal && (
             <MessageReactions
               reactions={reactions}
               myId={myId}
@@ -428,3 +510,83 @@ const MessageListRow = memo(function MessageListRow({
     </>
   );
 });
+
+/** Обёртка «уходящей» строки (R-15): две фазы, обе на CSS-токенах длительности (CLAUDE.md,
+ *  правило 6) — сперва прозрачность и лёгкий масштаб, затем схлопывание высоты, соседи
+ *  съезжают на освободившееся место. Если удаляемое сообщение стоит выше видимой области,
+ *  ResizeObserver на собственную высоту строки компенсирует scrollTop на лету — иначе
+ *  схлопывание утащило бы за собой то, на что смотрит пользователь. */
+function LeavingMessageRow(
+  props: MessageRowBodyProps & {
+    listRef: React.RefObject<HTMLDivElement | null>;
+    stuckToBottomRef: React.RefObject<boolean>;
+    onDone: () => void;
+  },
+) {
+  const { listRef, stuckToBottomRef, onDone, ...rowProps } = props;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<'enter' | 'fade' | 'collapse'>('enter');
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setPhase('fade'));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'fade') return;
+    const timer = setTimeout(() => setPhase('collapse'), cssDurationMs('--dur-close') + WATCHDOG_BUFFER_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  useLayoutEffect(() => {
+    if (phase !== 'collapse') return;
+    const node = wrapRef.current;
+    const list = listRef.current;
+    if (!node) {
+      onDone();
+      return;
+    }
+
+    node.style.height = `${node.scrollHeight}px`;
+    void node.offsetHeight;
+
+    let observer: ResizeObserver | null = null;
+    if (list && !stuckToBottomRef.current && node.offsetTop < list.scrollTop) {
+      let lastHeight = node.offsetHeight;
+      observer = new ResizeObserver((entries) => {
+        const height = entries[0]?.contentRect.height;
+        if (height === undefined) return;
+        const delta = lastHeight - height;
+        lastHeight = height;
+        if (delta !== 0) list.scrollTop -= delta;
+      });
+      observer.observe(node);
+    }
+
+    const raf = requestAnimationFrame(() => {
+      node.style.height = '0px';
+    });
+
+    const timer = setTimeout(() => {
+      observer?.disconnect();
+      onDone();
+    }, cssDurationMs('--dur-menu') + WATCHDOG_BUFFER_MS);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      observer?.disconnect();
+    };
+  }, [phase]);
+
+  return (
+    <div
+      ref={wrapRef}
+      className={`${styles.leaving} ${phase !== 'enter' ? styles.leavingFade : ''} ${
+        phase === 'collapse' ? styles.leavingCollapse : ''
+      }`}
+    >
+      <MessageListRow {...rowProps} />
+    </div>
+  );
+}

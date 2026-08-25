@@ -159,6 +159,14 @@ export function ChatScreen() {
   }, [chatId, exitSelection, openPanelRequested]);
 
   useEffect(() => {
+    // Отвечали/редактировали сообщение, которое тем временем удалили (своё действие или
+    // с другого устройства/собеседником) — контекст композера сбрасывается (R-15).
+    if (composerContext && !messages.some((m) => m.id === composerContext.message.id)) {
+      setComposerContext(null);
+    }
+  }, [messages, composerContext]);
+
+  useEffect(() => {
     // Меня удалили из группы (или я вышел) — если это открытый чат, уходим из него (секция 8).
     if (!kickedChatId) return;
     if (kickedChatId === chatId) navigate('/chats', { replace: true });

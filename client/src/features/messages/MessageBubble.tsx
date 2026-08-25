@@ -114,95 +114,87 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
 
       {message.replyTo && <ReplyQuote reply={message.replyTo} own={own} />}
 
-      {message.deletedAt ? (
-        <span className={styles.deleted}>Сообщение удалено</span>
+      {isVoice && message.attachment ? (
+        <VoiceMessage
+          attachment={message.attachment}
+          own={own}
+          createdAt={message.createdAt}
+          edited={Boolean(message.editedAt)}
+          status={status}
+          read={read}
+        />
       ) : (
         <>
-          {isVoice && message.attachment ? (
-            <VoiceMessage
-              attachment={message.attachment}
-              own={own}
-              createdAt={message.createdAt}
-              edited={Boolean(message.editedAt)}
-              status={status}
-              read={read}
-            />
-          ) : (
-            <>
-              {(album || message.attachment || message.localAttachment) && (
-                <div
-                  className={[
-                    styles.media,
-                    hasHeader ? styles.mediaHeaded : '',
-                    bareMedia ? styles.mediaBare : '',
-                  ].join(' ')}
-                >
-                  {album ? (
-                    <MediaGrid
-                      tiles={albumTiles(album)}
-                      chatId={message.chatId}
-                      onCancel={(clientId) => cancelAttachmentUpload(message.chatId, clientId)}
-                      onRetry={(clientId) => retryMessage(message.chatId, clientId)}
-                    />
-                  ) : message.attachment ? (
-                    <AttachmentView attachment={message.attachment} chatId={message.chatId} />
-                  ) : message.localAttachment ? (
-                    <LocalAttachmentPreview
-                      local={message.localAttachment}
-                      onCancel={() => cancelAttachmentUpload(message.chatId, message.clientId!)}
-                      onRetry={() => retryMessage(message.chatId, message.clientId!)}
-                    />
-                  ) : null}
-
-                  {bareMedia && (
-                    <span className={styles.mediaMeta}>
-                      {children}
-                      <span className={styles.metaHolder}>
-                        <MessageMeta
-                          createdAt={message.createdAt}
-                          own={own}
-                          edited={Boolean(message.editedAt)}
-                          status={status}
-                          read={read}
-                          overlay
-                        />
-                      </span>
-                    </span>
-                  )}
-                </div>
+          {(album || message.attachment || message.localAttachment) && (
+            <div
+              className={[styles.media, hasHeader ? styles.mediaHeaded : '', bareMedia ? styles.mediaBare : ''].join(
+                ' ',
               )}
-              {!bareMedia && (
-                <span className={styles.textRow}>
-                  <span className={styles.text} data-selectable="true">
-                    {message.content ? parseEmoji(message.content) : null}
-                    <span
-                      className={styles.pad}
-                      style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
-                      aria-hidden="true"
+            >
+              {album ? (
+                <MediaGrid
+                  tiles={albumTiles(album)}
+                  chatId={message.chatId}
+                  onCancel={(clientId) => cancelAttachmentUpload(message.chatId, clientId)}
+                  onRetry={(clientId) => retryMessage(message.chatId, clientId)}
+                />
+              ) : message.attachment ? (
+                <AttachmentView attachment={message.attachment} chatId={message.chatId} />
+              ) : message.localAttachment ? (
+                <LocalAttachmentPreview
+                  local={message.localAttachment}
+                  onCancel={() => cancelAttachmentUpload(message.chatId, message.clientId!)}
+                  onRetry={() => retryMessage(message.chatId, message.clientId!)}
+                />
+              ) : null}
+
+              {bareMedia && (
+                <span className={styles.mediaMeta}>
+                  {children}
+                  <span className={styles.metaHolder}>
+                    <MessageMeta
+                      createdAt={message.createdAt}
+                      own={own}
+                      edited={Boolean(message.editedAt)}
+                      status={status}
+                      read={read}
+                      overlay
                     />
                   </span>
-                  <MessageMeta
-                    createdAt={message.createdAt}
-                    own={own}
-                    edited={Boolean(message.editedAt)}
-                    status={status}
-                    read={read}
-                  />
                 </span>
               )}
-            </>
+            </div>
           )}
-          {status === 'failed' && !message.localAttachment && (
-            <button
-              type="button"
-              className={styles.retryText}
-              onClick={() => retryMessage(message.chatId, message.clientId!)}
-            >
-              <Icon name="retry" size={13} />
-              Повторить
-            </button>
+          {!bareMedia && (
+            <span className={styles.textRow}>
+              <span className={styles.text} data-selectable="true">
+                {message.content ? parseEmoji(message.content) : null}
+                <span
+                  className={styles.pad}
+                  style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
+                  aria-hidden="true"
+                />
+              </span>
+              <MessageMeta
+                createdAt={message.createdAt}
+                own={own}
+                edited={Boolean(message.editedAt)}
+                status={status}
+                read={read}
+              />
+            </span>
           )}
         </>
+      )}
+      {status === 'failed' && !message.localAttachment && (
+        <button
+          type="button"
+          className={styles.retryText}
+          onClick={() => retryMessage(message.chatId, message.clientId!)}
+        >
+          <Icon name="retry" size={13} />
+          Повторить
+        </button>
       )}
 
       {!bareMedia && children}

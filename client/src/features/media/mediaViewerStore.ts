@@ -78,3 +78,18 @@ export const useMediaViewerStore = create<MediaViewerState>((set, get) => ({
 export function openMediaViewer(chatId: string, attachmentId: string): void {
   useMediaViewerStore.getState().open(chatId, attachmentId);
 }
+
+// Снимок, открытый в просмотрщике, могли удалить с другого устройства/вкладки — свой
+// deleteMessage (MediaViewer.handleConfirmDelete) вызывает dropMessage сам, для чужого
+// удаления нужна эта подписка (R-15, «Проверка руками», п.9).
+useChatStore.subscribe((state) => {
+  const { chatId, items } = useMediaViewerStore.getState();
+  if (!chatId || items.length === 0) return;
+  const list = state.messagesByChat[chatId];
+  if (!list) return;
+  for (const item of items) {
+    if (!list.some((m) => m.id === item.messageId)) {
+      useMediaViewerStore.getState().dropMessage(item.messageId);
+    }
+  }
+});

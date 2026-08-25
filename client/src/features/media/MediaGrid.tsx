@@ -1,5 +1,7 @@
 import type { AttachmentDto } from '@messenger/shared';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { cssDurationMs } from '../../ui/motion';
 import { type LocalAttachmentState, type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { ProgressRing } from '../messages/ProgressRing';
@@ -40,15 +42,91 @@ interface MediaGridProps {
   onRetry: (clientId: string) => void;
 }
 
+/** Мозаика альбома. Удаление снимка (R-15) не рвёт раскладку рывком: ушедшая плитка сама
+ *  тает и уменьшается (--dur-close), пока ещё занимает своё место в сетке, а когда её и
+ *  правда убирают из расчёта — соседи переезжают на новые места через FLIP: измеряется
+ *  прямоугольник «до», после перерисовки — «после», разница гасится обратным `transform`
+ *  без перехода и тут же снимается с переходом (--dur-menu). */
 export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) {
   const selectionMode = useChatStore((s) => s.selectionMode);
   const selectedIds = useChatStore((s) => s.selectedIds);
   const enterSelection = useChatStore((s) => s.enterSelection);
   const toggleSelected = useChatStore((s) => s.toggleSelected);
 
-  const shown = tiles.slice(0, MOSAIC_MAX_ITEMS);
-  const extra = tiles.length - shown.length;
+  const [leaving, setLeaving] = useState<Map<string, AlbumTile>>(new Map());
+  const prevTilesRef = useRef<AlbumTile[]>(tiles);
+  const nodesRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const rectsRef = useRef<Map<string, DOMRect>>(new Map());
+
+  // Тот же приём, что у «уходящей» строки ленты (MessageList.LeavingMessageRow): диффим
+  // в useLayoutEffect, чтобы плитка не мигнула пропаданием на один кадр до того, как
+  // попадёт в leaving.
+  useLayoutEffect(() => {
+    const nextKeys = new Set(tiles.map((t) => t.key));
+    const goneNow = prevTilesRef.current.filter((t) => !nextKeys.has(t.key) && !leaving.has(t.key));
+    prevTilesRef.current = tiles;
+    if (goneNow.length === 0) return;
+
+    setLeaving((prev) => {
+      const next = new Map(prev);
+      for (const tile of goneNow) next.set(tile.key, tile);
+      return next;
+    });
+
+    const ms = cssDurationMs('--dur-close') + 80;
+    for (const tile of goneNow) {
+      setTimeout(() => {
+        setLeaving((prev) => {
+          if (!prev.has(tile.key)) return prev;
+          const next = new Map(prev);
+          next.delete(tile.key);
+          return next;
+        });
+      }, ms);
+    }
+  }, [tiles, leaving]);
+
+  const shown = [...tiles, ...leaving.values()]
+    .sort((a, b) => (a.messageId ?? 0) - (b.messageId ?? 0))
+    .slice(0, MOSAIC_MAX_ITEMS);
+  const extra = tiles.length - tiles.slice(0, MOSAIC_MAX_ITEMS).length;
   const layout = mosaicLayout(shown.map((tile) => tile.ratio));
+
+  useLayoutEffect(() => {
+    const prevRects = rectsRef.current;
+    const nextRects = new Map<string, DOMRect>();
+
+    for (const [key, node] of nodesRef.current) {
+      const rect = node.getBoundingClientRect();
+      nextRects.set(key, rect);
+      const prev = prevRects.get(key);
+      if (!prev) continue;
+
+      const dx = prev.left - rect.left;
+      const dy = prev.top - rect.top;
+      const sx = prev.width / rect.width;
+      const sy = prev.height / rect.height;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
+
+      node.style.transition = 'none';
+      node.style.transformOrigin = 'top left';
+      node.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+      // Форсируем reflow, чтобы браузер зафиксировал стартовое положение до снятия перехода.
+      void node.getBoundingClientRect();
+
+      requestAnimationFrame(() => {
+        node.style.transition = `transform var(--dur-menu) var(--ease-screen)`;
+        node.style.transform = '';
+        const clear = (): void => {
+          node.style.transition = '';
+          node.removeEventListener('transitionend', clear);
+        };
+        node.addEventListener('transitionend', clear);
+      });
+    }
+
+    rectsRef.current = nextRects;
+  }, [layout, shown.length]);
 
   return (
     <div
@@ -63,45 +141,48 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
             {row.indexes.map((index) => {
               const tile = shown[index];
               if (!tile) return null;
-              const style = { flexGrow: normalizeRatio(tile.ratio) / rowRatio };
-              const overlay = extra > 0 && index === shown.length - 1 ? `+${extra}` : undefined;
-
-              if (tile.attachment) {
-                const messageId = tile.messageId;
-                const selected = messageId !== null && selectedIds.has(messageId);
-
-                return (
-                  <MediaTile
-                    key={tile.key}
-                    attachment={tile.attachment}
-                    chatId={chatId}
-                    className={styles.cell}
-                    style={style}
-                    overlay={overlay}
-                    selected={selected}
-                    selectionMode={selectionMode}
-                    onLongPressTile={messageId !== null ? () => enterSelection(messageId) : undefined}
-                    onTapSelect={messageId !== null ? () => toggleSelected(messageId) : undefined}
-                    checkboxSlot={
-                      selectionMode &&
-                      messageId !== null && (
-                        <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
-                          {selected && <Icon name="check" size={14} />}
-                        </span>
-                      )
-                    }
-                  />
-                );
-              }
+              const isLeaving = leaving.has(tile.key);
+              const messageId = isLeaving ? null : tile.messageId;
+              const selected = messageId !== null && selectedIds.has(messageId);
+              const style: CSSProperties = { flexGrow: normalizeRatio(tile.ratio) / rowRatio };
+              const overlay = !isLeaving && extra > 0 && index === shown.length - 1 ? `+${extra}` : undefined;
 
               return (
-                <UploadingTile
+                <div
                   key={tile.key}
-                  local={tile.local}
+                  ref={(node) => {
+                    if (node) nodesRef.current.set(tile.key, node);
+                    else nodesRef.current.delete(tile.key);
+                  }}
+                  className={`${styles.cell} ${isLeaving ? styles.cellLeaving : ''}`}
                   style={style}
-                  onCancel={() => tile.clientId && onCancel(tile.clientId)}
-                  onRetry={() => tile.clientId && onRetry(tile.clientId)}
-                />
+                >
+                  {tile.attachment ? (
+                    <MediaTile
+                      attachment={tile.attachment}
+                      chatId={chatId}
+                      overlay={overlay}
+                      selected={selected}
+                      selectionMode={!isLeaving && selectionMode}
+                      onLongPressTile={messageId !== null ? () => enterSelection(messageId) : undefined}
+                      onTapSelect={messageId !== null ? () => toggleSelected(messageId) : undefined}
+                      checkboxSlot={
+                        selectionMode &&
+                        messageId !== null && (
+                          <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+                            {selected && <Icon name="check" size={14} />}
+                          </span>
+                        )
+                      }
+                    />
+                  ) : (
+                    <UploadingTile
+                      local={tile.local}
+                      onCancel={() => tile.clientId && onCancel(tile.clientId)}
+                      onRetry={() => tile.clientId && onRetry(tile.clientId)}
+                    />
+                  )}
+                </div>
               );
             })}
           </div>
@@ -113,19 +194,17 @@ export function MediaGrid({ tiles, chatId, onCancel, onRetry }: MediaGridProps) 
 
 function UploadingTile({
   local,
-  style,
   onCancel,
   onRetry,
 }: {
   local: LocalAttachmentState | null;
-  style: React.CSSProperties;
   onCancel: () => void;
   onRetry: () => void;
 }) {
   const failed = !!local?.error;
 
   return (
-    <div className={`${tileStyles.tile} ${styles.cell}`} style={style}>
+    <div className={tileStyles.tile}>
       {local?.previewUrl &&
         (local.kind === 'video' ? (
           <video className={tileStyles.cover} src={local.previewUrl} muted playsInline />

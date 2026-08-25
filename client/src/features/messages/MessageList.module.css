@@ -158,6 +158,28 @@
   right: -5px;
 }
 
+/* Уходящая строка (R-15): фаза 1 — прозрачность и лёгкий масштаб (--dur-close), фаза 2 —
+   схлопывание высоты (--dur-menu), соседи съезжают на освободившееся место. Высоту в фазе
+   2 задаёт инлайн-стиль из JS (LeavingMessageRow) — здесь только переход. */
+.leaving {
+  overflow: hidden;
+}
+
+.leavingFade {
+  transition:
+    opacity var(--dur-close) var(--ease-close),
+    transform var(--dur-close) var(--ease-close);
+  transform: scale(0.94);
+  opacity: 0;
+}
+
+.leavingCollapse {
+  transition:
+    opacity var(--dur-close) var(--ease-close),
+    transform var(--dur-close) var(--ease-close),
+    height var(--dur-menu) var(--ease-screen);
+}
+
 .empty {
   display: grid;
   height: 100%;

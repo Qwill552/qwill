@@ -72,7 +72,6 @@ function attachmentIcon(chat: ChatListItemDto, own: boolean): IconName | null {
 function previewText(chat: ChatListItemDto, own: boolean): string {
   const last = chat.lastMessage;
   if (!last) return 'Нет сообщений';
-  if (last.deletedAt) return 'Сообщение удалено';
   if (last.call) return callPreviewText(last.call, own);
   if (last.announcement) return `Новое обновление (${last.announcement.versionName})`;
   if (last.content) return last.content;

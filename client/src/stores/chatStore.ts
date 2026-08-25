@@ -52,7 +52,14 @@ import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/fil
 import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment } from '../cache/db';
 import { removeCachedMediaByFileIds } from '../cache/mediaCache';
-import { readCachedChats, readCachedMessages, removeCachedChat, writeCachedChats, writeCachedMessages } from '../cache/messageCache';
+import {
+  readCachedChats,
+  readCachedMessages,
+  removeCachedChat,
+  removeCachedMessages,
+  writeCachedChats,
+  writeCachedMessages,
+} from '../cache/messageCache';
 import {
   bumpAttempts,
   dequeueOutbox,
@@ -342,6 +349,65 @@ function cancelPendingEmptyChatDrop(chatId: string): void {
   if (pendingEmptyChatDrop?.chatId !== chatId) return;
   clearTimeout(pendingEmptyChatDrop.timer);
   pendingEmptyChatDrop = null;
+}
+
+interface MessageRemovalResult {
+  messagesByChat: Record<string, LocalMessage[]>;
+  chats: ChatListItemDto[];
+  pinnedByChat: Record<string, MessageDto | null>;
+  removed: LocalMessage | null;
+  wasPinned: boolean;
+}
+
+/** Убирает сообщение из ленты насовсем (не заменяет надгробием) — R-15: удалённое
+ *  сообщение не должно доходить до ленты вовсе, плашки «Сообщение удалено» там нет.
+ *  Общая точка для applyMessageUpdate (пришло с сервера) и оптимистичного deleteMessage. */
+function removeMessageFromState(
+  state: Pick<ChatState, 'messagesByChat' | 'chats' | 'pinnedByChat'>,
+  chatId: string,
+  messageId: number,
+): MessageRemovalResult {
+  const list = state.messagesByChat[chatId];
+  const removed = list?.find((m) => m.id === messageId) ?? null;
+  const nextList = list?.filter((m) => m.id !== messageId);
+  const messagesByChat = list ? { ...state.messagesByChat, [chatId]: nextList! } : state.messagesByChat;
+
+  const chat = state.chats.find((c) => c.id === chatId);
+  const wasLast = chat?.lastMessage?.id === messageId;
+  const chats = wasLast
+    ? state.chats.map((c) =>
+        c.id === chatId
+          ? { ...c, lastMessage: nextList?.filter((m) => m.id < messageId).at(-1) ?? null }
+          : c,
+      )
+    : state.chats;
+
+  const wasPinned = state.pinnedByChat[chatId]?.id === messageId;
+  const pinnedByChat = wasPinned ? { ...state.pinnedByChat, [chatId]: null } : state.pinnedByChat;
+
+  return { messagesByChat, chats, pinnedByChat, removed, wasPinned };
+}
+
+/** Возврат сообщения назад в ленту — откат оптимистичного удаления при ошибке сервера. */
+function reinsertMessageIntoState(
+  state: Pick<ChatState, 'messagesByChat' | 'chats' | 'pinnedByChat'>,
+  chatId: string,
+  message: LocalMessage,
+  wasPinned: boolean,
+): Pick<ChatState, 'messagesByChat' | 'chats' | 'pinnedByChat'> {
+  const list = state.messagesByChat[chatId];
+  const nextList = list ? [...list, message].sort((a, b) => a.id - b.id) : list;
+  const messagesByChat = list ? { ...state.messagesByChat, [chatId]: nextList! } : state.messagesByChat;
+
+  const chat = state.chats.find((c) => c.id === chatId);
+  const isNewLast = chat ? (chat.lastMessage === null || message.id > chat.lastMessage.id) : false;
+  const chats = isNewLast
+    ? state.chats.map((c) => (c.id === chatId ? { ...c, lastMessage: message } : c))
+    : state.chats;
+
+  const pinnedByChat = wasPinned ? { ...state.pinnedByChat, [chatId]: message } : state.pinnedByChat;
+
+  return { messagesByChat, chats, pinnedByChat };
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -1013,12 +1079,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = getSocket();
     if (!socket) return Promise.resolve();
 
+    // Оптимистично: пузырь уходит из ленты сразу, не дожидаясь ack — при ошибке возвращается.
+    let restore: { message: LocalMessage; wasPinned: boolean } | null = null;
+    set((state) => {
+      const { messagesByChat, chats, pinnedByChat, removed, wasPinned } = removeMessageFromState(
+        state,
+        chatId,
+        messageId,
+      );
+      if (removed) restore = { message: removed, wasPinned };
+      return { messagesByChat, chats, pinnedByChat };
+    });
+    void removeCachedMessages(chatId, [messageId]);
+
     return new Promise((resolve, reject) => {
       socket.emit(SocketEvent.MessageDelete, { chatId, messageId }, (ack: MessageActionAck) => {
-        if (ack.ok && ack.message) {
-          get().applyMessageUpdate(ack.message);
+        if (ack.ok) {
           resolve();
           return;
+        }
+        if (restore) {
+          const { message, wasPinned } = restore;
+          set((state) => reinsertMessageIntoState(state, chatId, message, wasPinned));
+          void writeCachedMessages([message]);
         }
         reject(new Error(ack.error?.message ?? 'Не удалось удалить сообщение'));
       });
@@ -1313,8 +1396,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  // Не часть публичного интерфейса стора — заменяет сообщение по id (правка/удаление уже собраны сервером).
+  // Не часть публичного интерфейса стора — заменяет сообщение по id (правка) либо убирает
+  // его из ленты насовсем (удаление, R-15 — надгробия в ленте больше нет).
   applyMessageUpdate(message: MessageDto) {
+    if (message.deletedAt) {
+      set((state) => {
+        const { messagesByChat, chats, pinnedByChat } = removeMessageFromState(state, message.chatId, message.id);
+        return { messagesByChat, chats, pinnedByChat };
+      });
+      // Иначе перезаход до следующего /sync увидит сообщение снова — оно ещё лежит в
+      // IndexedDB нетронутым, syncEngine догонит удаление сам, но не сразу.
+      void removeCachedMessages(message.chatId, [message.id]);
+      return;
+    }
+
     set((state) => {
       const list = state.messagesByChat[message.chatId];
       const nextMessagesByChat = list
@@ -1330,7 +1425,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ? state.chats.map((c) => (c.id === message.chatId ? { ...c, lastMessage: message } : c))
           : state.chats;
 
-      // Правка/удаление закреплённого сообщения обновляет и баннер закрепа без похода на сервер.
+      // Правка закреплённого сообщения обновляет и баннер закрепа без похода на сервер.
       const pinnedByChat =
         state.pinnedByChat[message.chatId]?.id === message.id
           ? { ...state.pinnedByChat, [message.chatId]: message }
