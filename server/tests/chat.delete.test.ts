@@ -16,14 +16,14 @@ const RUN_ID = Date.now().toString(36);
 const createdUserIds: string[] = [];
 const createdChatIds: string[] = [];
 
-async function registerUser(suffix: string): Promise<{ userId: string; username: string }> {
+async function registerUser(suffix: string): Promise<{ userId: string; username: string; token: string }> {
   const username = `del_${RUN_ID}_${suffix}`;
   const res = await request
     .post('/api/auth/register')
     .send({ username, password: 'password123', displayName: suffix });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
-  return { userId: res.body.user.id as string, username };
+  return { userId: res.body.user.id as string, username, token: res.body.accessToken as string };
 }
 
 async function createPrivateChat(userId: string, targetUsername: string): Promise<string> {
@@ -67,6 +67,23 @@ describe('chat.service.deleteChat (R-11)', () => {
     const page = await getMessages(chatId, alice.userId, undefined, 50);
     expect(page.messages).toHaveLength(1);
     expect(page.messages[0]?.content).toBe('новое сообщение');
+  });
+
+  it('DELETE /api/chats/:id?forEveryone=false не удаляет у собеседника', async () => {
+    const alice = await registerUser('http_alice');
+    const bob = await registerUser('http_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await post(chatId, alice.userId, 'привет');
+
+    const res = await request
+      .delete(`/api/chats/${chatId}`)
+      .query({ forEveryone: 'false' })
+      .set('Authorization', `Bearer ${alice.token}`);
+    expect(res.status).toBe(204);
+
+    expect((await listChats(alice.userId)).some((c) => c.id === chatId)).toBe(false);
+    expect((await listChats(bob.userId)).some((c) => c.id === chatId)).toBe(true);
+    expect(await prisma.chat.findUnique({ where: { id: chatId } })).not.toBeNull();
   });
 
   it('forEveryone: true — чат удаляется целиком для обеих сторон', async () => {

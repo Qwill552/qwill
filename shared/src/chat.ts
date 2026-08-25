@@ -135,7 +135,10 @@ export const chatMuteSchema = z.object({
 export type ChatMuteInput = z.infer<typeof chatMuteSchema>;
 
 export const deleteChatQuerySchema = z.object({
-  forEveryone: z.coerce.boolean().default(false),
+  forEveryone: z
+    .literal(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
 });
 export type DeleteChatQuery = z.infer<typeof deleteChatQuerySchema>;
 
