@@ -29,14 +29,21 @@ export async function readCachedMessages(chatId: string): Promise<MessageDto[]> 
   if (!db) return [];
 
   const messages = await db.getAllFromIndex('messages', 'byChat', chatId);
-  return messages.sort((a, b) => a.id - b.id).slice(-CACHED_HISTORY_LIMIT);
+
+  const buried = messages.filter((message) => message.deletedAt).map((message) => message.id);
+  if (buried.length > 0) void removeCachedMessages(chatId, buried);
+
+  return messages
+    .filter((message) => !message.deletedAt)
+    .sort((a, b) => a.id - b.id)
+    .slice(-CACHED_HISTORY_LIMIT);
 }
 
 export async function writeCachedMessages(messages: MessageDto[]): Promise<void> {
   const db = await openCacheDb();
   if (!db) return;
 
-  const persistable = messages.filter((message) => message.id > 0);
+  const persistable = messages.filter((message) => message.id > 0 && !message.deletedAt);
   if (persistable.length === 0) return;
 
   const tx = db.transaction('messages', 'readwrite');

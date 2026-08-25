@@ -1,5 +1,5 @@
 import type { ChatListItemDto, MessageDto } from '@messenger/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearAllCache, openCacheDb } from './db';
 import { readCachedChats, readCachedMessages, removeCachedChat, removeCachedMessages, writeCachedChats, writeCachedMessages } from './messageCache';
@@ -63,6 +63,24 @@ describe('messageCache', () => {
     await writeCachedMessages([message(-1), message(5)]);
 
     expect((await readCachedMessages('c1')).map((m) => m.id)).toEqual([5]);
+  });
+
+  it('не сохраняет удалённые сообщения', async () => {
+    const buried = { ...message(4), content: null, deletedAt: '2026-08-25T07:00:00.000Z' } as MessageDto;
+
+    await writeCachedMessages([message(3), buried]);
+
+    expect((await readCachedMessages('c1')).map((m) => m.id)).toEqual([3]);
+  });
+
+  it('выбрасывает удалённые сообщения, попавшие в кэш раньше, и вычищает их из хранилища', async () => {
+    const db = await openCacheDb();
+    await db?.put('messages', { ...message(4), content: null, deletedAt: '2026-08-25T07:00:00.000Z' } as MessageDto);
+    await writeCachedMessages([message(3)]);
+
+    expect((await readCachedMessages('c1')).map((m) => m.id)).toEqual([3]);
+
+    await vi.waitFor(async () => expect(await db?.get('messages', ['c1', 4])).toBeUndefined());
   });
 
   it('удаляет указанные сообщения', async () => {

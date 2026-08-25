@@ -120,6 +120,7 @@ export function MessageList({
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
+  const reconciled = useChatStore((s) => s.hasMoreByChat[chatId] !== undefined);
   const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
@@ -333,7 +334,9 @@ export function MessageList({
 
   if (previousRows !== renderRows || leavingRows.size > 0) {
     const liveKeys = new Set(renderRows.map((entry) => entry.key));
-    const gone = previousRows.filter((entry) => !liveKeys.has(entry.key) && !leavingRows.has(entry.key));
+    const gone = reconciled
+      ? previousRows.filter((entry) => !liveKeys.has(entry.key) && !leavingRows.has(entry.key))
+      : [];
     const revived = [...leavingRows.keys()].filter((key) => liveKeys.has(key));
 
     if (gone.length > 0 || revived.length > 0) {
