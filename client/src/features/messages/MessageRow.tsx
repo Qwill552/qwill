@@ -155,6 +155,7 @@ export function MessageRow({
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
   const menuSeqRef = useRef(0);
+  const pendingDeleteRef = useRef(false);
   const [menu, setMenu] = useState<{
     rect: DOMRect;
     origin: MenuOrigin | null;
@@ -341,6 +342,13 @@ export function MessageRow({
     tap.cancel();
   }
 
+  useEffect(() => {
+    if (menu === null && pendingDeleteRef.current) {
+      pendingDeleteRef.current = false;
+      setConfirmDelete(true);
+    }
+  }, [menu]);
+
   const items = useMemo<MessageMenuItem[]>(() => {
     const list: MessageMenuItem[] = canReply
       ? [{ id: 'reply', icon: 'reply', label: 'Ответить', onSelect: () => onReply(message) }]
@@ -351,7 +359,9 @@ export function MessageRow({
       icon: 'trash',
       label: 'Удалить',
       danger: true,
-      onSelect: () => setConfirmDelete(true),
+      onSelect: () => {
+        pendingDeleteRef.current = true;
+      },
     };
 
     if (message.type === 'CALL' || message.announcement) {
