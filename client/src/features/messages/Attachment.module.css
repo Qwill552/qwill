@@ -70,6 +70,10 @@
   transform: translate(-50%, -50%);
 }
 
+.overlay > * {
+  grid-area: 1 / 1;
+}
+
 .cancelButton {
   display: grid;
   width: var(--tap-min);

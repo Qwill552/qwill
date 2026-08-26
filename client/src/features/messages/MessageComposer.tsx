@@ -1,3 +1,4 @@
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ClipboardEvent,
@@ -17,6 +18,7 @@ import { useEmojiIndex, type EmojiIndex } from '../emoji/emojiIndex';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice/VoiceRecorder';
 import { AttachSheet } from './AttachSheet';
+import { formatBytes } from './Attachment';
 import { ComposerContextBar, type ComposerContextValue } from './ComposerContext';
 import {
   composerDomMatchesTokens,
@@ -274,7 +276,22 @@ export function MessageComposer({
 
   function handleFilesFromSheet(files: File[]): void {
     setAttachSheetOpen(false);
-    setPickedFiles(files);
+
+    const tooLarge = files.filter((file) => file.size > DEFAULT_MAX_FILE_SIZE_BYTES);
+    const allowed = files.filter((file) => file.size <= DEFAULT_MAX_FILE_SIZE_BYTES);
+
+    if (tooLarge.length > 0) {
+      const limit = formatBytes(DEFAULT_MAX_FILE_SIZE_BYTES);
+      setError(
+        tooLarge.length === 1
+          ? `«${tooLarge[0]!.name}» весит ${formatBytes(tooLarge[0]!.size)} — больше ${limit}, отправить нельзя`
+          : `${tooLarge.length} файла(ов) больше ${limit} — отправить нельзя`,
+      );
+    } else {
+      setError(null);
+    }
+
+    if (allowed.length > 0) setPickedFiles(allowed);
   }
 
   function handleMediaSend(caption: string): void {
@@ -286,7 +303,7 @@ export function MessageComposer({
         caption: index === 0 ? caption || undefined : undefined,
         replyTo: index === 0 ? replyTo : undefined,
         albumId,
-      });
+      }).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Не удалось отправить файл'));
     });
     setPickedFiles(null);
     if (replyTo) onClearContext();
@@ -320,7 +337,9 @@ export function MessageComposer({
     setRecordingLocked(false);
     if (!user) return;
     const replyTo = context?.mode === 'reply' ? context.message : undefined;
-    sendAttachmentMessage(chatId, user, file, { duration: durationMs, peaks, replyTo });
+    sendAttachmentMessage(chatId, user, file, { duration: durationMs, peaks, replyTo }).catch((err: unknown) =>
+      setError(err instanceof Error ? err.message : 'Не удалось отправить голосовое'),
+    );
     if (replyTo) onClearContext();
   }
 

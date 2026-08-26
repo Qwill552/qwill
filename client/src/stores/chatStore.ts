@@ -50,7 +50,7 @@ import {
 import { NetworkError } from '../api/client';
 import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
 import { buildImageAssets } from '../api/mediaTasks';
-import { openCacheDb, type OutboxAttachment } from '../cache/db';
+import { openCacheDb, type OutboxAttachment, type OutboxEntry } from '../cache/db';
 import { removeCachedMediaByFileIds } from '../cache/mediaCache';
 import {
   readCachedChats,
@@ -262,6 +262,17 @@ function seedPresence(
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const uploadAbortControllers = new Map<string, AbortController>();
+
+const unqueuedAttachments = new Map<string, OutboxAttachment>();
+
+async function persistOutbox(entry: OutboxEntry): Promise<boolean> {
+  try {
+    await enqueueOutbox(entry);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface PreparedImage {
   thumb: File;
@@ -738,7 +749,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       status: 'sending',
     };
 
-    await enqueueOutbox({
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
+      },
+    }));
+
+    await persistOutbox({
       clientId,
       chatId,
       content: content || null,
@@ -747,13 +765,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       createdAt: Date.now(),
       attempts: 0,
     });
-
-    set((state) => ({
-      messagesByChat: {
-        ...state.messagesByChat,
-        [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
-      },
-    }));
 
     if (!socket) return;
 
@@ -818,22 +829,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       localAttachment: { kind, previewUrl, name: file.name, size: file.size, progress: 0 },
     };
 
-    await enqueueOutbox({
-      clientId,
-      chatId,
-      albumId: options.albumId ?? null,
-      content: options.caption || null,
-      replyToId: replyTo?.id ?? null,
-      attachment: {
-        blob: file,
-        fileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        duration: options.duration ?? null,
-        peaks: options.peaks ?? null,
-      },
-      createdAt: Date.now(),
-      attempts: 0,
-    });
+    const outboxAttachment: OutboxAttachment = {
+      blob: file,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      duration: options.duration ?? null,
+      peaks: options.peaks ?? null,
+    };
 
     set((state) => ({
       messagesByChat: {
@@ -841,6 +843,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
       },
     }));
+
+    const queued = await persistOutbox({
+      clientId,
+      chatId,
+      albumId: options.albumId ?? null,
+      content: options.caption || null,
+      replyToId: replyTo?.id ?? null,
+      attachment: outboxAttachment,
+      createdAt: Date.now(),
+      attempts: 0,
+    });
+    if (!queued) unqueuedAttachments.set(clientId, outboxAttachment);
 
     if (kind === 'image') {
       void prepareImage(clientId, file)
@@ -863,12 +877,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   async runAttachmentUpload(chatId, clientId) {
     const db = await openCacheDb();
-    const entry = await db?.get('outbox', clientId);
-    if (!entry?.attachment) return;
+    const stored = await db?.get('outbox', clientId);
+    const attachment = stored?.attachment ?? unqueuedAttachments.get(clientId);
+    if (!attachment) return;
 
-    const file = outboxAttachmentToFile(entry.attachment);
-    const duration = entry.attachment.duration ?? undefined;
-    const peaks = entry.attachment.peaks ?? undefined;
+    const file = outboxAttachmentToFile(attachment);
+    const duration = attachment.duration ?? undefined;
+    const peaks = attachment.peaks ?? undefined;
 
     const controller = new AbortController();
     uploadAbortControllers.set(clientId, controller);
@@ -958,6 +973,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           uploadAbortControllers.delete(clientId);
           preparedImages.delete(clientId);
           if (ack.ok && ack.message) {
+            unqueuedAttachments.delete(clientId);
             void dequeueOutbox(clientId);
             get().applyIncomingMessage(ack.message);
             return;
@@ -986,6 +1002,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     uploadAbortControllers.get(clientId)?.abort();
     uploadAbortControllers.delete(clientId);
     preparedImages.delete(clientId);
+    unqueuedAttachments.delete(clientId);
     dropPacketQueuedForReconnect(clientId);
     if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);
 
@@ -1417,6 +1434,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     clearOutboxRetry();
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
+    unqueuedAttachments.clear();
     for (const list of Object.values(get().messagesByChat)) {
       for (const message of list) {
         if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);
