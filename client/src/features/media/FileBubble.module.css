@@ -2,9 +2,7 @@
   display: flex;
   min-width: 200px;
   align-items: center;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--bg);
+  padding: var(--bubble-pad-y) var(--bubble-pad-x);
   color: inherit;
   gap: var(--space-3);
   text-decoration: none;
@@ -16,9 +14,7 @@
   height: 40px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
+  color: inherit;
 }
 
 .info {
@@ -29,7 +25,7 @@
 
 .name {
   overflow: hidden;
-  color: var(--text-primary);
+  color: inherit;
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -37,6 +33,7 @@
 }
 
 .size {
-  color: var(--text-secondary);
+  color: inherit;
   font-size: 12px;
+  opacity: 0.75;
 }

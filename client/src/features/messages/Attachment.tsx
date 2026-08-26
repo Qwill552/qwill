@@ -55,7 +55,9 @@ export function LocalAttachmentPreview({
       <div className={styles.imagePlaceholder} />
     ) : (
       <div className={styles.file}>
-        <Icon name={localIcon(local.kind)} size={22} className={styles.fileIcon} />
+        <span className={styles.fileIcon}>
+          <Icon name={localIcon(local.kind)} size={22} />
+        </span>
         <span className={styles.fileInfo}>
           <span className={styles.fileName}>{local.name}</span>
           <span className={styles.fileSize}>{formatBytes(local.size)}</span>

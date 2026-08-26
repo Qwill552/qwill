@@ -20,15 +20,18 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 200px;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--bg);
+  padding: var(--bubble-pad-y) var(--bubble-pad-x);
   color: inherit;
   text-decoration: none;
 }
 
 .fileIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
+  place-items: center;
+  color: inherit;
 }
 
 .fileInfo {
@@ -39,7 +42,7 @@
 
 .fileName {
   overflow: hidden;
-  color: var(--text-primary);
+  color: inherit;
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -47,8 +50,9 @@
 }
 
 .fileSize {
-  color: var(--text-secondary);
+  color: inherit;
   font-size: 12px;
+  opacity: 0.75;
 }
 
 .localWrap {
