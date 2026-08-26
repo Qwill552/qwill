@@ -2,7 +2,6 @@
   display: flex;
   min-width: 200px;
   align-items: center;
-  padding: var(--bubble-pad-y) var(--bubble-pad-x);
   color: inherit;
   gap: var(--space-3);
   text-decoration: none;
@@ -20,7 +19,9 @@
 .info {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
+  gap: 4px;
 }
 
 .name {
@@ -32,8 +33,16 @@
   white-space: nowrap;
 }
 
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .size {
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-time);
+  line-height: 1;
   opacity: 0.75;
 }

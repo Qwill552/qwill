@@ -110,6 +110,10 @@
   border-top-right-radius: 0;
 }
 
+.fileRow {
+  margin-bottom: 4px;
+}
+
 .mediaBare {
   margin-bottom: -7px;
   border-radius: var(--radius-bubble);

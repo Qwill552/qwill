@@ -1,4 +1,5 @@
 import type { AttachmentDto } from '@messenger/shared';
+import type { ReactNode } from 'react';
 
 import type { LocalAttachmentState } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
@@ -24,9 +25,17 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export function AttachmentView({ attachment, chatId }: { attachment: AttachmentDto; chatId: string }) {
+export function AttachmentView({
+  attachment,
+  chatId,
+  meta,
+}: {
+  attachment: AttachmentDto;
+  chatId: string;
+  meta?: ReactNode;
+}) {
   if (isViewableMedia(attachment)) return <MediaBubble attachment={attachment} chatId={chatId} />;
-  return <FileBubble attachment={attachment} />;
+  return <FileBubble attachment={attachment} meta={meta} />;
 }
 
 function localIcon(kind: LocalAttachmentState['kind']): 'image' | 'file' | 'mic' {
@@ -39,10 +48,12 @@ export function LocalAttachmentPreview({
   local,
   onCancel,
   onRetry,
+  meta,
 }: {
   local: LocalAttachmentState;
   onCancel: () => void;
   onRetry: () => void;
+  meta?: ReactNode;
 }) {
   const failed = !!local.error;
 
@@ -60,7 +71,10 @@ export function LocalAttachmentPreview({
         </span>
         <span className={styles.fileInfo}>
           <span className={styles.fileName}>{local.name}</span>
-          <span className={styles.fileSize}>{formatBytes(local.size)}</span>
+          <span className={styles.fileFooter}>
+            <span className={styles.fileSize}>{formatBytes(local.size)}</span>
+            {meta}
+          </span>
         </span>
       </div>
     );

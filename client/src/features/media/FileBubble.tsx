@@ -1,4 +1,5 @@
 import type { AttachmentDto } from '@messenger/shared';
+import type { ReactNode } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -11,7 +12,7 @@ function iconFor(mimeType: string): IconName {
   return 'file';
 }
 
-export function FileBubble({ attachment }: { attachment: AttachmentDto }) {
+export function FileBubble({ attachment, meta }: { attachment: AttachmentDto; meta?: ReactNode }) {
   const href = useFileSrc(attachment.file.id, 'stream');
 
   return (
@@ -21,7 +22,10 @@ export function FileBubble({ attachment }: { attachment: AttachmentDto }) {
       </span>
       <span className={styles.info}>
         <span className={styles.name}>{attachment.originalName}</span>
-        <span className={styles.size}>{formatBytes(attachment.file.size)}</span>
+        <span className={styles.footer}>
+          <span className={styles.size}>{formatBytes(attachment.file.size)}</span>
+          {meta}
+        </span>
       </span>
     </a>
   );

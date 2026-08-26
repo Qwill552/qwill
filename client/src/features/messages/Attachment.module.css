@@ -20,7 +20,6 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 200px;
-  padding: var(--bubble-pad-y) var(--bubble-pad-x);
   color: inherit;
   text-decoration: none;
 }
@@ -37,7 +36,16 @@
 .fileInfo {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
+  gap: 4px;
+}
+
+.fileFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .fileName {
@@ -51,7 +59,8 @@
 
 .fileSize {
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-time);
+  line-height: 1;
   opacity: 0.75;
 }
 

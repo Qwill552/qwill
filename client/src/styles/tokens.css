@@ -265,7 +265,7 @@
   --viewer-ink-soft: color-mix(in srgb, #fff 65%, transparent);
   --viewer-chrome-bg: color-mix(in srgb, #000 55%, transparent);
 
-  --media-meta-bg: color-mix(in srgb, #000 45%, transparent);
+  --media-meta-bg: color-mix(in srgb, #000 62%, transparent);
   --media-meta-ink: #fff;
 }
 
@@ -416,7 +416,7 @@
   --font-meta: 0.93em; /* превью сообщения, статусы */
   --font-caption: 0.82em; /* подписи секций, сабтитулы строк */
   --font-message: 1em;
-  --font-time: 0.75em; /* время в пузыре */
+  --font-time: 0.82em; /* время и галочки в пузыре — та же ступень, что у подписей */
   --font-tab: 0.68em; /* подпись таб-бара */
 }
 

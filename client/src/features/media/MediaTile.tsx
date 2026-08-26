@@ -25,8 +25,8 @@ interface MediaTileProps {
   checkboxSlot?: ReactNode;
 }
 
-export function formatMediaDuration(seconds: number): string {
-  const whole = Math.max(0, Math.round(seconds));
+export function formatMediaDuration(milliseconds: number): string {
+  const whole = Math.max(0, Math.round(milliseconds / 1000));
   const minutes = Math.floor(whole / 60);
   return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
 }

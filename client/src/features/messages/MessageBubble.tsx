@@ -39,6 +39,8 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
     !isVoice && !message.deletedAt && (!!album || localMedia || (!!message.attachment && isViewableMedia(message.attachment)));
   const hasHeader = Boolean((showAuthor && message.sender) || message.forwardedFrom || message.replyTo);
   const bareMedia = hasVisualMedia && !message.content;
+  const hasAttachment = Boolean(album || message.attachment || message.localAttachment);
+  const fileOnly = hasAttachment && !hasVisualMedia && !isVoice && !message.deletedAt && !message.content;
 
   const bare =
     !showAuthor &&
@@ -61,7 +63,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
             ))}
             <span
               className={styles.pad}
-              style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
+              style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}
               aria-hidden="true"
             />
           </span>
@@ -71,6 +73,17 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
       </div>
     );
   }
+
+  const inlineMeta = (
+    <MessageMeta
+      createdAt={message.createdAt}
+      own={own}
+      edited={Boolean(message.editedAt)}
+      status={status}
+      read={read}
+      variant="inline"
+    />
+  );
 
   const classes = [
     styles.bubble,
@@ -125,11 +138,15 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
         />
       ) : (
         <>
-          {(album || message.attachment || message.localAttachment) && (
+          {hasAttachment && (
             <div
-              className={[styles.media, hasHeader ? styles.mediaHeaded : '', bareMedia ? styles.mediaBare : ''].join(
-                ' ',
-              )}
+              className={
+                hasVisualMedia
+                  ? [styles.media, hasHeader ? styles.mediaHeaded : '', bareMedia ? styles.mediaBare : ''].join(' ')
+                  : fileOnly
+                    ? ''
+                    : styles.fileRow
+              }
             >
               {album ? (
                 <MediaGrid
@@ -139,12 +156,13 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
                   onRetry={(clientId) => retryMessage(message.chatId, clientId)}
                 />
               ) : message.attachment ? (
-                <AttachmentView attachment={message.attachment} chatId={message.chatId} />
+                <AttachmentView attachment={message.attachment} chatId={message.chatId} meta={fileOnly ? inlineMeta : undefined} />
               ) : message.localAttachment ? (
                 <LocalAttachmentPreview
                   local={message.localAttachment}
                   onCancel={() => void cancelMessage(message.chatId, message.clientId!)}
                   onRetry={() => retryMessage(message.chatId, message.clientId!)}
+                  meta={fileOnly ? inlineMeta : undefined}
                 />
               ) : null}
 
@@ -158,20 +176,20 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
                       edited={Boolean(message.editedAt)}
                       status={status}
                       read={read}
-                      overlay
+                      variant="overlay"
                     />
                   </span>
                 </span>
               )}
             </div>
           )}
-          {!bareMedia && (
+          {!bareMedia && !fileOnly && (
             <span className={styles.textRow}>
               <span className={styles.text} data-selectable="true">
                 {message.content ? parseEmoji(message.content) : null}
                 <span
                   className={styles.pad}
-                  style={{ width: `var(--meta-w, ${own ? 62 : 40}px)` }}
+                  style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}
                   aria-hidden="true"
                 />
               </span>

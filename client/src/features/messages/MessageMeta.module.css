@@ -3,17 +3,28 @@
    а не по всему пузырю — см. её комментарий), поэтому 0/0, а не 12px/7px буквально:
    те смещения в референсе считаны от пузыря, здесь их уже даёт padding пузыря. */
 
-.meta {
-  position: absolute;
-  right: 0;
-  bottom: 0;
+.base {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: rgba(var(--pulse-ink), 0.4);
-  font-size: 11px;
+  line-height: 1;
+  font-size: var(--font-time);
   white-space: nowrap;
   pointer-events: none;
+}
+
+.meta {
+  composes: base;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: rgba(var(--pulse-ink), 0.4);
+}
+
+.inline {
+  composes: base;
+  color: inherit;
+  opacity: 0.75;
 }
 
 /* На исходящем пузыре вторичный цвет утонул бы в градиенте. */
@@ -35,19 +46,16 @@
 
 .failed {
   color: var(--danger);
+  opacity: 1;
 }
 
 .overlay {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-2);
+  composes: base;
+  padding: 3px var(--space-2);
   border-radius: var(--radius-pill);
   background: var(--media-meta-bg);
   color: var(--media-meta-ink);
-  font-size: 11px;
-  gap: 3px;
-  pointer-events: none;
-  white-space: nowrap;
+  font-weight: 500;
 }
 
 .overlay.failed {
