@@ -25,49 +25,6 @@
   font-weight: 600;
 }
 
-.dayClip {
-  position: relative;
-  display: inline-block;
-  overflow: hidden;
-  vertical-align: top;
-  line-height: 18px;
-  height: 18px;
-}
-
-.dayText {
-  display: block;
-  white-space: nowrap;
-}
-
-.dayTextOut {
-  position: absolute;
-  inset: 0;
-  animation: dayTextOut var(--dur-tab) var(--ease-screen) forwards;
-}
-
-.dayTextIn {
-  animation: dayTextIn var(--dur-tab) var(--ease-screen);
-}
-
-@keyframes dayTextOut {
-  to {
-    transform: translateY(calc(-100% * var(--day-dir, 1)));
-    opacity: 0;
-  }
-}
-
-@keyframes dayTextIn {
-  from {
-    transform: translateY(calc(100% * var(--day-dir, 1)));
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
 /* Граница прочитанного: линия во всю ширину с подписью по центру. */
 .unread {
   display: flex;
