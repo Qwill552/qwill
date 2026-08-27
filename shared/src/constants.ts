@@ -45,8 +45,9 @@ export const ALLOWED_MIME_TYPES = [
 ] as const;
 export type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
 
-/** Аватар — только изображения (секция 7). */
-export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** Аватар — только изображения (секция 7). GIF идёт мимо кроппера (files.ts, isGifFile) —
+ *  канвас плющит анимацию до одного кадра, поэтому загружается как есть. */
+export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 
 /** Значения по умолчанию — сервер авторитетен (реальные лимиты берёт из env), это только для быстрой UX-проверки на клиенте до хэширования. */
 export const DEFAULT_MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024;

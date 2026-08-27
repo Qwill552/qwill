@@ -71,6 +71,12 @@ async function withRateLimitRetry<T>(run: () => Promise<T>, signal?: AbortSignal
   }
 }
 
+/** Кадрирование через canvas плющит GIF до одного кадра — аватар из GIF грузится сырым
+ *  файлом, минуя кроппер, чтобы `<img>` показывал его анимированным, как и везде в браузере. */
+export function isGifFile(file: File): boolean {
+  return file.type === 'image/gif' || /\.gif$/i.test(file.name);
+}
+
 export type UploadPurpose = 'message' | 'avatar';
 
 export interface UploadedFile extends FileDto {

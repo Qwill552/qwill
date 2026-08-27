@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
-import { uploadFile } from '../api/files';
+import { isGifFile, uploadFile } from '../api/files';
 import { updateProfileRequest } from '../api/users';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
@@ -44,26 +44,34 @@ export function ProfileScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): void {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setError(null);
-    setCropSource(file);
-  }
-
-  async function handleAvatarCropped(cropped: File): Promise<void> {
-    setCropSource(null);
+  async function uploadAvatar(file: File): Promise<void> {
     setAvatarUploading(true);
     setError(null);
     try {
-      const uploaded = await uploadFile(cropped, 'avatar');
+      const uploaded = await uploadFile(file, 'avatar');
       updateUser(await setAvatarRequest(uploaded.id, uploaded.sha256));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить аватар');
     } finally {
       setAvatarUploading(false);
     }
+  }
+
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>): void {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setError(null);
+    if (isGifFile(file)) {
+      void uploadAvatar(file);
+      return;
+    }
+    setCropSource(file);
+  }
+
+  async function handleAvatarCropped(cropped: File): Promise<void> {
+    setCropSource(null);
+    await uploadAvatar(cropped);
   }
 
   async function handleNameSave(): Promise<void> {

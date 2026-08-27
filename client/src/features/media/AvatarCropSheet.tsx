@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { cropImageToAvatarFile } from '../../api/files';
+import { DesktopScreenModal } from '../../app/DesktopScreenModal';
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { Sheet } from '../../ui/Sheet';
 import styles from './AvatarCropSheet.module.css';
 
@@ -35,6 +37,7 @@ function summarize(pointers: Map<number, Pointer>): { x: number; y: number; spre
 }
 
 export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetProps) {
+  const desktop = useLayoutMode() === 'desktop';
   const frameRef = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, Pointer>());
 
@@ -138,8 +141,8 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
     }
   }
 
-  return (
-    <Sheet title="Кадрирование" onClose={onClose}>
+  const body = (
+    <>
       <div className={styles.stage} data-no-back-swipe>
         <div
           ref={frameRef}
@@ -165,7 +168,9 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
         </div>
       </div>
 
-      <p className={styles.hint}>Двигайте фото пальцем, масштабируйте щипком</p>
+      <p className={styles.hint}>
+        {desktop ? 'Перетащите фото мышью, чтобы выбрать нужную область' : 'Двигайте фото пальцем, масштабируйте щипком'}
+      </p>
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.actions}>
@@ -181,6 +186,20 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
           Готово
         </button>
       </div>
+    </>
+  );
+
+  if (desktop) {
+    return (
+      <DesktopScreenModal chromeless title="Кадрирование" onClose={onClose}>
+        <div className={styles.desktopPad}>{body}</div>
+      </DesktopScreenModal>
+    );
+  }
+
+  return (
+    <Sheet title="Кадрирование" onClose={onClose}>
+      {body}
     </Sheet>
   );
 }

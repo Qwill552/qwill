@@ -171,8 +171,8 @@ function AvatarViewerStage({ url }: { url: string }) {
       </div>
 
       <div className={styles.controls}>
-        <GlassButton icon="close" label="Закрыть" variant="chrome" onClick={startClose} />
         <GlassButton icon="download" label="Скачать фото" variant="chrome" onClick={handleSave} disabled={!src} />
+        <GlassButton icon="close" label="Закрыть" variant="chrome" onClick={startClose} />
       </div>
     </div>,
     document.body,

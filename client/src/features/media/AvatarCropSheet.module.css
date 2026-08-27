@@ -4,6 +4,12 @@
   padding: var(--space-2) 0 var(--space-3);
 }
 
+/* Десктоп: DesktopScreenModal.chromeless не даёт своих полей, а плавающий крестик сидит
+   в верхнем правом углу карточки — без верхнего отступа кадр цеплял бы его. */
+.desktopPad {
+  padding: 44px var(--space-4) var(--space-4);
+}
+
 .frame {
   position: relative;
   overflow: hidden;
