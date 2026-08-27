@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect } from 'react';
 
 import { CallOverlay } from '../features/calls/CallOverlay';
+import { AvatarViewer } from '../features/media/AvatarViewer';
 import { MediaViewer } from '../features/media/MediaViewer';
 import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
 import { applyDesktopListWidth, useDesktopColumnsStore } from '../stores/desktopColumnsStore';
@@ -38,6 +39,7 @@ export function AppShell() {
       <UpdateBanner />
       <CallOverlay />
       <MediaViewer />
+      <AvatarViewer />
       {updateModalOpen && <UpdateModal onClose={closeUpdateModal} />}
       <RequiredUpdateModal />
     </div>

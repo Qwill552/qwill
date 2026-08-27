@@ -10,6 +10,7 @@ import { OfficialMark } from '../features/chat/OfficialMark';
 import { ServiceChatBar } from '../features/chat/ServiceChatBar';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
 import { DeleteChatModal } from '../features/chats/DeleteChatModal';
+import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
@@ -207,6 +208,7 @@ export function ChatScreen() {
   const isService = isServiceChat(activeChat);
   const muted = activeChat?.muted ?? false;
   const isTyping = typingUsers.length > 0;
+  const headerAvatarUrl = !isGroup && !isService ? activeChat?.avatarUrl : undefined;
 
   const activeGroupCall = chatId ? (activeCallByChat[chatId] ?? null) : null;
   const showCallBanner = isGroup && !!activeGroupCall && activeGroupCall.id !== myCallId;
@@ -419,6 +421,10 @@ export function ChatScreen() {
               onClick={
                 isService ? undefined : () => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))
               }
+              onLeadingClick={
+                headerAvatarUrl ? () => openAvatarViewer(headerAvatarUrl, activeChat?.title ?? '') : undefined
+              }
+              leadingLabel="Открыть фото профиля"
             />
             {/* Поиск по чату — задел на будущее (ux-ui/14-desktop/03): функции поиска
                 внутри переписки в продукте пока нет. */}

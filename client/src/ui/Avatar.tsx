@@ -30,7 +30,7 @@ interface AvatarProps {
 }
 
 /** DTO отдаёт путь вида /api/files/{id} — токен для img нужен по голому id (секция 7). */
-function fileIdFromUrl(url: string): string | null {
+export function fileIdFromUrl(url: string): string | null {
   return /\/api\/files\/([^/?]+)/.exec(url)?.[1] ?? null;
 }
 

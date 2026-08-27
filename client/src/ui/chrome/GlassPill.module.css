@@ -33,6 +33,51 @@
   outline-offset: 2px;
 }
 
+/* Разбивка капсулы на две кнопки (аватар отдельно от текста) — см. onLeadingClick в GlassPill.tsx. */
+.leadingButton {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: 50%;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.leadingButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.textButton {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.textButton:disabled {
+  cursor: default;
+}
+
+.textButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .text {
   display: flex;
   min-width: 0;

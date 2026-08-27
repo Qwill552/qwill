@@ -1,0 +1,85 @@
+/* Открывается и из-под DesktopScreenModal (профиль/карточка чата на десктопе, z-index 220),
+   поэтому слой выше всех оверлеев контента — вплоть до DeleteMessageModal (350). */
+.viewer {
+  position: fixed;
+  z-index: 400;
+  inset: 0;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-bg);
+  backdrop-filter: var(--scrim-blur);
+  opacity: 0;
+  transition: opacity var(--dur-screen) var(--ease-screen);
+}
+
+.entered .backdrop {
+  opacity: 1;
+}
+
+.closing .backdrop {
+  transition: opacity var(--dur-close) var(--ease-close);
+  opacity: 0;
+}
+
+.stage {
+  position: absolute;
+  display: grid;
+  inset: 0;
+  place-items: center;
+  touch-action: none;
+}
+
+.image {
+  composes: no-native-media-menu from global;
+  max-width: 92vw;
+  max-height: 82dvh;
+  border-radius: var(--radius-card);
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity var(--dur-screen) var(--ease-screen), transform var(--dur-screen) var(--ease-screen);
+}
+
+.entered .image {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.closing .image {
+  transition: opacity var(--dur-close) var(--ease-close), transform var(--dur-close) var(--ease-close);
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+.imageDragging {
+  transition: none;
+}
+
+.controls {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-2));
+  right: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  opacity: 0;
+  transition: opacity var(--dur-screen) var(--ease-screen);
+}
+
+.entered .controls {
+  opacity: 1;
+}
+
+.closing .controls {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .image,
+  .controls {
+    transition-duration: 1ms;
+  }
+}

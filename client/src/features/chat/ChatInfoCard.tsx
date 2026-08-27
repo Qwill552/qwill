@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCallStore } from '../../stores/callStore';
 import { useChatStore } from '../../stores/chatStore';
 import { formatLastSeen } from '../../utils/presence';
+import { openAvatarViewer } from '../media/avatarViewerStore';
 import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
 import { Icon } from '../../ui/Icon';
@@ -96,6 +97,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
 
   if (!other) return null;
 
+  const avatarUrl = other.avatarUrl;
   const usernameHandle = `@${other.username}`;
 
   async function copyUsername(): Promise<void> {
@@ -117,7 +119,18 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   return (
     <div className={`${styles.scroller} hide-native-scrollbar`}>
       <div className={styles.hero}>
-        <Avatar label={other.displayName} avatarUrl={other.avatarUrl} size={108} color={other.avatarColor} />
+        {avatarUrl ? (
+          <button
+            type="button"
+            className={styles.avatarButton}
+            onClick={() => openAvatarViewer(avatarUrl, other.displayName)}
+            aria-label="Открыть фото профиля"
+          >
+            <Avatar label={other.displayName} avatarUrl={avatarUrl} size={108} color={other.avatarColor} />
+          </button>
+        ) : (
+          <Avatar label={other.displayName} avatarUrl={avatarUrl} size={108} color={other.avatarColor} />
+        )}
         <span className={styles.name}>{other.displayName}</span>
         <span className={online ? styles.statusOnline : styles.status}>
           {online ? 'в сети' : formatLastSeen(presence?.lastSeenAt ?? other.lastSeenAt)}

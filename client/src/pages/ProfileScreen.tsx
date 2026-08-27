@@ -7,6 +7,7 @@ import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
 import { updateProfileRequest } from '../api/users';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
+import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { useAuthStore } from '../stores/authStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -100,19 +101,27 @@ export function ProfileScreen() {
     { icon: 'settings', label: 'Настройки', onClick: () => navigate('/settings') },
   ];
 
+  const avatarUrl = user?.avatarUrl;
+
   return (
     <div className={styles.screen}>
       <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
         <ScrollIndicator target={scrollerRef} />
         <div className={styles.hero}>
-          <div className={styles.avatarRing}>
-            <Avatar
-              label={user?.displayName ?? '?'}
-              avatarUrl={user?.avatarUrl}
-              size={107}
-              color={user?.avatarColor}
-            />
-          </div>
+          {avatarUrl ? (
+            <button
+              type="button"
+              className={styles.avatarRing}
+              onClick={() => openAvatarViewer(avatarUrl, user?.displayName ?? '')}
+              aria-label="Открыть фото профиля"
+            >
+              <Avatar label={user?.displayName ?? '?'} avatarUrl={avatarUrl} size={107} color={user?.avatarColor} />
+            </button>
+          ) : (
+            <div className={styles.avatarRing}>
+              <Avatar label={user?.displayName ?? '?'} avatarUrl={undefined} size={107} color={user?.avatarColor} />
+            </div>
+          )}
 
           {nameEditing ? (
             <div className={styles.nameEditRow}>

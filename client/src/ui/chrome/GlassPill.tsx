@@ -23,6 +23,11 @@ interface GlassPillProps {
   leading?: ReactNode;
   trailing?: ReactNode;
   onClick?: () => void;
+  /** Аватар — отдельная кнопка (просмотр фото), не часть перехода в профиль/группу. Вложенный
+   *  `<button>` внутри `onClick`-капсулы невалиден, поэтому при заданном onLeadingClick `leading`
+   *  выносится в свою кнопку рядом, а не внутрь общей. */
+  onLeadingClick?: () => void;
+  leadingLabel?: string;
   disabled?: boolean;
   className?: string;
 }
@@ -37,6 +42,8 @@ export function GlassPill({
   leading,
   trailing,
   onClick,
+  onLeadingClick,
+  leadingLabel,
   disabled,
   className,
 }: GlassPillProps) {
@@ -44,17 +51,41 @@ export function GlassPill({
   const titleVariantClass = variant === 'cap' ? styles.capTitle : variant === 'flat' ? styles.flatTitle : '';
   const subtitleVariantClass = variant === 'cap' ? styles.capSubtitle : variant === 'flat' ? styles.flatSubtitle : '';
 
+  const text = (
+    <span className={styles.text}>
+      <span className={`${styles.title} ${titleVariantClass}`}>{title}</span>
+      {subtitle != null && (
+        <span className={`${styles.subtitle} ${subtitleVariantClass} ${TONE_CLASS[subtitleTone]}`}>{subtitle}</span>
+      )}
+    </span>
+  );
+
+  if (onLeadingClick) {
+    return (
+      <div className={`${styles.pill} ${variantClass} ${className ?? ''}`}>
+        <button type="button" className={styles.leadingButton} onClick={onLeadingClick} aria-label={leadingLabel}>
+          {leading}
+        </button>
+        {onClick ? (
+          <button type="button" className={styles.textButton} onClick={onClick} disabled={disabled}>
+            {text}
+            {trailing}
+            {!disabled && <Ripple />}
+          </button>
+        ) : (
+          <div className={styles.textButton}>
+            {text}
+            {trailing}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const body = (
     <>
       {leading}
-      <span className={styles.text}>
-        <span className={`${styles.title} ${titleVariantClass}`}>{title}</span>
-        {subtitle != null && (
-          <span className={`${styles.subtitle} ${subtitleVariantClass} ${TONE_CLASS[subtitleTone]}`}>
-            {subtitle}
-          </span>
-        )}
-      </span>
+      {text}
       {trailing}
     </>
   );
