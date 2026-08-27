@@ -42,6 +42,7 @@
     "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
     "emoji-datasource-apple": "^15.1.2",
+    "emojibase-data": "^17.0.0",
     "eslint": "^10.8.0",
     "sharp": "^0.34.5",
     "typescript": "~5.9.3",

@@ -25,13 +25,34 @@ interface EmojiPanelProps {
   anchor?: DOMRect | null;
 }
 
+function matchTier(entry: EmojiEntry, trimmed: string): number {
+  let best = 4;
+  for (const keyword of entry.k) {
+    if (keyword === trimmed) return 1;
+    if (best > 2 && keyword.startsWith(trimmed)) best = 2;
+    else if (best > 3 && keyword.includes(trimmed)) best = 3;
+  }
+  return best;
+}
+
 function buildSections(index: EmojiIndex | null | undefined, recent: string[], query: string): EmojiSection[] {
   if (!index) return [];
 
   const trimmed = query.trim().toLowerCase();
   if (trimmed) {
-    const flat = index.emoji.filter((entry) => entry.k.some((keyword) => keyword.includes(trimmed)));
-    return flat.length > 0 ? [{ label: '', entries: flat }] : [];
+    const recentSet = new Set(recent);
+    const ranked = index.emoji
+      .map((entry) => ({ entry, tier: matchTier(entry, trimmed) }))
+      .filter(({ tier }) => tier < 4)
+      .sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        const aRecent = recentSet.has(a.entry.e);
+        const bRecent = recentSet.has(b.entry.e);
+        if (aRecent !== bRecent) return aRecent ? -1 : 1;
+        return 0;
+      })
+      .map(({ entry }) => entry);
+    return ranked.length > 0 ? [{ label: '', entries: ranked }] : [];
   }
 
   const sections: EmojiSection[] = [];

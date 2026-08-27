@@ -26,6 +26,7 @@ const CATEGORY_LABELS = {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(scriptDir, '..', 'client', 'public', 'emoji');
+const synonymsPath = path.join(scriptDir, 'emoji-synonyms.json');
 
 function resolvePackageRoot() {
   const packageJsonPath = require.resolve('emoji-datasource-apple/package.json');
@@ -37,32 +38,81 @@ function codepointsToChar(unified) {
   return String.fromCodePoint(...codepoints);
 }
 
+function normalizeHexcode(hexcode) {
+  return hexcode
+    .split('-')
+    .filter((cp) => cp.toUpperCase() !== 'FE0F')
+    .join('-')
+    .toUpperCase();
+}
+
+async function loadRussianKeywords() {
+  const russianDataPath = require.resolve('emojibase-data/ru/data.json');
+  const raw = JSON.parse(await readFile(russianDataPath, 'utf8'));
+
+  const map = new Map();
+  function addRecord(record) {
+    const words = [record.label, ...(record.tags ?? [])]
+      .filter((v) => typeof v === 'string' && v.length > 0)
+      .map((v) => v.toLowerCase());
+    map.set(normalizeHexcode(record.hexcode), words);
+    if (Array.isArray(record.skins)) record.skins.forEach(addRecord);
+  }
+  raw.forEach(addRecord);
+  return map;
+}
+
+async function loadSynonyms() {
+  const raw = JSON.parse(await readFile(synonymsPath, 'utf8'));
+  return new Map(Object.entries(raw));
+}
+
 async function main() {
   const packageRoot = resolvePackageRoot();
   const emojiJsonPath = path.join(packageRoot, 'emoji.json');
   const imageDir = path.join(packageRoot, 'img', 'apple', String(CELL));
 
   const raw = JSON.parse(await readFile(emojiJsonPath, 'utf8'));
+  const russianKeywords = await loadRussianKeywords();
+  const synonyms = await loadSynonyms();
+
+  let missingRussian = 0;
 
   const entries = raw
     .filter((record) => record.has_img_apple && !record.obsoleted_by && record.category !== 'Component')
-    .map((record) => ({
-      unified: record.unified,
-      category: record.category,
-      sortOrder: record.sort_order,
-      keywords: Array.from(
+    .map((record) => {
+      const key = normalizeHexcode(record.unified);
+      const russian = russianKeywords.get(key);
+      if (!russian) missingRussian += 1;
+
+      const keywords = Array.from(
         new Set(
-          [record.short_name, ...(record.short_names ?? []), record.name]
+          [
+            record.short_name,
+            ...(record.short_names ?? []),
+            record.name,
+            ...(russian ?? []),
+            ...(synonyms.get(key) ?? []),
+          ]
             .filter((v) => typeof v === 'string' && v.length > 0)
             .map((v) => v.toLowerCase()),
         ),
-      ),
-    }))
+      );
+
+      return {
+        unified: record.unified,
+        category: record.category,
+        sortOrder: record.sort_order,
+        keywords,
+      };
+    })
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   if (entries.length === 0) {
     throw new Error('emoji.json не дал ни одной записи с has_img_apple — проверь версию emoji-datasource-apple');
   }
+
+  console.log(`Без русских слов осталось: ${missingRussian} из ${entries.length}`);
 
   const rows = Math.ceil(entries.length / COLS);
   const categoryOrder = [];
