@@ -65,6 +65,12 @@ interface LeavingRow {
   index: number;
 }
 
+interface DaySection {
+  key: RowKey;
+  iso: string;
+  entries: RenderRow[];
+}
+
 /** Ключ строки держится за `albumId`, а не за id первого сообщения: удаление первого снимка
  *  альбома иначе сменило бы ключ и пересоздало строку целиком вместо перекладки мозаики.
  *  Порядковый суффикс нужен альбому длиннее десяти — `groupAlbums` рвёт его на две строки
@@ -414,6 +420,19 @@ export function MessageList({
     return result;
   }, [renderRows, leavingRows]);
 
+  const daySections = useMemo<DaySection[]>(() => {
+    const sections: DaySection[] = [];
+    for (const entry of displayEntries) {
+      const current = sections[sections.length - 1];
+      if (!current || entry.row.showDay) {
+        sections.push({ key: `day-${entry.key}`, iso: entry.row.message.createdAt, entries: [entry] });
+      } else {
+        current.entries.push(entry);
+      }
+    }
+    return sections;
+  }, [displayEntries]);
+
   return (
     <>
       {pinnedMessage &&
@@ -455,23 +474,28 @@ export function MessageList({
           <p className={styles.empty}>Нет связи. История не загружена.</p>
         )}
 
-        {displayEntries.map((entry) => (
-          <MessageListRow
-            key={entry.key}
-            entry={entry}
-            leaving={leavingRows.has(entry.key)}
-            chatId={chatId}
-            myId={myId}
-            isGroup={isGroup}
-            unreadCount={unreadCount}
-            onReply={onReply}
-            onEdit={onEdit}
-            onForwardRequest={onForwardRequest}
-            onToggleReaction={toggleReaction}
-            onLeaveDone={handleLeaveDone}
-            listRef={listRef}
-            stuckToBottomRef={stuckToBottom}
-          />
+        {daySections.map((section) => (
+          <div key={section.key} className={styles.daySection}>
+            <DateDivider iso={section.iso} />
+            {section.entries.map((entry) => (
+              <MessageListRow
+                key={entry.key}
+                entry={entry}
+                leaving={leavingRows.has(entry.key)}
+                chatId={chatId}
+                myId={myId}
+                isGroup={isGroup}
+                unreadCount={unreadCount}
+                onReply={onReply}
+                onEdit={onEdit}
+                onForwardRequest={onForwardRequest}
+                onToggleReaction={toggleReaction}
+                onLeaveDone={handleLeaveDone}
+                listRef={listRef}
+                stuckToBottomRef={stuckToBottom}
+              />
+            ))}
+          </div>
         ))}
 
         {typing && (
@@ -536,7 +560,7 @@ const MessageListRow = memo(function MessageListRow({
   stuckToBottomRef: React.RefObject<boolean>;
 }) {
   const { row, own, read, isReal, canEdit, canDelete, canPin, canReply, canReact, isPinned, showUnread } = entry;
-  const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext, showDay } = row;
+  const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext } = row;
 
   const shellRef = useRef<HTMLDivElement>(null);
   const [collapsing, setCollapsing] = useState(false);
@@ -598,7 +622,6 @@ const MessageListRow = memo(function MessageListRow({
 
   return (
     <>
-      {showDay && <DateDivider iso={message.createdAt} />}
       {showUnread && <UnreadDivider count={unreadCount} />}
 
       <div

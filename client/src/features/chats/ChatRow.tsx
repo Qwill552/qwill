@@ -6,6 +6,7 @@ import { callPreviewText, callSymbolIcon, isUnansweredCall } from '../calls/call
 import { OfficialMark } from '../chat/OfficialMark';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../chat/serviceChat';
 import { parseEmoji } from '../emoji/parseEmoji';
+import { formatChatRowWhen } from '../messages/dayLabel';
 import { isVoiceAttachment } from '../messages/Attachment';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { useChatStore } from '../../stores/chatStore';
@@ -26,23 +27,6 @@ interface ChatRowProps {
   myUserId: string | null;
   /** Порядковый номер в списке — задержка входной анимации, буквально i*0.045s из референса. */
   index: number;
-}
-
-/** Время последнего сообщения: сегодняшнее — часами, вчерашнее — «вчера», старше — датой.
- *  Иначе в списке из старых чатов все строки показывают одно и то же бессмысленное время. */
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  if (sameDay) return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'вчера';
-
-  if (date.getFullYear() === now.getFullYear())
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 function isVoice(chat: ChatListItemDto): boolean {
@@ -198,7 +182,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
             {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
                 «отправлено». Двойная галочка появится вместе с этими данными. */}
             {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
-            {last && <span className={styles.time}>{formatWhen(last.createdAt)}</span>}
+            {last && <span className={styles.time}>{formatChatRowWhen(last.createdAt)}</span>}
           </div>
           <div className={styles.bottom}>
             {typing ? (

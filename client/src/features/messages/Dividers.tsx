@@ -1,19 +1,5 @@
+import { formatDayLabel } from './dayLabel';
 import styles from './Dividers.module.css';
-
-function formatDayLabel(iso: string): string {
-  const date = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) return 'Сегодня';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
-  return date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
-  });
-}
 
 /** Липкая пилюля с датой: висит над лентой, пока идут сообщения этого дня. */
 export function DateDivider({ iso }: { iso: string }) {
