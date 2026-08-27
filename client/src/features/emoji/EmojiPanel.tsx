@@ -12,6 +12,7 @@ import { EmojiCategories } from './EmojiCategories';
 import { EmojiGrid } from './EmojiGrid';
 import { buildEmojiLayout, type EmojiSection } from './emojiLayout';
 import { useEmojiIndex, type EmojiEntry, type EmojiIndex } from './emojiIndex';
+import { scoreEmojiEntry, tokenizeEmojiQuery } from './emojiSearch';
 import { useEmojiUsageStore } from './emojiUsageStore';
 import styles from './EmojiPanel.module.css';
 
@@ -25,27 +26,17 @@ interface EmojiPanelProps {
   anchor?: DOMRect | null;
 }
 
-function matchTier(entry: EmojiEntry, trimmed: string): number {
-  let best = 4;
-  for (const keyword of entry.k) {
-    if (keyword === trimmed) return 1;
-    if (best > 2 && keyword.startsWith(trimmed)) best = 2;
-    else if (best > 3 && keyword.includes(trimmed)) best = 3;
-  }
-  return best;
-}
-
 function buildSections(index: EmojiIndex | null | undefined, recent: string[], query: string): EmojiSection[] {
   if (!index) return [];
 
-  const trimmed = query.trim().toLowerCase();
-  if (trimmed) {
+  const tokens = tokenizeEmojiQuery(query);
+  if (tokens.length > 0) {
     const recentSet = new Set(recent);
     const ranked = index.emoji
-      .map((entry) => ({ entry, tier: matchTier(entry, trimmed) }))
-      .filter(({ tier }) => tier < 4)
+      .map((entry) => ({ entry, score: scoreEmojiEntry(entry, tokens) }))
+      .filter((candidate): candidate is { entry: EmojiEntry; score: number } => candidate.score !== null)
       .sort((a, b) => {
-        if (a.tier !== b.tier) return a.tier - b.tier;
+        if (a.score !== b.score) return a.score - b.score;
         const aRecent = recentSet.has(a.entry.e);
         const bRecent = recentSet.has(b.entry.e);
         if (aRecent !== bRecent) return aRecent ? -1 : 1;
