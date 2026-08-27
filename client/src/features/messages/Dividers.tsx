@@ -1,12 +1,10 @@
-import type { Ref } from 'react';
-
 import { formatDayLabel } from './dayLabel';
 import styles from './Dividers.module.css';
 
-/** Липкая пилюля с датой: одна на всю ленту, текст меняется на текущий день по скроллу. */
-export function DateDivider({ iso, pillRef }: { iso: string; pillRef?: Ref<HTMLDivElement> }) {
+/** Липкая пилюля с датой: висит над лентой, пока идут сообщения этого дня. */
+export function DateDivider({ iso }: { iso: string }) {
   return (
-    <div ref={pillRef} className={styles.dayWrap}>
+    <div className={styles.dayWrap}>
       <span className={styles.day}>{formatDayLabel(iso)}</span>
     </div>
   );

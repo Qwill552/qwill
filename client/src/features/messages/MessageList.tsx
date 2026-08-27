@@ -155,12 +155,6 @@ export function MessageList({
   const prependAnchor = useRef<number | null>(null);
   const [showJump, setShowJump] = useState(false);
 
-  const pillRef = useRef<HTMLDivElement>(null);
-  const sectionNodes = useRef<Map<RowKey, HTMLDivElement>>(new Map());
-  const activeDayIsoRef = useRef<string | null>(null);
-  const activeDayFrame = useRef(0);
-  const [activeDayIso, setActiveDayIso] = useState<string | null>(null);
-
   const myRole = members?.find((m) => m.userId === myId)?.role;
   const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
   /** Приватный чат — закреплять может любой участник; группа — только OWNER/ADMIN
@@ -287,13 +281,6 @@ export function MessageList({
     stuckToBottom.current = distance < STICK_THRESHOLD;
     if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
     else if (distance < STICK_THRESHOLD) setShowJump(false);
-
-    if (!activeDayFrame.current) {
-      activeDayFrame.current = requestAnimationFrame(() => {
-        activeDayFrame.current = 0;
-        updateActiveDay();
-      });
-    }
   }
 
   function handleLoadMore(): void {
@@ -446,41 +433,6 @@ export function MessageList({
     return sections;
   }, [displayEntries]);
 
-  function updateActiveDay(): void {
-    if (daySections.length === 0) {
-      if (activeDayIsoRef.current !== null) {
-        activeDayIsoRef.current = null;
-        setActiveDayIso(null);
-      }
-      return;
-    }
-    const line = pillRef.current?.getBoundingClientRect().bottom;
-    let current: DaySection;
-    if (line === undefined) {
-      current = daySections[daySections.length - 1]!;
-    } else {
-      current = daySections[0]!;
-      for (const section of daySections) {
-        const node = sectionNodes.current.get(section.key);
-        if (!node) continue;
-        if (node.getBoundingClientRect().top <= line) current = section;
-        else break;
-      }
-    }
-    if (current.iso !== activeDayIsoRef.current) {
-      activeDayIsoRef.current = current.iso;
-      setActiveDayIso(current.iso);
-    }
-  }
-
-  useLayoutEffect(() => {
-    updateActiveDay();
-  }, [daySections]);
-
-  useEffect(() => {
-    return () => cancelAnimationFrame(activeDayFrame.current);
-  }, []);
-
   return (
     <>
       {pinnedMessage &&
@@ -522,17 +474,9 @@ export function MessageList({
           <p className={styles.empty}>Нет связи. История не загружена.</p>
         )}
 
-        {activeDayIso && <DateDivider iso={activeDayIso} pillRef={pillRef} />}
-
         {daySections.map((section) => (
-          <div
-            key={section.key}
-            className={styles.daySection}
-            ref={(node) => {
-              if (node) sectionNodes.current.set(section.key, node);
-              else sectionNodes.current.delete(section.key);
-            }}
-          >
+          <div key={section.key} className={styles.daySection}>
+            <DateDivider iso={section.iso} />
             {section.entries.map((entry) => (
               <MessageListRow
                 key={entry.key}
