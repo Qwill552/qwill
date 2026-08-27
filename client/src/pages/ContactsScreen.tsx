@@ -2,6 +2,8 @@ import type { AvatarColor } from '@messenger/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import card from '../app/desktopCard.module.css';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { EmptyState } from '../features/chats/EmptyState';
 import { isEmptyPrivateChat } from '../features/chats/visibleChats';
 import { useChatStore } from '../stores/chatStore';
@@ -67,6 +69,7 @@ function CallIcon() {
  *  человека остаётся на своём месте (кнопка «Написать» на вкладке «Сообщения»). */
 export function ContactsScreen() {
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   const chats = useChatStore((s) => s.chats);
   const loadChats = useChatStore((s) => s.loadChats);
   const presenceByUser = useChatStore((s) => s.presenceByUser);
@@ -117,7 +120,7 @@ export function ContactsScreen() {
         <SearchField value={query} onChange={setQuery} placeholder="Поиск контактов" />
       </div>
 
-      <div ref={listRef} className={`${styles.list} hide-native-scrollbar`}>
+      <div ref={listRef} className={`${styles.list} ${isDesktop ? card.root : ''} hide-native-scrollbar`}>
         <ScrollIndicator target={listRef} />
         <Card className={styles.cardReset}>
           <div className={styles.entryRow}>

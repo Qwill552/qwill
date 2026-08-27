@@ -6,6 +6,8 @@ import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
 import { updateProfileRequest } from '../api/users';
+import card from '../app/desktopCard.module.css';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { useAuthStore } from '../stores/authStore';
@@ -32,6 +34,7 @@ import styles from './ProfileScreen.module.css';
 
 export function ProfileScreen() {
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
 
@@ -109,7 +112,10 @@ export function ProfileScreen() {
 
   return (
     <div className={styles.screen}>
-      <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
+      <div
+        ref={scrollerRef}
+        className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}
+      >
         <ScrollIndicator target={scrollerRef} />
         <div className={styles.hero}>
           {avatarUrl ? (
@@ -168,16 +174,16 @@ export function ProfileScreen() {
           onChange={handleAvatarChange}
         />
 
-        <div className={styles.actions}>
+        <div className={isDesktop ? card.actionRow : styles.actions}>
           {actions.map((action) => (
             <button
               key={action.label}
               type="button"
-              className={styles.action}
+              className={isDesktop ? card.actionTile : styles.action}
               onClick={action.onClick}
               disabled={action.disabled}
             >
-              <Icon name={action.icon} size={23} />
+              <Icon name={action.icon} size={23} className={isDesktop ? card.actionTileIcon : undefined} />
               {action.label}
             </button>
           ))}

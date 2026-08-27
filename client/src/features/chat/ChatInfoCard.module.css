@@ -1,6 +1,5 @@
 .scroller {
   height: 100%;
-  --tile-ink-override: var(--text-primary);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -46,68 +45,11 @@
 }
 
 .actions {
-  display: flex;
-  gap: var(--space-2);
   padding: 0 var(--card-inset) var(--space-4);
-}
-
-.action {
-  display: flex;
-  overflow: hidden;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-width: 0;
-  height: 72px;
-  padding: 0 var(--space-1);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-md);
-  background: var(--card-bg);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: var(--font-caption);
-  cursor: pointer;
-  transition: background var(--transition);
-}
-
-@media (hover: hover) {
-  .action:hover {
-    background: var(--hover-row);
-  }
-}
-
-.action:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-}
-
-.action:active {
-  background: var(--primary-soft);
-}
-
-.actionIcon {
-  color: var(--text-primary);
 }
 
 .tallyRow.tallyRow {
   --row-divider-inset: 0;
-}
-
-.tallyRow svg {
-  stroke-width: 1.5;
-}
-
-:global(:root[data-theme='light']) .tallyRow,
-:global([data-theme='light']) .tallyRow {
-  --tile-ink-override: color-mix(in srgb, var(--text-primary) 65%, var(--text-secondary));
-}
-
-:global(:root[data-theme='light']) .scroller,
-:global([data-theme='light']) .scroller {
-  --card-surface-override: var(--card-bg);
-  --card-surface-border-override: var(--card-border);
 }
 
 .username {

@@ -19,6 +19,12 @@
   gap: 14px;
 }
 
+@media (min-width: 900px) {
+  .scroller {
+    padding: var(--space-4) var(--card-inset);
+  }
+}
+
 .cardReset {
   margin: 0;
 }

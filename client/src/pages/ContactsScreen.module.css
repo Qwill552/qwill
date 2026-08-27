@@ -190,3 +190,17 @@
 .statusOnline {
   color: var(--online);
 }
+
+@media (min-width: 900px) {
+  .top {
+    padding: var(--space-3) var(--card-inset) var(--space-2);
+  }
+
+  .list {
+    padding: 0 var(--card-inset) var(--space-4);
+  }
+
+  .row {
+    padding: 6px 15px;
+  }
+}

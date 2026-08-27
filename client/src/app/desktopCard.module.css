@@ -1,0 +1,63 @@
+.root {
+  --tile-ink-override: var(--text-primary);
+}
+
+:global(:root[data-theme='light']) .root,
+:global([data-theme='light']) .root {
+  --card-surface-override: var(--card-bg);
+  --card-surface-border-override: var(--card-border);
+}
+
+.actionRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actionTile {
+  display: flex;
+  overflow: hidden;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
+  height: 72px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-caption);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+@media (hover: hover) {
+  .actionTile:hover {
+    background: var(--hover-row);
+  }
+}
+
+.actionTile:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.actionTile:active {
+  background: var(--primary-soft);
+}
+
+.actionTileIcon {
+  color: var(--text-primary);
+}
+
+.tileStroke svg {
+  stroke-width: 1.5;
+}
+
+:global(:root[data-theme='light']) .tileStroke,
+:global([data-theme='light']) .tileStroke {
+  --tile-ink-override: color-mix(in srgb, var(--text-primary) 65%, var(--text-secondary));
+}

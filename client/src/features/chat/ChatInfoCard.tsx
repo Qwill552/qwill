@@ -6,6 +6,7 @@ import { useCallStore } from '../../stores/callStore';
 import { useChatStore } from '../../stores/chatStore';
 import { formatLastSeen } from '../../utils/presence';
 import { openAvatarViewer } from '../media/avatarViewerStore';
+import card from '../../app/desktopCard.module.css';
 import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
 import { Icon } from '../../ui/Icon';
@@ -117,7 +118,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   ];
 
   return (
-    <div className={`${styles.scroller} hide-native-scrollbar`}>
+    <div className={`${styles.scroller} ${card.root} hide-native-scrollbar`}>
       <div className={styles.hero}>
         {avatarUrl ? (
           <button
@@ -137,36 +138,36 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
         </span>
       </div>
 
-      <div className={styles.actions}>
-        <button type="button" className={styles.action} onClick={() => navigate(`/chats/${chatId}`)}>
-          <Icon name="chat-filled" size={22} solid className={styles.actionIcon} />
+      <div className={`${styles.actions} ${card.actionRow}`}>
+        <button type="button" className={card.actionTile} onClick={() => navigate(`/chats/${chatId}`)}>
+          <Icon name="chat-filled" size={22} solid className={card.actionTileIcon} />
           Чат
         </button>
         <button
           type="button"
-          className={styles.action}
+          className={card.actionTile}
           aria-pressed={muted}
           onClick={() => {
             setChatMuted(chatId, !muted).catch(() => undefined);
           }}
         >
-          <Icon name={muted ? 'mute' : 'bell-filled'} size={22} solid={!muted} className={styles.actionIcon} />
+          <Icon name={muted ? 'mute' : 'bell-filled'} size={22} solid={!muted} className={card.actionTileIcon} />
           Звук
         </button>
-        <button type="button" className={styles.action} onClick={() => void startCall(chatId, 'AUDIO')}>
-          <Icon name="phone-filled" size={22} solid className={styles.actionIcon} />
+        <button type="button" className={card.actionTile} onClick={() => void startCall(chatId, 'AUDIO')}>
+          <Icon name="phone-filled" size={22} solid className={card.actionTileIcon} />
           Звонок
         </button>
         <button
           type="button"
-          className={styles.action}
+          className={card.actionTile}
           aria-haspopup="menu"
           aria-expanded={menuAnchor !== null}
           onClick={(event: MouseEvent<HTMLButtonElement>) =>
             setMenuAnchor(event.currentTarget.getBoundingClientRect())
           }
         >
-          <Icon name="more-horizontal" size={22} className={styles.actionIcon} />
+          <Icon name="more-horizontal" size={22} className={card.actionTileIcon} />
           Ещё
         </button>
       </div>
@@ -192,7 +193,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
               title={row.label}
               icon={row.icon}
               tint="blue"
-              className={styles.tallyRow}
+              className={`${styles.tallyRow} ${card.tileStroke}`}
             />
           ))}
         </Card>
