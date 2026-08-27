@@ -132,14 +132,12 @@
 @keyframes popIn {
   from {
     transform: scale(0.94) translateY(8px);
-    opacity: 0;
   }
 }
 
 @keyframes popOut {
   to {
     transform: scale(0.94) translateY(8px);
-    opacity: 0;
   }
 }
 
