@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { cropImageToAvatarFile } from '../../api/files';
+import { cropGifToAvatarFile, cropImageToAvatarFile, isGifFile } from '../../api/files';
 import { DesktopScreenModal } from '../../app/DesktopScreenModal';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { Sheet } from '../../ui/Sheet';
@@ -26,6 +26,8 @@ interface Pointer {
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const IDENTITY: Transform = { scale: 1, x: 0, y: 0 };
+/** Множитель на один «щелчок» колеса (~100px deltaY) — подобрано на ощупь под пинч-жест. */
+const WHEEL_SENSITIVITY = 0.0015;
 
 function summarize(pointers: Map<number, Pointer>): { x: number; y: number; spread: number } {
   const points = [...pointers.values()];
@@ -122,6 +124,31 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
     }
   }
 
+  /** Пинч недоступен мыши — колесо повторяет ту же математику зума от точки, только с одним
+   *  «пальцем», зафиксированным под курсором. */
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>): void {
+    if (!image) return;
+    event.preventDefault();
+    const rect = frameRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const pointerX = event.clientX - centerX;
+    const pointerY = event.clientY - centerY;
+    const factor = Math.exp(-event.deltaY * WHEEL_SENSITIVITY);
+
+    setTransform((current) => {
+      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor));
+      const applied = scale / current.scale;
+      return clampTransform({
+        scale,
+        x: pointerX - (pointerX - current.x) * applied,
+        y: pointerY - (pointerY - current.y) * applied,
+      });
+    });
+  }
+
   async function handleDone(): Promise<void> {
     if (!image || !baseScale || pending) return;
     setPending(true);
@@ -134,7 +161,8 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
         0,
         Math.min(image.naturalHeight - side, image.naturalHeight / 2 - transform.y / shown - side / 2),
       );
-      onCropped(await cropImageToAvatarFile(image, { x, y, width: side, height: side }));
+      const rect = { x, y, width: side, height: side };
+      onCropped(isGifFile(file) ? await cropGifToAvatarFile(file, rect) : await cropImageToAvatarFile(image, rect));
     } catch {
       setError('Не удалось обрезать изображение');
       setPending(false);
@@ -151,6 +179,7 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onWheel={handleWheel}
         >
           {image && imageUrl && (
             <img
@@ -169,7 +198,9 @@ export function AvatarCropSheet({ file, onClose, onCropped }: AvatarCropSheetPro
       </div>
 
       <p className={styles.hint}>
-        {desktop ? 'Перетащите фото мышью, чтобы выбрать нужную область' : 'Двигайте фото пальцем, масштабируйте щипком'}
+        {desktop
+          ? 'Перетащите фото мышью, масштабируйте колесом'
+          : 'Двигайте фото пальцем, масштабируйте щипком'}
       </p>
       {error && <p className={styles.error}>{error}</p>}
 

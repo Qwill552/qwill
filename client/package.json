@@ -21,6 +21,8 @@
     "@capacitor/push-notifications": "^8.1.2",
     "@messenger/shared": "*",
     "@noble/hashes": "^1.8.0",
+    "gifenc": "^1.0.3",
+    "gifuct-js": "^2.1.2",
     "idb": "^7.1.1",
     "livekit-client": "^2.21.0",
     "react": "^19.2.8",

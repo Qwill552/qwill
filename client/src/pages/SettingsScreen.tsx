@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
-import { isGifFile, uploadFile } from '../api/files';
+import { uploadFile } from '../api/files';
 import { isApkUpdateSupported, selectUpdateAvailable, useAppUpdateStore } from '../app/appUpdate';
 import { countPendingOutbox } from '../cache/outbox';
 import { formatBytes } from '../features/messages/Attachment';
@@ -83,10 +83,6 @@ export function SettingsScreen() {
     event.target.value = '';
     if (!file) return;
     setError(null);
-    if (isGifFile(file)) {
-      void uploadAvatar(file);
-      return;
-    }
     setCropSource(file);
   }
 

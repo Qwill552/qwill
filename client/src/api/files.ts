@@ -8,7 +8,7 @@ import {
 } from '@messenger/shared';
 
 import { API_URL, apiFetch, apiRequest, ApiError } from './client';
-import { canvasToJpegBlob, downscaleInSteps, fitDimensions, type SourceRect } from './imageCanvas';
+import { canvasToJpegBlob, downscaleInSteps, drawScaled, fitDimensions, type SourceRect } from './imageCanvas';
 import { hashBlob } from './mediaTasks';
 
 function initUploadRequest(input: InitUploadInput): Promise<InitUploadResponse> {
@@ -146,6 +146,78 @@ export function cropImageToAvatarFile(image: HTMLImageElement, rect: SourceRect)
   const side = Math.min(AVATAR_MAX_DIMENSION, Math.round(rect.width));
   const canvas = downscaleInSteps(image, rect, { width: side, height: side });
   return canvasToJpegFile(canvas, 'avatar.jpg', AVATAR_JPEG_QUALITY);
+}
+
+interface DisposalPending {
+  clearRect?: { left: number; top: number; width: number; height: number };
+  restore?: ImageData;
+}
+
+/**
+ * Кадрирование через `cropImageToAvatarFile` идёт через canvas одного кадра — для GIF это
+ * плющит анимацию. Здесь каждый кадр перерисовывается на общий холст по правилам GIF
+ * (disposalType 2/3 — не просто copy), кадрируется и уходит в тот же 256-цветный кодер,
+ * а не в JPEG.
+ */
+export async function cropGifToAvatarFile(file: File, rect: SourceRect): Promise<File> {
+  const [{ parseGIF, decompressFrames }, { GIFEncoder, quantize, applyPalette }] = await Promise.all([
+    import('gifuct-js'),
+    import('gifenc'),
+  ]);
+
+  const parsed = parseGIF(await file.arrayBuffer());
+  const frames = decompressFrames(parsed, true);
+  const canvasWidth = parsed.lsd.width;
+  const canvasHeight = parsed.lsd.height;
+
+  const composite = document.createElement('canvas');
+  composite.width = canvasWidth;
+  composite.height = canvasHeight;
+  const compositeCtx = composite.getContext('2d', { willReadFrequently: true });
+  if (!compositeCtx) throw new Error('Canvas недоступен');
+
+  const side = Math.min(AVATAR_MAX_DIMENSION, Math.round(rect.width));
+  const encoder = GIFEncoder();
+  let pending: DisposalPending | null = null;
+
+  for (const frame of frames) {
+    if (pending?.restore) {
+      compositeCtx.putImageData(pending.restore, 0, 0);
+    } else if (pending?.clearRect) {
+      const { left, top, width, height } = pending.clearRect;
+      compositeCtx.clearRect(left, top, width, height);
+    }
+    pending = null;
+
+    const preDrawSnapshot =
+      frame.disposalType === 3 ? compositeCtx.getImageData(0, 0, canvasWidth, canvasHeight) : null;
+
+    const patchCanvas = document.createElement('canvas');
+    patchCanvas.width = frame.dims.width;
+    patchCanvas.height = frame.dims.height;
+    const patchCtx = patchCanvas.getContext('2d');
+    if (!patchCtx) throw new Error('Canvas недоступен');
+    patchCtx.putImageData(new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height), 0, 0);
+    compositeCtx.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
+
+    const cropped = drawScaled(composite, rect, side, side);
+    const croppedCtx = cropped.getContext('2d');
+    if (!croppedCtx) throw new Error('Canvas недоступен');
+    const { data } = croppedCtx.getImageData(0, 0, side, side);
+
+    const palette = quantize(data, 256);
+    const index = applyPalette(data, palette);
+    encoder.writeFrame(index, side, side, { palette, delay: frame.delay });
+
+    if (frame.disposalType === 2) {
+      pending = { clearRect: frame.dims };
+    } else if (frame.disposalType === 3 && preDrawSnapshot) {
+      pending = { restore: preDrawSnapshot };
+    }
+  }
+
+  encoder.finish();
+  return new File([new Uint8Array(encoder.bytes())], 'avatar.gif', { type: 'image/gif' });
 }
 
 export interface ThumbnailResult {

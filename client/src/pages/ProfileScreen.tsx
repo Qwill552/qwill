@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
-import { isGifFile, uploadFile } from '../api/files';
+import { uploadFile } from '../api/files';
 import { updateProfileRequest } from '../api/users';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
@@ -62,10 +62,6 @@ export function ProfileScreen() {
     event.target.value = '';
     if (!file) return;
     setError(null);
-    if (isGifFile(file)) {
-      void uploadAvatar(file);
-      return;
-    }
     setCropSource(file);
   }
 
