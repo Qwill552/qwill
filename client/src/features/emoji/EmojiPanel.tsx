@@ -1,3 +1,4 @@
+import { layoutVariants } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -26,16 +27,35 @@ interface EmojiPanelProps {
   anchor?: DOMRect | null;
 }
 
+interface EmojiMatch {
+  entry: EmojiEntry;
+  score: number;
+  isOriginal: boolean;
+}
+
+function bestMatch(entry: EmojiEntry, variantTokens: string[][]): EmojiMatch | null {
+  let best: EmojiMatch | null = null;
+  variantTokens.forEach((tokens, variantIndex) => {
+    const score = scoreEmojiEntry(entry, tokens);
+    if (score === null) return;
+    const isOriginal = variantIndex === 0;
+    if (!best || score < best.score) best = { entry, score, isOriginal };
+  });
+  return best;
+}
+
 function buildSections(index: EmojiIndex | null | undefined, recent: string[], query: string): EmojiSection[] {
   if (!index) return [];
 
-  const tokens = tokenizeEmojiQuery(query);
-  if (tokens.length > 0) {
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length > 0) {
+    const variantTokens = layoutVariants(trimmedQuery).map((variant) => tokenizeEmojiQuery(variant));
     const recentSet = new Set(recent);
     const ranked = index.emoji
-      .map((entry) => ({ entry, score: scoreEmojiEntry(entry, tokens) }))
-      .filter((candidate): candidate is { entry: EmojiEntry; score: number } => candidate.score !== null)
+      .map((entry) => bestMatch(entry, variantTokens))
+      .filter((candidate): candidate is EmojiMatch => candidate !== null)
       .sort((a, b) => {
+        if (a.isOriginal !== b.isOriginal) return a.isOriginal ? -1 : 1;
         if (a.score !== b.score) return a.score - b.score;
         const aRecent = recentSet.has(a.entry.e);
         const bRecent = recentSet.has(b.entry.e);

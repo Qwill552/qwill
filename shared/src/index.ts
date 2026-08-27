@@ -5,6 +5,7 @@ export * from './constants.js';
 export * from './emoji.js';
 export * from './errors.js';
 export * from './files.js';
+export * from './keyboardLayout.js';
 export * from './push.js';
 export * from './search.js';
 export * from './socket.js';

@@ -1,5 +1,5 @@
 import type { ChatSearchResult, SearchResultsDto, UserSearchResult } from '@messenger/shared';
-import { SEARCH_PAGE_SIZE } from '@messenger/shared';
+import { layoutVariants, SEARCH_PAGE_SIZE } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { toAvatarColor } from '../lib/avatarColor.js';
@@ -44,38 +44,49 @@ function previewOf(message: LastMessage | undefined): string | null {
 }
 
 interface Query {
-  needle: string;
+  needles: string[];
   usernamesOnly: boolean;
   exactOnly: boolean;
 }
 
 function parseQuery(raw: string): Query {
   const usernamesOnly = raw.startsWith('@');
-  const needle = (usernamesOnly ? raw.slice(1) : raw).trim();
-  return { needle, usernamesOnly, exactOnly: needle.length < PREFIX_MIN_LENGTH };
+  const trimmed = (usernamesOnly ? raw.slice(1) : raw).trim();
+  return { needles: layoutVariants(trimmed), usernamesOnly, exactOnly: trimmed.length < PREFIX_MIN_LENGTH };
 }
 
 function startsWithWord(needle: string): Prisma.StringFilter {
   return { contains: ` ${needle}`, mode: insensitive };
 }
 
-function userMatches({ needle, usernamesOnly, exactOnly }: Query): Prisma.UserWhereInput {
+function userMatches({ needles, usernamesOnly, exactOnly }: Query): Prisma.UserWhereInput {
   if (exactOnly) {
-    const byUsername = { username: { equals: needle, mode: insensitive } };
-    if (usernamesOnly) return byUsername;
-    return { OR: [byUsername, { displayName: { equals: needle, mode: insensitive } }] };
+    return {
+      OR: needles.flatMap((needle) => {
+        const byUsername = { username: { equals: needle, mode: insensitive } };
+        return usernamesOnly ? [byUsername] : [byUsername, { displayName: { equals: needle, mode: insensitive } }];
+      }),
+    };
   }
 
-  const byUsername = { username: { startsWith: needle, mode: insensitive } };
-  if (usernamesOnly) return byUsername;
   return {
-    OR: [byUsername, { displayName: { startsWith: needle, mode: insensitive } }, { displayName: startsWithWord(needle) }],
+    OR: needles.flatMap((needle) => {
+      const byUsername = { username: { startsWith: needle, mode: insensitive } };
+      return usernamesOnly
+        ? [byUsername]
+        : [byUsername, { displayName: { startsWith: needle, mode: insensitive } }, { displayName: startsWithWord(needle) }];
+    }),
   };
 }
 
-function titleMatches({ needle, exactOnly }: Query): Prisma.ChatWhereInput {
-  if (exactOnly) return { title: { equals: needle, mode: insensitive } };
-  return { OR: [{ title: { startsWith: needle, mode: insensitive } }, { title: startsWithWord(needle) }] };
+function titleMatches({ needles, exactOnly }: Query): Prisma.ChatWhereInput {
+  if (exactOnly) return { OR: needles.map((needle) => ({ title: { equals: needle, mode: insensitive } })) };
+  return {
+    OR: needles.flatMap((needle) => [
+      { title: { startsWith: needle, mode: insensitive } },
+      { title: startsWithWord(needle) },
+    ]),
+  };
 }
 
 function rankOf(candidate: { username: string; displayName: string }, needle: string): number {
@@ -87,6 +98,24 @@ function rankOf(candidate: { username: string; displayName: string }, needle: st
   if (username.startsWith(query)) return 1;
   if (displayName.startsWith(query)) return 2;
   return 3;
+}
+
+function matchesNeedle(candidate: { username: string; displayName: string }, needle: string, usernamesOnly: boolean, exactOnly: boolean): boolean {
+  const query = needle.toLowerCase();
+  const username = candidate.username.toLowerCase();
+  const displayName = candidate.displayName.toLowerCase();
+
+  if (exactOnly) return username === query || (!usernamesOnly && displayName === query);
+  if (username.startsWith(query)) return true;
+  if (usernamesOnly) return false;
+  return displayName.startsWith(query) || displayName.includes(` ${query}`);
+}
+
+function bestNeedleFor(candidate: { username: string; displayName: string }, query: Query): { needle: string; isOriginal: boolean } {
+  const original = query.needles[0] ?? '';
+  const converted = query.needles[1];
+  if (matchesNeedle(candidate, original, query.usernamesOnly, query.exactOnly)) return { needle: original, isOriginal: true };
+  return { needle: converted ?? original, isOriginal: false };
 }
 
 async function searchChats(query: Query, userId: string): Promise<ChatSearchResult[]> {
@@ -152,7 +181,10 @@ async function searchUsers(query: Query, userId: string, excludeIds: Set<string>
 
   return candidates
     .sort((a, b) => {
-      const byRank = rankOf(a, query.needle) - rankOf(b, query.needle);
+      const aBest = bestNeedleFor(a, query);
+      const bBest = bestNeedleFor(b, query);
+      if (aBest.isOriginal !== bBest.isOriginal) return aBest.isOriginal ? -1 : 1;
+      const byRank = rankOf(a, aBest.needle) - rankOf(b, bBest.needle);
       return byRank !== 0 ? byRank : a.displayName.localeCompare(b.displayName, 'ru');
     })
     .map((candidate) => ({
@@ -168,7 +200,7 @@ async function searchUsers(query: Query, userId: string, excludeIds: Set<string>
 
 export async function search(raw: string, userId: string): Promise<SearchResultsDto> {
   const query = parseQuery(raw);
-  if (query.needle.length === 0) return { chats: [], users: [] };
+  if ((query.needles[0] ?? '').length === 0) return { chats: [], users: [] };
 
   const chats = await searchChats(query, userId);
 
