@@ -39,6 +39,10 @@
   gap: var(--message-gap);
 }
 
+.daySection:not(:first-child) {
+  margin-top: var(--space-2);
+}
+
 .daySection > * {
   flex-shrink: 0;
 }
