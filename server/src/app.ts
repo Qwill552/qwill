@@ -4,7 +4,8 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 
-import { isAllowedClientOrigin } from './config/env.js';
+import { env, isAllowedClientOrigin } from './config/env.js';
+import { cardHostMiddleware } from './http/cardHost.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
 import { generalLimiter } from './http/middleware/rateLimit.js';
 import { adminRouter } from './http/routes/admin.js';
@@ -31,11 +32,25 @@ export function createApp(): Express {
   app.disable('x-powered-by');
 
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/health' } }));
+
+  // Домен песочницы визиток — до cookie-parser, CORS и всей аутентификации: его маршруты
+  // не должны иметь доступа к сессии вообще (R-30, server/src/http/cardHost.ts).
+  app.use(cardHostMiddleware);
+
   app.use(
     helmet({
       // Клиент и API — разные origin по дизайну (секция 6); дефолтный same-origin CORP
       // молча блокирует <img>/<video> с /api/files несмотря на успешный fetch() (CORS его не покрывает).
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          // Ужесточение, а не послабление: до неё встроить в приложение можно было что угодно,
+          // после — только домен песочницы. Проверяется и при первой загрузке кадра, и при
+          // каждой навигации внутри него, то есть кадр не уведёт сам себя на чужой адрес.
+          'frame-src': [env.CARD_ORIGIN],
+        },
+      },
     }),
   );
   app.use(

@@ -13,6 +13,10 @@ export const DISPLAY_NAME_MAX_LENGTH = 64;
 
 export const BIO_MAX_LENGTH = 89;
 
+/** Предел HTML-визитки, в байтах UTF-8, а не в символах: тело маршрута читается
+ *  своим `express.text`, общий `express.json({ limit: '1mb' })` под неё не поднимается (R-30). */
+export const PROFILE_CARD_MAX_BYTES = 2 * 1024 * 1024;
+
 export const PHONE_MIN_LENGTH = 5;
 export const PHONE_MAX_LENGTH = 32;
 export const PHONE_PATTERN = /^[0-9+()\-\s]+$/;

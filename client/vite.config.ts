@@ -13,7 +13,11 @@ export default defineConfig(() => {
   return {
     plugins: [
       react(),
-      mkcert(),
+      // qwillsandbox.localhost — домен песочницы визиток в локальной разработке (R-30).
+      // Браузер резолвит любой *.localhost в 127.0.0.1 сам, но сертификат его не покрывал бы:
+      // сервер читает те же файлы из ~/.vite-plugin-mkcert, что и Vite (server/src/config/env.ts,
+      // devHttpsCredentials), и без этой строки песочница по https не открывается.
+      mkcert({ hosts: ['localhost', '127.0.0.1', 'qwillsandbox.localhost'] }),
       VitePWA({
         // generateSW не даёт добавить свои push/notificationclick хендлеры — нужен свой sw.js (этап 9).
         strategies: 'injectManifest',

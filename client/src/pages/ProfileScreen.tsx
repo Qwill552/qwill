@@ -9,6 +9,7 @@ import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
+import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
 import { Avatar } from '../ui/Avatar';
@@ -129,10 +130,19 @@ export function ProfileScreen() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        {profile?.bio && (
-          <Card caption="О себе" className={styles.cardReset}>
-            <p className={styles.bioText}>{profile.bio}</p>
-          </Card>
+        {profile?.cardUrl ? (
+          <ProfileCardFrame
+            cardUrl={profile.cardUrl}
+            authorId={profile.id}
+            authorName={profile.displayName}
+            autoStart
+          />
+        ) : (
+          profile?.bio && (
+            <Card caption="О себе" className={styles.cardReset}>
+              <p className={styles.bioText}>{profile.bio}</p>
+            </Card>
+          )
         )}
 
         <Card className={styles.cardReset}>

@@ -11,6 +11,7 @@ import {
   isReservedUsername,
   SURFACE_VALUES,
   THEME_VALUES,
+  toBioMode,
   toUserRole,
 } from '@messenger/shared';
 
@@ -20,6 +21,7 @@ import { AppError, banned, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { assertAvatarEligible } from './file.js';
+import { cardUrlForProfile } from './profileCard.js';
 import type { User } from '../generated/prisma/client.js';
 
 export function toPublicUser(user: User): PublicUser {
@@ -85,7 +87,7 @@ export async function getUserById(id: string): Promise<User> {
   return user;
 }
 
-export function toUserProfile(user: User): UserProfileDto {
+export function toUserProfile(user: User, cardUrl: string | null): UserProfileDto {
   return {
     id: user.id,
     username: user.username,
@@ -96,13 +98,15 @@ export function toUserProfile(user: User): UserProfileDto {
     phone: user.phone,
     birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : null,
     bio: user.bio,
+    bioMode: toBioMode(user.bioMode),
+    cardUrl,
   };
 }
 
 export async function getUserProfile(id: string): Promise<UserProfileDto> {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user || user.isService) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
-  return toUserProfile(user);
+  return toUserProfile(user, await cardUrlForProfile(user));
 }
 
 function emptyToNull(value: string | null | undefined): string | null | undefined {
@@ -123,6 +127,7 @@ export async function updateProfile(userId: string, data: UpdateProfileDTO): Pro
       ...('phone' in data ? { phone: emptyToNull(data.phone) } : {}),
       ...('birthday' in data ? { birthday: data.birthday ? new Date(`${data.birthday}T00:00:00.000Z`) : null } : {}),
       ...('bio' in data ? { bio: emptyToNull(data.bio) } : {}),
+      ...(data.bioMode !== undefined ? { bioMode: data.bioMode } : {}),
     },
   });
   return toPublicUser(user);

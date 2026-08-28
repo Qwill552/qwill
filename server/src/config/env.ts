@@ -23,6 +23,14 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
 
+  /// Домен самого мессенджера. Из него собирается frame-ancestors документа визитки:
+  /// встроить визитку на постороннем сайте нельзя (R-30, Граница 2).
+  APP_ORIGIN: z.url().default('http://localhost:5173'),
+  /// Домен песочницы визиток. Обязан отличаться от APP_ORIGIN — на этом держится вся изоляция
+  /// (R-30, Граница 0). Локально `*.localhost` резолвится браузером в 127.0.0.1 сам, править
+  /// hosts не нужно; в прод и dev-контуре смотрит на то же приложение, маршрутизация по Host.
+  CARD_ORIGIN: z.url().default('http://qwillsandbox.localhost:3000'),
+
   DATABASE_URL: z.string().min(1, 'DATABASE_URL обязателен'),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET должен быть не короче 32 символов'),
@@ -70,6 +78,14 @@ if (!parsed.success) {
 
 const raw = parsed.data;
 
+if (new URL(raw.CARD_ORIGIN).host === new URL(raw.APP_ORIGIN).host) {
+  console.error(
+    'CARD_ORIGIN совпадает с APP_ORIGIN. Визитка обязана жить на отдельном хосте — иначе\n' +
+      'пользовательский HTML оказывается в origin приложения со всеми его правами.',
+  );
+  process.exit(1);
+}
+
 export const env = {
   ...raw,
   isDev: raw.NODE_ENV === 'development',
@@ -85,6 +101,9 @@ export const env = {
   clientOrigins: raw.CLIENT_ORIGIN.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  /** Хост песочницы вместе с портом — по нему заголовок Host отличает запрос визитки
+   *  от запроса к API (server/src/http/cardHost.ts). */
+  cardHost: new URL(raw.CARD_ORIGIN).host,
 } as const;
 
 export type Env = typeof env;

@@ -74,6 +74,11 @@ model User {
   birthday DateTime? @db.Date
   bio      String?   @db.VarChar(89)
 
+  /// "text" | "html" (shared/src/user.ts, BIO_MODE_VALUES). Указывает, что показывать вместо
+  /// «О себе»: текст из bio или визитку из ProfileCard. Оба черновика живут одновременно —
+  /// переключение режима ничего не стирает (R-30).
+  bioMode String @default("text")
+
   /// "user" | "admin" (shared/src/user.ts, USER_ROLE_VALUES). Строкой, а не enum — так решено
   /// в R-30. Права читаются отсюда на каждый запрос, в access-токен роль не кладётся (R-32A).
   role String @default("user")
@@ -95,6 +100,9 @@ model User {
 
   reportsFiled    Report[] @relation("ReportAuthor")
   reportsReceived Report[] @relation("ReportTarget")
+
+  profileCard       ProfileCard?
+  profileCardImages ProfileCardImage[]
 
   sessions           Session[]
   memberships        ChatMember[]
@@ -375,6 +383,38 @@ model CallParticipant {
   leftAt   DateTime?
 
   @@unique([callId, userId])
+}
+
+/// HTML-визитка профиля: отдельная таблица, а не поле у User, потому что два мегабайта не
+/// должны попадать ни в один запрос, где они не нужны — а User вложен в каждое сообщение
+/// и каждую строку списка чатов (R-30). Хранится уже очищенной санитайзером.
+model ProfileCard {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  html      String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+/// Картинка внутри визитки. Имя на диске — сгенерированный storageId, никогда не имя из
+/// запроса: обход по пути становится невозможным конструктивно, а не проверкой. Отображаемое
+/// имя (`name`) живёт только здесь и участвует в относительном пути `img/<name>` (R-30).
+model ProfileCardImage {
+  id String @id @default(cuid(2))
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  storageId String
+  mime      String
+  width     Int
+  height    Int
+  bytes     Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 /// Глобальные переключатели, которые обязаны действовать без перезапуска сервера — потому

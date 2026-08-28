@@ -23,6 +23,15 @@ const phoneSchema = z
 
 const bioSchema = z.string().trim().max(BIO_MAX_LENGTH, `Не длиннее ${BIO_MAX_LENGTH} символов`);
 
+/** Что показывать вместо «О себе»: обычный текст (`User.bio`) или HTML-визитку (`ProfileCard`).
+ *  Черновики обоих режимов живут одновременно, переключение ничего не стирает (R-30). */
+export const BIO_MODE_VALUES = ['text', 'html'] as const;
+export type BioMode = (typeof BIO_MODE_VALUES)[number];
+
+export function toBioMode(value: string): BioMode {
+  return (BIO_MODE_VALUES as readonly string[]).includes(value) ? (value as BioMode) : 'text';
+}
+
 /** Правка профиля — username неизменяем; аватар меняется отдельным proof-of-possession
  *  эндпоинтом (setAvatarSchema), сюда не входит (этап 8). */
 export const updateProfileSchema = z.object({
@@ -35,6 +44,7 @@ export const updateProfileSchema = z.object({
   phone: phoneSchema.nullable().optional(),
   birthday: birthdaySchema.nullable().optional(),
   bio: bioSchema.nullable().optional(),
+  bioMode: z.enum(BIO_MODE_VALUES).optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export interface UpdateProfileDTO {
@@ -42,6 +52,7 @@ export interface UpdateProfileDTO {
   phone?: string | null;
   birthday?: string | null;
   bio?: string | null;
+  bioMode?: BioMode;
 }
 
 export interface UserProfileDto {
@@ -54,6 +65,11 @@ export interface UserProfileDto {
   phone: string | null;
   birthday: string | null;
   bio: string | null;
+  bioMode: BioMode;
+  /** Полный адрес документа визитки на CARD_ORIGIN вместе с версией, либо null, если
+   *  показывать нечего. Собирается сервером — клиент домена песочницы не знает и знать
+   *  не должен: это единственная точка, где сходятся режим, рубильники и бан (R-30). */
+  cardUrl: string | null;
 }
 
 /** Роль хранится строкой в `User.role` и проверяется на сервере походом в базу на каждый

@@ -1,6 +1,9 @@
 dev.qwill.mooo.com {
 	encode zstd gzip
 
+	# См. Caddyfile.qwill — та же единственная директива, свой домен песочницы.
+	header Content-Security-Policy "frame-src https://devsandbox.qwill.mooo.com"
+
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3001
 	}
@@ -24,4 +27,10 @@ dev.qwill.mooo.com {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# Песочница визиток dev-контура — тот же приём, что и в проде, свой порт.
+devsandbox.qwill.mooo.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3001
 }

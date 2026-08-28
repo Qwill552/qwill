@@ -7,6 +7,7 @@ import { useCallStore } from '../../stores/callStore';
 import { useChatStore } from '../../stores/chatStore';
 import { formatBirthday, formatLastSeen } from '../../utils/presence';
 import { openAvatarViewer } from '../media/avatarViewerStore';
+import { ProfileCardFrame } from '../profile/ProfileCardFrame';
 import card from '../../app/desktopCard.module.css';
 import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
@@ -187,10 +188,14 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
         </button>
       </div>
 
-      {profile?.bio && (
-        <Card caption="О себе">
-          <p className={styles.bioText}>{profile.bio}</p>
-        </Card>
+      {profile?.cardUrl ? (
+        <ProfileCardFrame cardUrl={profile.cardUrl} authorId={profile.id} authorName={profile.displayName} />
+      ) : (
+        profile?.bio && (
+          <Card caption="О себе">
+            <p className={styles.bioText}>{profile.bio}</p>
+          </Card>
+        )
       )}
 
       <Card>

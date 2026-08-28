@@ -1,0 +1,149 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 var(--card-inset);
+}
+
+/* Высота фиксированная с внутренней прокруткой: кадр недоверенный, автоподгон высоты
+   означал бы, что он запросит любую и займёт весь экран. */
+.window {
+  position: relative;
+  height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+
+.frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--card-bg);
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.placeholderText {
+  margin: 0;
+  font-size: var(--font-caption);
+  word-break: break-word;
+}
+
+.start {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-size: var(--font-name);
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.start:hover {
+  opacity: 0.9;
+}
+
+.start:focus-visible,
+.control:focus-visible,
+.reportSend:focus-visible,
+.reportInput:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.control {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: var(--font-caption);
+  cursor: pointer;
+  transition: opacity var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.control:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Кадр не отчитался за три секунды — подсказываем, чем его погасить, пока зритель не решил,
+   что подвисло само приложение. */
+.controlAlert {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+
+.reportHint,
+.reportDone {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.reportDone {
+  padding: 4px 16px 20px;
+}
+
+.reportInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-name);
+  resize: vertical;
+}
+
+.reportError {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-caption);
+}
+
+.reportSend {
+  min-height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-size: var(--font-name);
+  cursor: pointer;
+}
+
+.reportSend:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -14,6 +14,15 @@ export const notFoundHandler: RequestHandler = (_req, res) => {
   res.status(404).json(body);
 };
 
+function isPayloadTooLarge(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'type' in err &&
+    (err as { type?: unknown }).type === 'entity.too.large'
+  );
+}
+
 /**
  * Единый обработчик: наружу — код и текст, в лог — стек с requestId.
  * Детали Postgres клиенту не уходят (в старом сервере уходили).
@@ -34,6 +43,17 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       },
     };
     res.status(err.httpStatus).json(body);
+    return;
+  }
+
+  // body-parser отклоняет слишком большое тело своей ошибкой, а не AppError: без этой ветки
+  // превышение лимита выглядело бы как поломка сервера (R-30, PUT /users/me/card).
+  if (isPayloadTooLarge(err)) {
+    logger.warn({ path: req.originalUrl }, 'Тело запроса больше разрешённого');
+    const body: ApiErrorBody = {
+      error: { code: ErrorCode.FILE_TOO_LARGE, message: 'Слишком большой запрос' },
+    };
+    res.status(413).json(body);
     return;
   }
 

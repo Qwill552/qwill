@@ -58,6 +58,34 @@ export const uploadChunkLimiter = rateLimit({
   handler: sendRateLimited,
 });
 
+/**
+ * Сохранение визитки — 20 в час на пользователя (R-30). Тело до 2 МБ и разбор настоящим
+ * парсером на каждое сохранение: это дороже обычного PATCH профиля, и повторять его сотнями
+ * незачем даже добросовестному редактору.
+ */
+export const cardSaveLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
+/**
+ * Показ визитки — 300 в час на IP. Домен песочницы аутентификации не имеет вовсе, ключ
+ * может быть только по адресу; общий лимитер сюда не достаёт — он живёт под /api.
+ */
+export const cardViewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
 /** Остальные запросы — 200/мин на IP (секция 8). */
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
