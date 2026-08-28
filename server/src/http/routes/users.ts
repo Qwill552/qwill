@@ -4,6 +4,7 @@ import { Router } from 'express';
 import {
   getSettings,
   getUserById,
+  getUserProfile,
   setAvatar,
   toPublicUser,
   updateProfile,
@@ -43,5 +44,11 @@ usersRouter.get('/me/settings', (req, res, next) => {
 usersRouter.patch('/me/settings', validateBody(updateSettingsSchema), (req, res, next) => {
   updateSettings(req.userId!, req.body)
     .then((settings) => res.json(settings))
+    .catch(next);
+});
+
+usersRouter.get('/:id/profile', (req, res, next) => {
+  getUserProfile(req.params.id)
+    .then((profile) => res.json(profile))
     .catch(next);
 });

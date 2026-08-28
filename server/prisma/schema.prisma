@@ -70,6 +70,10 @@ model User {
   /// FCM-подписке.
   isService Boolean @default(false)
 
+  phone    String?   @db.VarChar(32)
+  birthday DateTime? @db.Date
+  bio      String?   @db.VarChar(89)
+
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 

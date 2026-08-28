@@ -1,11 +1,11 @@
-import { AVATAR_MIME_TYPES, DISPLAY_NAME_MAX_LENGTH } from '@messenger/shared';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { AVATAR_MIME_TYPES, DISPLAY_NAME_MAX_LENGTH, type UserProfileDto } from '@messenger/shared';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
-import { updateProfileRequest } from '../api/users';
+import { getUserProfileRequest, updateProfileRequest } from '../api/users';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
@@ -15,22 +15,8 @@ import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { Icon, type IconName } from '../ui/Icon';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
+import { formatBirthday } from '../utils/presence';
 import styles from './ProfileScreen.module.css';
-
-/** Буквально из референса (isProfile, строки 218-263): кольцо-градиент вокруг аватара,
- *  три стеклянные кнопки-действия, карточка с данными. Вкладки и сетка медиа под
- *  карточкой (Публикации/Медиа/Файлы и плейсхолдер-плитки) убраны по прямому указанию
- *  пользователя — в приложении за ними нет ни функции, ни настоящих медиаданных.
- *
- *  Телефон и день рождения — полей для них в модели пользователя нет вовсе (не просто
- *  «функция не подключена», как у инертных строк «Настроек»), подвязать некуда. По
- *  решению пользователя (диалог этапа 5) строки всё равно перенесены один в один —
- *  значение буквально из референса, как и остальные нефункциональные элементы по
- *  правилу CLAUDE.md.
- *
- *  Правки имени в референсе нет вовсе (эту функцию открывает кнопка «Изменить», у
- *  которой в источнике нет собственного экрана) — редактирование сделано инлайн в
- *  шапке, поверх статичного имени, тем же стеклянным языком, что и остальной экран. */
 
 export function ProfileScreen() {
   const navigate = useNavigate();
@@ -46,6 +32,20 @@ export function ProfileScreen() {
   const [nameEditing, setNameEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfileDto | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    getUserProfileRequest(user.id)
+      .then((result) => {
+        if (!cancelled) setProfile(result);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   async function uploadAvatar(file: File): Promise<void> {
     setAvatarUploading(true);
@@ -191,10 +191,16 @@ export function ProfileScreen() {
 
         {error && <p className={styles.error}>{error}</p>}
 
+        {profile?.bio && (
+          <Card caption="О себе">
+            <p className={styles.bioText}>{profile.bio}</p>
+          </Card>
+        )}
+
         <Card className={styles.cardReset}>
-          <Card.Row title="+7 (958) 873-16-19" subtitle="Телефон" />
+          {profile?.phone && <Card.Row title={profile.phone} subtitle="Телефон" />}
           <Card.Row title={<span className={styles.accent}>{`@${user?.username ?? ''}`}</span>} subtitle="Имя пользователя" />
-          <Card.Row title="15 дек. 1998" subtitle="День рождения" />
+          {profile?.birthday && <Card.Row title={formatBirthday(profile.birthday)} subtitle="День рождения" />}
         </Card>
       </div>
 

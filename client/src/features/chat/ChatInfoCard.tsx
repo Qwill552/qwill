@@ -1,10 +1,11 @@
-import type { AttachmentDto } from '@messenger/shared';
+import type { AttachmentDto, UserProfileDto } from '@messenger/shared';
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { getUserProfileRequest } from '../../api/users';
 import { useCallStore } from '../../stores/callStore';
 import { useChatStore } from '../../stores/chatStore';
-import { formatLastSeen } from '../../utils/presence';
+import { formatBirthday, formatLastSeen } from '../../utils/presence';
 import { openAvatarViewer } from '../media/avatarViewerStore';
 import card from '../../app/desktopCard.module.css';
 import { Avatar } from '../../ui/Avatar';
@@ -77,11 +78,25 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]);
   const setChatMuted = useChatStore((s) => s.setChatMuted);
   const startCall = useCallStore((s) => s.startCall);
+  const [profile, setProfile] = useState<UserProfileDto | null>(null);
 
   const other = chat?.otherMember ?? null;
   const presence = other ? presenceByUser[other.id] : undefined;
   const online = presence?.online ?? false;
   const muted = chat?.muted ?? false;
+
+  useEffect(() => {
+    if (!other?.id) return;
+    let cancelled = false;
+    getUserProfileRequest(other.id)
+      .then((result) => {
+        if (!cancelled) setProfile(result);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [other?.id]);
 
   const tallies = useMemo(() => {
     const attachments = (messages ?? [])
@@ -172,6 +187,12 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
         </button>
       </div>
 
+      {profile?.bio && (
+        <Card caption="О себе">
+          <p className={styles.bioText}>{profile.bio}</p>
+        </Card>
+      )}
+
       <Card>
         <Card.Row
           title={
@@ -183,6 +204,10 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
           icon="user"
           tint="blue"
         />
+        {profile?.phone && <Card.Row title={profile.phone} subtitle="Телефон" icon="phone" tint="green" />}
+        {profile?.birthday && (
+          <Card.Row title={formatBirthday(profile.birthday)} subtitle="День рождения" icon="calendar" tint="orange" />
+        )}
       </Card>
 
       {tallies.length > 0 && (

@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { getServiceUser } from '../src/services/announcements.js';
 
 const app = createApp();
 const request = supertest(app);
@@ -51,6 +52,86 @@ describe('users profile/settings (этап 8)', () => {
 
       const again = await request.get('/api/users/me').set('Authorization', `Bearer ${token}`);
       expect(again.body.displayName).toBe('После правки');
+    });
+  });
+
+  describe('поля профиля (R-28)', () => {
+    it('записывает и стирает phone/birthday/bio', async () => {
+      const { token, userId } = await registerUser('fields', 'Полевой');
+
+      const filled = await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ phone: '+7 900 000-00-00', birthday: '1998-12-15', bio: 'Тестовое био' });
+      expect(filled.status).toBe(200);
+
+      const profile = await request.get(`/api/users/${userId}/profile`).set('Authorization', `Bearer ${token}`);
+      expect(profile.status).toBe(200);
+      expect(profile.body.phone).toBe('+7 900 000-00-00');
+      expect(profile.body.birthday).toBe('1998-12-15');
+      expect(profile.body.bio).toBe('Тестовое био');
+
+      const cleared = await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bio: null });
+      expect(cleared.status).toBe(200);
+
+      const again = await request.get(`/api/users/${userId}/profile`).set('Authorization', `Bearer ${token}`);
+      expect(again.body.bio).toBeNull();
+      expect(again.body.phone).toBe('+7 900 000-00-00');
+    });
+
+    it('у нового аккаунта поля профиля пустые', async () => {
+      const { token, userId } = await registerUser('fields_new', 'Новичок');
+
+      const profile = await request.get(`/api/users/${userId}/profile`).set('Authorization', `Bearer ${token}`);
+      expect(profile.status).toBe(200);
+      expect(profile.body.phone).toBeNull();
+      expect(profile.body.birthday).toBeNull();
+      expect(profile.body.bio).toBeNull();
+    });
+
+    it('отклоняет bio длиннее 89 символов', async () => {
+      const { token } = await registerUser('fields_bio', 'Многословный');
+
+      const res = await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bio: 'a'.repeat(90) });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('отклоняет телефон из букв', async () => {
+      const { token } = await registerUser('fields_phone', 'Буквенный');
+
+      const res = await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ phone: 'abcdefgh' });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('день рождения не съезжает на сутки', async () => {
+      const { token, userId } = await registerUser('fields_bday', 'Именинник');
+
+      await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ birthday: '1998-01-01' });
+
+      const profile = await request.get(`/api/users/${userId}/profile`).set('Authorization', `Bearer ${token}`);
+      expect(profile.body.birthday).toBe('1998-01-01');
+    });
+
+    it('404 на профиле сервисного аккаунта', async () => {
+      const { token } = await registerUser('fields_service', 'Проверяющий');
+      const service = await getServiceUser();
+
+      const res = await request.get(`/api/users/${service.id}/profile`).set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(404);
     });
   });
 

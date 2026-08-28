@@ -1,6 +1,27 @@
 import { z } from 'zod';
 
-import { DISPLAY_NAME_MAX_LENGTH, DISPLAY_NAME_MIN_LENGTH } from './constants.js';
+import {
+  BIO_MAX_LENGTH,
+  DISPLAY_NAME_MAX_LENGTH,
+  DISPLAY_NAME_MIN_LENGTH,
+  PHONE_MAX_LENGTH,
+  PHONE_MIN_LENGTH,
+  PHONE_PATTERN,
+} from './constants.js';
+
+const birthdaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Неверный формат даты')
+  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)), 'Неверная дата');
+
+const phoneSchema = z
+  .string()
+  .trim()
+  .min(PHONE_MIN_LENGTH, `Телефон не короче ${PHONE_MIN_LENGTH} символов`)
+  .max(PHONE_MAX_LENGTH, `Телефон не длиннее ${PHONE_MAX_LENGTH} символов`)
+  .regex(PHONE_PATTERN, 'Только цифры, пробелы, +, скобки и дефисы');
+
+const bioSchema = z.string().trim().max(BIO_MAX_LENGTH, `Не длиннее ${BIO_MAX_LENGTH} символов`);
 
 /** Правка профиля — username неизменяем; аватар меняется отдельным proof-of-possession
  *  эндпоинтом (setAvatarSchema), сюда не входит (этап 8). */
@@ -11,10 +32,28 @@ export const updateProfileSchema = z.object({
     .min(DISPLAY_NAME_MIN_LENGTH, 'Введите имя')
     .max(DISPLAY_NAME_MAX_LENGTH, `Имя не длиннее ${DISPLAY_NAME_MAX_LENGTH} символов`)
     .optional(),
+  phone: phoneSchema.nullable().optional(),
+  birthday: birthdaySchema.nullable().optional(),
+  bio: bioSchema.nullable().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export interface UpdateProfileDTO {
   displayName?: string;
+  phone?: string | null;
+  birthday?: string | null;
+  bio?: string | null;
+}
+
+export interface UserProfileDto {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  avatarColor: AvatarColor;
+  lastSeenAt: string;
+  phone: string | null;
+  birthday: string | null;
+  bio: string | null;
 }
 
 export const THEME_VALUES = ['light', 'dark', 'system'] as const;

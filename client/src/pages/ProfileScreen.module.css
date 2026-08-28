@@ -174,3 +174,12 @@
 .hiddenInput {
   display: none;
 }
+
+.bioText {
+  margin: 0;
+  padding: 13px 15px;
+  color: rgb(var(--pulse-ink));
+  font-size: var(--font-name);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

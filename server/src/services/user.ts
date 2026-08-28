@@ -1,9 +1,15 @@
-import type { PublicUser, UpdateProfileDTO, UpdateSettingsInput, UserSettingsDTO } from '@messenger/shared';
+import type {
+  PublicUser,
+  UpdateProfileDTO,
+  UpdateSettingsInput,
+  UserProfileDto,
+  UserSettingsDTO,
+} from '@messenger/shared';
 import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
-import { AppError } from '../lib/errors.js';
+import { AppError, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { assertAvatarEligible } from './file.js';
@@ -65,6 +71,30 @@ export async function getUserById(id: string): Promise<User> {
   return user;
 }
 
+export function toUserProfile(user: User): UserProfileDto {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: fileUrl(user.avatarFileId),
+    avatarColor: toAvatarColor(user.avatarColor),
+    lastSeenAt: user.lastSeenAt.toISOString(),
+    phone: user.phone,
+    birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : null,
+    bio: user.bio,
+  };
+}
+
+export async function getUserProfile(id: string): Promise<UserProfileDto> {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user || user.isService) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
+  return toUserProfile(user);
+}
+
+function emptyToNull(value: string | null | undefined): string | null | undefined {
+  return value === '' ? null : value;
+}
+
 export async function setAvatar(userId: string, fileId: string, sha256: string): Promise<PublicUser> {
   await assertAvatarEligible(fileId, sha256);
   const user = await prisma.user.update({ where: { id: userId }, data: { avatarFileId: fileId } });
@@ -74,7 +104,12 @@ export async function setAvatar(userId: string, fileId: string, sha256: string):
 export async function updateProfile(userId: string, data: UpdateProfileDTO): Promise<PublicUser> {
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { ...(data.displayName !== undefined ? { displayName: data.displayName } : {}) },
+    data: {
+      ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
+      ...('phone' in data ? { phone: emptyToNull(data.phone) } : {}),
+      ...('birthday' in data ? { birthday: data.birthday ? new Date(`${data.birthday}T00:00:00.000Z`) : null } : {}),
+      ...('bio' in data ? { bio: emptyToNull(data.bio) } : {}),
+    },
   });
   return toPublicUser(user);
 }

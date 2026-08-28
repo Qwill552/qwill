@@ -8,3 +8,8 @@ export function formatLastSeen(iso: string): string {
   const day = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   return `был(а) ${day} в ${time}`;
 }
+
+export function formatBirthday(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
