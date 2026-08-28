@@ -168,29 +168,31 @@ export function ProfileEditScreen() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <Card
-          caption={
-            <span className={styles.bioCaptionRow}>
-              <span>О себе</span>
-              <span className={styles.bioCounter}>{bioRemaining}</span>
-            </span>
-          }
-        >
-          <textarea
-            className={styles.bioInput}
-            value={bio}
-            maxLength={BIO_MAX_LENGTH}
-            placeholder="Любые подробности: возраст, род занятий или город. Например: 23 года, дизайнер из Санкт-Петербурга."
-            aria-label="О себе"
-            onChange={(e) => setBio(e.target.value)}
-          />
-          <div className={styles.advancedRow}>
-            <div className={styles.advancedText}>
-              <span className={styles.advancedTitle}>Продвинутый режим</span>
-              <span className={styles.advancedSubtitle}>HTML-визитка — скоро</span>
-            </div>
-            <Switch checked={false} onChange={() => undefined} disabled label="Продвинутый режим" />
+        <Card className={styles.cardReset}>
+          <div className={styles.bioBox}>
+            <span className={styles.bioCounter}>{bioRemaining}</span>
+            <textarea
+              className={styles.bioInput}
+              value={bio}
+              maxLength={BIO_MAX_LENGTH}
+              aria-label="О себе"
+              onChange={(e) => setBio(e.target.value)}
+            />
           </div>
+        </Card>
+        <p className={styles.hint}>
+          Любые подробности: возраст, род занятий или город. Например: 23 года, дизайнер из
+          Санкт-Петербурга.
+        </p>
+
+        <Card className={styles.cardReset}>
+          <Card.Row
+            icon="settings"
+            tint="indigo"
+            title="Продвинутый режим"
+            subtitle="HTML-визитка — скоро"
+            trailing={<Switch checked={false} onChange={() => undefined} disabled label="Продвинутый режим" />}
+          />
         </Card>
 
         <Card className={styles.cardReset}>
@@ -219,7 +221,7 @@ export function ProfileEditScreen() {
 
         <Card className={styles.cardReset}>
           <Card.Row
-            icon="gift"
+            icon="cake"
             tint="pink"
             title="День рождения"
             trailing={
