@@ -13,8 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "grant-admin": "tsx scripts/grantAdmin.ts",
-    "revoke-admin": "tsx scripts/revokeAdmin.ts",
+    "grant-admin": "node dist/scripts/grantAdmin.js",
+    "revoke-admin": "node dist/scripts/revokeAdmin.js",
     "test": "vitest run"
   },
   "dependencies": {

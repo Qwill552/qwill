@@ -1,5 +1,5 @@
-import { prisma } from '../src/db/prisma.js';
-import { revokeAdminRole } from '../src/services/admin.js';
+import { prisma } from '../db/prisma.js';
+import { revokeAdminRole } from '../services/admin.js';
 
 async function main(): Promise<void> {
   const username = process.argv[2];
