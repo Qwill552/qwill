@@ -142,10 +142,6 @@ export function ProfileEditScreen() {
         <ScrollIndicator target={scrollerRef} />
 
         <div className={styles.hero}>
-          <button type="button" className={styles.qrButton} disabled aria-disabled="true" aria-label="QR-код профиля">
-            <Icon name="qrcode" size={20} />
-          </button>
-
           <div className={styles.avatarWrap}>
             <div className={styles.avatarRing}>
               <Avatar label={user?.displayName ?? '?'} avatarUrl={avatarUrl} size={107} color={user?.avatarColor} />
@@ -172,16 +168,19 @@ export function ProfileEditScreen() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <Card caption="О себе">
-          <div className={styles.bioHead}>
-            <span className={styles.bioHint}>Видно всем, кто открыл профиль</span>
-            <span className={styles.bioCounter}>{bioRemaining}</span>
-          </div>
+        <Card
+          caption={
+            <span className={styles.bioCaptionRow}>
+              <span>О себе</span>
+              <span className={styles.bioCounter}>{bioRemaining}</span>
+            </span>
+          }
+        >
           <textarea
             className={styles.bioInput}
             value={bio}
             maxLength={BIO_MAX_LENGTH}
-            placeholder="Пара слов о себе"
+            placeholder="Любые подробности: возраст, род занятий или город. Например: 23 года, дизайнер из Санкт-Петербурга."
             aria-label="О себе"
             onChange={(e) => setBio(e.target.value)}
           />
@@ -196,6 +195,8 @@ export function ProfileEditScreen() {
 
         <Card className={styles.cardReset}>
           <Card.Row
+            icon="user"
+            tint="blue"
             title="Имя"
             trailing={
               <input
@@ -207,8 +208,19 @@ export function ProfileEditScreen() {
               />
             }
           />
-          <Card.Row title="Имя пользователя" value={<span className={styles.accent}>{`@${user?.username ?? ''}`}</span>} />
           <Card.Row
+            icon="at"
+            tint="violet"
+            title="Имя пользователя"
+            value={<span className={styles.accent}>{`@${user?.username ?? ''}`}</span>}
+          />
+        </Card>
+        <p className={styles.hint}>Имя пользователя нельзя изменить после регистрации</p>
+
+        <Card className={styles.cardReset}>
+          <Card.Row
+            icon="gift"
+            tint="pink"
             title="День рождения"
             trailing={
               <input
@@ -220,7 +232,12 @@ export function ProfileEditScreen() {
               />
             }
           />
+        </Card>
+
+        <Card className={styles.cardReset}>
           <Card.Row
+            icon="phone"
+            tint="teal"
             title="Телефон"
             trailing={
               <input
@@ -235,7 +252,6 @@ export function ProfileEditScreen() {
             }
           />
         </Card>
-        <p className={styles.hint}>Имя пользователя нельзя изменить после регистрации</p>
 
         <button type="button" className={styles.saveButton} onClick={() => void handleSave()} disabled={pending || !profile}>
           {pending ? 'Сохранение…' : 'Сохранить'}
@@ -254,6 +270,7 @@ export function ProfileEditScreen() {
         <ChromeBar>
           <GlassButton icon="back" label="Назад в профиль" onClick={() => navigate('/profile')} />
           <GlassPill title="Изменить профиль" />
+          <GlassButton icon="qrcode" label="QR-код профиля" disabled aria-disabled="true" />
         </ChromeBar>
       )}
     </div>

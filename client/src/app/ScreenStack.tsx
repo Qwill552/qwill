@@ -39,6 +39,7 @@ import {
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
 import { ChatInfoCard } from '../features/chat/ChatInfoCard';
+import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
 import { hasOpenOverlay } from './useBackHandler';
@@ -94,6 +95,10 @@ const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
   '/settings/developer': 'Для разработчиков',
   '/settings/developer/call-trace': 'Трассировка звонка',
   '/profile/edit': 'Изменить профиль',
+};
+
+const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
+  '/profile/edit': <IconButton icon="qrcode" label="QR-код профиля" disabled aria-disabled="true" />,
 };
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
@@ -710,6 +715,7 @@ export function ScreenStack() {
             title={overlayMeta.title}
             onBack={overlayMeta.backTo ? () => navigate(overlayMeta.backTo as string) : undefined}
             onClose={() => navigate(lastPathForTab('/chats'))}
+            headerAction={OVERLAY_SUBROUTE_ACTION[location.pathname]}
           >
             <RouteSwitch location={location} />
           </DesktopScreenModal>

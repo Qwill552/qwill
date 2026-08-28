@@ -11,6 +11,7 @@ interface DesktopScreenModalProps {
   onClose: () => void;
   onBack?: () => void;
   chromeless?: boolean;
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -26,7 +27,14 @@ interface DesktopScreenModalProps {
  * кнопка «назад» и так закрывает карточку — просто без exit-анимации, потому что ScreenStack
  * перестаёт её рендерить в тот же кадр, где меняется location.
  */
-export function DesktopScreenModal({ title, onClose, onBack, chromeless, children }: DesktopScreenModalProps) {
+export function DesktopScreenModal({
+  title,
+  onClose,
+  onBack,
+  chromeless,
+  headerAction,
+  children,
+}: DesktopScreenModalProps) {
   const [closing, setClosing] = useState(false);
 
   function startClose(): void {
@@ -69,7 +77,10 @@ export function DesktopScreenModal({ title, onClose, onBack, chromeless, childre
               {onBack && <IconButton icon="back" label="Назад" onClick={onBack} />}
               <h2 className={styles.title}>{title}</h2>
             </div>
-            <IconButton icon="close" label="Закрыть" onClick={startClose} />
+            <div className={styles.headerActions}>
+              {headerAction}
+              <IconButton icon="close" label="Закрыть" onClick={startClose} />
+            </div>
           </div>
         )}
         <div className={styles.body}>
