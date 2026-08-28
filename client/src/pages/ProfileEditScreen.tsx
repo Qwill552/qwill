@@ -15,6 +15,7 @@ import { updateProfileRequest } from '../api/users';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { Modal } from '../features/groups/Modal';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
@@ -26,7 +27,23 @@ import { GlassPill } from '../ui/chrome/GlassPill';
 import { Icon } from '../ui/Icon';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import { Switch } from '../ui/Switch';
+import { formatBirthday } from '../utils/presence';
 import styles from './ProfileEditScreen.module.css';
+
+type EditableFieldKey = 'displayName' | 'birthday' | 'phone';
+
+interface EditableFieldMeta {
+  title: string;
+  label: string;
+  type: 'text' | 'date' | 'tel';
+  maxLength?: number;
+}
+
+const FIELD_META: Record<EditableFieldKey, EditableFieldMeta> = {
+  displayName: { title: 'Имя', label: 'Имя', type: 'text', maxLength: DISPLAY_NAME_MAX_LENGTH },
+  birthday: { title: 'День рождения', label: 'Дата рождения', type: 'date' },
+  phone: { title: 'Телефон', label: 'Номер телефона', type: 'tel', maxLength: PHONE_MAX_LENGTH },
+};
 
 export function ProfileEditScreen() {
   const navigate = useNavigate();
@@ -47,6 +64,8 @@ export function ProfileEditScreen() {
   const [bio, setBio] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<EditableFieldKey | null>(null);
+  const [draftValue, setDraftValue] = useState('');
 
   const profile = storedProfile?.id === user?.id ? storedProfile : null;
 
@@ -89,6 +108,18 @@ export function ProfileEditScreen() {
   async function handleAvatarCropped(cropped: File): Promise<void> {
     setCropSource(null);
     await uploadAvatar(cropped);
+  }
+
+  function openFieldEditor(field: EditableFieldKey): void {
+    setDraftValue(field === 'displayName' ? displayName : field === 'birthday' ? birthday : phone);
+    setEditingField(field);
+  }
+
+  function saveFieldEditor(): void {
+    if (editingField === 'displayName') setDisplayName(draftValue);
+    else if (editingField === 'birthday') setBirthday(draftValue);
+    else if (editingField === 'phone') setPhone(draftValue);
+    setEditingField(null);
   }
 
   async function handleSave(): Promise<void> {
@@ -196,20 +227,7 @@ export function ProfileEditScreen() {
         </Card>
 
         <Card className={styles.cardReset}>
-          <Card.Row
-            icon="user"
-            tint="blue"
-            title="Имя"
-            trailing={
-              <input
-                className={styles.fieldInput}
-                value={displayName}
-                maxLength={DISPLAY_NAME_MAX_LENGTH}
-                aria-label="Имя"
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
-            }
-          />
+          <Card.Row icon="user" tint="blue" title="Имя" value={displayName} onClick={() => openFieldEditor('displayName')} />
           <Card.Row
             icon="at"
             tint="violet"
@@ -224,35 +242,13 @@ export function ProfileEditScreen() {
             icon="cake"
             tint="pink"
             title="День рождения"
-            trailing={
-              <input
-                type="date"
-                className={styles.fieldInput}
-                value={birthday}
-                aria-label="День рождения"
-                onChange={(e) => setBirthday(e.target.value)}
-              />
-            }
+            value={birthday ? formatBirthday(birthday) : 'Не указан'}
+            onClick={() => openFieldEditor('birthday')}
           />
         </Card>
 
         <Card className={styles.cardReset}>
-          <Card.Row
-            icon="phone"
-            tint="teal"
-            title="Телефон"
-            trailing={
-              <input
-                type="tel"
-                className={styles.fieldInput}
-                value={phone}
-                maxLength={PHONE_MAX_LENGTH}
-                placeholder="Не указан"
-                aria-label="Телефон"
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            }
-          />
+          <Card.Row icon="phone" tint="teal" title="Телефон" value={phone || 'Не указан'} onClick={() => openFieldEditor('phone')} />
         </Card>
 
         <button type="button" className={styles.saveButton} onClick={() => void handleSave()} disabled={pending || !profile}>
@@ -266,6 +262,31 @@ export function ProfileEditScreen() {
           onClose={() => setCropSource(null)}
           onCropped={(cropped) => void handleAvatarCropped(cropped)}
         />
+      )}
+
+      {editingField && (
+        <Modal title={FIELD_META[editingField].title} onClose={() => setEditingField(null)}>
+          <label className={styles.editFieldLabel} htmlFor="profile-field-input">
+            {FIELD_META[editingField].label}
+          </label>
+          <input
+            id="profile-field-input"
+            className={styles.editFieldInput}
+            type={FIELD_META[editingField].type}
+            value={draftValue}
+            maxLength={FIELD_META[editingField].maxLength}
+            autoFocus
+            onChange={(e) => setDraftValue(e.target.value)}
+          />
+          <div className={styles.editFieldActions}>
+            <button type="button" className={styles.editFieldCancel} onClick={() => setEditingField(null)}>
+              Отмена
+            </button>
+            <button type="button" className={styles.editFieldSave} onClick={saveFieldEditor}>
+              Сохранить
+            </button>
+          </div>
+        </Modal>
       )}
 
       {!isDesktop && (

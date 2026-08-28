@@ -119,24 +119,6 @@
   outline: none;
 }
 
-.fieldInput {
-  flex: 0 1 150px;
-  min-width: 0;
-  min-height: 24px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: rgb(var(--pulse-ink));
-  font: inherit;
-  font-size: var(--font-name);
-  text-align: right;
-  outline: none;
-}
-
-.fieldInput::placeholder {
-  color: rgba(var(--pulse-ink), 0.35);
-}
-
 .accent {
   color: var(--primary);
 }
@@ -170,4 +152,58 @@
 .saveButton:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.editFieldLabel {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.editFieldInput {
+  width: 100%;
+  padding: 6px 0 8px;
+  border: none;
+  border-bottom: 2px solid var(--primary);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-screen-title);
+  outline: none;
+}
+
+.editFieldActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.editFieldCancel,
+.editFieldSave {
+  height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+.editFieldCancel {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+@media (hover: hover) {
+  .editFieldCancel:hover {
+    background: var(--primary-soft);
+  }
+}
+
+.editFieldSave {
+  background: var(--primary);
+  color: var(--text-on-primary);
 }
