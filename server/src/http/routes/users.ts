@@ -6,6 +6,7 @@ import {
   findVisibleCard,
   getOwnCardHtml,
   saveCard,
+  savePreview,
 } from '../../services/profileCard.js';
 import {
   getSettings,
@@ -55,6 +56,16 @@ usersRouter.put(
     saveCard(req.userId!, html)
       .then((card) => sendCardAsText(res, card.html))
       .catch(next);
+  },
+);
+
+usersRouter.put(
+  '/me/card/preview',
+  cardSaveLimiter,
+  express.text({ type: ['text/html', 'text/plain'], limit: PROFILE_CARD_MAX_BYTES }),
+  (req, res) => {
+    const html = typeof req.body === 'string' ? req.body : '';
+    res.json(savePreview(req.userId!, html));
   },
 );
 

@@ -72,6 +72,11 @@ export interface UserProfileDto {
   cardUrl: string | null;
 }
 
+export interface ProfileCardPreviewDto {
+  token: string;
+  url: string;
+}
+
 /** Роль хранится строкой в `User.role` и проверяется на сервере походом в базу на каждый
  *  запрос — не выводится из username и не кладётся в access-токен (R-32A). */
 export const USER_ROLE_VALUES = ['user', 'admin'] as const;

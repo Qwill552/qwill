@@ -1,6 +1,7 @@
 import { ErrorCode } from '@messenger/shared';
 import type {
   ApiErrorBody,
+  ProfileCardPreviewDto,
   PublicUser,
   UpdateProfileInput,
   UpdateSettingsInput,
@@ -20,15 +21,17 @@ export function getUserProfileRequest(userId: string): Promise<UserProfileDto> {
 
 /** Визитка ходит текстом, а не JSON: тело — сам HTML, и на домене приложения оно отдаётся
  *  как `text/plain` с `nosniff`, чтобы прямое открытие адреса ничего не исполняло (R-30). */
+async function throwCardError(res: Response): Promise<never> {
+  const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+  throw new ApiError(
+    body?.error ?? { code: ErrorCode.INTERNAL, message: 'Не удалось выполнить запрос' },
+    res.status,
+  );
+}
+
 async function cardText(path: string, init: RequestInit = {}): Promise<string> {
   const res = await apiFetch(path, init);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
-    throw new ApiError(
-      body?.error ?? { code: ErrorCode.INTERNAL, message: 'Не удалось выполнить запрос' },
-      res.status,
-    );
-  }
+  if (!res.ok) await throwCardError(res);
   return res.text();
 }
 
@@ -46,6 +49,16 @@ export function putOwnCardRequest(html: string): Promise<string> {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
     body: html,
   });
+}
+
+export async function putCardPreviewRequest(html: string): Promise<ProfileCardPreviewDto> {
+  const res = await apiFetch('/api/users/me/card/preview', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    body: html,
+  });
+  if (!res.ok) await throwCardError(res);
+  return (await res.json()) as ProfileCardPreviewDto;
 }
 
 export function deleteOwnCardRequest(): Promise<void> {

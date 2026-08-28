@@ -205,6 +205,13 @@
 }
 
 :root {
+  --code-bg: #10131c;
+  --code-ink: #d7dcea;
+  --code-ink-dim: #7b8399;
+  --code-border: #2a3145;
+}
+
+:root {
   --wallpaper-summer:
     radial-gradient(65.98% 75.49% at 0% 100%, rgb(238 228 146 / 72%) 0%, rgb(238 228 146 / 0%) 100%),
     radial-gradient(76.8% 87.87% at 100% 100%, rgb(224 166 118 / 86%) 0%, rgb(224 166 118 / 22.4%) 100%),
@@ -418,6 +425,9 @@
   --font-message: 1em;
   --font-time: 0.82em; /* время и галочки в пузыре — та же ступень, что у подписей */
   --font-tab: 0.68em; /* подпись таб-бара */
+
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', 'Cascadia Mono', Consolas,
+    'Roboto Mono', monospace;
 }
 
 /* ──────────────────────────  Метрики и скругления  ────────────────────────── */

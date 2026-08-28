@@ -33,18 +33,23 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
   const loadCount = useRef(0);
   const channel = useRef<MessageChannel | null>(null);
 
-  const stop = useCallback(() => {
+  const detach = useCallback(() => {
     channel.current?.port1.close();
     channel.current = null;
     loadCount.current = 0;
     setReady(false);
-    setRunning(false);
   }, []);
 
+  const stop = useCallback(() => {
+    detach();
+    setRunning(false);
+  }, [detach]);
+
   useEffect(() => {
-    stop();
+    detach();
+    setRunning(autoStart);
     setEscaped(false);
-  }, [cardUrl, stop]);
+  }, [cardUrl, autoStart, detach]);
 
   useEffect(() => {
     if (!running) {

@@ -1,10 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
-import { ErrorCode, PROFILE_CARD_MAX_BYTES, toBioMode } from '@messenger/shared';
+import { PROFILE_CARD_MAX_BYTES, toBioMode, type ProfileCardPreviewDto } from '@messenger/shared';
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
-import { notFound, tooLarge } from '../lib/errors.js';
+import { tooLarge } from '../lib/errors.js';
 import { sanitizeProfileCard } from '../lib/sanitizeProfileCard.js';
 import { getProfileCardsEnabled } from './admin.js';
 import type { User } from '../generated/prisma/client.js';
@@ -78,6 +78,64 @@ export async function saveCard(userId: string, rawHtml: string): Promise<Visible
 }
 
 export async function deleteCard(userId: string): Promise<void> {
-  const deleted = await prisma.profileCard.deleteMany({ where: { userId } });
-  if (deleted.count === 0) throw notFound(ErrorCode.NOT_FOUND, 'Визитки нет');
+  dropPreviewOf(userId);
+  await prisma.profileCard.deleteMany({ where: { userId } });
+  await prisma.user.update({ where: { id: userId }, data: { bioMode: 'text' } });
+}
+
+const PREVIEW_TTL_MS = 10 * 60 * 1000;
+
+interface CardPreview {
+  userId: string;
+  html: string;
+  expiresAt: number;
+}
+
+const previewsByToken = new Map<string, CardPreview>();
+const previewTokenByUser = new Map<string, string>();
+
+function dropPreviewOf(userId: string): void {
+  const token = previewTokenByUser.get(userId);
+  if (!token) return;
+  previewsByToken.delete(token);
+  previewTokenByUser.delete(userId);
+}
+
+function dropExpiredPreviews(now: number): void {
+  for (const [token, preview] of previewsByToken) {
+    if (preview.expiresAt > now) continue;
+    previewsByToken.delete(token);
+    if (previewTokenByUser.get(preview.userId) === token) previewTokenByUser.delete(preview.userId);
+  }
+}
+
+export function previewUrlFor(token: string): string {
+  return `${env.CARD_ORIGIN}/c/preview/${token}/`;
+}
+
+export function savePreview(userId: string, rawHtml: string): ProfileCardPreviewDto {
+  assertCardSizeAllowed(Buffer.byteLength(rawHtml, 'utf8'));
+
+  const now = Date.now();
+  dropExpiredPreviews(now);
+  dropPreviewOf(userId);
+
+  const token = randomBytes(16).toString('hex');
+  previewsByToken.set(token, {
+    userId,
+    html: sanitizeProfileCard(rawHtml),
+    expiresAt: now + PREVIEW_TTL_MS,
+  });
+  previewTokenByUser.set(userId, token);
+  return { token, url: previewUrlFor(token) };
+}
+
+export function findPreview(token: string): { userId: string; html: string } | null {
+  const preview = previewsByToken.get(token);
+  if (!preview) return null;
+  if (preview.expiresAt <= Date.now()) {
+    dropPreviewOf(preview.userId);
+    return null;
+  }
+  return { userId: preview.userId, html: preview.html };
 }

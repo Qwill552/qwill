@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 
 import { env } from '../config/env.js';
 import { buildCardCsp } from '../lib/cardCsp.js';
-import { findVisibleCard } from '../services/profileCard.js';
+import { findPreview, findVisibleCard } from '../services/profileCard.js';
 import { cardViewLimiter } from './middleware/rateLimit.js';
 
 /**
@@ -70,6 +70,15 @@ function sendCardDocument(res: Response, userId: string, html: string, cacheable
   res.setHeader('Cache-Control', cacheable ? 'private, max-age=300' : 'no-store');
   res.status(200).send(renderCardDocument(html));
 }
+
+cardHostRouter.get('/c/preview/:token/', cardViewLimiter, (req, res, next) => {
+  const preview = findPreview(String(req.params.token ?? ''));
+  if (!preview) {
+    next();
+    return;
+  }
+  sendCardDocument(res, preview.userId, preview.html, false);
+});
 
 cardHostRouter.get('/c/:userId/', cardViewLimiter, (req, res, next) => {
   const userId = String(req.params.userId ?? '');

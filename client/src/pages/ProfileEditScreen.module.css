@@ -140,6 +140,127 @@
   color: var(--primary);
 }
 
+.codeBox {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--code-border);
+  border-radius: var(--card-radius);
+  background: var(--code-bg);
+}
+
+.codeInput {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--code-ink);
+  font-family: var(--font-mono);
+  font-size: var(--font-meta);
+  line-height: 1.5;
+  tab-size: 2;
+  resize: vertical;
+  outline: none;
+}
+
+.codeInput::placeholder {
+  color: var(--code-ink-dim);
+}
+
+.codeInput:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.codeFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 8px 8px;
+}
+
+.codeCounter {
+  flex: 1;
+  min-width: 0;
+  padding-left: 6px;
+  color: var(--code-ink-dim);
+  font-size: var(--font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.codeCounterOver {
+  color: var(--danger);
+}
+
+.codeAction {
+  height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--code-ink);
+  font: inherit;
+  font-size: var(--font-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.codeAction:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.codeAction:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cardDelete {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font: inherit;
+  font-size: var(--font-name);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cardDelete:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.confirmText {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.confirmDelete {
+  height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: var(--text-on-primary);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+.confirmDelete:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
 .hint {
   margin: -6px 0 0;
   padding: 0 var(--space-3);

@@ -6,6 +6,7 @@ import { getUserProfileRequest } from '../api/users';
 interface UserProfileState {
   profile: UserProfileDto | null;
   load: (userId: string) => void;
+  refresh: (userId: string) => Promise<void>;
   setProfile: (profile: UserProfileDto) => void;
 }
 
@@ -19,6 +20,11 @@ export const useUserProfileStore = create<UserProfileState>((set, get) => ({
     getUserProfileRequest(userId)
       .then((profile) => set({ profile }))
       .catch(() => undefined);
+  },
+
+  async refresh(userId) {
+    const profile = await getUserProfileRequest(userId).catch(() => null);
+    if (profile) set({ profile });
   },
 
   setProfile(profile) {
