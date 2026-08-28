@@ -92,32 +92,35 @@
 }
 
 .bioBox {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 11px 15px 13px;
 }
 
 .bioCounter {
-  align-self: flex-end;
-  flex-shrink: 0;
-  margin-bottom: 4px;
+  position: absolute;
+  top: 11px;
+  right: 15px;
   color: rgba(var(--pulse-ink), 0.4);
   font-size: var(--font-caption);
+  line-height: 20px;
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .bioInput {
   display: block;
   width: 100%;
   overflow: hidden;
-  padding: 0 0 4px;
+  padding: 0 32px 4px 0;
   border: none;
   border-bottom: 1.5px solid transparent;
   background: transparent;
   color: rgb(var(--pulse-ink));
   font: inherit;
   font-size: var(--font-name);
-  line-height: 1.35;
+  line-height: 20px;
   resize: none;
   outline: none;
   transition: border-color var(--transition);
