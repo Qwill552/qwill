@@ -1,11 +1,6 @@
 qwill.mooo.com {
 	encode zstd gzip
 
-	# Единственная директива CSP на странице приложения: встроить в неё кадром можно только
-	# домен песочницы визиток и больше ничего (R-30, Граница 1). Директив без default-src
-	# намеренно ровно одна — политика ограничивает кадры и не трогает остальное.
-	header Content-Security-Policy "frame-src https://qwillsandbox.mooo.com"
-
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3000
 	}
@@ -16,6 +11,16 @@ qwill.mooo.com {
 
 	handle {
 		root * /var/www/message/current/client/dist
+
+		# Единственная директива CSP на странице приложения: встроить в неё кадром можно только
+		# домен песочницы визиток и больше ничего (R-30, Граница 1). Директив без default-src
+		# намеренно ровно одна — политика ограничивает кадры и не трогает остальное.
+		#
+		# Стоит внутри handle статики, а НЕ на уровне сайта: на уровне сайта заголовок
+		# оборачивает ResponseWriter и для /socket.io/*, где соединение хайджекается под
+		# WebSocket. Апгрейд при этом проходит и тут же рвётся, а висящий polling с тем же
+		# sid получает 400 — сессии на сервере уже нет.
+		header Content-Security-Policy "frame-src https://qwillsandbox.mooo.com"
 
 		@immutable path /assets/*
 		header @immutable Cache-Control "public, max-age=31536000, immutable"

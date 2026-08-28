@@ -1,9 +1,6 @@
 dev.qwill.mooo.com {
 	encode zstd gzip
 
-	# См. Caddyfile.qwill — та же единственная директива, свой домен песочницы.
-	header Content-Security-Policy "frame-src https://devsandbox.qwill.mooo.com"
-
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3001
 	}
@@ -14,6 +11,9 @@ dev.qwill.mooo.com {
 
 	handle {
 		root * /var/www/message-dev/current/client/dist
+
+		# См. Caddyfile.qwill — та же единственная директива, свой домен песочницы.
+		header Content-Security-Policy "frame-src https://devsandbox.qwill.mooo.com"
 
 		@immutable path /assets/*
 		header @immutable Cache-Control "public, max-age=31536000, immutable"
