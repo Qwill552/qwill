@@ -32,6 +32,13 @@ export const unauthorized = (message = 'Требуется вход', code: Erro
 export const forbidden = (message = 'Нет доступа', code: ErrorCode = ErrorCode.FORBIDDEN) =>
   new AppError(code, 403, message);
 
+export const banned = (reason: string | null) =>
+  new AppError(
+    ErrorCode.USER_BANNED,
+    403,
+    reason ? `Аккаунт заблокирован. Причина: ${reason}` : 'Аккаунт заблокирован',
+  );
+
 export const notFound = (code: ErrorCode, message: string) => new AppError(code, 404, message);
 
 export const conflict = (code: ErrorCode, message: string) => new AppError(code, 409, message);

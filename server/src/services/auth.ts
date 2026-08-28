@@ -1,7 +1,7 @@
 import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
-import { AppError, unauthorized } from '../lib/errors.js';
+import { AppError, banned, unauthorized } from '../lib/errors.js';
 import {
   generateRefreshToken,
   hashRefreshToken,
@@ -67,6 +67,7 @@ export async function refresh(
   }
 
   const user = await getUserById(session.userId);
+  if (user.bannedAt) throw banned(user.bannedReason);
   // deleteMany, а не delete: параллельный повторный /refresh с тем же токеном (двойной
   // вызов bootstrap в React StrictMode, гонка нескольких вкладок) уже мог удалить строку —
   // delete() бросил бы P2025 вместо аккуратной ротации токена.
@@ -80,16 +81,33 @@ export async function logout(refreshToken: string): Promise<void> {
   await prisma.session.deleteMany({ where: { refreshTokenHash: tokenHash } });
 }
 
+/**
+ * Бан обязан подействовать сразу: удаление сессий закрывает refresh, а эта проверка — окно
+ * до истечения уже выданного access-токена. Лишний findUnique по первичному ключу дешевле
+ * пользователя, который ещё пятнадцать минут пишет в чаты после блокировки (R-32A).
+ */
+export async function assertNotBanned(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bannedAt: true, bannedReason: true },
+  });
+  if (!user) throw unauthorized('Пользователь не найден');
+  if (user.bannedAt) throw banned(user.bannedReason);
+}
+
 export async function requireUserFromAccessToken(authorizationHeader: string | undefined) {
   if (!authorizationHeader?.startsWith('Bearer ')) {
     throw unauthorized();
   }
   const token = authorizationHeader.slice('Bearer '.length);
 
+  let userId: string;
   try {
-    const payload = verifyAccessToken(token);
-    return payload.sub;
+    userId = verifyAccessToken(token).sub;
   } catch {
     throw new AppError(ErrorCode.TOKEN_INVALID, 401, 'Недействительный токен');
   }
+
+  await assertNotBanned(userId);
+  return userId;
 }

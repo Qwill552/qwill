@@ -9,7 +9,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from './constants.js';
-import type { AvatarColor } from './user.js';
+import { isReservedUsername, type AvatarColor, type UserRole } from './user.js';
 
 /** `@username` неизменяем после регистрации — хранится и сравнивается в нижнем регистре (секция 2). */
 const usernameSchema = z
@@ -26,7 +26,10 @@ const passwordSchema = z
   .max(PASSWORD_MAX_LENGTH, `Пароль не длиннее ${PASSWORD_MAX_LENGTH} символов`);
 
 export const registerSchema = z.object({
-  username: usernameSchema,
+  username: usernameSchema.refine(
+    (value) => !isReservedUsername(value),
+    'Это имя пользователя занято сервисом',
+  ),
   password: passwordSchema,
   displayName: z
     .string()
@@ -59,6 +62,8 @@ export interface PublicUser {
   theme: string;
   createdAt: string;
   lastSeenAt: string;
+  /** Только для отрисовки кнопок: права проверяет сервер, подмена поля в ответе ничего не даёт. */
+  role: UserRole;
 }
 
 export interface AuthResponse {

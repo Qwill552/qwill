@@ -33,6 +33,7 @@ import { prisma } from '../db/prisma.js';
 import { AppError, rateLimited } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
+import { assertNotBanned } from '../services/auth.js';
 import { assertMember, getCoMemberIds, markChatRead, pinMessage } from '../services/chat.js';
 import {
   deleteMessage,
@@ -80,6 +81,14 @@ export async function unsubscribeUserFromChat(userId: string, chatId: string): P
 
 export function emitToUser(userId: string, event: string, payload: unknown): void {
   io?.to(userRoom(userId)).emit(event, payload);
+}
+
+/** Бан обязан подействовать сразу, не дожидаясь истечения access-токена: сессии удалены,
+ *  а живое соединение рвётся отсюда (R-32A). */
+export async function disconnectUserSockets(userId: string): Promise<void> {
+  if (!io) return;
+  const sockets = await io.in(userRoom(userId)).fetchSockets();
+  for (const socket of sockets) socket.disconnect(true);
 }
 
 export function emitToChat(chatId: string, event: string, payload: unknown): void {
@@ -383,20 +392,27 @@ export function createSocketServer(httpServer: HttpServer | HttpsServer): Socket
     cors: { origin: (origin, callback) => callback(null, isAllowedClientOrigin(origin)), credentials: true },
   });
 
-  // Access-токен передаётся в handshake.auth — та же проверка, что и на HTTP (секция 3).
+  // Access-токен передаётся в handshake.auth — та же проверка, что и на HTTP (секция 3),
+  // включая отказ забаненному: иначе разорванный сокет тут же переподключится (R-32A).
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
     if (!token) {
       next(new Error('unauthorized'));
       return;
     }
+    let userId: string;
     try {
-      const payload = verifyAccessToken(token);
-      socket.data.userId = payload.sub;
-      next();
+      userId = verifyAccessToken(token).sub;
     } catch {
       next(new Error('unauthorized'));
+      return;
     }
+    assertNotBanned(userId)
+      .then(() => {
+        socket.data.userId = userId;
+        next();
+      })
+      .catch(() => next(new Error('unauthorized')));
   });
 
   io.on('connection', (socket) => {

@@ -74,8 +74,27 @@ model User {
   birthday DateTime? @db.Date
   bio      String?   @db.VarChar(89)
 
+  /// "user" | "admin" (shared/src/user.ts, USER_ROLE_VALUES). Строкой, а не enum — так решено
+  /// в R-30. Права читаются отсюда на каждый запрос, в access-токен роль не кладётся (R-32A).
+  role String @default("user")
+
+  /// Визитка этого пользователя выключена администратором. Глобальный рубильник всех визиток —
+  /// отдельно, в AppSetting под ключом profileCardsEnabled.
+  cardDisabled Boolean @default(false)
+
+  /// Бан: ограничение доступа, а не стирание истории — сообщения и файлы остаются на месте.
+  bannedAt     DateTime?
+  bannedReason String?
+  bannedById   String?
+
+  /// Пароль обязан быть сменён до первого запроса к API (механика — в R-32E).
+  mustChangePassword Boolean @default(false)
+
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
+
+  reportsFiled    Report[] @relation("ReportAuthor")
+  reportsReceived Report[] @relation("ReportTarget")
 
   sessions           Session[]
   memberships        ChatMember[]
@@ -356,6 +375,68 @@ model CallParticipant {
   leftAt   DateTime?
 
   @@unique([callId, userId])
+}
+
+/// Глобальные переключатели, которые обязаны действовать без перезапуска сервера — потому
+/// строка в базе, а не переменная окружения (R-32A). Сейчас ключ один: profileCardsEnabled.
+model AppSetting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}
+
+/// Жалоба от пользователя. Одна жалоба ничего не выключает автоматически — разбирает человек.
+model Report {
+  id String @id @default(cuid(2))
+
+  reporterId String
+  reporter   User   @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  targetUserId String
+  targetUser   User   @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  targetChatId    String?
+  targetMessageId Int?
+
+  /// "card" | "message" | "profile" (shared/src/admin.ts).
+  kind    String
+  comment String
+
+  /// "new" | "working" | "closed".
+  status     String  @default("new")
+  resolution String?
+
+  createdAt  DateTime  @default(now())
+  closedAt   DateTime?
+  closedById String?
+
+  @@index([status, createdAt])
+  @@index([targetUserId])
+  @@index([targetChatId])
+}
+
+/// Журнал административных действий. Не редактируется и не удаляется: маршрутов PATCH/DELETE
+/// нет и чистки по сроку нет — журнал, который можно почистить из панели, бесполезен ровно в
+/// том случае, ради которого заведён.
+model AdminAction {
+  id String @id @default(cuid(2))
+
+  adminId      String
+  action       String
+  targetUserId String?
+  targetChatId String?
+
+  /// Сериализованный JSON до 1 КБ — колонки Json в схеме проекта нет и ради одного поля не заводится.
+  detail String?
+
+  ip        String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetUserId, createdAt])
 }
 
 /// Один выпуск приложения — одна запись; сообщения в чатах всех получателей ссылаются на неё.

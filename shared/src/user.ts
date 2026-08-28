@@ -56,6 +56,45 @@ export interface UserProfileDto {
   bio: string | null;
 }
 
+/** Роль хранится строкой в `User.role` и проверяется на сервере походом в базу на каждый
+ *  запрос — не выводится из username и не кладётся в access-токен (R-32A). */
+export const USER_ROLE_VALUES = ['user', 'admin'] as const;
+export type UserRole = (typeof USER_ROLE_VALUES)[number];
+
+export function toUserRole(value: string): UserRole {
+  return (USER_ROLE_VALUES as readonly string[]).includes(value) ? (value as UserRole) : 'user';
+}
+
+/** Имена, под которыми нельзя зарегистрироваться: посторонний не должен выдавать себя за
+ *  администрацию. Проверяются только при регистрации — существующие записи не валидируются
+ *  и не переименовываются (R-32A). */
+export const RESERVED_USERNAMES = [
+  'qwill',
+  'admin',
+  'administrator',
+  'administration',
+  'support',
+  'moderator',
+  'mod',
+  'system',
+  'root',
+  'staff',
+  'team',
+  'official',
+  'security',
+  'abuse',
+  'help',
+  'info',
+  'service',
+  'bot',
+  'null',
+  'undefined',
+] as const;
+
+export function isReservedUsername(username: string): boolean {
+  return (RESERVED_USERNAMES as readonly string[]).includes(username.trim().toLowerCase());
+}
+
 export const THEME_VALUES = ['light', 'dark', 'system'] as const;
 export type ThemePreference = (typeof THEME_VALUES)[number];
 

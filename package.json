@@ -34,7 +34,9 @@
     "db:down": "docker compose down",
     "db:migrate": "npm run db:migrate -w @messenger/server",
     "db:generate": "npm run db:generate -w @messenger/server",
-    "db:studio": "npm run db:studio -w @messenger/server"
+    "db:studio": "npm run db:studio -w @messenger/server",
+    "grant-admin": "npm run grant-admin -w @messenger/server --",
+    "revoke-admin": "npm run revoke-admin -w @messenger/server --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

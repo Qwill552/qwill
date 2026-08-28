@@ -21,6 +21,7 @@ import {
   type Location,
 } from 'react-router-dom';
 
+import { AdminScreen } from '../pages/AdminScreen';
 import { AppearanceScreen } from '../pages/AppearanceScreen';
 import { CallTraceScreen } from '../pages/CallTraceScreen';
 import { ChatInfoScreen } from '../pages/ChatInfoScreen';
@@ -85,6 +86,7 @@ const OVERLAY_TAB_TITLE: Record<string, string> = {
   contacts: 'Контакты',
   settings: 'Настройки',
   profile: 'Мой профиль',
+  admin: 'Администрирование',
 };
 
 /** Заголовок карточки для конкретного подмаршрута — переопределяет `OVERLAY_TAB_TITLE`,
@@ -131,6 +133,7 @@ const RouteSwitch = memo(
         <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="/profile/edit" element={<ProfileEditScreen />} />
+        <Route path="/admin" element={<AdminScreen />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
     );

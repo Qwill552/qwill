@@ -7,6 +7,7 @@ import { pinoHttp } from 'pino-http';
 import { isAllowedClientOrigin } from './config/env.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
 import { generalLimiter } from './http/middleware/rateLimit.js';
+import { adminRouter } from './http/routes/admin.js';
 import { appVersionRouter } from './http/routes/appVersion.js';
 import { authRouter } from './http/routes/auth.js';
 import { callsRouter } from './http/routes/calls.js';
@@ -14,6 +15,7 @@ import { chatsRouter } from './http/routes/chats.js';
 import { filesRouter } from './http/routes/files.js';
 import { healthRouter } from './http/routes/health.js';
 import { pushRouter } from './http/routes/push.js';
+import { reportsRouter } from './http/routes/reports.js';
 import { searchRouter } from './http/routes/search.js';
 import { usersRouter } from './http/routes/users.js';
 import { logger } from './lib/logger.js';
@@ -57,6 +59,8 @@ export function createApp(): Express {
   app.use('/api/files', filesRouter);
   app.use('/api/push', pushRouter);
   app.use('/api/calls', callsRouter);
+  app.use('/api/reports', reportsRouter);
+  app.use('/api/admin', adminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

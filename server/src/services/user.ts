@@ -5,11 +5,18 @@ import type {
   UserProfileDto,
   UserSettingsDTO,
 } from '@messenger/shared';
-import { ErrorCode, FONT_SIZE_VALUES, SURFACE_VALUES, THEME_VALUES } from '@messenger/shared';
+import {
+  ErrorCode,
+  FONT_SIZE_VALUES,
+  isReservedUsername,
+  SURFACE_VALUES,
+  THEME_VALUES,
+  toUserRole,
+} from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
-import { AppError, notFound } from '../lib/errors.js';
+import { AppError, banned, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { assertAvatarEligible } from './file.js';
@@ -25,6 +32,7 @@ export function toPublicUser(user: User): PublicUser {
     theme: user.theme,
     createdAt: user.createdAt.toISOString(),
     lastSeenAt: user.lastSeenAt.toISOString(),
+    role: toUserRole(user.role),
   };
 }
 
@@ -33,6 +41,10 @@ export async function createUser(input: {
   password: string;
   displayName: string;
 }): Promise<User> {
+  if (isReservedUsername(input.username)) {
+    throw new AppError(ErrorCode.USERNAME_TAKEN, 409, 'Это имя пользователя занято сервисом');
+  }
+
   const existing = await prisma.user.findUnique({ where: { username: input.username } });
   if (existing) {
     throw new AppError(ErrorCode.USERNAME_TAKEN, 409, 'Это имя пользователя уже занято');
@@ -59,6 +71,8 @@ export async function verifyCredentials(username: string, password: string): Pro
   if (!valid) {
     throw new AppError(ErrorCode.INVALID_CREDENTIALS, 401, 'Неверное имя пользователя или пароль');
   }
+
+  if (user.bannedAt) throw banned(user.bannedReason);
 
   return user;
 }
