@@ -130,7 +130,7 @@ export function ProfileScreen() {
         {error && <p className={styles.error}>{error}</p>}
 
         {profile?.bio && (
-          <Card caption="О себе">
+          <Card caption="О себе" className={styles.cardReset}>
             <p className={styles.bioText}>{profile.bio}</p>
           </Card>
         )}

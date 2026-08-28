@@ -11,6 +11,7 @@ interface DesktopScreenModalProps {
   onClose: () => void;
   onBack?: () => void;
   chromeless?: boolean;
+  wide?: boolean;
   headerAction?: ReactNode;
   children: ReactNode;
 }
@@ -32,6 +33,7 @@ export function DesktopScreenModal({
   onClose,
   onBack,
   chromeless,
+  wide,
   headerAction,
   children,
 }: DesktopScreenModalProps) {
@@ -57,7 +59,7 @@ export function DesktopScreenModal({
   return createPortal(
     <div className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`} onClick={handleScrimClick}>
       <div
-        className={`${styles.card} ${chromeless ? styles.cardChromeless : ''} ${closing ? styles.cardClosing : ''}`}
+        className={`${styles.card} ${wide ? styles.cardWide : ''} ${chromeless ? styles.cardChromeless : ''} ${closing ? styles.cardClosing : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

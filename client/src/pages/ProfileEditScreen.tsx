@@ -55,6 +55,7 @@ export function ProfileEditScreen() {
   const storedProfile = useUserProfileStore((s) => s.profile);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bioRef = useRef<HTMLTextAreaElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [cropSource, setCropSource] = useState<File | null>(null);
@@ -83,6 +84,13 @@ export function ProfileEditScreen() {
     setBirthday(profile.birthday ?? '');
     setBio(profile.bio ?? '');
   }, [profile]);
+
+  useEffect(() => {
+    const field = bioRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${field.scrollHeight}px`;
+  }, [bio]);
 
   async function uploadAvatar(file: File): Promise<void> {
     setAvatarUploading(true);
@@ -203,9 +211,12 @@ export function ProfileEditScreen() {
           <div className={styles.bioBox}>
             <span className={styles.bioCounter}>{bioRemaining}</span>
             <textarea
+              ref={bioRef}
               className={styles.bioInput}
+              rows={1}
               value={bio}
               maxLength={BIO_MAX_LENGTH}
+              placeholder="О себе"
               aria-label="О себе"
               onChange={(e) => setBio(e.target.value)}
             />
@@ -218,8 +229,6 @@ export function ProfileEditScreen() {
 
         <Card className={styles.cardReset}>
           <Card.Row
-            icon="settings"
-            tint="indigo"
             title="Продвинутый режим"
             subtitle="HTML-визитка — скоро"
             trailing={<Switch checked={false} onChange={() => undefined} disabled label="Продвинутый режим" />}

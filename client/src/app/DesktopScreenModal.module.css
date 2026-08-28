@@ -35,6 +35,10 @@
   animation: popIn var(--dur-menu) var(--ease-spring);
 }
 
+.cardWide {
+  width: min(500px, 100%);
+}
+
 .cardChromeless {
   height: auto;
   max-height: 86dvh;

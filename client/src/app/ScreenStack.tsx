@@ -713,6 +713,7 @@ export function ScreenStack() {
         {overlayTab && overlayMeta && (
           <DesktopScreenModal
             title={overlayMeta.title}
+            wide={overlayTab === 'profile'}
             onBack={overlayMeta.backTo ? () => navigate(overlayMeta.backTo as string) : undefined}
             onClose={() => navigate(lastPathForTab('/chats'))}
             headerAction={OVERLAY_SUBROUTE_ACTION[location.pathname]}
