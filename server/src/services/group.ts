@@ -47,7 +47,7 @@ export async function getMembers(chatId: string, requesterId: string): Promise<G
   const members = await prisma.chatMember.findMany({
     where: { chatId },
     include: { user: true },
-    orderBy: { joinedAt: 'asc' },
+    orderBy: [{ joinedAt: 'asc' }, { userId: 'asc' }],
   });
   return members.map(toGroupMemberDto);
 }
@@ -170,7 +170,7 @@ export async function leaveGroup(chatId: string, userId: string): Promise<void> 
 
   const others = await prisma.chatMember.findMany({
     where: { chatId, userId: { not: userId } },
-    orderBy: { joinedAt: 'asc' },
+    orderBy: [{ joinedAt: 'asc' }, { userId: 'asc' }],
   });
 
   if (others.length === 0) {

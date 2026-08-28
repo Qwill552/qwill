@@ -34,6 +34,13 @@ async function createGroup(creatorId: string, title: string, memberUsernames: st
   return chatId;
 }
 
+async function makeOlder(chatId: string, userId: string): Promise<void> {
+  await prisma.chatMember.update({
+    where: { chatId_userId: { chatId, userId } },
+    data: { joinedAt: new Date(Date.now() - 60 * 60 * 1000) },
+  });
+}
+
 function roleOf(chatId: string, userId: string) {
   return prisma.chatMember
     .findUnique({ where: { chatId_userId: { chatId, userId } } })
@@ -70,6 +77,7 @@ describe('group.service (этап 7, чек-лист 7-D)', () => {
       const memberOld = await registerUser('lg2_member_old');
       const memberNew = await registerUser('lg2_member_new');
       const chatId = await createGroup(owner.userId, 'Группа 2', [memberOld.username, memberNew.username]);
+      await makeOlder(chatId, memberOld.userId);
 
       await leaveGroup(chatId, owner.userId);
 
