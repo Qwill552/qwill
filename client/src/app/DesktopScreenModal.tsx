@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useEscapeKey } from './hotkeys';
@@ -38,6 +38,7 @@ export function DesktopScreenModal({
   children,
 }: DesktopScreenModalProps) {
   const [closing, setClosing] = useState(false);
+  const pressedOnScrim = useRef(false);
 
   function startClose(): void {
     setClosing((current) => current || true);
@@ -52,12 +53,22 @@ export function DesktopScreenModal({
 
   useEscapeKey(!closing, startClose);
 
-  function handleScrimClick(event: MouseEvent<HTMLDivElement>): void {
-    if (event.target === event.currentTarget) startClose();
+  function handleScrimPointerDown(event: PointerEvent<HTMLDivElement>): void {
+    pressedOnScrim.current = event.target === event.currentTarget;
+  }
+
+  function handleScrimPointerUp(event: PointerEvent<HTMLDivElement>): void {
+    const startedHere = pressedOnScrim.current;
+    pressedOnScrim.current = false;
+    if (startedHere && event.target === event.currentTarget) startClose();
   }
 
   return createPortal(
-    <div className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`} onClick={handleScrimClick}>
+    <div
+      className={`${styles.scrim} ${closing ? styles.scrimClosing : ''}`}
+      onPointerDown={handleScrimPointerDown}
+      onPointerUp={handleScrimPointerUp}
+    >
       <div
         className={`${styles.card} ${wide ? styles.cardWide : ''} ${chromeless ? styles.cardChromeless : ''} ${closing ? styles.cardClosing : ''}`}
         role="dialog"

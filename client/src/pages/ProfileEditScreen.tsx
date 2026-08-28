@@ -25,6 +25,7 @@ import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Modal } from '../features/groups/Modal';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
+import { clearCardDraft, readCardDraft, writeCardDraft } from '../features/profile/cardDraft';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
@@ -55,6 +56,7 @@ const FIELD_META: Record<EditableFieldKey, EditableFieldMeta> = {
 };
 
 const CARD_MAX_MB = Math.floor(PROFILE_CARD_MAX_BYTES / (1024 * 1024));
+const DRAFT_WRITE_DELAY_MS = 400;
 
 function formatBytes(bytes: number): string {
   return bytes.toLocaleString('ru-RU');
@@ -92,6 +94,7 @@ export function ProfileEditScreen() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [confirmingCardDelete, setConfirmingCardDelete] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const profile = storedProfile?.id === user?.id ? storedProfile : null;
 
@@ -113,18 +116,38 @@ export function ProfileEditScreen() {
   }, [profile]);
 
   useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return;
+
     let cancelled = false;
     getOwnCardRequest()
       .then((html) => {
         if (cancelled) return;
-        setCardHtml(html);
         setSavedCardHtml(html);
+        setCardHtml(readCardDraft(userId) ?? html);
+        setDraftRestored(true);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (cancelled) return;
+        const draft = readCardDraft(userId);
+        if (draft !== null) setCardHtml(draft);
+        setDraftRestored(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId || !draftRestored) return;
+
+    const timer = window.setTimeout(() => {
+      if (cardHtml === savedCardHtml) clearCardDraft(userId);
+      else writeCardDraft(userId, cardHtml);
+    }, DRAFT_WRITE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [cardHtml, savedCardHtml, draftRestored, user?.id]);
 
   useEffect(() => {
     const field = bioRef.current;
