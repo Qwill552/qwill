@@ -3,6 +3,8 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import card from '../app/desktopCard.module.css';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { isNativeShell, type CallBackgroundStyle } from '../calls/nativeCall';
 import { useUiStore } from '../stores/uiStore';
 import { Card } from '../ui/Card';
@@ -35,6 +37,7 @@ const CALL_BACKGROUNDS: Segment<CallBackgroundStyle>[] = [
  *  сразу и уходит на сервер существующим механизмом uiStore. */
 export function AppearanceScreen() {
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   const themePreference = useUiStore((s) => s.themePreference);
   const setThemePreference = useUiStore((s) => s.setThemePreference);
   const fontSize = useUiStore((s) => s.fontSize);
@@ -45,8 +48,11 @@ export function AppearanceScreen() {
 
   return (
     <div className={styles.screen}>
-      <AmbientBlobs />
-      <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
+      {!isDesktop && <AmbientBlobs />}
+      <div
+        ref={scrollerRef}
+        className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}
+      >
         <ScrollIndicator target={scrollerRef} />
         <Card caption="Тема">
           <div className={styles.control}>
@@ -80,10 +86,12 @@ export function AppearanceScreen() {
         )}
       </div>
 
-      <ChromeBar>
-        <GlassButton icon="back" label="Назад в настройки" onClick={() => navigate('/settings')} />
-        <GlassPill title="Оформление" />
-      </ChromeBar>
+      {!isDesktop && (
+        <ChromeBar>
+          <GlassButton icon="back" label="Назад в настройки" onClick={() => navigate('/settings')} />
+          <GlassPill title="Оформление" />
+        </ChromeBar>
+      )}
     </div>
   );
 }

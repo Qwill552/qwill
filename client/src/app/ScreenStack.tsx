@@ -77,14 +77,28 @@ function emptyLocation(pathname: string): Location {
 
 const CHATS_ROOT_LOCATION = emptyLocation('/chats');
 
-/** Заголовок карточки DesktopScreenModal — по вкладке верхнего уровня, не по конкретному
- *  подмаршруту: «Оформление»/«Для разработчиков» показывают свой заголовок сами, через
- *  собственный ChromeBar (StubScreen/AppearanceScreen), эта строка — «имя окна». */
+/** Заголовок карточки DesktopScreenModal по вкладке верхнего уровня — для маршрутов без
+ *  собственной строки в `OVERLAY_SUBROUTE_TITLE` ниже. */
 const OVERLAY_TAB_TITLE: Record<string, string> = {
   contacts: 'Контакты',
   settings: 'Настройки',
   profile: 'Мой профиль',
 };
+
+/** Заголовок карточки для конкретного подмаршрута — переопределяет `OVERLAY_TAB_TITLE`,
+ *  когда открыт не корень вкладки, а вложенный экран. Стрелка «←» в шапке карточки ведёт
+ *  на `parentPathOf` этого же пути — те же связи, что и у свайпа «назад» на телефоне. */
+const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
+  '/settings/appearance': 'Настройки чатов',
+  '/settings/developer': 'Для разработчиков',
+  '/settings/developer/call-trace': 'Трассировка звонка',
+};
+
+function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
+  const subroute = OVERLAY_SUBROUTE_TITLE[pathname];
+  if (subroute) return { title: subroute, backTo: parentPathOf(pathname) };
+  return { title: OVERLAY_TAB_TITLE[tab] ?? '', backTo: null };
+}
 
 const RESIZE_STEP = 16;
 const RESIZE_STEP_LARGE = 48;
@@ -662,6 +676,7 @@ export function ScreenStack() {
     // чат, что был открыт до перехода в оверлей (lastPathForTab запоминает его на каждый чих
     // location в эффекте ниже).
     const overlayTab = currentTab === 'chats' ? null : currentTab;
+    const overlayMeta = overlayTab ? overlayCardMeta(location.pathname, overlayTab) : null;
     const chatsLocation = overlayTab ? emptyLocation(lastPathForTab('/chats')) : location;
     const leftLocation = CHATS_ROOT_LOCATION;
     const chatInfoId = matchPath('/chats/:chatId/info', chatsLocation.pathname)?.params.chatId ?? null;
@@ -687,9 +702,10 @@ export function ScreenStack() {
             onKeyDown={handleResizerKeyDown}
           />
         </div>
-        {overlayTab && (
+        {overlayTab && overlayMeta && (
           <DesktopScreenModal
-            title={OVERLAY_TAB_TITLE[overlayTab] ?? ''}
+            title={overlayMeta.title}
+            onBack={overlayMeta.backTo ? () => navigate(overlayMeta.backTo as string) : undefined}
             onClose={() => navigate(lastPathForTab('/chats'))}
           >
             <RouteSwitch location={location} />

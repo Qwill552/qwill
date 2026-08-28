@@ -6,6 +6,8 @@ import { setAvatarRequest } from '../api/auth';
 import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
 import { isApkUpdateSupported, selectUpdateAvailable, useAppUpdateStore } from '../app/appUpdate';
+import card from '../app/desktopCard.module.css';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { countPendingOutbox } from '../cache/outbox';
 import { formatBytes } from '../features/messages/Attachment';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
@@ -41,6 +43,7 @@ function CameraBadgeIcon() {
  *  карточкой, как и на предыдущем этапе (см. ux-ui.md, запись про экраны 2026-08-01). */
 export function SettingsScreen() {
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const logout = useAuthStore((s) => s.logout);
@@ -109,7 +112,10 @@ export function SettingsScreen() {
 
   return (
     <div className={styles.screen}>
-      <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
+      <div
+        ref={scrollerRef}
+        className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}
+      >
         <ScrollIndicator target={scrollerRef} mode="bounded" boundsTop={profileRef} boundsBottom={nameRef} />
         <div ref={profileRef} className={styles.profile}>
           <button

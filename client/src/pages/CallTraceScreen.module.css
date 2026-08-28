@@ -33,3 +33,13 @@
   text-align: center;
   color: var(--text-secondary);
 }
+
+@media (min-width: 900px) {
+  .screen {
+    background: transparent;
+  }
+
+  .scroller {
+    padding: var(--space-4) var(--card-inset);
+  }
+}

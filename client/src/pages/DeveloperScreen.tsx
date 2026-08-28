@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import card from '../app/desktopCard.module.css';
+import { useLayoutMode } from '../app/useLayoutMode';
 import { useDevPrefsStore } from '../stores/devPrefsStore';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
@@ -13,14 +15,18 @@ import styles from './DeveloperScreen.module.css';
 
 export function DeveloperScreen() {
   const navigate = useNavigate();
+  const isDesktop = useLayoutMode() === 'desktop';
   const callStatsOverlayEnabled = useDevPrefsStore((s) => s.callStatsOverlayEnabled);
   const setCallStatsOverlayEnabled = useDevPrefsStore((s) => s.setCallStatsOverlayEnabled);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className={styles.screen}>
-      <AmbientBlobs />
-      <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
+      {!isDesktop && <AmbientBlobs />}
+      <div
+        ref={scrollerRef}
+        className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}
+      >
         <ScrollIndicator target={scrollerRef} />
         <Card caption="Звонки">
           <Card.Row
@@ -46,10 +52,12 @@ export function DeveloperScreen() {
         </Card>
       </div>
 
-      <ChromeBar>
-        <GlassButton icon="back" label="Назад в настройки" onClick={() => navigate('/settings')} />
-        <GlassPill title="Для разработчиков" />
-      </ChromeBar>
+      {!isDesktop && (
+        <ChromeBar>
+          <GlassButton icon="back" label="Назад в настройки" onClick={() => navigate('/settings')} />
+          <GlassPill title="Для разработчиков" />
+        </ChromeBar>
+      )}
     </div>
   );
 }

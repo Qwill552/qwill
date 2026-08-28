@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom';
 
 import { useEscapeKey } from './hotkeys';
 import { Icon } from '../ui/Icon';
+import { IconButton } from '../ui/IconButton';
 import styles from './DesktopScreenModal.module.css';
 
 interface DesktopScreenModalProps {
   title: string;
   onClose: () => void;
+  onBack?: () => void;
   chromeless?: boolean;
   children: ReactNode;
 }
@@ -24,7 +26,7 @@ interface DesktopScreenModalProps {
  * кнопка «назад» и так закрывает карточку — просто без exit-анимации, потому что ScreenStack
  * перестаёт её рендерить в тот же кадр, где меняется location.
  */
-export function DesktopScreenModal({ title, onClose, chromeless, children }: DesktopScreenModalProps) {
+export function DesktopScreenModal({ title, onClose, onBack, chromeless, children }: DesktopScreenModalProps) {
   const [closing, setClosing] = useState(false);
 
   function startClose(): void {
@@ -63,13 +65,18 @@ export function DesktopScreenModal({ title, onClose, chromeless, children }: Des
           </button>
         ) : (
           <div className={styles.header}>
-            <h2 className={styles.title}>{title}</h2>
-            <button type="button" className={styles.closeButton} onClick={startClose} aria-label="Закрыть">
-              <Icon name="close" size={18} />
-            </button>
+            <div className={styles.titleRow}>
+              {onBack && <IconButton icon="back" label="Назад" onClick={onBack} />}
+              <h2 className={styles.title}>{title}</h2>
+            </div>
+            <IconButton icon="close" label="Закрыть" onClick={startClose} />
           </div>
         )}
-        <div className={styles.body}>{children}</div>
+        <div className={styles.body}>
+          <div key={title} className={styles.content}>
+            {children}
+          </div>
+        </div>
       </div>
     </div>,
     document.body,
