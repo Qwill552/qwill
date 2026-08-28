@@ -22,6 +22,7 @@ function staticParent(pathname: string): string | null {
   if (pathname === '/settings/appearance') return '/settings';
   if (pathname === '/settings/developer') return '/settings';
   if (pathname === '/settings/developer/call-trace') return '/settings/developer';
+  if (pathname === '/profile/edit') return '/profile';
   return null;
 }
 

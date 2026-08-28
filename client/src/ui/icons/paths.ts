@@ -223,6 +223,14 @@ export const ICON_PATHS = {
     'M12 11v5.5',
     'M11.9 7.9a1.1 1.1 0 1 0 2.2 0 1.1 1.1 0 1 0-2.2 0',
   ],
+  qrcode: [
+    'M3.5 3.5h6v6h-6Z',
+    'M14.5 3.5h6v6h-6Z',
+    'M3.5 14.5h6v6h-6Z',
+    'M14.5 14.5h3v3h-3Z',
+    'M20.5 14.5v3h-2.3',
+    'M14.5 20.5h3v-2',
+  ],
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

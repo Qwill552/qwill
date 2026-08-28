@@ -1,0 +1,229 @@
+.screen {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.scroller {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: var(--chrome-space-top) calc(14px + var(--safe-right)) calc(96px + var(--safe-bottom))
+    calc(14px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 900px) {
+  .screen {
+    background: transparent;
+  }
+
+  .scroller {
+    padding: var(--space-4) var(--card-inset);
+  }
+}
+
+.cardReset {
+  margin: 0;
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.qrButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  border-radius: 50%;
+  background: rgba(var(--pulse-glass), 0.06);
+  color: rgb(var(--pulse-ink));
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.qrButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.avatarWrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+}
+
+.avatarRing {
+  width: 110px;
+  height: 110px;
+  padding: 1.5px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #4d8dff, #a05aff, #00c8b4, #4d8dff);
+}
+
+.avatarCamera {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  cursor: pointer;
+}
+
+.avatarCamera:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.avatarCamera:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--card-radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-caption);
+}
+
+.bioHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) var(--space-1);
+}
+
+.bioHint {
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+}
+
+.bioCounter {
+  flex-shrink: 0;
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.bioInput {
+  width: 100%;
+  min-height: 72px;
+  padding: 11px 13px;
+  border: 1px solid rgba(var(--pulse-glass), 0.09);
+  border-radius: 16px;
+  background: rgba(var(--pulse-glass), 0.055);
+  color: rgb(var(--pulse-ink));
+  font: inherit;
+  font-size: var(--font-name);
+  resize: none;
+  outline: none;
+}
+
+.bioInput:focus {
+  border-color: var(--primary);
+}
+
+.advancedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-1) 0;
+}
+
+.advancedText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.advancedTitle {
+  font-size: var(--font-name);
+}
+
+.advancedSubtitle {
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+}
+
+.fieldInput {
+  flex: 0 1 150px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgb(var(--pulse-ink));
+  font: inherit;
+  font-size: var(--font-name);
+  text-align: right;
+  outline: none;
+}
+
+.fieldInput::placeholder {
+  color: rgba(var(--pulse-ink), 0.35);
+}
+
+.accent {
+  color: var(--primary);
+}
+
+.hint {
+  margin: -6px 0 0;
+  padding: 0 var(--space-3);
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+}
+
+.saveButton {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font: inherit;
+  font-size: var(--font-name);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saveButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.saveButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

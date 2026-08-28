@@ -28,6 +28,7 @@ import { ChatScreen } from '../pages/ChatScreen';
 import { ChatsScreen } from '../pages/ChatsScreen';
 import { ContactsScreen } from '../pages/ContactsScreen';
 import { DeveloperScreen } from '../pages/DeveloperScreen';
+import { ProfileEditScreen } from '../pages/ProfileEditScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StubScreen } from '../pages/StubScreen';
@@ -92,6 +93,7 @@ const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
   '/settings/appearance': 'Настройки чатов',
   '/settings/developer': 'Для разработчиков',
   '/settings/developer/call-trace': 'Трассировка звонка',
+  '/profile/edit': 'Изменить профиль',
 };
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
@@ -123,6 +125,7 @@ const RouteSwitch = memo(
         <Route path="/settings/developer" element={<DeveloperScreen />} />
         <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
+        <Route path="/profile/edit" element={<ProfileEditScreen />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
     );
