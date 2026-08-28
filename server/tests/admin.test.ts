@@ -301,7 +301,16 @@ describe('администрирование (R-32A)', () => {
 
       const actions = await prisma.adminAction.findMany({ where: { adminId: admin.userId } });
       expect(actions.map((action) => action.action).sort()).toEqual(['settings.profileCards', 'user.card']);
-      for (const action of actions) expect(action.ip.length).toBeGreaterThan(0);
+      for (const action of actions) {
+        expect(action.ip.length).toBeGreaterThan(0);
+        expect(action.adminUsername).toBe(admin.username);
+      }
+
+      const cardAction = actions.find((action) => action.action === 'user.card');
+      expect(cardAction?.targetUsername).toBe(target.username);
+
+      const settingsAction = actions.find((action) => action.action === 'settings.profileCards');
+      expect(settingsAction?.targetUsername).toBeNull();
     });
   });
 });
