@@ -4,12 +4,20 @@ import { fileURLToPath } from 'node:url';
 
 import type { CardFontDto } from '@messenger/shared';
 
+import { env } from '../config/env.js';
 import { logger } from './logger.js';
 
 export const PROFILE_FONTS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../assets/profile-fonts',
 );
+
+/**
+ * Второй каталог — рядом со `storage`, то есть вне каталога выпуска. Положенный туда `.woff2`
+ * переживает деплой, в отличие от того, что лежит в репозитории внутри выпуска. При совпадении
+ * имени побеждает этот.
+ */
+export const PROFILE_FONTS_PERSISTENT_DIR = path.join(env.storageDir, 'profile-fonts');
 
 const FILE_NAME_PATTERN = /^[A-Za-z0-9._-]+\.woff2$/;
 const FAMILY_PATTERN = /^[A-Za-z0-9 _-]{1,64}$/;
@@ -36,6 +44,7 @@ const WEIGHT_BY_SUFFIX: Record<string, number> = {
 
 interface FontFace {
   file: string;
+  path: string;
   family: string;
   weight: number;
   italic: boolean;
@@ -45,13 +54,14 @@ interface FontTable {
   faces: FontFace[];
   css: string;
   families: CardFontDto[];
-  files: Set<string>;
+  files: Map<string, string>;
 }
 
 let table: FontTable | null = null;
 
-function parseFace(file: string): FontFace | null {
+function parseFace(file: string, dir: string): FontFace | null {
   const stem = file.slice(0, -'.woff2'.length);
+  const fullPath = path.join(dir, file);
   const dash = stem.lastIndexOf('-');
 
   if (dash > 0) {
@@ -61,11 +71,11 @@ function parseFace(file: string): FontFace | null {
     const weight = WEIGHT_BY_SUFFIX[weightKey];
     if (weight !== undefined) {
       const family = stem.slice(0, dash);
-      return FAMILY_PATTERN.test(family) ? { file, family, weight, italic } : null;
+      return FAMILY_PATTERN.test(family) ? { file, path: fullPath, family, weight, italic } : null;
     }
   }
 
-  return FAMILY_PATTERN.test(stem) ? { file, family: stem, weight: 400, italic: false } : null;
+  return FAMILY_PATTERN.test(stem) ? { file, path: fullPath, family: stem, weight: 400, italic: false } : null;
 }
 
 function buildCss(faces: FontFace[]): string {
@@ -94,41 +104,49 @@ function buildFamilies(faces: FontFace[]): CardFontDto[] {
     .sort((a, b) => a.family.localeCompare(b.family, 'ru'));
 }
 
-function scan(): FontTable {
-  const faces: FontFace[] = [];
-
-  if (!existsSync(PROFILE_FONTS_DIR)) {
-    logger.warn({ dir: PROFILE_FONTS_DIR }, 'Папки шрифтов визитки нет — список шрифтов пуст');
-    return { faces, css: '', families: [], files: new Set() };
+function scanInto(dir: string, byFile: Map<string, FontFace>, required: boolean): void {
+  if (!existsSync(dir)) {
+    if (required) logger.warn({ dir }, 'Папки шрифтов визитки нет — список шрифтов пуст');
+    return;
   }
 
-  for (const entry of readdirSync(PROFILE_FONTS_DIR, { withFileTypes: true })) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
     if (!FILE_NAME_PATTERN.test(entry.name)) {
       if (!entry.name.startsWith('.') && entry.name.toLowerCase() !== 'readme.md') {
-        logger.warn({ file: entry.name }, 'Шрифт визитки пропущен: годятся только .woff2 с именем из латиницы');
+        logger.warn({ dir, file: entry.name }, 'Шрифт визитки пропущен: годятся только .woff2 с именем из латиницы');
       }
       continue;
     }
-    const face = parseFace(entry.name);
+    const face = parseFace(entry.name, dir);
     if (!face) {
-      logger.warn({ file: entry.name }, 'Шрифт визитки пропущен: имя семейства не годится для CSS');
+      logger.warn({ dir, file: entry.name }, 'Шрифт визитки пропущен: имя семейства не годится для CSS');
       continue;
     }
-    faces.push(face);
+    byFile.set(face.file, face);
   }
+}
 
+function scan(): FontTable {
+  const byFile = new Map<string, FontFace>();
+  scanInto(PROFILE_FONTS_DIR, byFile, true);
+  scanInto(PROFILE_FONTS_PERSISTENT_DIR, byFile, false);
+
+  const faces = [...byFile.values()];
   return {
     faces,
     css: buildCss(faces),
     families: buildFamilies(faces),
-    files: new Set(faces.map((face) => face.file)),
+    files: new Map(faces.map((face) => [face.file, face.path])),
   };
 }
 
 export function initProfileFonts(): void {
   table = scan();
-  logger.info({ families: table.families.length, faces: table.faces.length }, 'Шрифты визитки просканированы');
+  logger.info(
+    { families: table.families.length, faces: table.faces.length, persistentDir: PROFILE_FONTS_PERSISTENT_DIR },
+    'Шрифты визитки просканированы',
+  );
 }
 
 function ensureTable(): FontTable {
@@ -145,5 +163,5 @@ export function getProfileFontFamilies(): CardFontDto[] {
 }
 
 export function resolveProfileFontPath(fileName: string): string | null {
-  return ensureTable().files.has(fileName) ? path.join(PROFILE_FONTS_DIR, fileName) : null;
+  return ensureTable().files.get(fileName) ?? null;
 }

@@ -189,7 +189,12 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
       </div>
 
       {profile?.cardUrl ? (
-        <ProfileCardFrame cardUrl={profile.cardUrl} authorId={profile.id} authorName={profile.displayName} />
+        <ProfileCardFrame
+          cardUrl={profile.cardUrl}
+          authorId={profile.id}
+          authorName={profile.displayName}
+          autoStart
+        />
       ) : (
         profile?.bio && (
           <Card caption="О себе">

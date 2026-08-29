@@ -29,7 +29,7 @@ export function CardImagePanel() {
   const [maxCount, setMaxCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<{ name: string; label: string } | null>(null);
   const [pending, setPending] = useState<PendingUpload | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -63,15 +63,14 @@ export function CardImagePanel() {
     setMaxCount(list.maxCount);
   }
 
-  function flash(message: string): void {
-    setCopied(message);
-    window.setTimeout(() => setCopied((current) => (current === message ? null : current)), COPIED_FLASH_MS);
-  }
-
-  async function copy(text: string, message: string): Promise<void> {
+  async function copy(text: string, name: string, label: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
-      flash(message);
+      setCopied({ name, label });
+      window.setTimeout(
+        () => setCopied((current) => (current?.name === name && current.label === label ? null : current)),
+        COPIED_FLASH_MS,
+      );
     } catch {
       setError('Браузер не дал скопировать — выделите путь вручную');
     }
@@ -129,11 +128,6 @@ export function CardImagePanel() {
 
       <input ref={inputRef} className={styles.hiddenInput} type="file" accept={ACCEPT} onChange={handleFileChosen} />
 
-      {copied && (
-        <p className={styles.copied} role="status">
-          {copied}
-        </p>
-      )}
       {error && <p className={styles.error}>{error}</p>}
 
       {loading ? (
@@ -144,14 +138,21 @@ export function CardImagePanel() {
         <ul className={styles.grid}>
           {images.map((image) => (
             <li key={image.name} className={styles.tile}>
-              <button
-                type="button"
-                className={styles.preview}
-                onClick={() => void copy(`img/${image.name}`, `Путь img/${image.name} скопирован`)}
-                aria-label={`Скопировать путь img/${image.name}`}
-              >
-                <img className={styles.thumb} src={image.url} alt="" loading="lazy" />
-              </button>
+              <div className={styles.previewWrap}>
+                <button
+                  type="button"
+                  className={styles.preview}
+                  onClick={() => void copy(`img/${image.name}`, image.name, 'Путь скопирован!')}
+                  aria-label={`Скопировать путь img/${image.name}`}
+                >
+                  <img className={styles.thumb} src={image.url} alt="" loading="lazy" />
+                </button>
+                {copied?.name === image.name && (
+                  <span className={styles.bubble} role="status">
+                    {copied.label}
+                  </span>
+                )}
+              </div>
               <span className={styles.name} title={image.name}>
                 {image.name}
               </span>
@@ -162,7 +163,7 @@ export function CardImagePanel() {
                 <button
                   type="button"
                   className={styles.action}
-                  onClick={() => void copy(`<img src="img/${image.name}" alt="">`, 'Тег скопирован')}
+                  onClick={() => void copy(`<img src="img/${image.name}" alt="">`, image.name, 'Тег скопирован!')}
                 >
                   ⧉ тег
                 </button>
