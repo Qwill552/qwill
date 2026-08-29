@@ -91,6 +91,27 @@ cardHostRouter.get('/c/:userId/', cardViewLimiter, (req, res, next) => {
     .catch(next);
 });
 
+/** Заголовки ставятся только после того, как файл действительно открылся: строка в базе
+ *  без файла на диске иначе уходила бы с заголовками картинки и статусом 404. */
+function sendAsset(
+  res: Response,
+  next: NextFunction,
+  filePath: string,
+  mime: string,
+  cacheControl: string,
+): void {
+  const stream = createReadStream(filePath);
+  stream.on('error', () => next());
+  stream.on('open', () => {
+    res.setHeader('Content-Type', mime);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', cacheControl);
+    stream.pipe(res);
+  });
+}
+
 /**
  * Папка картинок этого пользователя. Никакой аутентификации здесь нет и быть не может —
  * документ визитки живёт в непрозрачном origin и куки не носит. Изоляция держится на CSP:
@@ -107,15 +128,7 @@ cardHostRouter.get('/c/:userId/img/:name', cardAssetLimiter, (req, res, next) =>
         next();
         return;
       }
-      res.setHeader('Content-Type', image.mime);
-      res.setHeader('Content-Length', String(image.bytes));
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-      res.setHeader('Referrer-Policy', 'no-referrer');
-      res.setHeader('Cache-Control', 'public, max-age=300');
-      createReadStream(image.path)
-        .on('error', () => next())
-        .pipe(res);
+      sendAsset(res, next, image.path, image.mime, 'public, max-age=300');
     })
     .catch(next);
 });
@@ -126,13 +139,7 @@ cardHostRouter.get('/fonts/:file', cardAssetLimiter, (req, res, next) => {
     next();
     return;
   }
-  res.setHeader('Content-Type', 'font/woff2');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  createReadStream(filePath)
-    .on('error', () => next())
-    .pipe(res);
+  sendAsset(res, next, filePath, 'font/woff2', 'public, max-age=86400');
 });
 
 /** Всё остальное на этом домене — не существует. Отдаём простой текст, а не JSON API:
