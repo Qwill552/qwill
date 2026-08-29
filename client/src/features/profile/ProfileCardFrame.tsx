@@ -17,12 +17,13 @@ interface ProfileCardFrameProps {
   cardUrl: string;
   authorId: string;
   authorName: string;
-  /** Свой профиль и предпросмотр редактора запускаются сразу — автор смотрит своё. */
+  /** Свой профиль и предпросмотр редактора запускаются сами, как только окно попадает
+   *  в зону видимости, и так же сами возвращаются после прокрутки туда-обратно. */
   autoStart?: boolean;
 }
 
 export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = false }: ProfileCardFrameProps) {
-  const [running, setRunning] = useState(autoStart);
+  const [running, setRunning] = useState(false);
   const [ready, setReady] = useState(false);
   const [escaped, setEscaped] = useState(false);
   const [readyLate, setReadyLate] = useState(false);
@@ -32,6 +33,7 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const loadCount = useRef(0);
   const channel = useRef<MessageChannel | null>(null);
+  const stoppedByViewer = useRef(false);
 
   const detach = useCallback(() => {
     channel.current?.port1.close();
@@ -45,9 +47,15 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
     setRunning(false);
   }, [detach]);
 
+  const stopByViewer = useCallback(() => {
+    stoppedByViewer.current = true;
+    stop();
+  }, [stop]);
+
   useEffect(() => {
     detach();
-    setRunning(autoStart);
+    stoppedByViewer.current = false;
+    setRunning(false);
     setEscaped(false);
   }, [cardUrl, autoStart, detach]);
 
@@ -63,13 +71,16 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
 
   useEffect(() => {
     const node = windowRef.current;
-    if (!running || !node) return;
+    if (!node) return;
 
     let offscreenTimer = 0;
     const observer = new IntersectionObserver(
       ([entry]) => {
         window.clearTimeout(offscreenTimer);
-        if (entry?.isIntersecting) return;
+        if (entry?.isIntersecting) {
+          if (autoStart && !stoppedByViewer.current && !escaped) setRunning(true);
+          return;
+        }
         offscreenTimer = window.setTimeout(stop, OFFSCREEN_GRACE_MS);
       },
       { threshold: 0 },
@@ -79,7 +90,7 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
       window.clearTimeout(offscreenTimer);
       observer.disconnect();
     };
-  }, [running, stop]);
+  }, [autoStart, escaped, stop]);
 
   function handleLoad(): void {
     loadCount.current += 1;
@@ -125,7 +136,14 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
               {escaped ? 'Оформление отключено' : `Оформление профиля: ${authorName}`}
             </p>
             {!escaped && (
-              <button type="button" className={styles.start} onClick={() => setRunning(true)}>
+              <button
+                type="button"
+                className={styles.start}
+                onClick={() => {
+                  stoppedByViewer.current = false;
+                  setRunning(true);
+                }}
+              >
                 Показать оформление
               </button>
             )}
@@ -137,7 +155,7 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
         <button
           type="button"
           className={`${styles.control} ${running && readyLate && !ready ? styles.controlAlert : ''}`}
-          onClick={stop}
+          onClick={stopByViewer}
           disabled={!running}
         >
           Остановить

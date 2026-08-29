@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 
 import { env } from '../config/env.js';
-import { buildCardCsp } from '../lib/cardCsp.js';
+import { buildCardCsp, buildPreviewCardCsp } from '../lib/cardCsp.js';
 import { getProfileFontFaceCss, resolveProfileFontPath } from '../lib/profileFonts.js';
 import { findCardImageForServing } from '../services/cardImages.js';
 import { findPreview, findVisibleCard } from '../services/profileCard.js';
@@ -63,8 +63,8 @@ ${html}
 `;
 }
 
-function sendCardDocument(res: Response, userId: string, html: string, cacheable: boolean): void {
-  res.setHeader('Content-Security-Policy', buildCardCsp(userId));
+function sendCardDocument(res: Response, csp: string, html: string, cacheable: boolean): void {
+  res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
@@ -81,13 +81,13 @@ cardHostRouter.get('/c/preview/:token/', cardViewLimiter, (req, res, next) => {
     next();
     return;
   }
-  sendCardDocument(res, preview.userId, preview.html, false);
+  sendCardDocument(res, buildPreviewCardCsp(String(req.params.token ?? '')), preview.html, false);
 });
 
 cardHostRouter.get('/c/:userId/', cardViewLimiter, (req, res, next) => {
   const userId = String(req.params.userId ?? '');
   findVisibleCard(userId)
-    .then((card) => sendCardDocument(res, userId, card?.html ?? '', card !== null))
+    .then((card) => sendCardDocument(res, buildCardCsp(userId), card?.html ?? '', card !== null))
     .catch(next);
 });
 
@@ -118,6 +118,24 @@ function sendAsset(
  * `img-src` документа указывает ровно на `/c/<его id>/img/`, и чужой адрес браузер не
  * запросит вовсе (R-30, Граница 2).
  */
+cardHostRouter.get('/c/preview/:token/img/:name', cardAssetLimiter, (req, res, next) => {
+  const preview = findPreview(String(req.params.token ?? ''));
+  if (!preview) {
+    next();
+    return;
+  }
+
+  findCardImageForServing(preview.userId, String(req.params.name ?? ''))
+    .then((image) => {
+      if (!image) {
+        next();
+        return;
+      }
+      sendAsset(res, next, image.path, image.mime, 'no-store');
+    })
+    .catch(next);
+});
+
 cardHostRouter.get('/c/:userId/img/:name', cardAssetLimiter, (req, res, next) => {
   const userId = String(req.params.userId ?? '');
   const name = String(req.params.name ?? '');

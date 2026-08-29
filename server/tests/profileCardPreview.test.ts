@@ -1,3 +1,6 @@
+import { randomBytes } from 'node:crypto';
+
+import sharp from 'sharp';
 import supertest from 'supertest';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +13,7 @@ const request = supertest(app);
 
 const RUN_ID = Date.now().toString(36);
 const createdUserIds: string[] = [];
+const createdImageOwnerIds: string[] = [];
 
 async function registerUser(suffix: string): Promise<{ token: string; userId: string }> {
   const res = await request
@@ -34,6 +38,7 @@ function pathOf(url: string): string {
 
 describe('Предпросмотр визитки (R-30B)', () => {
   afterAll(async () => {
+    await prisma.profileCardImage.deleteMany({ where: { userId: { in: createdImageOwnerIds } } });
     await prisma.profileCard.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await prisma.$disconnect();
@@ -55,14 +60,46 @@ describe('Предпросмотр визитки (R-30B)', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
-  it('CSP собирается по владельцу токена, а не по токену', async () => {
-    const { token, userId } = await registerUser('csp');
+  it('CSP разрешает картинки по адресу самого предпросмотра', async () => {
+    const { token } = await registerUser('csp');
     const created = await savePreview(token, '<p>картинки</p>');
+    const previewToken = created.body.token as string;
 
     const res = await request.get(pathOf(created.body.url as string)).set('Host', env.cardHost);
-    expect(res.headers['content-security-policy']).toContain(`${env.CARD_ORIGIN}/c/${userId}/img/`);
+    expect(res.headers['content-security-policy']).toContain(
+      `${env.CARD_ORIGIN}/c/preview/${previewToken}/img/`,
+    );
     expect(res.headers['content-security-policy']).toContain("connect-src 'none'");
     expect(res.headers['content-security-policy']).toContain(`frame-ancestors ${env.APP_ORIGIN}`);
+  });
+
+  it('относительный img/имя из предпросмотра ведёт в папку владельца токена', async () => {
+    const { token, userId } = await registerUser('previewimg');
+    const png = await sharp(Buffer.alloc(16 * 16 * 3, 0x60), { raw: { width: 16, height: 16, channels: 3 } })
+      .png()
+      .toBuffer();
+    const uploaded = await request
+      .post('/api/users/me/card/images?name=preview-cat.png')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'image/png')
+      .send(png);
+    expect(uploaded.status).toBe(201);
+    createdImageOwnerIds.push(userId);
+
+    const created = await savePreview(token, '<img src="img/preview-cat.png">');
+    const previewToken = created.body.token as string;
+
+    const served = await request
+      .get(`/c/preview/${previewToken}/img/preview-cat.png`)
+      .set('Host', env.cardHost);
+    expect(served.status).toBe(200);
+    expect(served.headers['content-type']).toBe('image/png');
+
+    const strangerToken = randomBytes(16).toString('hex');
+    const foreign = await request
+      .get(`/c/preview/${strangerToken}/img/preview-cat.png`)
+      .set('Host', env.cardHost);
+    expect(foreign.status).toBe(404);
   });
 
   it('новый черновик вытесняет предыдущий', async () => {

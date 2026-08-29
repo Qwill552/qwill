@@ -7,7 +7,12 @@ import {
 } from '@messenger/shared';
 import express, { Router } from 'express';
 
-import { addCardImage, deleteCardImage, listCardImages } from '../../services/cardImages.js';
+import {
+  addCardImage,
+  cardImageTooLargeMessage,
+  deleteCardImage,
+  listCardImages,
+} from '../../services/cardImages.js';
 import {
   deleteCard,
   findVisibleCard,
@@ -24,6 +29,7 @@ import {
   updateProfile,
   updateSettings,
 } from '../../services/user.js';
+import { tooLarge } from '../../lib/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { cardImageUploadLimiter, cardSaveLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
@@ -82,10 +88,28 @@ usersRouter.get('/me/card/images', (req, res, next) => {
     .catch(next);
 });
 
+const readCardImageBody = express.raw({ type: () => true, limit: CARD_IMAGE_MAX_BYTES });
+
+/**
+ * `express.raw` на превышении бросает ошибку body-parser, и общий обработчик отвечает
+ * безликим «Слишком большой запрос» вместо цифр, которых требует ТЗ. Отказ до чтения тела
+ * по заголовку `Content-Length` не годится: ответ уходит раньше, чем отправитель дописал
+ * тело, и он получает обрыв соединения вместо сообщения.
+ */
+function readCardImage(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  readCardImageBody(req, res, (error: unknown) => {
+    if (error && typeof error === 'object' && (error as { type?: unknown }).type === 'entity.too.large') {
+      next(tooLarge(cardImageTooLargeMessage(Number(req.headers['content-length'] ?? 0))));
+      return;
+    }
+    next(error);
+  });
+}
+
 usersRouter.post(
   '/me/card/images',
   cardImageUploadLimiter,
-  express.raw({ type: () => true, limit: CARD_IMAGE_MAX_BYTES }),
+  readCardImage,
   (req, res, next) => {
     const name = typeof req.query.name === 'string' ? req.query.name : '';
     const replace = req.query.replace === '1';

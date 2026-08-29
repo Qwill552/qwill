@@ -10,7 +10,20 @@ import { env } from '../config/env.js';
  * Внешних доменов в списке нет ни одного: автор визитки физически не может узнать IP зрителя.
  */
 export function buildCardCsp(userId: string): string {
-  const ownImages = `${env.CARD_ORIGIN}/c/${userId}/img/`;
+  return cspWithImages(`${env.CARD_ORIGIN}/c/${userId}/img/`);
+}
+
+/**
+ * Предпросмотр живёт по адресу `/c/preview/<токен>/`, и относительный `img/кот.png` внутри
+ * него разрешается в `/c/preview/<токен>/img/кот.png`, а не в папку автора. Поэтому и CSP,
+ * и маршрут раздачи у предпросмотра свои — иначе картинки не покажутся именно там, где их
+ * и проверяют перед сохранением (R-30C).
+ */
+export function buildPreviewCardCsp(token: string): string {
+  return cspWithImages(`${env.CARD_ORIGIN}/c/preview/${token}/img/`);
+}
+
+function cspWithImages(ownImages: string): string {
   return [
     'sandbox allow-scripts',
     "default-src 'none'",

@@ -162,6 +162,17 @@ describe('картинки визитки (R-30C)', () => {
     expect(res.body.error.message).toContain('20');
   });
 
+  it('файл сверх предела отклоняется с цифрами, а не безликим «слишком большой запрос»', async () => {
+    const { token } = await registerUser('oversize');
+
+    const res = await upload(token, 'huge.png', Buffer.alloc(6 * 1024 * 1024, 0x21));
+
+    expect(res.status).toBe(413);
+    expect(res.body.error.message).toContain('5 МБ');
+    expect(res.body.error.message).toContain('6 МБ');
+    expect(res.body.error.message).not.toContain('Слишком большой запрос');
+  });
+
   it('удаление убирает картинку из списка и с домена песочницы', async () => {
     const { token, userId } = await registerUser('delete');
     await upload(token, 'gone.png', await makePng());

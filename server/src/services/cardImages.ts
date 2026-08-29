@@ -47,6 +47,11 @@ function formatMb(bytes: number): string {
   return (Math.round((bytes / (1024 * 1024)) * 10) / 10).toLocaleString('ru-RU');
 }
 
+export function cardImageTooLargeMessage(bytes?: number): string {
+  const limit = `Один файл — не больше ${formatMb(CARD_IMAGE_MAX_BYTES)} МБ`;
+  return bytes && bytes > CARD_IMAGE_MAX_BYTES ? `${limit}, а этот ${formatMb(bytes)} МБ` : limit;
+}
+
 export async function listCardImages(userId: string): Promise<CardImageListDto> {
   const images = await prisma.profileCardImage.findMany({
     where: { userId },
@@ -75,7 +80,7 @@ export async function addCardImage(
   }
 
   if (body.length > CARD_IMAGE_MAX_BYTES) {
-    throw tooLarge(`Один файл — не больше ${formatMb(CARD_IMAGE_MAX_BYTES)} МБ, а этот ${formatMb(body.length)} МБ`);
+    throw tooLarge(cardImageTooLargeMessage(body.length));
   }
 
   const existing = await prisma.profileCardImage.findMany({ where: { userId } });
