@@ -11,6 +11,7 @@ import { generalLimiter } from './http/middleware/rateLimit.js';
 import { adminRouter } from './http/routes/admin.js';
 import { appVersionRouter } from './http/routes/appVersion.js';
 import { authRouter } from './http/routes/auth.js';
+import { cardFontsRouter } from './http/routes/cardFonts.js';
 import { callsRouter } from './http/routes/calls.js';
 import { chatsRouter } from './http/routes/chats.js';
 import { filesRouter } from './http/routes/files.js';
@@ -69,6 +70,7 @@ export function createApp(): Express {
   app.use('/api/app', appVersionRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
+  app.use('/api/card-fonts', cardFontsRouter);
   app.use('/api/chats', chatsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/files', filesRouter);

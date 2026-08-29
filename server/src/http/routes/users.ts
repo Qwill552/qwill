@@ -1,6 +1,13 @@
-import { PROFILE_CARD_MAX_BYTES, setAvatarSchema, updateProfileSchema, updateSettingsSchema } from '@messenger/shared';
+import {
+  CARD_IMAGE_MAX_BYTES,
+  PROFILE_CARD_MAX_BYTES,
+  setAvatarSchema,
+  updateProfileSchema,
+  updateSettingsSchema,
+} from '@messenger/shared';
 import express, { Router } from 'express';
 
+import { addCardImage, deleteCardImage, listCardImages } from '../../services/cardImages.js';
 import {
   deleteCard,
   findVisibleCard,
@@ -18,7 +25,7 @@ import {
   updateSettings,
 } from '../../services/user.js';
 import { requireAuth } from '../middleware/auth.js';
-import { cardSaveLimiter } from '../middleware/rateLimit.js';
+import { cardImageUploadLimiter, cardSaveLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const usersRouter: Router = Router();
@@ -68,6 +75,32 @@ usersRouter.put(
     res.json(savePreview(req.userId!, html));
   },
 );
+
+usersRouter.get('/me/card/images', (req, res, next) => {
+  listCardImages(req.userId!)
+    .then((list) => res.json(list))
+    .catch(next);
+});
+
+usersRouter.post(
+  '/me/card/images',
+  cardImageUploadLimiter,
+  express.raw({ type: () => true, limit: CARD_IMAGE_MAX_BYTES }),
+  (req, res, next) => {
+    const name = typeof req.query.name === 'string' ? req.query.name : '';
+    const replace = req.query.replace === '1';
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    addCardImage(req.userId!, name, body, replace)
+      .then((image) => res.status(201).json(image))
+      .catch(next);
+  },
+);
+
+usersRouter.delete('/me/card/images/:name', (req, res, next) => {
+  deleteCardImage(req.userId!, String(req.params.name ?? ''))
+    .then(() => res.status(204).end())
+    .catch(next);
+});
 
 usersRouter.delete('/me/card', (req, res, next) => {
   deleteCard(req.userId!)

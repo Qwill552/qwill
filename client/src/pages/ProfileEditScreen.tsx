@@ -26,6 +26,8 @@ import { useLayoutMode } from '../app/useLayoutMode';
 import { Modal } from '../features/groups/Modal';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { clearCardDraft, readCardDraft, writeCardDraft } from '../features/profile/cardDraft';
+import { CardFontList } from '../features/profile/CardFontList';
+import { CardImagePanel } from '../features/profile/CardImagePanel';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
@@ -95,6 +97,7 @@ export function ProfileEditScreen() {
   const [previewPending, setPreviewPending] = useState(false);
   const [confirmingCardDelete, setConfirmingCardDelete] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [openPanel, setOpenPanel] = useState<'images' | 'fonts' | null>(null);
 
   const profile = storedProfile?.id === user?.id ? storedProfile : null;
 
@@ -428,6 +431,28 @@ export function ProfileEditScreen() {
             />
 
             {cardError && <p className={styles.error}>{cardError}</p>}
+
+            <div className={styles.cardTools}>
+              <button
+                type="button"
+                className={styles.toolButton}
+                aria-expanded={openPanel === 'images'}
+                onClick={() => setOpenPanel((current) => (current === 'images' ? null : 'images'))}
+              >
+                Мои картинки
+              </button>
+              <button
+                type="button"
+                className={styles.toolButton}
+                aria-expanded={openPanel === 'fonts'}
+                onClick={() => setOpenPanel((current) => (current === 'fonts' ? null : 'fonts'))}
+              >
+                Шрифты
+              </button>
+            </div>
+
+            {openPanel === 'images' && <CardImagePanel />}
+            {openPanel === 'fonts' && <CardFontList />}
 
             <p className={styles.hint}>
               Визитку показывает отдельное окно в песочнице: скрипты внутри работают, выход

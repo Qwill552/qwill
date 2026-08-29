@@ -84,3 +84,15 @@ export const DEFAULT_DOUBLE_TAP_REACTION = '❤️';
 /** Максимум сообщений в одной групповой операции (удалить/переслать разом, этап 6) —
  *  тот же порядок величины, что и страница ленты. */
 export const MESSAGE_BATCH_LIMIT = MESSAGES_PAGE_SIZE;
+
+export const CARD_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const CARD_IMAGE_MAX_COUNT = 50;
+export const CARD_IMAGE_TOTAL_MAX_BYTES = 20 * 1024 * 1024;
+export const CARD_IMAGE_MAX_DIMENSION = 2048;
+export const CARD_IMAGE_UPLOADS_PER_DAY = 40;
+
+export const AVATAR_STORED_MAX_DIMENSION = 512;
+
+export const PROCESSED_IMAGE_MAX_SIDE = 8000;
+export const PROCESSED_IMAGE_MAX_FRAMES = 300;
+export const PROCESSED_IMAGE_MAX_PIXELS = 100_000_000;

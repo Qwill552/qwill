@@ -1,6 +1,9 @@
 import { ErrorCode } from '@messenger/shared';
 import type {
   ApiErrorBody,
+  CardFontDto,
+  CardImageDto,
+  CardImageListDto,
   ProfileCardPreviewDto,
   PublicUser,
   UpdateProfileInput,
@@ -63,6 +66,35 @@ export async function putCardPreviewRequest(html: string): Promise<ProfileCardPr
 
 export function deleteOwnCardRequest(): Promise<void> {
   return apiRequest<void>('/api/users/me/card', { method: 'DELETE' });
+}
+
+export function listCardImagesRequest(): Promise<CardImageListDto> {
+  return apiRequest<CardImageListDto>('/api/users/me/card/images');
+}
+
+/** Тело — сами байты картинки, имя едет в query: multipart в этом API не используется нигде,
+ *  и заводить его разбор ради одного маршрута значит добавлять поверхность атаки (R-30C). */
+export async function uploadCardImageRequest(
+  name: string,
+  file: File,
+  replace: boolean,
+): Promise<CardImageDto> {
+  const query = `name=${encodeURIComponent(name)}${replace ? '&replace=1' : ''}`;
+  const res = await apiFetch(`/api/users/me/card/images?${query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) await throwCardError(res);
+  return (await res.json()) as CardImageDto;
+}
+
+export function deleteCardImageRequest(name: string): Promise<void> {
+  return apiRequest<void>(`/api/users/me/card/images/${encodeURIComponent(name)}`, { method: 'DELETE' });
+}
+
+export function listCardFontsRequest(): Promise<CardFontDto[]> {
+  return apiRequest<CardFontDto[]>('/api/card-fonts');
 }
 
 export function getSettingsRequest(): Promise<UserSettingsDTO> {

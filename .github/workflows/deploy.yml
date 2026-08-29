@@ -56,12 +56,13 @@ jobs:
 
       # server/prisma.config.ts лежит рядом с каталогом prisma/, под шаблон server/prisma
       # не попадает, а без него Prisma 7 не знает строку подключения.
+      # server/assets — шрифты визитки: tsc их не компилирует, а сервер читает из этой папки.
       - name: Pack release
         run: |
           tar czf release.tar.gz \
             package.json package-lock.json \
             shared/package.json shared/dist \
-            server/package.json server/prisma.config.ts server/dist server/prisma \
+            server/package.json server/prisma.config.ts server/dist server/prisma server/assets \
             client/package.json client/dist \
             scripts/announce.mjs \
             deploy

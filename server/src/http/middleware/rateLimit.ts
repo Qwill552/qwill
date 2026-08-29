@@ -1,4 +1,4 @@
-import { ErrorCode, type ApiErrorBody } from '@messenger/shared';
+import { CARD_IMAGE_UPLOADS_PER_DAY, ErrorCode, type ApiErrorBody } from '@messenger/shared';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Request, Response } from 'express';
 
@@ -69,6 +69,33 @@ export const cardSaveLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
+/**
+ * Загрузка картинки визитки — 40 в сутки на пользователя (R-30C). Каждая проходит полное
+ * перекодирование через sharp, и это ощутимо дороже сохранения самого HTML.
+ */
+export const cardImageUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: CARD_IMAGE_UPLOADS_PER_DAY,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
+/**
+ * Картинки и шрифты визитки — 3000 в час на IP. Отдельно от cardViewLimiter: одна визитка
+ * тянет за собой десяток файлов, и лимит на документы её же и задушил бы.
+ */
+export const cardAssetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
   skip: skipInTest,
   handler: sendRateLimited,
 });

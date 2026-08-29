@@ -146,3 +146,58 @@ export interface UserSettingsDTO {
   fontSize: FontSize;
   surface: SurfaceMode;
 }
+
+export const CARD_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'] as const;
+export type CardImageExtension = (typeof CARD_IMAGE_EXTENSIONS)[number];
+
+export const CARD_IMAGE_NAME_PATTERN = /^[a-z0-9._-]{1,64}$/;
+
+export function cardImageExtensionOf(name: string): CardImageExtension | null {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const ext = name.slice(dot + 1);
+  return (CARD_IMAGE_EXTENSIONS as readonly string[]).includes(ext) ? (ext as CardImageExtension) : null;
+}
+
+export function isValidCardImageName(name: string): boolean {
+  if (!CARD_IMAGE_NAME_PATTERN.test(name)) return false;
+  if (name.includes('..')) return false;
+  return cardImageExtensionOf(name) !== null;
+}
+
+export function toSafeCardImageName(fileName: string): string {
+  const lower = fileName.trim().toLowerCase();
+  const dot = lower.lastIndexOf('.');
+  const rawExt = dot > 0 ? lower.slice(dot + 1) : '';
+  const ext = (CARD_IMAGE_EXTENSIONS as readonly string[]).includes(rawExt) ? rawExt : 'png';
+  const base = (dot > 0 ? lower.slice(0, dot) : lower)
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^[-._]+|[-._]+$/g, '');
+  const trimmed = (base === '' ? 'image' : base).slice(0, 63 - ext.length);
+  return `${trimmed === '' ? 'image' : trimmed}.${ext}`;
+}
+
+export interface CardImageDto {
+  name: string;
+  width: number;
+  height: number;
+  bytes: number;
+  /** Полный адрес картинки на CARD_ORIGIN — собирается сервером по той же причине, что и
+   *  `cardUrl`: домен песочницы клиенту неизвестен. В код визитки вставляется не он, а
+   *  относительный путь `img/<name>` (R-30C). */
+  url: string;
+}
+
+export interface CardImageListDto {
+  images: CardImageDto[];
+  totalBytes: number;
+  maxBytes: number;
+  maxCount: number;
+}
+
+export interface CardFontDto {
+  family: string;
+  weights: number[];
+  hasItalic: boolean;
+}

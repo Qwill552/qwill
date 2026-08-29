@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { devHttpsCredentials, env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './db/prisma.js';
 import { logger } from './lib/logger.js';
+import { initProfileFonts } from './lib/profileFonts.js';
 import { createSocketServer } from './realtime/index.js';
 import { ensureStorageDirs } from './services/file.js';
 
@@ -12,6 +13,7 @@ import { ensureStorageDirs } from './services/file.js';
 async function main(): Promise<void> {
   await connectDatabase();
   await ensureStorageDirs();
+  initProfileFonts();
 
   const app = createApp();
   const httpServer = devHttpsCredentials

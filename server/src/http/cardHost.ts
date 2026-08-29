@@ -1,9 +1,13 @@
+import { createReadStream } from 'node:fs';
+
 import { Router, type NextFunction, type Request, type Response } from 'express';
 
 import { env } from '../config/env.js';
 import { buildCardCsp } from '../lib/cardCsp.js';
+import { getProfileFontFaceCss, resolveProfileFontPath } from '../lib/profileFonts.js';
+import { findCardImageForServing } from '../services/cardImages.js';
 import { findPreview, findVisibleCard } from '../services/profileCard.js';
-import { cardViewLimiter } from './middleware/rateLimit.js';
+import { cardAssetLimiter, cardViewLimiter } from './middleware/rateLimit.js';
 
 /**
  * Домен песочницы визиток. Подключается по совпадению заголовка Host **до** cookie-parser,
@@ -49,7 +53,7 @@ function renderCardDocument(html: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Оформление профиля</title>
-<style>html,body{margin:0;padding:0;}</style>
+<style>html,body{margin:0;padding:0;}${getProfileFontFaceCss()}</style>
 <script>${READY_BOOTSTRAP}</script>
 </head>
 <body>
@@ -85,6 +89,50 @@ cardHostRouter.get('/c/:userId/', cardViewLimiter, (req, res, next) => {
   findVisibleCard(userId)
     .then((card) => sendCardDocument(res, userId, card?.html ?? '', card !== null))
     .catch(next);
+});
+
+/**
+ * Папка картинок этого пользователя. Никакой аутентификации здесь нет и быть не может —
+ * документ визитки живёт в непрозрачном origin и куки не носит. Изоляция держится на CSP:
+ * `img-src` документа указывает ровно на `/c/<его id>/img/`, и чужой адрес браузер не
+ * запросит вовсе (R-30, Граница 2).
+ */
+cardHostRouter.get('/c/:userId/img/:name', cardAssetLimiter, (req, res, next) => {
+  const userId = String(req.params.userId ?? '');
+  const name = String(req.params.name ?? '');
+
+  findCardImageForServing(userId, name)
+    .then((image) => {
+      if (!image) {
+        next();
+        return;
+      }
+      res.setHeader('Content-Type', image.mime);
+      res.setHeader('Content-Length', String(image.bytes));
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      createReadStream(image.path)
+        .on('error', () => next())
+        .pipe(res);
+    })
+    .catch(next);
+});
+
+cardHostRouter.get('/fonts/:file', cardAssetLimiter, (req, res, next) => {
+  const filePath = resolveProfileFontPath(String(req.params.file ?? ''));
+  if (!filePath) {
+    next();
+    return;
+  }
+  res.setHeader('Content-Type', 'font/woff2');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  createReadStream(filePath)
+    .on('error', () => next())
+    .pipe(res);
 });
 
 /** Всё остальное на этом домене — не существует. Отдаём простой текст, а не JSON API:

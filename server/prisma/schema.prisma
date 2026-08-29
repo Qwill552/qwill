@@ -271,8 +271,12 @@ model Attachment {
 model File {
   id String @id @default(cuid(2))
 
-  /// Дедупликация: одна физическая копия на много вложений (секция 7).
+  /// Дедупликация: одна физическая копия на много вложений (секция 7). Хэш того, что лежит
+  /// на диске: для картинок, прошедших перекодирование, он отличается от присланного клиентом.
   sha256     String @unique
+  /// Хэш того, что прислал клиент — доказательство владения содержимым (assertFileOwnershipProof)
+  /// и ключ дедупликации. У записей, созданных до R-30C, равен sha256.
+  sourceSha256 String?
   /// Имя на диске внутри приватной STORAGE_DIR. Наружу не отдаётся.
   storedName String
   mimeType   String
@@ -290,6 +294,8 @@ model File {
   thumbnailOfAttachments Attachment[] @relation("AttachmentThumbnail")
   avatarOfUsers          User[]       @relation("UserAvatar")
   avatarOfChats          Chat[]       @relation("ChatAvatar")
+
+  @@index([sourceSha256])
 }
 
 model Reaction {

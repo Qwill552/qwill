@@ -46,7 +46,6 @@
     "emoji-datasource-apple": "^15.1.2",
     "emojibase-data": "^17.0.0",
     "eslint": "^10.8.0",
-    "sharp": "^0.34.5",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"

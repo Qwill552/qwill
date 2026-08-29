@@ -1,0 +1,88 @@
+import type { CardFontDto } from '@messenger/shared';
+import { useEffect, useState } from 'react';
+
+import { ApiError } from '../../api/client';
+import { listCardFontsRequest } from '../../api/users';
+import styles from './CardFontList.module.css';
+
+const COPIED_FLASH_MS = 1600;
+
+const WEIGHT_LABELS: Record<number, string> = {
+  100: 'тонкий',
+  200: 'сверхсветлый',
+  300: 'светлый',
+  400: 'обычный',
+  500: 'средний',
+  600: 'полужирный',
+  700: 'жирный',
+  800: 'сверхжирный',
+  900: 'чёрный',
+};
+
+function describe(font: CardFontDto): string {
+  const weights = font.weights.map((weight) => WEIGHT_LABELS[weight] ?? String(weight)).join(', ');
+  return font.hasItalic ? `${weights} · курсив` : weights;
+}
+
+export function CardFontList() {
+  const [fonts, setFonts] = useState<CardFontDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listCardFontsRequest()
+      .then((list) => {
+        if (!cancelled) setFonts(list);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Не удалось загрузить список шрифтов');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function copy(family: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(`font-family: "${family}";`);
+      setCopied(family);
+      window.setTimeout(() => setCopied((current) => (current === family ? null : current)), COPIED_FLASH_MS);
+    } catch {
+      setError('Браузер не дал скопировать — впишите название вручную');
+    }
+  }
+
+  return (
+    <section className={styles.panel} aria-label="Шрифты">
+      {error && <p className={styles.error}>{error}</p>}
+
+      {loading ? (
+        <p className={styles.empty}>Загружаем список…</p>
+      ) : fonts.length === 0 ? (
+        <p className={styles.empty}>Шрифтов на сервере пока нет — визитка рисуется системными.</p>
+      ) : (
+        <ul className={styles.list}>
+          {fonts.map((font) => (
+            <li key={font.family} className={styles.row}>
+              <span className={styles.family}>{font.family}</span>
+              <span className={styles.weights}>{describe(font)}</span>
+              <button type="button" className={styles.copy} onClick={() => void copy(font.family)}>
+                {copied === font.family ? 'Скопировано' : 'Копировать'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className={styles.hint}>
+        Писать <code>@font-face</code> не нужно — сервер подставляет его сам. Достаточно указать{' '}
+        <code>font-family</code>.
+      </p>
+    </section>
+  );
+}
