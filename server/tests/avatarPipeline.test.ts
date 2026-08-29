@@ -5,11 +5,12 @@ import path from 'node:path';
 import { AVATAR_STORED_MAX_DIMENSION, UPLOAD_OFFSET_HEADER } from '@messenger/shared';
 import sharp from 'sharp';
 import supertest from 'supertest';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/prisma.js';
+import { ensureStorageDirs } from '../src/services/file.js';
 
 const app = createApp();
 const request = supertest(app);
@@ -69,6 +70,10 @@ function storedBytes(storedName: string): Promise<Buffer> {
 }
 
 describe('аватарки идут через конвейер обработки (R-30C)', () => {
+  beforeAll(async () => {
+    await ensureStorageDirs();
+  });
+
   afterAll(async () => {
     await prisma.user.updateMany({ where: { id: { in: createdUserIds } }, data: { avatarFileId: null } });
     await prisma.file.deleteMany({ where: { storedName: { in: createdStoredNames } } });
