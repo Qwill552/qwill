@@ -44,6 +44,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
     updatedAt: chat.updatedAt.toISOString(),
     unreadCount,
     muted: own?.mutedAt != null,
+    isSupportRequest: chat.isSupportRequest,
   };
 }
 

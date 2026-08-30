@@ -5,6 +5,7 @@ import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
+import { BugReportDialog } from '../features/support/BugReportDialog';
 import { isEmptyPrivateChat, selectVisibleChats } from '../features/chats/visibleChats';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
@@ -54,6 +55,7 @@ export function ChatsScreen() {
   const chats = useChatStore((s) => s.chats);
   const activeChatId = useChatStore((s) => s.activeChatId);
   const me = useAuthStore((s) => s.user);
+  const isAdmin = me?.role === 'admin';
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const layout = useLayoutMode();
@@ -70,6 +72,7 @@ export function ChatsScreen() {
   const [filter, setFilter] = useState<ChatFilter>('all');
   const [composeOpen, setComposeOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [searchHidden, setSearchHidden] = useState(savedScrollTop > SEARCH_HIDE_AT);
   const [searchReveal, setSearchReveal] = useState<RevealOrigin | null>(null);
@@ -82,17 +85,19 @@ export function ChatsScreen() {
    *  показывать обе разом нельзя (см. .searchWrapMuted в ChatsScreen.module.css). */
   const [searchRetreating, setSearchRetreating] = useState(false);
 
-  const effectiveFilter = folderTabsEnabled ? filter : 'all';
+  const filterRowEnabled = folderTabsEnabled || isAdmin;
+  const effectiveFilter = filterRowEnabled ? filter : 'all';
 
   const counts = useMemo(() => {
     const started = chats.filter((c) => !isEmptyPrivateChat(c));
     return {
-      all: started.length,
+      all: started.filter((c) => !isAdmin || !c.isSupportRequest).length,
       unread: started.filter((c) => c.unreadCount > 0).length,
       private: started.filter((c) => c.type === 'PRIVATE').length,
       groups: started.filter((c) => c.type === 'GROUP').length,
+      support: started.filter((c) => c.isSupportRequest && c.unreadCount > 0).length,
     };
-  }, [chats]);
+  }, [chats, isAdmin]);
 
   useHotkey(layout === 'desktop', { code: 'KeyK', mod: true, allowInInput: true }, () => openSearchByHotkey());
   useHotkey(layout === 'desktop', { key: 'ArrowDown', mod: true, allowInInput: true }, () => stepChat(1));
@@ -199,16 +204,27 @@ export function ChatsScreen() {
 
   const desktopMenuItems: MenuItem[] = [
     { id: 'profile', label: 'Мой профиль', icon: 'user', onSelect: () => navigate('/profile') },
-    me?.role === 'admin'
+    isAdmin
       ? { id: 'admin', label: 'Админ-панель', icon: 'shield', onSelect: () => navigate('/admin') }
       : { id: 'contacts', label: 'Контакты', icon: 'users', onSelect: () => navigate('/contacts') },
     { id: 'settings', label: 'Настройки', icon: 'settings', onSelect: () => navigate('/settings') },
+    ...(isAdmin
+      ? []
+      : [
+          {
+            id: 'bugReport',
+            label: 'Нашли баг? Есть предложение?',
+            icon: 'flag' as const,
+            dividerBefore: true,
+            onSelect: () => setBugReportOpen(true),
+          },
+        ]),
     {
       id: 'theme',
       label: 'Тёмная тема',
       icon: 'moon',
       keepOpen: true,
-      dividerBefore: true,
+      dividerBefore: isAdmin,
       onSelect: handleThemeToggle,
       trailing: (
         <span ref={themeSwitchRef}>
@@ -218,7 +234,10 @@ export function ChatsScreen() {
     },
   ];
 
-  const navigableChats = useMemo(() => selectVisibleChats(chats, effectiveFilter), [chats, effectiveFilter]);
+  const navigableChats = useMemo(
+    () => selectVisibleChats(chats, effectiveFilter, isAdmin),
+    [chats, effectiveFilter, isAdmin],
+  );
 
   function stepChat(delta: number): void {
     if (navigableChats.length === 0) return;
@@ -332,7 +351,9 @@ export function ChatsScreen() {
           </>
         )}
 
-        {folderTabsEnabled && <ChatFilters value={filter} onChange={setFilter} counts={counts} />}
+        {filterRowEnabled && (
+          <ChatFilters value={filter} onChange={setFilter} counts={counts} admin={isAdmin} />
+        )}
       </div>
 
       <ChatList ref={listRef} filter={effectiveFilter} onScroll={handleScroll} />
@@ -406,6 +427,8 @@ export function ChatsScreen() {
       )}
 
       {groupOpen && <CreateGroupModal onClose={() => setGroupOpen(false)} onCreated={openChat} />}
+
+      {bugReportOpen && <BugReportDialog onClose={() => setBugReportOpen(false)} />}
     </div>
   );
 }

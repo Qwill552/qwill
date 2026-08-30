@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 
 import { isTypingTarget } from '../../app/hotkeys';
+import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { Skeleton } from '../../ui/Skeleton';
@@ -40,6 +41,7 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
   const presenceByUser = useChatStore((s) => s.presenceByUser);
   const typingByChat = useChatStore((s) => s.typingByChat);
   const myUserId = useChatStore((s) => s.myUserId);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const listRef = useRef<HTMLElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -63,7 +65,7 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
     },
   }));
 
-  const visible = useMemo(() => selectVisibleChats(chats, filter), [chats, filter]);
+  const visible = useMemo(() => selectVisibleChats(chats, filter, isAdmin), [chats, filter, isAdmin]);
 
   const loading = !chatsLoaded && chats.length === 0;
 

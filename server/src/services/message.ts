@@ -21,6 +21,7 @@ import { presenceStore } from '../realtime/presence.js';
 import { assertChatWritable, assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
 import * as pushService from './push.js';
+import { assertSupportSendAllowed } from './support.js';
 import { ChatRole } from '../generated/prisma/client.js';
 import type { Announcement, Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
@@ -175,6 +176,7 @@ export interface SendMessageInput {
 export async function sendMessage(input: SendMessageInput): Promise<MessageDto> {
   await assertMember(input.chatId, input.senderId);
   await assertChatWritable(input.chatId, input.senderId);
+  await assertSupportSendAllowed(input.chatId, input.senderId);
 
   const existing = await prisma.message.findUnique({
     where: { clientId: input.clientId },
@@ -379,6 +381,7 @@ export async function forwardMessages(input: ForwardMessagesInput): Promise<Mess
   await assertMember(input.fromChatId, input.userId);
   await assertMember(input.toChatId, input.userId);
   await assertChatWritable(input.toChatId, input.userId);
+  await assertSupportSendAllowed(input.toChatId, input.userId);
 
   const sources = await prisma.message.findMany({
     where: { id: { in: input.messageIds }, chatId: input.fromChatId },

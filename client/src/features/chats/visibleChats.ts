@@ -6,7 +6,11 @@ export function isEmptyPrivateChat(chat: ChatListItemDto): boolean {
   return chat.type === 'PRIVATE' && chat.lastMessage === null;
 }
 
-export function selectVisibleChats(chats: ChatListItemDto[], filter: ChatFilter): ChatListItemDto[] {
+export function selectVisibleChats(
+  chats: ChatListItemDto[],
+  filter: ChatFilter,
+  isAdmin = false,
+): ChatListItemDto[] {
   const started = chats.filter((c) => !isEmptyPrivateChat(c));
   const filtered =
     filter === 'unread'
@@ -15,6 +19,10 @@ export function selectVisibleChats(chats: ChatListItemDto[], filter: ChatFilter)
         ? started.filter((c) => c.type === 'PRIVATE')
         : filter === 'groups'
           ? started.filter((c) => c.type === 'GROUP')
-          : started;
+          : filter === 'support'
+            ? started.filter((c) => c.isSupportRequest)
+            : isAdmin
+              ? started.filter((c) => !c.isSupportRequest)
+              : started;
   return [...filtered].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }

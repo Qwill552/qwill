@@ -45,6 +45,9 @@ export type SetUserCardInput = z.infer<typeof setUserCardSchema>;
 export const setProfileCardsSchema = z.object({ enabled: z.boolean() });
 export type SetProfileCardsInput = z.infer<typeof setProfileCardsSchema>;
 
+export const muteSupportSchema = z.object({ until: z.string().datetime().nullable() });
+export type MuteSupportInput = z.infer<typeof muteSupportSchema>;
+
 export const reportListQuerySchema = z.object({
   status: z.enum(REPORT_STATUS_VALUES).optional(),
 });
@@ -62,6 +65,7 @@ export interface AdminUserDto {
   bannedReason: string | null;
   cardDisabled: boolean;
   mustChangePassword: boolean;
+  supportMutedUntil: string | null;
 }
 
 export interface AdminReportDto {
@@ -97,6 +101,7 @@ export const ADMIN_ACTION_VALUES = [
   'user.avatar.clear',
   'user.sessions.revoke',
   'user.pii.reveal',
+  'user.support.mute',
   'settings.profileCards',
   'role.grant',
   'role.revoke',
@@ -115,6 +120,7 @@ export interface AdminUserCardDto {
   bannedByUsername: string | null;
   cardDisabled: boolean;
   mustChangePassword: boolean;
+  supportMutedUntil: string | null;
   bioMode: BioMode;
   hasBio: boolean;
   hasCard: boolean;

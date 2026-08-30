@@ -12,6 +12,7 @@ import { countPendingOutbox } from '../cache/outbox';
 import { formatBytes } from '../features/messages/Attachment';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
+import { BugReportDialog } from '../features/support/BugReportDialog';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -62,6 +63,7 @@ export function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [pendingOutboxCount, setPendingOutboxCount] = useState<number | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
 
   const updateInfo = useAppUpdateStore((s) => s.info);
   const updateAvailable = useAppUpdateStore(selectUpdateAvailable);
@@ -243,6 +245,14 @@ export function SettingsScreen() {
         </Card>
 
         <Card className={styles.cardReset}>
+          {user?.role !== 'admin' && (
+            <Card.Row
+              icon="flag"
+              tint="orange"
+              title="Нашли баг? Есть предложение?"
+              onClick={() => setBugReportOpen(true)}
+            />
+          )}
           <Card.Row
             icon="logout"
             tint="red"
@@ -256,6 +266,8 @@ export function SettingsScreen() {
           <p className={styles.version}>Qwill {currentVersionName}</p>
         )}
       </div>
+
+      {bugReportOpen && <BugReportDialog onClose={() => setBugReportOpen(false)} />}
 
       {pendingOutboxCount != null && (
         <Modal title="Выйти из аккаунта" onClose={() => setPendingOutboxCount(null)} opaque>

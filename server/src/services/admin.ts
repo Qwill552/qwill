@@ -38,6 +38,7 @@ export function toAdminUser(user: User): AdminUserDto {
     bannedReason: user.bannedReason,
     cardDisabled: user.cardDisabled,
     mustChangePassword: user.mustChangePassword,
+    supportMutedUntil: user.supportMutedUntil ? user.supportMutedUntil.toISOString() : null,
   };
 }
 
@@ -85,6 +86,7 @@ async function buildUserCard(user: User): Promise<AdminUserCardDto> {
     bannedByUsername: bannedBy?.username ?? null,
     cardDisabled: user.cardDisabled,
     mustChangePassword: user.mustChangePassword,
+    supportMutedUntil: user.supportMutedUntil ? user.supportMutedUntil.toISOString() : null,
     bioMode: toBioMode(user.bioMode),
     hasBio: Boolean(user.bio && user.bio.trim().length > 0),
     hasCard: Boolean(card && card.html.trim().length > 0),
@@ -387,6 +389,19 @@ export async function revokeUserSessions(actor: AdminActor, targetUserId: string
   const { count } = await prisma.session.deleteMany({ where: { userId: targetUserId } });
 
   await recordAdminAction(actor, { action: 'user.sessions.revoke', targetUserId, detail: { count } });
+  return buildUserCard(user);
+}
+
+export async function muteUserSupport(
+  actor: AdminActor,
+  targetUserId: string,
+  until: string | null,
+): Promise<AdminUserCardDto> {
+  await requireUser(targetUserId);
+  const supportMutedUntil = until ? new Date(until) : null;
+  const user = await prisma.user.update({ where: { id: targetUserId }, data: { supportMutedUntil } });
+
+  await recordAdminAction(actor, { action: 'user.support.mute', targetUserId, detail: { until } });
   return buildUserCard(user);
 }
 

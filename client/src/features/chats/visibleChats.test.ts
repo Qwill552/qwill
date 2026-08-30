@@ -14,6 +14,7 @@ function chat(overrides: Partial<ChatListItemDto> = {}): ChatListItemDto {
     updatedAt: '2026-08-25T10:00:00.000Z',
     unreadCount: 0,
     muted: false,
+    isSupportRequest: false,
     ...overrides,
   };
 }
@@ -45,5 +46,26 @@ describe('видимость пустого приватного чата (R-12)
     expect(isEmptyPrivateChat(chat())).toBe(true);
     expect(isEmptyPrivateChat(chat({ lastMessage: someMessage }))).toBe(false);
     expect(isEmptyPrivateChat(chat({ type: 'GROUP' }))).toBe(false);
+  });
+});
+
+describe('чипс «Предложка» у администратора (R-32C)', () => {
+  it('фильтр «support» показывает только чаты с isSupportRequest', () => {
+    const chats = [
+      chat({ id: 'friend', lastMessage: someMessage }),
+      chat({ id: 'ticket', lastMessage: someMessage, isSupportRequest: true }),
+    ];
+
+    expect(selectVisibleChats(chats, 'support').map((c) => c.id)).toEqual(['ticket']);
+  });
+
+  it('у администратора «Все» не включает обращения, у обычного пользователя — включает', () => {
+    const chats = [
+      chat({ id: 'friend', lastMessage: someMessage }),
+      chat({ id: 'ticket', lastMessage: someMessage, isSupportRequest: true }),
+    ];
+
+    expect(selectVisibleChats(chats, 'all', true).map((c) => c.id)).toEqual(['friend']);
+    expect(selectVisibleChats(chats, 'all', false).map((c) => c.id)).toEqual(['friend', 'ticket']);
   });
 });

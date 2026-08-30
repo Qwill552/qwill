@@ -2,6 +2,7 @@ import {
   adminLogQuerySchema,
   adminUpdateProfileSchema,
   banUserSchema,
+  muteSupportSchema,
   reportListQuerySchema,
   setProfileCardsSchema,
   setUserCardSchema,
@@ -20,6 +21,7 @@ import {
   getAdminUserCard,
   listAdminLog,
   listReports,
+  muteUserSupport,
   revealUserPii,
   revokeUserSessions,
   setProfileCardsEnabled,
@@ -120,6 +122,12 @@ adminRouter.delete('/users/:id/ban', (req, res, next) => {
 
 adminRouter.patch('/users/:id/card', validateBody(setUserCardSchema), (req, res, next) => {
   setUserCardDisabled(adminActor(req), paramId(req), req.body.disabled)
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.patch('/users/:id/support-mute', validateBody(muteSupportSchema), (req, res, next) => {
+  muteUserSupport(adminActor(req), paramId(req), req.body.until)
     .then((user) => res.json(user))
     .catch(next);
 });

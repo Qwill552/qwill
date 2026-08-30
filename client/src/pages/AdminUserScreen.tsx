@@ -8,6 +8,7 @@ import {
   clearAdminUserBioRequest,
   clearAdminUserCardRequest,
   getAdminUserRequest,
+  muteUserSupportRequest,
   revokeAdminUserSessionsRequest,
   setAdminUserDisplayNameRequest,
   setUserCardRequest,
@@ -34,6 +35,12 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Не удалось выполнить запрос';
 }
@@ -49,6 +56,7 @@ export function AdminUserScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [banReason, setBanReason] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [muteUntil, setMuteUntil] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,6 +67,7 @@ export function AdminUserScreen() {
         setUser(loaded);
         setBanReason(loaded.bannedReason ?? '');
         setDisplayName(loaded.displayName);
+        setMuteUntil(loaded.supportMutedUntil ? toDatetimeLocalValue(loaded.supportMutedUntil) : '');
       })
       .catch((error: unknown) => setLoadError(errorText(error)));
   }, [userId]);
@@ -112,6 +121,15 @@ export function AdminUserScreen() {
 
   function handleRevokeSessions(): void {
     void run(() => revokeAdminUserSessionsRequest(userId));
+  }
+
+  function handleMuteSupport(): void {
+    if (!muteUntil) return;
+    void run(() => muteUserSupportRequest(userId, new Date(muteUntil).toISOString()));
+  }
+
+  function handleUnmuteSupport(): void {
+    void run(() => muteUserSupportRequest(userId, null));
   }
 
   const body = (
@@ -177,6 +195,40 @@ export function AdminUserScreen() {
                 onChange={(event) => setBanReason(event.target.value)}
                 placeholder="Нарушение правил"
               />
+            </div>
+          </Card>
+
+          <Card caption="Поддержка">
+            <Card.Row
+              title="Заглушён от обращений"
+              subtitle={user.supportMutedUntil ? `до ${formatDate(user.supportMutedUntil)}` : 'Нет'}
+            />
+            <div className={styles.reasonRow}>
+              <label className={styles.label} htmlFor="admin-user-support-mute-until">
+                Заглушить до
+              </label>
+              <input
+                id="admin-user-support-mute-until"
+                type="datetime-local"
+                className={styles.input}
+                value={muteUntil}
+                onChange={(event) => setMuteUntil(event.target.value)}
+              />
+            </div>
+            <div className={styles.nameRow}>
+              <button
+                type="button"
+                className={styles.button}
+                disabled={busy || !muteUntil}
+                onClick={handleMuteSupport}
+              >
+                Заглушить
+              </button>
+              {user.supportMutedUntil && (
+                <button type="button" className={styles.button} disabled={busy} onClick={handleUnmuteSupport}>
+                  Снять заглушение
+                </button>
+              )}
             </div>
           </Card>
 

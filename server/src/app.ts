@@ -20,6 +20,7 @@ import { healthRouter } from './http/routes/health.js';
 import { pushRouter } from './http/routes/push.js';
 import { reportsRouter } from './http/routes/reports.js';
 import { searchRouter } from './http/routes/search.js';
+import { supportRouter } from './http/routes/support.js';
 import { usersRouter } from './http/routes/users.js';
 import { logger } from './lib/logger.js';
 
@@ -79,6 +80,7 @@ export function createApp(): Express {
   app.use('/api/push', pushRouter);
   app.use('/api/calls', callsRouter);
   app.use('/api/reports', reportsRouter);
+  app.use('/api/support', supportRouter);
   app.use('/api/admin', adminRouter);
 
   app.use(notFoundHandler);

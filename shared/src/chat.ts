@@ -258,6 +258,7 @@ export interface ChatListItemDto {
   /** Уведомления по этому чату выключены лично мной — пуши о новых сообщениях не уходят.
    *  На звонки не влияет. */
   muted: boolean;
+  isSupportRequest: boolean;
 }
 
 export interface ChatDto extends ChatListItemDto {

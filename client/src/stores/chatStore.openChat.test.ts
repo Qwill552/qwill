@@ -74,6 +74,7 @@ function listItem(): ChatListItemDto {
     updatedAt: new Date().toISOString(),
     unreadCount: 0,
     muted: false,
+    isSupportRequest: false,
   };
 }
 

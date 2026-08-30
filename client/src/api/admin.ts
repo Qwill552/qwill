@@ -46,6 +46,13 @@ export function revokeAdminUserSessionsRequest(userId: string): Promise<AdminUse
   return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/sessions/revoke`, { method: 'POST' });
 }
 
+export function muteUserSupportRequest(userId: string, until: string | null): Promise<AdminUserCardDto> {
+  return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/support-mute`, {
+    method: 'PATCH',
+    body: { until },
+  });
+}
+
 export function banUserRequest(userId: string, reason: string): Promise<AdminUserCardDto> {
   return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/ban`, {
     method: 'POST',

@@ -10,4 +10,5 @@ export * from './keyboardLayout.js';
 export * from './push.js';
 export * from './search.js';
 export * from './socket.js';
+export * from './support.js';
 export * from './user.js';

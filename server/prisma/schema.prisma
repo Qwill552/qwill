@@ -95,6 +95,8 @@ model User {
   /// Пароль обязан быть сменён до первого запроса к API (механика — в R-32E).
   mustChangePassword Boolean @default(false)
 
+  supportMutedUntil DateTime?
+
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
@@ -153,6 +155,8 @@ model Chat {
 
   createdById String?
   createdBy   User?   @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  isSupportRequest Boolean @default(false)
 
   /// Одно закреплённое сообщение на чат (этап 6). SetNull — удаление сообщения открепляет
   /// само себя, а не роняет чат.

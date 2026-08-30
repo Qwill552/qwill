@@ -1,7 +1,7 @@
 import { Chip } from '../../ui/Chip';
 import styles from './ChatFilters.module.css';
 
-export type ChatFilter = 'all' | 'unread' | 'private' | 'groups';
+export type ChatFilter = 'all' | 'unread' | 'private' | 'groups' | 'support';
 
 const FILTERS: { id: ChatFilter; label: string }[] = [
   { id: 'all', label: 'Все' },
@@ -10,18 +10,24 @@ const FILTERS: { id: ChatFilter; label: string }[] = [
   { id: 'groups', label: 'Группы' },
 ];
 
+const ADMIN_FILTERS: { id: ChatFilter; label: string }[] = [
+  { id: 'all', label: 'Все' },
+  { id: 'support', label: 'Предложка' },
+];
+
 interface ChatFiltersProps {
   value: ChatFilter;
   onChange: (value: ChatFilter) => void;
-  /** Счётчики по фильтрам; показываются только там, где отличны от нуля. */
-  counts: Record<ChatFilter, number>;
+  counts: Partial<Record<ChatFilter, number>>;
+  admin?: boolean;
 }
 
-/** Встроенные фильтры списка чатов. Пользовательских папок в объёме нет, но ряд их примет. */
-export function ChatFilters({ value, onChange, counts }: ChatFiltersProps) {
+export function ChatFilters({ value, onChange, counts, admin }: ChatFiltersProps) {
+  const items = admin ? ADMIN_FILTERS : FILTERS;
+
   return (
     <div className={styles.row} role="tablist" aria-label="Фильтр чатов">
-      {FILTERS.map((filter) => (
+      {items.map((filter) => (
         <Chip
           key={filter.id}
           label={filter.label}
