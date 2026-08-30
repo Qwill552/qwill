@@ -213,8 +213,8 @@ export function ChatsScreen() {
       : [
           {
             id: 'bugReport',
-            label: 'Нашли баг? Есть предложение?',
-            icon: 'flag' as const,
+            label: 'Что улучшить?',
+            icon: 'help' as const,
             dividerBefore: true,
             onSelect: () => setBugReportOpen(true),
           },

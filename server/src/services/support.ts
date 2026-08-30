@@ -16,12 +16,16 @@ export interface SupportChatResult {
   targetUserId: string;
 }
 
+function supportPairKey(userId: string, adminId: string): string {
+  return `support:${pairKeyFor(userId, adminId)}`;
+}
+
 export async function ensureSupportChat(userId: string): Promise<SupportChatResult> {
   const admin = await prisma.user.findUnique({ where: { username: SUPPORT_ADMIN_USERNAME } });
   if (!admin) throw notFound(ErrorCode.NOT_FOUND, 'Администратор не найден');
   if (admin.id === userId) throw badRequest(ErrorCode.VALIDATION_FAILED, 'Нельзя написать самому себе');
 
-  const pairKey = pairKeyFor(userId, admin.id);
+  const pairKey = supportPairKey(userId, admin.id);
   const existing = await prisma.chat.findUnique({ where: { pairKey } });
   if (existing) return { chatId: existing.id, isNew: false, targetUserId: admin.id };
 

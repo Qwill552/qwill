@@ -206,6 +206,7 @@ export function ChatScreen() {
   const activeChat = chats.find((c) => c.id === chatId);
   const isGroup = activeChat?.type === 'GROUP';
   const isService = isServiceChat(activeChat);
+  const isSupportChat = activeChat?.isSupportRequest === true;
   const muted = activeChat?.muted ?? false;
   const isTyping = typingUsers.length > 0;
   const headerAvatarUrl = !isGroup && !isService ? activeChat?.avatarUrl : undefined;
@@ -395,7 +396,7 @@ export function ChatScreen() {
             <GlassPill
               variant={isDesktop ? 'flat' : 'cap'}
               title={
-                isService ? (
+                isService || isSupportChat ? (
                   <span className={styles.serviceTitle}>
                     {activeChat?.title ?? '…'}
                     <OfficialMark size={16} />

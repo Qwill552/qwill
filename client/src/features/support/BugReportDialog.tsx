@@ -56,7 +56,7 @@ export function BugReportDialog({ onClose }: BugReportDialogProps) {
 
   return (
     <div ref={trapRef} onKeyDown={handleKeyDown}>
-      <Modal title="Нашли баг? Есть предложение?" onClose={onClose}>
+      <Modal title="Что улучшить?" onClose={onClose}>
         <p className={styles.text}>Qwill делает один человек в свободное время.</p>
         <p className={styles.text}>
           Если что-то сломалось или ведёт себя странно — напишите. Опишите, что вы делали и что произошло; скриншот

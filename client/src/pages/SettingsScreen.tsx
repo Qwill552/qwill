@@ -247,9 +247,9 @@ export function SettingsScreen() {
         <Card className={styles.cardReset}>
           {user?.role !== 'admin' && (
             <Card.Row
-              icon="flag"
+              icon="help"
               tint="orange"
-              title="Нашли баг? Есть предложение?"
+              title="Что улучшить?"
               onClick={() => setBugReportOpen(true)}
             />
           )}
