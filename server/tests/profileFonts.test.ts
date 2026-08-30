@@ -86,6 +86,28 @@ describe('шрифты визитки (R-30C)', () => {
     await prisma.user.delete({ where: { id: userId } });
   });
 
+  it('в документ попадают только семейства, упомянутые в самой визитке', async () => {
+    const registered = await request
+      .post('/api/auth/register')
+      .send({ username: `font2_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' });
+    const token = registered.body.accessToken as string;
+    const userId = registered.body.user.id as string;
+
+    await request
+      .put('/api/users/me/card')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'text/html')
+      .send('<p style="font-family:QwillPersist">Только один шрифт</p>');
+    await request.patch('/api/users/me').set('Authorization', `Bearer ${token}`).send({ bioMode: 'html' });
+
+    const document = await request.get(`/c/${userId}/`).set('Host', env.cardHost);
+    expect(document.text).toContain('font-family:"QwillPersist"');
+    expect(document.text).not.toContain('QwillTest');
+
+    await prisma.profileCard.deleteMany({ where: { userId } });
+    await prisma.user.delete({ where: { id: userId } });
+  });
+
   it('шрифт из постоянной папки рядом со storage тоже попадает в список и отдаётся', async () => {
     const list = await request.get('/api/card-fonts');
     const families = (list.body as { family: string; weights: number[] }[]);

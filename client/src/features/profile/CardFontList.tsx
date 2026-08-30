@@ -1,11 +1,12 @@
 import type { CardFontDto } from '@messenger/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ApiError } from '../../api/client';
 import { listCardFontsRequest } from '../../api/users';
 import styles from './CardFontList.module.css';
 
 const COPIED_FLASH_MS = 1600;
+const SEARCH_FROM = 8;
 
 const WEIGHT_LABELS: Record<number, string> = {
   100: 'тонкий',
@@ -29,6 +30,7 @@ export function CardFontList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -57,17 +59,37 @@ export function CardFontList() {
     }
   }
 
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return needle === '' ? fonts : fonts.filter((font) => font.family.toLowerCase().includes(needle));
+  }, [fonts, query]);
+
   return (
     <section className={styles.panel} aria-label="Шрифты">
       {error && <p className={styles.error}>{error}</p>}
+
+      {fonts.length >= SEARCH_FROM && (
+        <input
+          className={styles.search}
+          type="search"
+          value={query}
+          placeholder={`Поиск среди ${fonts.length}`}
+          aria-label="Поиск шрифта"
+          spellCheck={false}
+          autoCapitalize="off"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      )}
 
       {loading ? (
         <p className={styles.empty}>Загружаем список…</p>
       ) : fonts.length === 0 ? (
         <p className={styles.empty}>Шрифтов на сервере пока нет — визитка рисуется системными.</p>
+      ) : shown.length === 0 ? (
+        <p className={styles.empty}>Ничего не нашлось.</p>
       ) : (
         <ul className={styles.list}>
-          {fonts.map((font) => (
+          {shown.map((font) => (
             <li key={font.family} className={styles.row}>
               <span className={styles.family}>{font.family}</span>
               <span className={styles.weights}>{describe(font)}</span>

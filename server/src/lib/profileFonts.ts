@@ -52,7 +52,6 @@ interface FontFace {
 
 interface FontTable {
   faces: FontFace[];
-  css: string;
   families: CardFontDto[];
   files: Map<string, string>;
 }
@@ -78,7 +77,7 @@ function parseFace(file: string, dir: string): FontFace | null {
   return FAMILY_PATTERN.test(stem) ? { file, path: fullPath, family: stem, weight: 400, italic: false } : null;
 }
 
-function buildCss(faces: FontFace[]): string {
+function buildCss(faces: readonly FontFace[]): string {
   return faces
     .map(
       (face) =>
@@ -135,7 +134,6 @@ function scan(): FontTable {
   const faces = [...byFile.values()];
   return {
     faces,
-    css: buildCss(faces),
     families: buildFamilies(faces),
     files: new Map(faces.map((face) => [face.file, face.path])),
   };
@@ -154,8 +152,22 @@ function ensureTable(): FontTable {
   return table;
 }
 
-export function getProfileFontFaceCss(): string {
-  return ensureTable().css;
+/**
+ * Блок `@font-face` собирается под конкретную визитку: попадают только семейства, чьё имя
+ * встречается в её коде. Иначе в `<head>` каждого документа уезжал бы список всех шрифтов
+ * сервера — при паре сотен семейств это десятки килобайт на каждый показ (R-30C).
+ */
+export function getProfileFontFaceCss(html: string): string {
+  const table = ensureTable();
+  if (table.faces.length === 0 || html === '') return '';
+
+  const haystack = html.toLowerCase();
+  const wanted = new Set(
+    table.families.map((font) => font.family).filter((family) => haystack.includes(family.toLowerCase())),
+  );
+  if (wanted.size === 0) return '';
+
+  return buildCss(table.faces.filter((face) => wanted.has(face.family)));
 }
 
 export function getProfileFontFamilies(): CardFontDto[] {
