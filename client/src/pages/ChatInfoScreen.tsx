@@ -1,8 +1,10 @@
-import type { AttachmentDto } from '@messenger/shared';
-import { useMemo, useRef } from 'react';
+import type { AttachmentDto, UserProfileDto } from '@messenger/shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { getUserProfileRequest } from '../api/users';
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { MediaTile } from '../features/media/MediaTile';
 import { isViewableMedia } from '../features/media/mediaKind';
 import { useChatStore } from '../stores/chatStore';
@@ -23,6 +25,7 @@ export function ChatInfoScreen() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const [profile, setProfile] = useState<UserProfileDto | null>(null);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
@@ -31,6 +34,20 @@ export function ChatInfoScreen() {
   const other = chat?.otherMember ?? null;
   const presence = other ? presenceByUser[other.id] : undefined;
   const online = presence?.online ?? false;
+
+  useEffect(() => {
+    const otherId = chat?.otherMember?.id;
+    if (!otherId) return;
+    let cancelled = false;
+    getUserProfileRequest(otherId)
+      .then((result) => {
+        if (!cancelled) setProfile(result);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [chat?.otherMember?.id]);
 
   const media = useMemo(() => {
     if (!messages) return [];
@@ -61,6 +78,21 @@ export function ChatInfoScreen() {
             Написать
           </button>
         </div>
+
+        {profile?.cardUrl ? (
+          <ProfileCardFrame
+            cardUrl={profile.cardUrl}
+            authorId={profile.id}
+            authorName={profile.displayName}
+            autoStart
+          />
+        ) : (
+          profile?.bio && (
+            <Card caption="О себе">
+              <p className={styles.bioText}>{profile.bio}</p>
+            </Card>
+          )
+        )}
 
         <Card>
           <Card.Row title={`@${other.username}`} subtitle="Имя пользователя" icon="user" tint="blue" />

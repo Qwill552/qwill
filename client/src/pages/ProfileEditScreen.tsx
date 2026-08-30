@@ -28,6 +28,7 @@ import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { clearCardDraft, readCardDraft, writeCardDraft } from '../features/profile/cardDraft';
 import { CardFontList } from '../features/profile/CardFontList';
 import { CardImagePanel } from '../features/profile/CardImagePanel';
+import { CardSizeHint } from '../features/profile/CardSizeHint';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
@@ -404,6 +405,7 @@ export function ProfileEditScreen() {
                 <span className={`${styles.codeCounter} ${cardTooLarge ? styles.codeCounterOver : ''}`}>
                   {formatBytes(cardBytes)} Б из {formatBytes(PROFILE_CARD_MAX_BYTES)}
                 </span>
+                <CardSizeHint />
                 <button
                   type="button"
                   className={styles.codeAction}
