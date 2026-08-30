@@ -1,10 +1,6 @@
-.wrap {
-  position: relative;
-  flex: 0 0 auto;
-}
-
 .button {
   display: grid;
+  flex: 0 0 auto;
   width: var(--tap-min);
   height: var(--tap-min);
   place-items: center;
@@ -32,13 +28,11 @@
 }
 
 .popover {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 3;
+  position: fixed;
+  z-index: 240;
   display: flex;
   width: max-content;
-  max-width: min(300px, calc(100vw - 48px));
+  max-width: min(300px, calc(100vw - 24px));
   flex-direction: column;
   gap: 5px;
   padding: var(--space-3);

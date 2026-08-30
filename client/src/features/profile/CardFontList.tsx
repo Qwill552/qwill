@@ -20,9 +20,22 @@ const WEIGHT_LABELS: Record<number, string> = {
   900: 'чёрный',
 };
 
+function plural(count: number, one: string, few: string, many: string): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+/** До трёх весов перечисляем словами, дальше — счётом: у семейства с девятью начертаниями
+ *  перечисление занимает три строки и наезжает на соседние. */
 function describe(font: CardFontDto): string {
-  const weights = font.weights.map((weight) => WEIGHT_LABELS[weight] ?? String(weight)).join(', ');
-  return font.hasItalic ? `${weights} · курсив` : weights;
+  const base =
+    font.weights.length <= 3
+      ? font.weights.map((weight) => WEIGHT_LABELS[weight] ?? String(weight)).join(', ')
+      : `${font.weights.length} ${plural(font.weights.length, 'начертание', 'начертания', 'начертаний')}`;
+  return font.hasItalic ? `${base} · курсив` : base;
 }
 
 export function CardFontList() {
