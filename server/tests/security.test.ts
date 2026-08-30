@@ -10,6 +10,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/prisma.js';
+import {
+  CSRF_COOKIE,
+  CSRF_HEADER,
+  LEGACY_REFRESH_COOKIE,
+  REFRESH_COOKIE,
+} from '../src/http/authCookies.js';
 import { createSocketServer } from '../src/realtime/index.js';
 import { sendMessage } from '../src/services/message.js';
 
@@ -286,6 +292,177 @@ describe('security.test.ts — обязательный набор отказо�
         where: { chatId_userId: { chatId: groupChatId, userId: userB.userId } },
       });
       expect(stillMember?.role).toBe('MEMBER');
+    });
+  });
+  describe('источник запроса и куки сессии (R-30D)', () => {
+    function setCookiesOf(res: { headers: unknown }): string[] {
+      const header = (res.headers as Record<string, string[] | string | undefined>)['set-cookie'];
+      if (!header) return [];
+      return Array.isArray(header) ? header : [header];
+    }
+
+    function findSetCookie(cookies: string[], name: string): string | undefined {
+      return cookies.find((cookie) => cookie.startsWith(`${name}=`));
+    }
+
+    function valueOf(setCookie: string): string {
+      return decodeURIComponent(setCookie.slice(setCookie.indexOf('=') + 1).split(';')[0]);
+    }
+
+    function attributeOf(setCookie: string, name: string): string | undefined {
+      return setCookie
+        .split(';')
+        .slice(1)
+        .map((part) => part.trim())
+        .find((part) => part.toLowerCase() === name || part.toLowerCase().startsWith(`${name}=`));
+    }
+
+    async function openSession(suffix: string): Promise<{
+      cookies: string[];
+      cookieHeader: string;
+      csrfToken: string;
+      refreshToken: string;
+    }> {
+      const res = await request
+        .post('/api/auth/register')
+        .send({ username: `sec30d_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Куки' });
+      expect(res.status).toBe(201);
+      createdUserIds.push(res.body.user.id as string);
+
+      const cookies = setCookiesOf(res);
+      const refresh = findSetCookie(cookies, REFRESH_COOKIE);
+      const csrf = findSetCookie(cookies, CSRF_COOKIE);
+      expect(refresh).toBeDefined();
+      expect(csrf).toBeDefined();
+
+      const refreshToken = valueOf(refresh as string);
+      return {
+        cookies,
+        cookieHeader: `${REFRESH_COOKIE}=${refreshToken}; ${CSRF_COOKIE}=${valueOf(csrf as string)}`,
+        csrfToken: res.body.csrfToken as string,
+        refreshToken,
+      };
+    }
+
+    it('кука сессии выставляется с префиксом __Host-: Path=/, Secure, HttpOnly, без Domain', async () => {
+      const session = await openSession('attrs');
+      const refresh = findSetCookie(session.cookies, REFRESH_COOKIE) as string;
+
+      expect(attributeOf(refresh, 'path')).toBe('Path=/');
+      expect(attributeOf(refresh, 'secure')).toBeDefined();
+      expect(attributeOf(refresh, 'httponly')).toBeDefined();
+      expect(attributeOf(refresh, 'domain')).toBeUndefined();
+    });
+
+    it('CSRF-токен приходит телом ответа и совпадает с кукой __Host-messenger_csrf', async () => {
+      const session = await openSession('token');
+      const csrf = findSetCookie(session.cookies, CSRF_COOKIE) as string;
+
+      expect(session.csrfToken).toHaveLength(43);
+      expect(valueOf(csrf)).toBe(session.csrfToken);
+    });
+
+    it('кука старого образца гасится тем же ответом', async () => {
+      const session = await openSession('legacyclear');
+      const legacy = findSetCookie(session.cookies, LEGACY_REFRESH_COOKIE);
+
+      expect(legacy).toBeDefined();
+      expect(legacy).toContain('Expires=Thu, 01 Jan 1970');
+    });
+
+    it('refresh без заголовка X-CSRF-Token → 403', async () => {
+      const session = await openSession('nocsrf');
+      const res = await request.post('/api/auth/refresh').set('Cookie', session.cookieHeader).send({});
+
+      expect(res.status).toBe(403);
+    });
+
+    it('refresh с чужим CSRF-токеном → 403', async () => {
+      const session = await openSession('badcsrf');
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, 'a'.repeat(session.csrfToken.length))
+        .send({});
+
+      expect(res.status).toBe(403);
+    });
+
+    it('refresh с Origin соседнего поддомена mooo.com → 403', async () => {
+      const session = await openSession('neighbour');
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, session.csrfToken)
+        .set('Origin', 'https://evil.mooo.com')
+        .send({});
+
+      expect(res.status).toBe(403);
+    });
+
+    it('refresh без Origin, но с Sec-Fetch-Site: cross-site → 403', async () => {
+      const session = await openSession('crosssite');
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, session.csrfToken)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .send({});
+
+      expect(res.status).toBe(403);
+    });
+
+    it('refresh из оболочки: разрешённый Origin при Sec-Fetch-Site: cross-site проходит', async () => {
+      const session = await openSession('shell');
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, session.csrfToken)
+        .set('Origin', env.APP_ORIGIN)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(findSetCookie(setCookiesOf(res), REFRESH_COOKIE)).toBeDefined();
+    });
+
+    it('сессия старого образца обновляется без CSRF-токена и получает куки __Host-', async () => {
+      const session = await openSession('upgrade');
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', `${LEGACY_REFRESH_COOKIE}=${session.refreshToken}`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      const cookies = setCookiesOf(res);
+      expect(findSetCookie(cookies, REFRESH_COOKIE)).toBeDefined();
+      expect(res.body.csrfToken).toBeTruthy();
+      expect(findSetCookie(cookies, LEGACY_REFRESH_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+    });
+
+    it('logout удаляет обе куки сессии', async () => {
+      const session = await openSession('logout');
+      const res = await request
+        .post('/api/auth/logout')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, session.csrfToken)
+        .send({});
+
+      expect(res.status).toBe(204);
+      const cookies = setCookiesOf(res);
+      expect(findSetCookie(cookies, REFRESH_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+      expect(findSetCookie(cookies, CSRF_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+    });
+
+    it('запрос по заголовку Authorization без куки проверкой источника не трогается', async () => {
+      const res = await request
+        .post('/api/chats/private')
+        .set('Authorization', `Bearer ${userA.token}`)
+        .set('Origin', 'https://evil.mooo.com')
+        .set('Sec-Fetch-Site', 'cross-site')
+        .send({ username: userB.username });
+
+      expect([200, 201]).toContain(res.status);
     });
   });
 });

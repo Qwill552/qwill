@@ -69,4 +69,5 @@ export interface PublicUser {
 export interface AuthResponse {
   accessToken: string;
   user: PublicUser;
+  csrfToken: string;
 }

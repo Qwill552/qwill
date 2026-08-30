@@ -1,50 +1,39 @@
 import { loginSchema, refreshSchema, registerSchema, type AuthResponse } from '@messenger/shared';
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 
-import { env } from '../../config/env.js';
-import { unauthorized } from '../../lib/errors.js';
+import { forbidden, unauthorized } from '../../lib/errors.js';
 import * as authService from '../../services/auth.js';
+import {
+  clearSessionCookies,
+  isCsrfTokenValid,
+  issueCsrfToken,
+  readRefreshToken,
+  setSessionCookies,
+} from '../authCookies.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const authRouter: Router = Router();
 
-/** Кука — путь в браузере; Capacitor шлёт refreshToken в теле, т.к. кука там сторонняя (секция 6). */
-const REFRESH_COOKIE = 'messenger_refresh_token';
-
-const refreshCookieOptions = {
-  httpOnly: true,
-  secure: env.isProd,
-  sameSite: 'lax' as const,
-  path: '/api/auth',
-  maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
-};
-
-function setRefreshCookie(res: Response, token: string): void {
-  res.cookie(REFRESH_COOKIE, token, refreshCookieOptions);
+function requireCsrfToken(req: Request, _res: Response, next: NextFunction): void {
+  if (isCsrfTokenValid(req)) {
+    next();
+    return;
+  }
+  next(forbidden('Проверка запроса не пройдена, войдите заново'));
 }
 
-function clearRefreshCookie(res: Response): void {
-  res.clearCookie(REFRESH_COOKIE, { path: refreshCookieOptions.path });
-}
-
-function readRefreshToken(req: Request): string | undefined {
-  const fromCookie = (req.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE];
-  const fromBody = (req.body as { refreshToken?: string } | undefined)?.refreshToken;
-  return fromCookie ?? fromBody;
-}
-
-function toAuthResponse(tokens: authService.SessionTokens): AuthResponse {
-  return { accessToken: tokens.accessToken, user: tokens.user };
+function respondWithSession(res: Response, tokens: authService.SessionTokens, status: number): void {
+  const csrfToken = issueCsrfToken();
+  setSessionCookies(res, tokens.refreshToken, csrfToken);
+  const body: AuthResponse = { accessToken: tokens.accessToken, user: tokens.user, csrfToken };
+  res.status(status).json(body);
 }
 
 authRouter.post('/register', authLimiter, validateBody(registerSchema), (req, res, next) => {
   authService
     .register(req.body, req.headers['user-agent'])
-    .then((tokens) => {
-      setRefreshCookie(res, tokens.refreshToken);
-      res.status(201).json(toAuthResponse(tokens));
-    })
+    .then((tokens) => respondWithSession(res, tokens, 201))
     .catch(next);
 });
 
@@ -52,14 +41,11 @@ authRouter.post('/login', authLimiter, validateBody(loginSchema), (req, res, nex
   const { username, password } = req.body;
   authService
     .login(username, password, req.headers['user-agent'])
-    .then((tokens) => {
-      setRefreshCookie(res, tokens.refreshToken);
-      res.json(toAuthResponse(tokens));
-    })
+    .then((tokens) => respondWithSession(res, tokens, 200))
     .catch(next);
 });
 
-authRouter.post('/refresh', validateBody(refreshSchema), (req, res, next) => {
+authRouter.post('/refresh', validateBody(refreshSchema), requireCsrfToken, (req, res, next) => {
   const token = readRefreshToken(req);
   if (!token) {
     next(unauthorized('Нет активной сессии'));
@@ -68,16 +54,13 @@ authRouter.post('/refresh', validateBody(refreshSchema), (req, res, next) => {
 
   authService
     .refresh(token, req.headers['user-agent'])
-    .then((tokens) => {
-      setRefreshCookie(res, tokens.refreshToken);
-      res.json(toAuthResponse(tokens));
-    })
+    .then((tokens) => respondWithSession(res, tokens, 200))
     .catch(next);
 });
 
-authRouter.post('/logout', validateBody(refreshSchema), (req, res, next) => {
+authRouter.post('/logout', validateBody(refreshSchema), requireCsrfToken, (req, res, next) => {
   const token = readRefreshToken(req);
-  clearRefreshCookie(res);
+  clearSessionCookies(res);
 
   if (!token) {
     res.status(204).end();

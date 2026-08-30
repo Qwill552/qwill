@@ -28,6 +28,7 @@ export class NetworkError extends Error {
 
 const ACCESS_TOKEN_STORAGE_KEY = 'messenger.accessToken';
 const ACCESS_TOKEN_STORAGE_TTL_MS = 15 * 60 * 1000;
+const CSRF_TOKEN_STORAGE_KEY = 'messenger.csrfToken';
 
 interface StoredAccessToken {
   token: string;
@@ -35,6 +36,13 @@ interface StoredAccessToken {
 }
 
 let accessToken: string | null = null;
+let csrfToken: string | null = localStorage.getItem(CSRF_TOKEN_STORAGE_KEY);
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+  if (token) localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, token);
+  else localStorage.removeItem(CSRF_TOKEN_STORAGE_KEY);
+}
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
@@ -93,6 +101,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
       headers: {
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: options.signal,

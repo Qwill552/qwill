@@ -2,7 +2,7 @@ import type { AuthResponse, LoginInput, PublicUser, RegisterInput } from '@messe
 import { create } from 'zustand';
 
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
-import { NetworkError, restoreAccessToken, setAccessToken, setRefreshHandler } from '../api/client';
+import { NetworkError, restoreAccessToken, setAccessToken, setCsrfToken, setRefreshHandler } from '../api/client';
 import { getSettingsRequest } from '../api/users';
 import { clearAllCache } from '../cache/db';
 import { clearOfflineProfile, readOfflineProfile, saveOfflineProfile } from '../cache/offlineProfile';
@@ -39,6 +39,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
   function applyAuth(response: AuthResponse): void {
     setAccessToken(response.accessToken);
+    setCsrfToken(response.csrfToken);
     set({ user: response.user, status: 'authenticated', isOfflineSession: false });
     saveOfflineProfile(response.user);
     // Сокет — единственное соединение на вкладку; переподключается со свежим токеном при логине/рефреше (секция 4).
@@ -55,6 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
   async function clearAuth(): Promise<void> {
     setAccessToken(null);
+    setCsrfToken(null);
     clearOfflineProfile();
     disconnectSocket();
     await clearAllCache();
