@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import type { UserRole } from './user.js';
+import { DISPLAY_NAME_MAX_LENGTH, DISPLAY_NAME_MIN_LENGTH } from './constants.js';
+import type { BioMode, UserRole } from './user.js';
 
 export const REPORT_KIND_VALUES = ['card', 'message', 'profile'] as const;
 export type ReportKind = (typeof REPORT_KIND_VALUES)[number];
@@ -82,3 +83,97 @@ export interface AdminReportDto {
 export interface AdminSettingsDto {
   profileCardsEnabled: boolean;
 }
+
+export const ADMIN_PII_REVEAL_MS = 60_000;
+export const ADMIN_LOG_PAGE_SIZE = 50;
+
+export const ADMIN_ACTION_VALUES = [
+  'user.ban',
+  'user.unban',
+  'user.card',
+  'user.card.clear',
+  'user.bio.clear',
+  'user.displayName',
+  'user.avatar.clear',
+  'user.sessions.revoke',
+  'user.pii.reveal',
+  'settings.profileCards',
+  'role.grant',
+  'role.revoke',
+] as const;
+export type AdminActionName = (typeof ADMIN_ACTION_VALUES)[number];
+
+export interface AdminUserCardDto {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+  createdAt: string;
+  lastSeenAt: string;
+  bannedAt: string | null;
+  bannedReason: string | null;
+  bannedByUsername: string | null;
+  cardDisabled: boolean;
+  mustChangePassword: boolean;
+  bioMode: BioMode;
+  hasBio: boolean;
+  hasCard: boolean;
+  hasAvatar: boolean;
+  chatCount: number;
+  messageCount: number;
+  reportsAgainst: number;
+  reportsFiled: number;
+  sessionCount: number;
+}
+
+export interface AdminSessionDto {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  ip: string | null;
+  lastSeenIp: string | null;
+  userAgent: string | null;
+}
+
+export interface AdminPiiDto {
+  signupIp: string | null;
+  signupUserAgent: string | null;
+  sessions: AdminSessionDto[];
+}
+
+export interface AdminLogEntryDto {
+  id: string;
+  createdAt: string;
+  adminId: string;
+  adminUsername: string | null;
+  action: string;
+  targetUserId: string | null;
+  targetUsername: string | null;
+  targetChatId: string | null;
+  detail: string | null;
+  ip: string;
+  userAgent: string | null;
+}
+
+export interface AdminLogPageDto {
+  entries: AdminLogEntryDto[];
+  nextCursor: string | null;
+}
+
+export const adminUpdateProfileSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(DISPLAY_NAME_MIN_LENGTH, 'Введите имя')
+    .max(DISPLAY_NAME_MAX_LENGTH, `Имя не длиннее ${DISPLAY_NAME_MAX_LENGTH} символов`),
+});
+export type AdminUpdateProfileInput = z.infer<typeof adminUpdateProfileSchema>;
+
+export const adminLogQuerySchema = z.object({
+  admin: z.string().trim().min(1).max(64).optional(),
+  action: z.string().trim().min(1).max(64).optional(),
+  from: z.string().trim().min(1).max(32).optional(),
+  to: z.string().trim().min(1).max(32).optional(),
+  cursor: z.string().trim().min(1).max(64).optional(),
+});
+export type AdminLogQuery = z.infer<typeof adminLogQuerySchema>;

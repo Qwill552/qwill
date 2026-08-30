@@ -18,14 +18,25 @@ export interface SessionTokens {
   user: ReturnType<typeof toPublicUser>;
 }
 
-async function issueSession(user: User, userAgent: string | undefined): Promise<SessionTokens> {
+export interface ClientContext {
+  userAgent: string | undefined;
+  ip: string | undefined;
+}
+
+async function issueSession(
+  user: User,
+  client: ClientContext,
+  originIp?: string | null,
+): Promise<SessionTokens> {
   const refreshToken = generateRefreshToken();
   await prisma.session.create({
     data: {
       userId: user.id,
       refreshTokenHash: hashRefreshToken(refreshToken),
       expiresAt: refreshTokenExpiry(),
-      userAgent,
+      userAgent: client.userAgent,
+      ip: originIp ?? client.ip ?? null,
+      lastSeenIp: client.ip ?? null,
     },
   });
 
@@ -38,26 +49,23 @@ async function issueSession(user: User, userAgent: string | undefined): Promise<
 
 export async function register(
   input: { username: string; password: string; displayName: string },
-  userAgent: string | undefined,
+  client: ClientContext,
 ): Promise<SessionTokens> {
   const user = await createUser(input);
-  return issueSession(user, userAgent);
+  return issueSession(user, client);
 }
 
 export async function login(
   username: string,
   password: string,
-  userAgent: string | undefined,
+  client: ClientContext,
 ): Promise<SessionTokens> {
   const user = await verifyCredentials(username, password);
-  return issueSession(user, userAgent);
+  return issueSession(user, client);
 }
 
 /** Ротация: старая сессия удаляется, выдаётся новая пара токенов (секция 3). */
-export async function refresh(
-  refreshToken: string,
-  userAgent: string | undefined,
-): Promise<SessionTokens> {
+export async function refresh(refreshToken: string, client: ClientContext): Promise<SessionTokens> {
   const tokenHash = hashRefreshToken(refreshToken);
   const session = await prisma.session.findUnique({ where: { refreshTokenHash: tokenHash } });
 
@@ -72,7 +80,7 @@ export async function refresh(
   // вызов bootstrap в React StrictMode, гонка нескольких вкладок) уже мог удалить строку —
   // delete() бросил бы P2025 вместо аккуратной ротации токена.
   await prisma.session.deleteMany({ where: { id: session.id } });
-  return issueSession(user, userAgent);
+  return issueSession(user, client, session.ip);
 }
 
 /** Разлогин = удаление строки Session — отсюда бесплатно «выйти со всех устройств» (секция 3). */

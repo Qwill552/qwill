@@ -23,6 +23,10 @@ function requireCsrfToken(req: Request, _res: Response, next: NextFunction): voi
   next(forbidden('Проверка запроса не пройдена, войдите заново'));
 }
 
+function clientContext(req: Request): authService.ClientContext {
+  return { userAgent: req.headers['user-agent'], ip: req.ip };
+}
+
 function respondWithSession(res: Response, tokens: authService.SessionTokens, status: number): void {
   const csrfToken = issueCsrfToken();
   setSessionCookies(res, tokens.refreshToken, csrfToken);
@@ -32,7 +36,7 @@ function respondWithSession(res: Response, tokens: authService.SessionTokens, st
 
 authRouter.post('/register', authLimiter, validateBody(registerSchema), (req, res, next) => {
   authService
-    .register(req.body, req.headers['user-agent'])
+    .register(req.body, clientContext(req))
     .then((tokens) => respondWithSession(res, tokens, 201))
     .catch(next);
 });
@@ -40,7 +44,7 @@ authRouter.post('/register', authLimiter, validateBody(registerSchema), (req, re
 authRouter.post('/login', authLimiter, validateBody(loginSchema), (req, res, next) => {
   const { username, password } = req.body;
   authService
-    .login(username, password, req.headers['user-agent'])
+    .login(username, password, clientContext(req))
     .then((tokens) => respondWithSession(res, tokens, 200))
     .catch(next);
 });
@@ -53,7 +57,7 @@ authRouter.post('/refresh', validateBody(refreshSchema), requireCsrfToken, (req,
   }
 
   authService
-    .refresh(token, req.headers['user-agent'])
+    .refresh(token, clientContext(req))
     .then((tokens) => respondWithSession(res, tokens, 200))
     .catch(next);
 });

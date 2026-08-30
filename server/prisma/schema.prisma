@@ -126,7 +126,11 @@ model Session {
   refreshTokenHash String   @unique
   expiresAt        DateTime
   userAgent        String?
-  createdAt        DateTime @default(now())
+
+  ip         String?
+  lastSeenIp String?
+
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([expiresAt])

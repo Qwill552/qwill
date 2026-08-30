@@ -10,10 +10,10 @@
   z-index: 1;
   height: 100%;
   overflow-y: auto;
+  padding-top: var(--chrome-space-top);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-6));
   overscroll-behavior: contain;
   touch-action: pan-y;
-  padding-top: var(--safe-top);
-  padding-bottom: calc(var(--safe-bottom) + var(--space-6));
 }
 
 @media (min-width: 900px) {
@@ -26,34 +26,22 @@
   }
 }
 
-.top {
-  flex-shrink: 0;
-  padding: calc(6px + var(--safe-top)) calc(18px + var(--safe-right)) 4px calc(18px + var(--safe-left));
+.reasonRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) var(--space-3);
 }
 
-.title {
-  margin: 0;
-  color: rgb(var(--pulse-ink));
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-}
-
-.search {
+.nameRow {
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  padding: var(--space-3) var(--space-4);
-}
-
-.reasonRow {
   padding: var(--space-2) var(--space-4) var(--space-3);
 }
 
 .label {
   display: block;
-  margin-bottom: var(--space-1);
   color: var(--text-secondary);
   font-size: var(--font-caption);
 }
@@ -100,4 +88,9 @@
 .button:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.dangerButton {
+  composes: button;
+  background: var(--danger);
 }

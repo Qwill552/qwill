@@ -21,7 +21,9 @@ import {
   type Location,
 } from 'react-router-dom';
 
+import { AdminLogScreen } from '../pages/AdminLogScreen';
 import { AdminScreen } from '../pages/AdminScreen';
+import { AdminUserScreen } from '../pages/AdminUserScreen';
 import { AppearanceScreen } from '../pages/AppearanceScreen';
 import { CallTraceScreen } from '../pages/CallTraceScreen';
 import { ChatInfoScreen } from '../pages/ChatInfoScreen';
@@ -104,6 +106,8 @@ const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
 };
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
+  if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
+  if (matchPath('/admin/users/:id', pathname)) return { title: 'Пользователь', backTo: '/admin' };
   const subroute = OVERLAY_SUBROUTE_TITLE[pathname];
   if (subroute) return { title: subroute, backTo: parentPathOf(pathname) };
   return { title: OVERLAY_TAB_TITLE[tab] ?? '', backTo: null };
@@ -134,6 +138,8 @@ const RouteSwitch = memo(
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="/profile/edit" element={<ProfileEditScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/admin/users/:id" element={<AdminUserScreen />} />
+        <Route path="/admin/log" element={<AdminLogScreen />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
     );

@@ -199,7 +199,9 @@ export function ChatsScreen() {
 
   const desktopMenuItems: MenuItem[] = [
     { id: 'profile', label: 'Мой профиль', icon: 'user', onSelect: () => navigate('/profile') },
-    { id: 'contacts', label: 'Контакты', icon: 'users', onSelect: () => navigate('/contacts') },
+    me?.role === 'admin'
+      ? { id: 'admin', label: 'Админ-панель', icon: 'shield', onSelect: () => navigate('/admin') }
+      : { id: 'contacts', label: 'Контакты', icon: 'users', onSelect: () => navigate('/contacts') },
     { id: 'settings', label: 'Настройки', icon: 'settings', onSelect: () => navigate('/settings') },
     {
       id: 'theme',

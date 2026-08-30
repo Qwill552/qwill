@@ -1,7 +1,10 @@
 import { matchPath } from 'react-router-dom';
 
 /** Корневые маршруты вкладок таб-бара — в этом порядке они и рисуются. */
-export const TAB_ROOTS = ['/chats', '/contacts', '/settings', '/profile'] as const;
+/** У администратора «Контакты» в таб-баре заменяются на «Админ-панель» (R-32B), поэтому
+ *  оба корня — соседи по порядку: маршрут переключения угадывает направление свайпа
+ *  по позиции в этом списке, а какой из двух показан в таб-баре, решает роль (TabBar.tsx). */
+export const TAB_ROOTS = ['/chats', '/contacts', '/admin', '/settings', '/profile'] as const;
 export type TabRoot = (typeof TAB_ROOTS)[number];
 
 /** Хвостовой слэш для react-router — не различие: `<Route path="/chats">` матчит и `/chats/`,
@@ -23,6 +26,7 @@ function staticParent(pathname: string): string | null {
   if (pathname === '/settings/developer') return '/settings';
   if (pathname === '/settings/developer/call-trace') return '/settings/developer';
   if (pathname === '/profile/edit') return '/profile';
+  if (pathname === '/admin/log') return '/admin';
   return null;
 }
 
@@ -38,6 +42,9 @@ export function parentPathOf(pathname: string): string | null {
 
   const contact = matchPath('/contacts/:userId', path);
   if (contact) return '/contacts';
+
+  const adminUser = matchPath('/admin/users/:id', path);
+  if (adminUser) return '/admin';
 
   return staticParent(path);
 }

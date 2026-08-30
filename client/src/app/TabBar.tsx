@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { Badge } from '../ui/Badge';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
@@ -10,22 +11,34 @@ import { isTabRoot, tabOf } from './routing';
 import { useLayoutMode } from './useLayoutMode';
 
 /** Пути `d` — буквально ICON.chat/person/sliders/profile из референса (viewBox 0 0 20 20,
- *  stroke-width 1.6), не общий набор иконок приложения: там другая сетка (24, вес 2). */
+ *  stroke-width 1.6), не общий набор иконок приложения: там другая сетка (24, вес 2). Иконка
+ *  `admin` — щит с галочкой, нарисован в той же сетке (R-32B). */
 const TAB_ICON_PATH: Record<string, string> = {
   chats: 'M4 4.5h12a1.5 1.5 0 011.5 1.5v6a1.5 1.5 0 01-1.5 1.5H9l-4 3v-3H4A1.5 1.5 0 012.5 12V6A1.5 1.5 0 014 4.5z',
   contacts: 'M10 3.6a3 3 0 110 6 3 3 0 010-6zM4.4 16.4c.5-3 2.7-4.6 5.6-4.6s5.1 1.6 5.6 4.6',
+  admin:
+    'M10 2.6l5.6 2v4.2c0 3.8-2.4 6.6-5.6 7.7-3.2-1.1-5.6-3.9-5.6-7.7V4.6l5.6-2z M7.4 9.8l1.7 1.7 3-3.3',
   settings:
     'M3 6.5h1.5M7.5 6.5h9.5M3 13.5h6.5M12.5 13.5h4.5M6 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11 12a1.5 1.5 0 110 3 1.5 1.5 0 010-3z',
   profile:
     'M10 3.4a6.6 6.6 0 110 13.2 6.6 6.6 0 010-13.2zM10 7.6a2.2 2.2 0 110 4.4 2.2 2.2 0 010-4.4zM5.7 15.3c.8-1.7 2.3-2.6 4.3-2.6s3.5.9 4.3 2.6',
 };
 
-const TABS: { root: string; icon: keyof typeof TAB_ICON_PATH; label: string }[] = [
-  { root: '/chats', icon: 'chats', label: 'Сообщения' },
-  { root: '/contacts', icon: 'contacts', label: 'Контакты' },
-  { root: '/settings', icon: 'settings', label: 'Настройки' },
-  { root: '/profile', icon: 'profile', label: 'Профиль' },
-];
+type TabDef = { root: string; icon: keyof typeof TAB_ICON_PATH; label: string };
+
+const CONTACTS_TAB: TabDef = { root: '/contacts', icon: 'contacts', label: 'Контакты' };
+const ADMIN_TAB: TabDef = { root: '/admin', icon: 'admin', label: 'Админ-панель' };
+
+/** У администратора «Контакты» заменяются на «Админ-панель» — сам экран `/contacts`
+ *  никуда не девается и остаётся доступен по прямому адресу (R-32B). */
+function tabsForRole(role: string | undefined): TabDef[] {
+  return [
+    { root: '/chats', icon: 'chats', label: 'Сообщения' },
+    role === 'admin' ? ADMIN_TAB : CONTACTS_TAB,
+    { root: '/settings', icon: 'settings', label: 'Настройки' },
+    { root: '/profile', icon: 'profile', label: 'Профиль' },
+  ];
+}
 
 /** Позиция капсулы — буквально left/right/bottom:26px из референса, плюс safe-area поверх
  *  (у демо-инструмента с рамкой телефона её не было и не могло быть). Задаётся инлайн-стилем
@@ -46,11 +59,13 @@ export function TabBar() {
   const location = useLocation();
   const navigate = useNavigate();
   const unreadTotal = useChatStore((s) => s.chats.reduce((sum, c) => sum + c.unreadCount, 0));
+  const role = useAuthStore((s) => s.user?.role);
 
   const layout = useLayoutMode();
 
   const activeTab = tabOf(location.pathname);
   const hidden = layout === 'desktop' || !isTabRoot(location.pathname);
+  const tabs = tabsForRole(role);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>, root: string): void {
     event.currentTarget.blur();
@@ -64,7 +79,7 @@ export function TabBar() {
   return (
     <ChromeBar side="bottom" className={`${styles.wrap} ${hidden ? styles.hidden : ''}`} style={CAPSULE_POSITION}>
       <nav className={styles.capsule} aria-hidden={hidden}>
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = tabOf(tab.root) === activeTab;
           return (
             <button

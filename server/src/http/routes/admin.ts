@@ -1,4 +1,6 @@
 import {
+  adminLogQuerySchema,
+  adminUpdateProfileSchema,
   banUserSchema,
   reportListQuerySchema,
   setProfileCardsSchema,
@@ -10,11 +12,19 @@ import { parseOrThrow } from '../../lib/validate.js';
 import { disconnectUserSockets } from '../../realtime/index.js';
 import {
   banUser,
-  findUserByUsername,
+  clearUserAvatar,
+  clearUserBio,
+  clearUserCard,
+  findAdminUserCardByUsername,
   getAdminSettings,
+  getAdminUserCard,
+  listAdminLog,
   listReports,
+  revealUserPii,
+  revokeUserSessions,
   setProfileCardsEnabled,
   setUserCardDisabled,
+  setUserDisplayName,
   unbanUser,
 } from '../../services/admin.js';
 import { adminActor, requireAdmin, requireAuth } from '../middleware/auth.js';
@@ -30,10 +40,66 @@ function paramId(req: Request): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 }
 
-adminRouter.get('/users', (req, res, next) => {
-  const username = typeof req.query.username === 'string' ? req.query.username : '';
-  findUserByUsername(username)
+function paramUsername(req: Request): string {
+  const value = req.params.username;
+  return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
+}
+
+adminRouter.get('/users/by-username/:username', (req, res, next) => {
+  findAdminUserCardByUsername(paramUsername(req))
     .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.get('/users/:id', (req, res, next) => {
+  getAdminUserCard(paramId(req))
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.get('/users/:id/pii', (req, res, next) => {
+  revealUserPii(adminActor(req), paramId(req))
+    .then((pii) => res.json(pii))
+    .catch(next);
+});
+
+adminRouter.patch('/users/:id/profile', validateBody(adminUpdateProfileSchema), (req, res, next) => {
+  setUserDisplayName(adminActor(req), paramId(req), req.body.displayName)
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.delete('/users/:id/avatar', (req, res, next) => {
+  clearUserAvatar(adminActor(req), paramId(req))
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.delete('/users/:id/card/content', (req, res, next) => {
+  clearUserCard(adminActor(req), paramId(req))
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.delete('/users/:id/bio', (req, res, next) => {
+  clearUserBio(adminActor(req), paramId(req))
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.post('/users/:id/sessions/revoke', (req, res, next) => {
+  revokeUserSessions(adminActor(req), paramId(req))
+    .then(async (user) => {
+      await disconnectUserSockets(user.id);
+      res.json(user);
+    })
+    .catch(next);
+});
+
+adminRouter.get('/log', (req, res, next) => {
+  const query = parseOrThrow(adminLogQuerySchema, req.query);
+  listAdminLog(query)
+    .then((page) => res.json(page))
     .catch(next);
 });
 

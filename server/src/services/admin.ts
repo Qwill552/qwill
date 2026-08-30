@@ -1,10 +1,17 @@
 import {
+  ADMIN_LOG_PAGE_SIZE,
   ErrorCode,
   PROFILE_CARDS_SETTING_KEY,
   REPORTS_PER_DAY_LIMIT,
+  toBioMode,
   toUserRole,
+  type AdminLogEntryDto,
+  type AdminLogPageDto,
+  type AdminLogQuery,
+  type AdminPiiDto,
   type AdminReportDto,
   type AdminSettingsDto,
+  type AdminUserCardDto,
   type AdminUserDto,
   type CreateReportInput,
   type ReportKind,
@@ -14,7 +21,8 @@ import {
 import { prisma } from '../db/prisma.js';
 import { AppError, badRequest, banned, forbidden, notFound, rateLimited } from '../lib/errors.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
-import type { Report, User } from '../generated/prisma/client.js';
+import { deleteCard } from './profileCard.js';
+import type { AdminAction, Report, Session, User } from '../generated/prisma/client.js';
 
 const REPORTS_PAGE_SIZE = 200;
 const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -45,10 +53,58 @@ export async function assertAdmin(userId: string): Promise<User> {
   return user;
 }
 
-export async function findUserByUsername(username: string): Promise<AdminUserDto> {
+async function requireUser(userId: string): Promise<User> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
+  return user;
+}
+
+async function buildUserCard(user: User): Promise<AdminUserCardDto> {
+  const [bannedBy, chatCount, messageCount, reportsAgainst, reportsFiled, sessionCount, card] =
+    await Promise.all([
+      user.bannedById
+        ? prisma.user.findUnique({ where: { id: user.bannedById }, select: { username: true } })
+        : Promise.resolve(null),
+      prisma.chatMember.count({ where: { userId: user.id } }),
+      prisma.message.count({ where: { senderId: user.id } }),
+      prisma.report.count({ where: { targetUserId: user.id } }),
+      prisma.report.count({ where: { reporterId: user.id } }),
+      prisma.session.count({ where: { userId: user.id, expiresAt: { gt: new Date() } } }),
+      prisma.profileCard.findUnique({ where: { userId: user.id }, select: { html: true } }),
+    ]);
+
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: toUserRole(user.role),
+    createdAt: user.createdAt.toISOString(),
+    lastSeenAt: user.lastSeenAt.toISOString(),
+    bannedAt: user.bannedAt ? user.bannedAt.toISOString() : null,
+    bannedReason: user.bannedReason,
+    bannedByUsername: bannedBy?.username ?? null,
+    cardDisabled: user.cardDisabled,
+    mustChangePassword: user.mustChangePassword,
+    bioMode: toBioMode(user.bioMode),
+    hasBio: Boolean(user.bio && user.bio.trim().length > 0),
+    hasCard: Boolean(card && card.html.trim().length > 0),
+    hasAvatar: user.avatarFileId !== null,
+    chatCount,
+    messageCount,
+    reportsAgainst,
+    reportsFiled,
+    sessionCount,
+  };
+}
+
+export async function findAdminUserCardByUsername(username: string): Promise<AdminUserCardDto> {
   const user = await prisma.user.findUnique({ where: { username: username.trim().toLowerCase() } });
   if (!user) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
-  return toAdminUser(user);
+  return buildUserCard(user);
+}
+
+export async function getAdminUserCard(userId: string): Promise<AdminUserCardDto> {
+  return buildUserCard(await requireUser(userId));
 }
 
 async function countOtherActiveAdmins(
@@ -63,7 +119,11 @@ async function countOtherActiveAdmins(
  * удаляются все refresh-сессии. Сообщения и файлы не трогаются — это ограничение доступа,
  * а не стирание истории.
  */
-export async function banUser(actor: AdminActor, targetUserId: string, reason: string): Promise<AdminUserDto> {
+export async function banUser(
+  actor: AdminActor,
+  targetUserId: string,
+  reason: string,
+): Promise<AdminUserCardDto> {
   if (targetUserId === actor.adminId) throw badRequest(ErrorCode.FORBIDDEN, 'Нельзя забанить себя');
 
   const user = await prisma.$transaction(async (tx) => {
@@ -81,10 +141,10 @@ export async function banUser(actor: AdminActor, targetUserId: string, reason: s
   });
 
   await recordAdminAction(actor, { action: 'user.ban', targetUserId, detail: { reason } });
-  return toAdminUser(user);
+  return buildUserCard(user);
 }
 
-export async function unbanUser(actor: AdminActor, targetUserId: string): Promise<AdminUserDto> {
+export async function unbanUser(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
   const target = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!target) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
 
@@ -94,20 +154,20 @@ export async function unbanUser(actor: AdminActor, targetUserId: string): Promis
   });
 
   await recordAdminAction(actor, { action: 'user.unban', targetUserId });
-  return toAdminUser(user);
+  return buildUserCard(user);
 }
 
 export async function setUserCardDisabled(
   actor: AdminActor,
   targetUserId: string,
   disabled: boolean,
-): Promise<AdminUserDto> {
+): Promise<AdminUserCardDto> {
   const target = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!target) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
 
   const user = await prisma.user.update({ where: { id: targetUserId }, data: { cardDisabled: disabled } });
   await recordAdminAction(actor, { action: 'user.card', targetUserId, detail: { disabled } });
-  return toAdminUser(user);
+  return buildUserCard(user);
 }
 
 /**
@@ -251,4 +311,125 @@ export async function revokeAdminRole(username: string): Promise<RoleChangeResul
     );
   }
   return { user: toAdminUser(result.user), changed: result.changed };
+}
+
+const PII_SESSION_LIMIT = 20;
+
+function toSessionDto(session: Session) {
+  return {
+    id: session.id,
+    createdAt: session.createdAt.toISOString(),
+    expiresAt: session.expiresAt.toISOString(),
+    ip: session.ip,
+    lastSeenIp: session.lastSeenIp,
+    userAgent: session.userAgent,
+  };
+}
+
+export async function revealUserPii(actor: AdminActor, targetUserId: string): Promise<AdminPiiDto> {
+  const user = await requireUser(targetUserId);
+  const sessions = await prisma.session.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    take: PII_SESSION_LIMIT,
+  });
+
+  await recordAdminAction(actor, { action: 'user.pii.reveal', targetUserId });
+  return {
+    signupIp: null,
+    signupUserAgent: null,
+    sessions: sessions.map(toSessionDto),
+  };
+}
+
+export async function setUserDisplayName(
+  actor: AdminActor,
+  targetUserId: string,
+  displayName: string,
+): Promise<AdminUserCardDto> {
+  const before = await requireUser(targetUserId);
+  const user = await prisma.user.update({ where: { id: targetUserId }, data: { displayName } });
+
+  await recordAdminAction(actor, {
+    action: 'user.displayName',
+    targetUserId,
+    detail: { from: before.displayName, to: displayName },
+  });
+  return buildUserCard(user);
+}
+
+export async function clearUserAvatar(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
+  await requireUser(targetUserId);
+  const user = await prisma.user.update({ where: { id: targetUserId }, data: { avatarFileId: null } });
+
+  await recordAdminAction(actor, { action: 'user.avatar.clear', targetUserId });
+  return buildUserCard(user);
+}
+
+export async function clearUserCard(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
+  await requireUser(targetUserId);
+  await deleteCard(targetUserId);
+
+  await recordAdminAction(actor, { action: 'user.card.clear', targetUserId });
+  return getAdminUserCard(targetUserId);
+}
+
+export async function clearUserBio(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
+  await requireUser(targetUserId);
+  const user = await prisma.user.update({ where: { id: targetUserId }, data: { bio: null } });
+
+  await recordAdminAction(actor, { action: 'user.bio.clear', targetUserId });
+  return buildUserCard(user);
+}
+
+export async function revokeUserSessions(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
+  const user = await requireUser(targetUserId);
+  const { count } = await prisma.session.deleteMany({ where: { userId: targetUserId } });
+
+  await recordAdminAction(actor, { action: 'user.sessions.revoke', targetUserId, detail: { count } });
+  return buildUserCard(user);
+}
+
+function toLogEntryDto(entry: AdminAction): AdminLogEntryDto {
+  return {
+    id: entry.id,
+    createdAt: entry.createdAt.toISOString(),
+    adminId: entry.adminId,
+    adminUsername: entry.adminUsername,
+    action: entry.action,
+    targetUserId: entry.targetUserId,
+    targetUsername: entry.targetUsername,
+    targetChatId: entry.targetChatId,
+    detail: entry.detail,
+    ip: entry.ip,
+    userAgent: entry.userAgent,
+  };
+}
+
+function dayBounds(from: string | undefined, to: string | undefined): { gte?: Date; lte?: Date } {
+  const range: { gte?: Date; lte?: Date } = {};
+  const start = from ? new Date(`${from}T00:00:00.000Z`) : null;
+  const end = to ? new Date(`${to}T23:59:59.999Z`) : null;
+  if (start && !Number.isNaN(start.getTime())) range.gte = start;
+  if (end && !Number.isNaN(end.getTime())) range.lte = end;
+  return range;
+}
+
+export async function listAdminLog(query: AdminLogQuery): Promise<AdminLogPageDto> {
+  const range = dayBounds(query.from, query.to);
+  const entries = await prisma.adminAction.findMany({
+    where: {
+      ...(query.admin ? { adminUsername: { contains: query.admin, mode: 'insensitive' as const } } : {}),
+      ...(query.action ? { action: query.action } : {}),
+      ...(range.gte || range.lte ? { createdAt: range } : {}),
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: ADMIN_LOG_PAGE_SIZE,
+    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+  });
+
+  return {
+    entries: entries.map(toLogEntryDto),
+    nextCursor: entries.length === ADMIN_LOG_PAGE_SIZE ? (entries[entries.length - 1]?.id ?? null) : null,
+  };
 }
