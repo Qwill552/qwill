@@ -506,6 +506,20 @@ export async function clearUserAvatar(actor: AdminActor, targetUserId: string): 
   return buildUserCard(user);
 }
 
+/**
+ * «Снять визитку» — мера показа, а не стирание: код остаётся в `ProfileCard`, меняется только
+ * режим «О себе». Владелец увидит текстовый режим и, если персональный выключатель не стоит,
+ * сможет вернуть визитку сам. Безвозвратное стирание — `clearUserCard` (R-32D).
+ */
+export async function hideUserCard(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
+  await requireUser(targetUserId);
+  const user = await prisma.user.update({ where: { id: targetUserId }, data: { bioMode: 'text' } });
+
+  await recordAdminAction(actor, { action: 'user.card.hide', targetUserId });
+  return buildUserCard(user);
+}
+
+/** Стирает сам код визитки без возможности восстановления — быстрое действие из разбора жалобы. */
 export async function clearUserCard(actor: AdminActor, targetUserId: string): Promise<AdminUserCardDto> {
   await requireUser(targetUserId);
   await deleteCard(targetUserId);

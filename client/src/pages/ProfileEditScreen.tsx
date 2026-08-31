@@ -101,6 +101,10 @@ export function ProfileEditScreen() {
   const [openPanel, setOpenPanel] = useState<'images' | 'fonts' | null>(null);
 
   const profile = storedProfile?.id === user?.id ? storedProfile : null;
+  /** Персональный выключатель администрации: режим не переключается, редактор не показывается
+   *  вовсе. Сервер отвергает и смену режима, и сохранение — здесь только честный вид (R-32D). */
+  const cardBlocked = Boolean(user?.cardDisabled);
+  const showAdvanced = advanced && !cardBlocked;
 
   useEffect(() => {
     if (user?.id) loadProfile(user.id);
@@ -348,7 +352,7 @@ export function ProfileEditScreen() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        {!advanced && (
+        {!showAdvanced && (
           <>
             <Card className={styles.cardReset}>
               <div className={styles.bioBox}>
@@ -375,18 +379,22 @@ export function ProfileEditScreen() {
         <Card className={styles.cardReset}>
           <Card.Row
             title="Продвинутый режим"
-            subtitle="HTML-визитка вместо текста «О себе»"
+            subtitle={cardBlocked ? 'Визитка выключена администрацией' : 'HTML-визитка вместо текста «О себе»'}
             trailing={
-              <Switch
-                checked={advanced}
-                onChange={(next) => void handleAdvancedToggle(next)}
-                label="Продвинутый режим"
-              />
+              cardBlocked ? (
+                <span className={styles.cardBlockedMark}>Доступ ограничен</span>
+              ) : (
+                <Switch
+                  checked={advanced}
+                  onChange={(next) => void handleAdvancedToggle(next)}
+                  label="Продвинутый режим"
+                />
+              )
             }
           />
         </Card>
 
-        {advanced && (
+        {showAdvanced && (
           <>
             <div className={styles.codeBox}>
               <textarea

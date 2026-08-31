@@ -1,11 +1,19 @@
-import type { ReportGroupDto, ReportGroupView } from '@messenger/shared';
-import { useEffect, useState } from 'react';
+import type { AdminUserCardDto, ReportGroupDto, ReportGroupView } from '@messenger/shared';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { closeReportRequest, markReportWorkingRequest } from '../../api/admin';
+import {
+  clearAdminUserCardRequest,
+  closeReportRequest,
+  getAdminUserRequest,
+  markReportWorkingRequest,
+  setUserCardRequest,
+} from '../../api/admin';
 import { getUserProfileRequest } from '../../api/users';
 import { Card } from '../../ui/Card';
+import { IconButton } from '../../ui/IconButton';
 import { Sheet } from '../../ui/Sheet';
+import { Switch } from '../../ui/Switch';
 import { ProfileCardFrame } from '../profile/ProfileCardFrame';
 import styles from './ReportDetail.module.css';
 
@@ -33,22 +41,43 @@ interface ReportDetailProps {
 export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailProps) {
   const navigate = useNavigate();
   const [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [target, setTarget] = useState<AdminUserCardDto | null>(null);
   const [resolution, setResolution] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workedNow, setWorkedNow] = useState(false);
   const [closedNow, setClosedNow] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (group.kind !== 'card') return;
+  const loadCard = useCallback(() => {
     getUserProfileRequest(group.targetUserId)
       .then((profile) => setCardUrl(profile.cardUrl))
       .catch(() => setCardUrl(null));
-  }, [group.kind, group.targetUserId]);
+  }, [group.targetUserId]);
 
-  function openUserCard(): void {
+  useEffect(() => {
+    if (group.kind !== 'card') return;
+    loadCard();
+    getAdminUserRequest(group.targetUserId)
+      .then(setTarget)
+      .catch(() => setTarget(null));
+  }, [group.kind, group.targetUserId, loadCard]);
+
+  function openProfile(userId: string): void {
     onClose();
-    navigate(`/admin/users/${group.targetUserId}`);
+    navigate(`/admin/users/${userId}/profile`);
+  }
+
+  async function runCardAction(action: () => Promise<AdminUserCardDto>): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      setTarget(await action());
+      loadCard();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleWork(): Promise<void> {
@@ -81,34 +110,82 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
     }
   }
 
+  const cardActions = (
+    <div className={styles.quickActions}>
+      <div className={styles.quickRow}>
+        <span className={styles.quickLabel}>Визитка выключена</span>
+        <Switch
+          checked={target?.cardDisabled ?? false}
+          onChange={(next) => void runCardAction(() => setUserCardRequest(group.targetUserId, next))}
+          label="Визитка выключена"
+          disabled={busy || !target}
+        />
+      </div>
+      <button
+        type="button"
+        className={styles.dangerButton}
+        disabled={busy || !target?.hasCard}
+        onClick={() => void runCardAction(() => clearAdminUserCardRequest(group.targetUserId))}
+      >
+        {target?.hasCard ? 'Удалить визитку' : 'Код визитки уже пуст'}
+      </button>
+      <p className={styles.quickHint}>
+        Рубильник прячет визитку и запирает редактор — код остаётся. «Удалить визитку» стирает
+        код без возможности восстановления.
+      </p>
+    </div>
+  );
+
   return (
-    <Sheet title={reportGroupTitle(group)} onClose={onClose}>
+    <Sheet
+      title={reportGroupTitle(group)}
+      onClose={onClose}
+      action={
+        <IconButton
+          icon="user"
+          label={`Профиль @${group.targetUsername}`}
+          onClick={() => openProfile(group.targetUserId)}
+        />
+      }
+    >
       <div className={styles.body}>
         {group.kind === 'card' && (
           <>
             {cardUrl ? (
-              <ProfileCardFrame cardUrl={cardUrl} authorId={group.targetUserId} authorName={group.targetDisplayName} />
+              <ProfileCardFrame
+                cardUrl={cardUrl}
+                authorId={group.targetUserId}
+                authorName={group.targetDisplayName}
+                footer={cardActions}
+              />
             ) : (
               <Card caption="Объект жалобы">
-                <Card.Row title="Визитки нет" subtitle="Выключена или ещё не создана" />
+                <Card.Row
+                  title="Визитка не показывается"
+                  subtitle={target?.cardDisabled ? 'Выключена рубильником ниже' : 'Кода нет или режим «О себе» текстовый'}
+                />
+                {cardActions}
               </Card>
             )}
-            <Card caption="Пользователь">
-              <Card.Row title="Открыть в панели пользователя" onClick={openUserCard} />
-            </Card>
           </>
         )}
 
         {group.kind === 'profile' && (
           <Card caption="Объект жалобы">
-            <Card.Row title={`Карточка пользователя @${group.targetUsername}`} onClick={openUserCard} />
+            <Card.Row
+              title={`Профиль @${group.targetUsername}`}
+              onClick={() => openProfile(group.targetUserId)}
+            />
           </Card>
         )}
 
         {group.kind === 'message' && (
           <Card caption="Объект жалобы">
             <Card.Row title={group.chatTitle ?? 'Чат'} subtitle="Чтение переписки появится в 32G" />
-            <Card.Row title="Открыть в панели пользователя" onClick={openUserCard} />
+            <Card.Row
+              title={`Профиль @${group.targetUsername}`}
+              onClick={() => openProfile(group.targetUserId)}
+            />
           </Card>
         )}
 
@@ -118,16 +195,22 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
               key={report.id}
               title={`@${report.reporterUsername}`}
               subtitle={
-                report.targetMessageId != null ? `«${report.comment}» · сообщение #${report.targetMessageId}` : `«${report.comment}»`
+                report.targetMessageId != null
+                  ? `«${report.comment}» · сообщение #${report.targetMessageId}`
+                  : `«${report.comment}»`
               }
               value={formatDateTime(report.createdAt)}
+              onClick={() => openProfile(report.reporterId)}
             />
           ))}
         </Card>
 
         {view === 'closed' ? (
           <Card caption="Решение">
-            <Card.Row title={group.resolution ?? '—'} subtitle={group.closedAt ? formatDateTime(group.closedAt) : undefined} />
+            <Card.Row
+              title={group.resolution ?? '—'}
+              subtitle={group.closedAt ? formatDateTime(group.closedAt) : undefined}
+            />
           </Card>
         ) : closedNow ? (
           <Card caption="Разбор">
@@ -136,11 +219,7 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
         ) : (
           <Card caption="Разбор">
             {group.hasNew && !workedNow && (
-              <Card.Row
-                title="Взять в работу"
-                onClick={!busy ? () => void handleWork() : undefined}
-                chevron={false}
-              />
+              <Card.Row title="Взять в работу" onClick={!busy ? () => void handleWork() : undefined} chevron={false} />
             )}
             {workedNow && <Card.Row title="Взято в работу" chevron={false} />}
             <div className={styles.closeForm}>

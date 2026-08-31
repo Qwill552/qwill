@@ -43,6 +43,8 @@ export function parentPathOf(pathname: string): string | null {
   const contact = matchPath('/contacts/:userId', path);
   if (contact) return '/contacts';
 
+  if (matchPath('/admin/users/:id/profile', path)) return '/admin';
+
   const adminUser = matchPath('/admin/users/:id', path);
   if (adminUser) return '/admin';
 

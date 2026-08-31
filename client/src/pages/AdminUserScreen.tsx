@@ -6,8 +6,8 @@ import {
   banUserRequest,
   clearAdminUserAvatarRequest,
   clearAdminUserBioRequest,
-  clearAdminUserCardRequest,
   getAdminUserRequest,
+  hideAdminUserCardRequest,
   muteUserSupportRequest,
   revokeAdminUserSessionsRequest,
   setAdminUserDisplayNameRequest,
@@ -111,8 +111,8 @@ export function AdminUserScreen() {
     void run(() => clearAdminUserAvatarRequest(userId));
   }
 
-  function handleClearCard(): void {
-    void run(() => clearAdminUserCardRequest(userId));
+  function handleHideCard(): void {
+    void run(() => hideAdminUserCardRequest(userId));
   }
 
   function handleClearBio(): void {
@@ -254,10 +254,12 @@ export function AdminUserScreen() {
             />
             <Card.Row
               title="Снять визитку"
-              subtitle={user.hasCard ? undefined : 'Визитки нет'}
-              onClick={user.hasCard && !busy ? handleClearCard : undefined}
+              subtitle={
+                user.bioMode === 'html' ? 'Вернёт текстовый режим, код визитки сохранится' : 'Визитка и так не показывается'
+              }
+              onClick={user.bioMode === 'html' && !busy ? handleHideCard : undefined}
               chevron={false}
-              danger={user.hasCard}
+              danger={user.bioMode === 'html'}
             />
             <Card.Row
               title="Снять «О себе»"

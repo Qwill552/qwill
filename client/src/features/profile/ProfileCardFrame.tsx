@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { createReportRequest } from '../../api/admin';
 import { ApiError } from '../../api/client';
@@ -20,9 +20,12 @@ interface ProfileCardFrameProps {
   /** Свой профиль и предпросмотр редактора запускаются сами, как только окно попадает
    *  в зону видимости, и так же сами возвращаются после прокрутки туда-обратно. */
   autoStart?: boolean;
+  /** Ряд под кнопками «Остановить»/«Пожаловаться». Занят только разбором жалобы: там под
+   *  визиткой стоят быстрые меры администратора (R-32D). В обычном профиле пуст. */
+  footer?: ReactNode;
 }
 
-export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = false }: ProfileCardFrameProps) {
+export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = false, footer }: ProfileCardFrameProps) {
   const [running, setRunning] = useState(false);
   const [ready, setReady] = useState(false);
   const [escaped, setEscaped] = useState(false);
@@ -164,6 +167,8 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
           Пожаловаться
         </button>
       </div>
+
+      {footer}
 
       {reporting && <ReportSheet authorName={authorName} onClose={() => setReporting(false)} onSend={sendReport} />}
     </div>

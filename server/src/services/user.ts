@@ -21,7 +21,7 @@ import { AppError, banned, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { assertAvatarEligible } from './file.js';
-import { cardUrlForProfile } from './profileCard.js';
+import { assertCardEditable, cardUrlForProfile } from './profileCard.js';
 import type { User } from '../generated/prisma/client.js';
 
 export function toPublicUser(user: User): PublicUser {
@@ -35,6 +35,7 @@ export function toPublicUser(user: User): PublicUser {
     createdAt: user.createdAt.toISOString(),
     lastSeenAt: user.lastSeenAt.toISOString(),
     role: toUserRole(user.role),
+    cardDisabled: user.cardDisabled,
   };
 }
 
@@ -120,6 +121,8 @@ export async function setAvatar(userId: string, fileId: string, sha256: string):
 }
 
 export async function updateProfile(userId: string, data: UpdateProfileDTO): Promise<PublicUser> {
+  if (data.bioMode !== undefined) await assertCardEditable(userId);
+
   const user = await prisma.user.update({
     where: { id: userId },
     data: {

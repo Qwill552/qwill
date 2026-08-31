@@ -379,3 +379,13 @@
   background: var(--primary);
   color: var(--text-on-primary);
 }
+
+.cardBlockedMark {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--font-caption);
+  font-weight: 600;
+}

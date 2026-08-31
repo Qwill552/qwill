@@ -64,6 +64,9 @@ export interface PublicUser {
   lastSeenAt: string;
   /** Только для отрисовки кнопок: права проверяет сервер, подмена поля в ответе ничего не даёт. */
   role: UserRole;
+  /** Визитка выключена администрацией: редактор HTML заперт, режим «О себе» переключить нельзя.
+   *  Отдаётся только про себя — `toPublicUser` не применяется к чужим пользователям. */
+  cardDisabled: boolean;
 }
 
 export interface AuthResponse {

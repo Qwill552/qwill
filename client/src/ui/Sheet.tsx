@@ -10,6 +10,8 @@ import styles from './Sheet.module.css';
 interface SheetProps {
   title?: string;
   onClose: () => void;
+  /** Кнопка справа от заголовка. */
+  action?: ReactNode;
   children: ReactNode;
 }
 
@@ -22,7 +24,7 @@ type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 
 /** Боттом-шит: перетаскивание вниз с инерцией, закрытие по Escape, скриму и броску.
  *  Один из четырёх разрешённых размывающих слоёв. */
-export function Sheet({ title, onClose, children }: SheetProps) {
+export function Sheet({ title, onClose, action, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
@@ -131,7 +133,12 @@ export function Sheet({ title, onClose, children }: SheetProps) {
             <span className={styles.gripBar} />
           </div>
         )}
-        {title && <h2 className={styles.title}>{title}</h2>}
+        {(title || action) && (
+          <div className={styles.titleRow}>
+            {title && <h2 className={styles.title}>{title}</h2>}
+            {action}
+          </div>
+        )}
         <div ref={bodyRef} className={`${styles.body} hide-native-scrollbar`}>
           <ScrollIndicator target={bodyRef} />
           {children}

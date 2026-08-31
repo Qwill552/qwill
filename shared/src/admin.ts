@@ -144,6 +144,7 @@ export const ADMIN_ACTION_VALUES = [
   'user.ban',
   'user.unban',
   'user.card',
+  'user.card.hide',
   'user.card.clear',
   'user.bio.clear',
   'user.displayName',

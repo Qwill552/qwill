@@ -22,6 +22,7 @@ import {
   findAdminUserCardByUsername,
   getAdminSettings,
   getAdminUserCard,
+  hideUserCard,
   listAdminLog,
   listReportGroups,
   markReportGroupWorking,
@@ -77,6 +78,12 @@ adminRouter.patch('/users/:id/profile', validateBody(adminUpdateProfileSchema), 
 
 adminRouter.delete('/users/:id/avatar', (req, res, next) => {
   clearUserAvatar(adminActor(req), paramId(req))
+    .then((user) => res.json(user))
+    .catch(next);
+});
+
+adminRouter.post('/users/:id/card/hide', (req, res, next) => {
+  hideUserCard(adminActor(req), paramId(req))
     .then((user) => res.json(user))
     .catch(next);
 });

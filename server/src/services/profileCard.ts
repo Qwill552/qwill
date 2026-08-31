@@ -4,7 +4,7 @@ import { PROFILE_CARD_MAX_BYTES, toBioMode, type ProfileCardPreviewDto } from '@
 
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
-import { tooLarge } from '../lib/errors.js';
+import { forbidden, tooLarge } from '../lib/errors.js';
 import { sanitizeProfileCard } from '../lib/sanitizeProfileCard.js';
 import { getProfileCardsEnabled } from './admin.js';
 import type { User } from '../generated/prisma/client.js';
@@ -52,6 +52,16 @@ export async function cardUrlForProfile(user: Pick<User, 'id'>): Promise<string 
   return card ? cardUrlFor(user.id, card.updatedAt) : null;
 }
 
+/**
+ * Персональный выключатель — это мера, а не подсказка: пока он стоит, владелец не может ни
+ * переключить режим «О себе» на html, ни сохранить новый код. Без этого визитка правилась бы
+ * и сохранялась, но не показывалась — человек чинил бы то, что не сломано (R-32D).
+ */
+export async function assertCardEditable(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { cardDisabled: true } });
+  if (user?.cardDisabled) throw forbidden('Визитка выключена администрацией');
+}
+
 /** Исходник для редактора — до всех выключателей и без оглядки на режим: владелец правит
  *  свой черновик даже тогда, когда показывать его сейчас никому не будут. */
 export async function getOwnCardHtml(userId: string): Promise<string> {
@@ -66,6 +76,7 @@ export function assertCardSizeAllowed(byteLength: number): void {
 }
 
 export async function saveCard(userId: string, rawHtml: string): Promise<VisibleCard> {
+  await assertCardEditable(userId);
   assertCardSizeAllowed(Buffer.byteLength(rawHtml, 'utf8'));
 
   const html = sanitizeProfileCard(rawHtml);

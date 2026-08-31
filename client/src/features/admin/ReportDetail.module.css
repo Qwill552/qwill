@@ -51,3 +51,53 @@
   cursor: default;
   opacity: 0.6;
 }
+
+.quickActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.quickRow {
+  display: flex;
+  min-height: var(--tap-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.quickLabel {
+  color: var(--text-primary);
+  font-size: var(--font-name);
+}
+
+.quickHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.dangerButton {
+  height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: var(--text-on-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.dangerButton:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.dangerButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

@@ -35,6 +35,7 @@ import { ProfileEditScreen } from '../pages/ProfileEditScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StubScreen } from '../pages/StubScreen';
+import { UserProfileScreen } from '../pages/UserProfileScreen';
 import {
   applyDesktopListWidth,
   clampDesktopListWidth,
@@ -107,6 +108,7 @@ const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
   if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
+  if (matchPath('/admin/users/:id/profile', pathname)) return { title: 'Профиль', backTo: '/admin' };
   if (matchPath('/admin/users/:id', pathname)) return { title: 'Пользователь', backTo: '/admin' };
   const subroute = OVERLAY_SUBROUTE_TITLE[pathname];
   if (subroute) return { title: subroute, backTo: parentPathOf(pathname) };
@@ -139,6 +141,7 @@ const RouteSwitch = memo(
         <Route path="/profile/edit" element={<ProfileEditScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/users/:id" element={<AdminUserScreen />} />
+        <Route path="/admin/users/:id/profile" element={<UserProfileScreen />} />
         <Route path="/admin/log" element={<AdminLogScreen />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>

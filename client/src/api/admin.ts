@@ -35,6 +35,10 @@ export function clearAdminUserAvatarRequest(userId: string): Promise<AdminUserCa
   return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/avatar`, { method: 'DELETE' });
 }
 
+export function hideAdminUserCardRequest(userId: string): Promise<AdminUserCardDto> {
+  return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/card/hide`, { method: 'POST' });
+}
+
 export function clearAdminUserCardRequest(userId: string): Promise<AdminUserCardDto> {
   return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/card/content`, { method: 'DELETE' });
 }

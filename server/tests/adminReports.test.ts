@@ -40,6 +40,7 @@ async function fileReport(
 
 describe('разбор жалоб (R-32D)', () => {
   afterAll(async () => {
+    await prisma.profileCard.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.report.deleteMany({ where: { reporterId: { in: createdUserIds } } });
     await prisma.adminAction.deleteMany({ where: { adminId: { in: createdUserIds } } });
     await prisma.chatMember.deleteMany({ where: { userId: { in: createdUserIds } } });
@@ -201,5 +202,86 @@ describe('разбор жалоб (R-32D)', () => {
       .set('Authorization', `Bearer ${user.token}`)
       .send({ status: 'working' });
     expect(working.status).toBe(403);
+  });
+
+  describe('быстрые меры по визитке', () => {
+    async function withCard(suffix: string): Promise<TestUser> {
+      const owner = await registerUser(suffix, 'Владелец визитки');
+      const saved = await request
+        .put('/api/users/me/card')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .set('Content-Type', 'text/html')
+        .send('<p>Визитка</p>');
+      expect(saved.status).toBe(200);
+      await prisma.user.update({ where: { id: owner.userId }, data: { bioMode: 'html' } });
+      return owner;
+    }
+
+    it('«Снять визитку» возвращает текстовый режим и сохраняет код', async () => {
+      const admin = await registerUser('hideadmin', 'Снимающий');
+      await makeAdmin(admin);
+      const owner = await withCard('hideowner');
+
+      const res = await request
+        .post(`/api/admin/users/${owner.userId}/card/hide`)
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.bioMode).toBe('text');
+      expect(res.body.hasCard).toBe(true);
+
+      const card = await prisma.profileCard.findUnique({ where: { userId: owner.userId } });
+      expect(card?.html).toContain('Визитка');
+
+      const action = await prisma.adminAction.findFirst({
+        where: { adminId: admin.userId, action: 'user.card.hide', targetUserId: owner.userId },
+      });
+      expect(action).not.toBeNull();
+    });
+
+    it('«Удалить визитку» стирает код без возврата', async () => {
+      const admin = await registerUser('wipeadmin', 'Стирающий');
+      await makeAdmin(admin);
+      const owner = await withCard('wipeowner');
+
+      const res = await request
+        .delete(`/api/admin/users/${owner.userId}/card/content`)
+        .set('Authorization', `Bearer ${admin.token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.hasCard).toBe(false);
+
+      const card = await prisma.profileCard.findUnique({ where: { userId: owner.userId } });
+      expect(card).toBeNull();
+    });
+
+    it('рубильник запирает редактор: режим не переключить и код не сохранить', async () => {
+      const admin = await registerUser('lockadmin', 'Запирающий');
+      await makeAdmin(admin);
+      const owner = await withCard('lockowner');
+
+      const off = await request
+        .patch(`/api/admin/users/${owner.userId}/card`)
+        .set('Authorization', `Bearer ${admin.token}`)
+        .send({ disabled: true });
+      expect(off.status).toBe(200);
+
+      const me = await request.get('/api/users/me').set('Authorization', `Bearer ${owner.token}`);
+      expect(me.body.cardDisabled).toBe(true);
+
+      const mode = await request
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({ bioMode: 'html' });
+      expect(mode.status).toBe(403);
+
+      const save = await request
+        .put('/api/users/me/card')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .set('Content-Type', 'text/html')
+        .send('<p>Обход</p>');
+      expect(save.status).toBe(403);
+
+      const card = await prisma.profileCard.findUnique({ where: { userId: owner.userId } });
+      expect(card?.html).toContain('Визитка');
+    });
   });
 });
