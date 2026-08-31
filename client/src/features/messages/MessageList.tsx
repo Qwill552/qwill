@@ -377,15 +377,6 @@ export function MessageList({
       : [];
     const revived = [...leavingRows.keys()].filter((key) => liveKeys.has(key));
 
-    if (previousRows.length !== renderRows.length) {
-      console.log(
-        '[qwill-dissolve] строк было', previousRows.length,
-        'стало', renderRows.length,
-        '| wasReconciled', wasReconciled,
-        '| gone', gone.length,
-      );
-    }
-
     if (gone.length > 0 || revived.length > 0) {
       setLeavingRows((current) => {
         const next = new Map(current);
@@ -583,7 +574,6 @@ const MessageListRow = memo(function MessageListRow({
     }
 
     const dissolveMs = cssDurationMs('--dur-dissolve');
-    console.log('[qwill-dissolve] строка уходит', entry.key, '| dissolveMs', dissolveMs);
     let done = false;
     function finish(): void {
       if (done) return;
