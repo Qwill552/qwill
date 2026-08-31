@@ -67,6 +67,11 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
     navigate(`/admin/users/${userId}/profile`);
   }
 
+  function openAdminCard(userId: string): void {
+    onClose();
+    navigate(`/admin/users/${userId}`);
+  }
+
   async function runCardAction(action: () => Promise<AdminUserCardDto>): Promise<void> {
     setBusy(true);
     setError(null);
@@ -170,24 +175,24 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
           </>
         )}
 
-        {group.kind === 'profile' && (
-          <Card caption="Объект жалобы">
-            <Card.Row
-              title={`Профиль @${group.targetUsername}`}
-              onClick={() => openProfile(group.targetUserId)}
-            />
-          </Card>
-        )}
-
         {group.kind === 'message' && (
           <Card caption="Объект жалобы">
             <Card.Row title={group.chatTitle ?? 'Чат'} subtitle="Чтение переписки появится в 32G" />
-            <Card.Row
-              title={`Профиль @${group.targetUsername}`}
-              onClick={() => openProfile(group.targetUserId)}
-            />
           </Card>
         )}
+
+        <Card caption="Нарушитель">
+          <Card.Row
+            title={`Профиль @${group.targetUsername}`}
+            subtitle="Как его видят обычные люди"
+            onClick={() => openProfile(group.targetUserId)}
+          />
+          <Card.Row
+            title="Панель управления пользователем"
+            subtitle="Бан, счётчики, сессии, IP"
+            onClick={() => openAdminCard(group.targetUserId)}
+          />
+        </Card>
 
         <Card caption={`Жалобы (${group.reports.length})`}>
           {group.reports.map((report) => (

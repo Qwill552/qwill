@@ -175,6 +175,15 @@
   border-color: var(--primary);
 }
 
+/* Глобальное :focus-visible из tokens.css рисует кольцо и вокруг этой textarea, а
+   overflow:hidden у .codeBox срезает у него всё, кроме нижней грани — она и читалась как
+   синяя полоса поперёк редактора. Одного `outline:none` в .codeInput не хватает: у него та
+   же специфичность, что и у глобального правила. Фокус при этом виден — рамка всей коробки
+   уходит в --primary строкой выше. */
+.codeInput:focus-visible {
+  outline: none;
+}
+
 .codeFoot {
   display: flex;
   align-items: center;
