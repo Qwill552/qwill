@@ -33,11 +33,10 @@ export function notifyAdminLoginSuccess(context: LoginContext): void {
 }
 
 export function notifyAdminLoginFailure(context: LoginContext): void {
-  notifyAdmin('admin_login_fail', (count) => {
-    const header =
-      count > 1 ? `Неудачных попыток входа в админский аккаунт за 10 минут: ${count}.` : 'Неудачная попытка входа в админский аккаунт.';
-    return `${header}\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`;
-  });
+  notifyAdmin(
+    'admin_login_fail',
+    () => `Неудачная попытка входа в админский аккаунт.\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`,
+  );
 }
 
 export function notifyNewReport(): void {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const BATCH_WINDOW_MS = 10 * 60 * 1000;
+const THROTTLE_WINDOW_MS = 10 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 function mockEnv(overrides: Partial<{
@@ -24,6 +24,10 @@ async function loadTelegram() {
   return import('../src/lib/telegram.js');
 }
 
+async function flushMicrotasks(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
+}
+
 describe('lib/telegram (R-32F)', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -37,12 +41,12 @@ describe('lib/telegram (R-32F)', () => {
     vi.doUnmock('../src/config/env.js');
   });
 
-  it('без токена ничего не шлёт даже после истечения окна склейки', async () => {
+  it('без токена ничего не шлёт', async () => {
     mockEnv({ TELEGRAM_NOTIFY_ENABLED: true, TELEGRAM_BOT_TOKEN: undefined, TELEGRAM_ADMIN_CHAT_ID: '123' });
     const { notifyAdmin } = await loadTelegram();
 
     notifyAdmin('test', () => 'событие');
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+    await flushMicrotasks();
 
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -52,9 +56,20 @@ describe('lib/telegram (R-32F)', () => {
     const { notifyAdmin } = await loadTelegram();
 
     notifyAdmin('test', () => 'событие');
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+    await flushMicrotasks();
 
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('отправка уходит сразу, без задержки', async () => {
+    mockEnv({ TELEGRAM_NOTIFY_ENABLED: true, TELEGRAM_BOT_TOKEN: '123:abc', TELEGRAM_ADMIN_CHAT_ID: '123' });
+    vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+    const { notifyAdmin } = await loadTelegram();
+
+    notifyAdmin('admin_login_success', () => 'Вход в админский аккаунт.');
+    await flushMicrotasks();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('неверный токен: Telegram отвечает 401, отправка не бросает исключение', async () => {
@@ -63,7 +78,7 @@ describe('lib/telegram (R-32F)', () => {
     const { notifyAdmin } = await loadTelegram();
 
     expect(() => notifyAdmin('test', () => 'событие')).not.toThrow();
-    await expect(vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS)).resolves.not.toThrow();
+    await expect(flushMicrotasks()).resolves.not.toThrow();
 
     expect(fetch).toHaveBeenCalledTimes(1);
     const url = vi.mocked(fetch).mock.calls[0]![0] as string;
@@ -76,26 +91,38 @@ describe('lib/telegram (R-32F)', () => {
     const { notifyAdmin } = await loadTelegram();
 
     notifyAdmin('test', () => 'событие');
-    await expect(vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS)).resolves.not.toThrow();
+    await expect(flushMicrotasks()).resolves.not.toThrow();
 
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('склейка: несколько событий одного типа за окно уходят одним сообщением со счётчиком', async () => {
+  it('склейка: повторные события одного типа в течение 10 минут не шлют новых сообщений', async () => {
     mockEnv({ TELEGRAM_NOTIFY_ENABLED: true, TELEGRAM_BOT_TOKEN: '123:abc', TELEGRAM_ADMIN_CHAT_ID: '123' });
     vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 200 }));
     const { notifyAdmin } = await loadTelegram();
 
-    const render = vi.fn((count: number) => `Новых жалоб: ${count}`);
     for (let i = 0; i < 7; i += 1) {
-      notifyAdmin('new_report', render);
+      notifyAdmin('new_report', () => 'Новая жалоба.');
+      await flushMicrotasks();
     }
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(render).toHaveBeenLastCalledWith(7);
-    const body = JSON.parse(vi.mocked(fetch).mock.calls[0]![1]!.body as string) as { text: string };
-    expect(body.text).toBe('Новых жалоб: 7');
+  });
+
+  it('после истечения окна склейки новое событие того же типа снова отправляется', async () => {
+    mockEnv({ TELEGRAM_NOTIFY_ENABLED: true, TELEGRAM_BOT_TOKEN: '123:abc', TELEGRAM_ADMIN_CHAT_ID: '123' });
+    vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+    const { notifyAdmin } = await loadTelegram();
+
+    notifyAdmin('new_report', () => 'Новая жалоба.');
+    await flushMicrotasks();
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(THROTTLE_WINDOW_MS);
+    notifyAdmin('new_report', () => 'Новая жалоба.');
+    await flushMicrotasks();
+
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('часовой потолок: 21-е сообщение в час не уходит, вместо него — одно предупреждение о потолке', async () => {
@@ -105,8 +132,8 @@ describe('lib/telegram (R-32F)', () => {
 
     for (let i = 0; i < 22; i += 1) {
       notifyAdmin(`type_${i}`, () => `событие ${i}`);
+      await flushMicrotasks();
     }
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
 
     expect(fetch).toHaveBeenCalledTimes(21);
     const texts = vi.mocked(fetch).mock.calls.map((call) => (JSON.parse(call[1]!.body as string) as { text: string }).text);
@@ -120,14 +147,14 @@ describe('lib/telegram (R-32F)', () => {
 
     for (let i = 0; i < 21; i += 1) {
       notifyAdmin(`type_${i}`, () => `событие ${i}`);
+      await flushMicrotasks();
     }
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
     expect(fetch).toHaveBeenCalledTimes(21);
 
     vi.mocked(fetch).mockClear();
     await vi.advanceTimersByTimeAsync(HOUR_MS);
     notifyAdmin('type_after_reset', () => 'снова работает');
-    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+    await flushMicrotasks();
 
     expect(fetch).toHaveBeenCalledTimes(1);
   });

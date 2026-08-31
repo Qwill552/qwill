@@ -3,7 +3,7 @@ import { logger } from './logger.js';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 const SEND_TIMEOUT_MS = 5000;
-const BATCH_WINDOW_MS = 10 * 60 * 1000;
+const THROTTLE_WINDOW_MS = 10 * 60 * 1000;
 const HOURLY_LIMIT = 20;
 const HOUR_MS = 60 * 60 * 1000;
 const CEILING_MESSAGE = 'Уведомления зачастили — до конца часа новые не придут.';
@@ -12,13 +12,7 @@ const configured = Boolean(
   env.TELEGRAM_NOTIFY_ENABLED && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID,
 );
 
-interface PendingBatch {
-  count: number;
-  render: (count: number) => string | Promise<string>;
-  timer: NodeJS.Timeout;
-}
-
-const pending = new Map<string, PendingBatch>();
+const lastSentAt = new Map<string, number>();
 
 let hourStart = Date.now();
 let hourCount = 0;
@@ -70,32 +64,20 @@ function reserveHourlySlot(): boolean {
   return false;
 }
 
-function flush(type: string): void {
-  const batch = pending.get(type);
-  pending.delete(type);
-  if (!batch) return;
+export function notifyAdmin(type: string, render: () => string | Promise<string>): void {
+  if (!configured) return;
+
+  const now = Date.now();
+  const last = lastSentAt.get(type);
+  if (last !== undefined && now - last < THROTTLE_WINDOW_MS) return;
+  lastSentAt.set(type, now);
+
   if (!reserveHourlySlot()) return;
 
-  Promise.resolve(batch.render(batch.count))
+  Promise.resolve()
+    .then(render)
     .then(post)
     .catch((error: unknown) => {
       logger.warn({ err: error }, 'Не удалось подготовить уведомление в Telegram');
     });
-}
-
-export function notifyAdmin(type: string, render: (count: number) => string | Promise<string>): void {
-  if (!configured) return;
-
-  const existing = pending.get(type);
-  if (existing) {
-    existing.count += 1;
-    existing.render = render;
-    return;
-  }
-
-  pending.set(type, {
-    count: 1,
-    render,
-    timer: setTimeout(() => flush(type), BATCH_WINDOW_MS),
-  });
 }
