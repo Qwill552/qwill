@@ -97,10 +97,15 @@ export function notifyAdmin(type: string, render: () => string | Promise<string>
 
   const now = Date.now();
   const last = lastSentAt.get(type);
-  if (last !== undefined && now - last < THROTTLE_WINDOW_MS) return;
+  if (last !== undefined && now - last < THROTTLE_WINDOW_MS) {
+    logger.debug({ type }, 'Уведомление в Telegram пропущено: тип уже отправлялся в этом окне');
+    return;
+  }
   lastSentAt.set(type, now);
 
   if (!reserveHourlySlot()) return;
+
+  logger.info({ type }, 'Отправляю уведомление администратору в Telegram');
 
   Promise.resolve()
     .then(render)

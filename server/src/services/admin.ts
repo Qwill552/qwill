@@ -33,7 +33,12 @@ import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { verifyPassword } from '../lib/password.js';
 import { signAdminTicket } from '../lib/tokens.js';
-import { notifyBanAction, notifyNewReport } from './adminNotify.js';
+import {
+  notifyAdminPanelAccess,
+  notifyAdminPanelFailure,
+  notifyBanAction,
+  notifyNewReport,
+} from './adminNotify.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
 import { deleteCard } from './profileCard.js';
 import type { AdminAction, Report, Session, User } from '../generated/prisma/client.js';
@@ -85,16 +90,18 @@ export async function reauthAdmin(actor: AdminActor, password: string): Promise<
   const admin = await assertAdmin(actor.adminId);
   if (!(await verifyPassword(password, admin.passwordHash))) {
     const fails = (attempts?.fails ?? 0) + 1;
+    const locked = fails >= ADMIN_REAUTH_FAIL_LIMIT;
     reauthAttempts.set(actor.adminId, {
       fails,
-      lockedUntil:
-        fails >= ADMIN_REAUTH_FAIL_LIMIT ? Date.now() + ADMIN_REAUTH_LOCK_MINUTES * 60 * 1000 : 0,
+      lockedUntil: locked ? Date.now() + ADMIN_REAUTH_LOCK_MINUTES * 60 * 1000 : 0,
     });
     await recordAdminAction(actor, { action: 'reauth.fail', detail: { fails } });
+    notifyAdminPanelFailure({ ip: actor.ip, userAgent: actor.userAgent }, locked);
     throw new AppError(ErrorCode.INVALID_CREDENTIALS, 401, 'Неверный пароль');
   }
 
   reauthAttempts.delete(actor.adminId);
+  notifyAdminPanelAccess({ ip: actor.ip, userAgent: actor.userAgent });
   const ticket = signAdminTicket(actor.adminId);
   return { ticket: ticket.ticket, expiresAt: ticket.expiresAt.toISOString() };
 }

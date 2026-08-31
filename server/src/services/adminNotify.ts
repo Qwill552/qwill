@@ -1,3 +1,5 @@
+import { ADMIN_REAUTH_FAIL_LIMIT, ADMIN_REAUTH_LOCK_MINUTES } from '@messenger/shared';
+
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { notifyAdmin } from '../lib/telegram.js';
@@ -36,6 +38,29 @@ export function notifyAdminLoginFailure(context: LoginContext): void {
   notifyAdmin(
     'admin_login_fail',
     () => `Неудачная попытка входа в админский аккаунт.\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`,
+  );
+}
+
+export function notifyAdminPanelAccess(context: LoginContext): void {
+  notifyAdmin(
+    'admin_reauth_success',
+    () => `Открыта админ-панель, пароль подтверждён.\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`,
+  );
+}
+
+export function notifyAdminPanelFailure(context: LoginContext, locked: boolean): void {
+  if (locked) {
+    notifyAdmin(
+      'admin_reauth_lock',
+      () =>
+        `Неверный пароль в админ-панели ${ADMIN_REAUTH_FAIL_LIMIT} раз подряд — выдача доступа заблокирована на ${ADMIN_REAUTH_LOCK_MINUTES} минут.\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`,
+    );
+    return;
+  }
+
+  notifyAdmin(
+    'admin_reauth_fail',
+    () => `Неверный пароль в админ-панели.\n${loginLines(context)}\n${ADMIN_PANEL_LINK}`,
   );
 }
 
