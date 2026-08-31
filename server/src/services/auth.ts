@@ -16,6 +16,7 @@ import {
   signAccessToken,
   verifyAccessToken,
 } from '../lib/tokens.js';
+import { notifyAdminLoginSuccess } from './adminNotify.js';
 import { createUser, getUserById, toPublicUser, verifyCredentials } from './user.js';
 import type { User } from '../generated/prisma/client.js';
 
@@ -67,7 +68,10 @@ export async function login(
   password: string,
   client: ClientContext,
 ): Promise<SessionTokens> {
-  const user = await verifyCredentials(username, password);
+  const user = await verifyCredentials(username, password, client);
+  if (toUserRole(user.role) === 'admin') {
+    notifyAdminLoginSuccess({ ip: client.ip, userAgent: client.userAgent });
+  }
   return issueSession(user, client);
 }
 

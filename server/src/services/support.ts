@@ -47,6 +47,15 @@ export async function ensureSupportChat(userId: string): Promise<SupportChatResu
   }
 }
 
+export async function incomingSupportMessageAdminId(chatId: string, senderId: string): Promise<string | null> {
+  const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { isSupportRequest: true } });
+  if (!chat?.isSupportRequest) return null;
+
+  const admin = await prisma.user.findUnique({ where: { username: SUPPORT_ADMIN_USERNAME }, select: { id: true } });
+  if (!admin || admin.id === senderId) return null;
+  return admin.id;
+}
+
 export async function assertSupportSendAllowed(chatId: string, userId: string): Promise<void> {
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { isSupportRequest: true } });
   if (!chat?.isSupportRequest) return;

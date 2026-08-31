@@ -33,6 +33,7 @@ import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { verifyPassword } from '../lib/password.js';
 import { signAdminTicket } from '../lib/tokens.js';
+import { notifyBanAction, notifyNewReport } from './adminNotify.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
 import { deleteCard } from './profileCard.js';
 import type { AdminAction, Report, Session, User } from '../generated/prisma/client.js';
@@ -190,6 +191,7 @@ export async function banUser(
   });
 
   await recordAdminAction(actor, { action: 'user.ban', targetUserId, detail: { reason } });
+  notifyBanAction('ban');
   return buildUserCard(user);
 }
 
@@ -203,6 +205,7 @@ export async function unbanUser(actor: AdminActor, targetUserId: string): Promis
   });
 
   await recordAdminAction(actor, { action: 'user.unban', targetUserId });
+  notifyBanAction('unban');
   return buildUserCard(user);
 }
 
@@ -291,6 +294,7 @@ export async function createReport(reporterId: string, input: CreateReportInput)
     include: { reporter: { select: { username: true } }, targetUser: { select: { username: true } } },
   });
 
+  notifyNewReport();
   return toReportDto(report);
 }
 

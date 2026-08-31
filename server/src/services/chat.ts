@@ -49,7 +49,7 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
 }
 
 /** Сообщения чужих авторов с id больше курсора прочтения (секция 2: lastReadMessageId вместо is_read). */
-function countUnread(
+export function countUnread(
   chatId: string,
   userId: string,
   lastReadMessageId: number | null,

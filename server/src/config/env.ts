@@ -66,6 +66,15 @@ const envSchema = z.object({
   LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
   LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),
   CALL_MISSED_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
+
+  /// Уведомления администратора в Telegram (R-32F). Все три опциональны: без токена
+  /// отправка тихо пропускается, сервер не падает на старте.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_ADMIN_CHAT_ID: z.string().optional(),
+  TELEGRAM_NOTIFY_ENABLED: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);

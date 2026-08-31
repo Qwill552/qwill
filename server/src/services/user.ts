@@ -20,6 +20,7 @@ import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
 import { AppError, banned, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { notifyAdminLoginFailure } from './adminNotify.js';
 import { assertAvatarEligible } from './file.js';
 import { assertCardEditable, cardUrlForProfile } from './profileCard.js';
 import type { User } from '../generated/prisma/client.js';
@@ -64,7 +65,11 @@ export async function createUser(input: {
   });
 }
 
-export async function verifyCredentials(username: string, password: string): Promise<User> {
+export async function verifyCredentials(
+  username: string,
+  password: string,
+  client?: { ip?: string; userAgent?: string },
+): Promise<User> {
   const user = await prisma.user.findUnique({ where: { username } });
   if (!user) {
     throw new AppError(ErrorCode.INVALID_CREDENTIALS, 401, 'Неверное имя пользователя или пароль');
@@ -72,6 +77,9 @@ export async function verifyCredentials(username: string, password: string): Pro
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    if (toUserRole(user.role) === 'admin') {
+      notifyAdminLoginFailure({ ip: client?.ip, userAgent: client?.userAgent });
+    }
     throw new AppError(ErrorCode.INVALID_CREDENTIALS, 401, 'Неверное имя пользователя или пароль');
   }
 

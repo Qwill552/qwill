@@ -18,10 +18,11 @@ import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { logger } from '../lib/logger.js';
 import { presenceStore } from '../realtime/presence.js';
+import { notifySupportMessage } from './adminNotify.js';
 import { assertChatWritable, assertMember } from './chat.js';
 import { assertFileOwnershipProof, toFileDto } from './file.js';
 import * as pushService from './push.js';
-import { assertSupportSendAllowed } from './support.js';
+import { assertSupportSendAllowed, incomingSupportMessageAdminId } from './support.js';
 import { ChatRole } from '../generated/prisma/client.js';
 import type { Announcement, Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
@@ -216,6 +217,14 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
   notifyOfflineMembers(input.chatId, input.senderId, dto).catch((error: unknown) => {
     logger.error({ err: error, chatId: input.chatId }, 'Не удалось отправить push-уведомления о новом сообщении');
   });
+
+  incomingSupportMessageAdminId(input.chatId, input.senderId)
+    .then((adminId) => {
+      if (adminId) notifySupportMessage(adminId);
+    })
+    .catch((error: unknown) => {
+      logger.warn({ err: error, chatId: input.chatId }, 'Не удалось проверить сообщение на уведомление в Предложку');
+    });
 
   return dto;
 }
