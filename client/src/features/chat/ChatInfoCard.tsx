@@ -1,5 +1,5 @@
 import type { AttachmentDto, UserProfileDto } from '@messenger/shared';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { getUserProfileRequest } from '../../api/users';
@@ -14,6 +14,7 @@ import { Card } from '../../ui/Card';
 import { Icon } from '../../ui/Icon';
 import type { IconName } from '../../ui/icons/paths';
 import { Menu, type MenuItem } from '../../ui/Menu';
+import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import styles from './ChatInfoCard.module.css';
 
 interface ChatInfoCardProps {
@@ -71,6 +72,7 @@ function tally(attachments: AttachmentDto[]): AttachmentTally[] {
 
 export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const navigate = useNavigate();
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [usernameCopied, setUsernameCopied] = useState(false);
 
@@ -134,7 +136,8 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   ];
 
   return (
-    <div className={`${styles.scroller} ${card.root} hide-native-scrollbar`}>
+    <div ref={scrollerRef} className={`${styles.scroller} ${card.root} hide-native-scrollbar`}>
+      <ScrollIndicator target={scrollerRef} />
       <div className={styles.hero}>
         {avatarUrl ? (
           <button

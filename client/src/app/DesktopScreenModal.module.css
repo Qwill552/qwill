@@ -123,8 +123,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   /* Telegram Desktop рисует иконки настроек без цветной подложки вовсе — мобильный радужный
      ряд (Card.Row tint) тут неуместен (референс пользователя, ux-ui/14-desktop/04). Точка
      подмены — IconTile.module.css, каскадные переменные без !important. Без подложки глиф
