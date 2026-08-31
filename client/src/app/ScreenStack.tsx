@@ -731,7 +731,7 @@ export function ScreenStack() {
           </DesktopScreenModal>
         )}
         {!overlayTab && chatInfoId && (
-          <DesktopScreenModal chromeless title="Профиль" onClose={() => navigate(`/chats/${chatInfoId}`)}>
+          <DesktopScreenModal chromeless wide title="Профиль" onClose={() => navigate(`/chats/${chatInfoId}`)}>
             <ChatInfoCard chatId={chatInfoId} />
           </DesktopScreenModal>
         )}

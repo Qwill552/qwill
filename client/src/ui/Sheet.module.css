@@ -1,7 +1,7 @@
 .scrim {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 260;
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
   animation: fade var(--dur-menu) var(--ease-screen);
@@ -16,7 +16,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 201;
+  z-index: 261;
   display: flex;
   max-height: calc(100dvh - var(--header-h) - var(--safe-top));
   flex-direction: column;
