@@ -1,5 +1,6 @@
 import {
   adminLogQuerySchema,
+  adminReauthSchema,
   adminUpdateProfileSchema,
   banUserSchema,
   closeReportSchema,
@@ -27,6 +28,7 @@ import {
   listReportGroups,
   markReportGroupWorking,
   muteUserSupport,
+  reauthAdmin,
   revealUserPii,
   revokeUserSessions,
   setProfileCardsEnabled,
@@ -34,7 +36,7 @@ import {
   setUserDisplayName,
   unbanUser,
 } from '../../services/admin.js';
-import { adminActor, requireAdmin, requireAuth } from '../middleware/auth.js';
+import { adminActor, requireAdmin, requireAdminTicket, requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const adminRouter: Router = Router();
@@ -52,6 +54,12 @@ function paramUsername(req: Request): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 }
 
+adminRouter.post('/reauth', validateBody(adminReauthSchema), (req, res, next) => {
+  reauthAdmin(adminActor(req), req.body.password)
+    .then((ticket) => res.json(ticket))
+    .catch(next);
+});
+
 adminRouter.get('/users/by-username/:username', (req, res, next) => {
   findAdminUserCardByUsername(paramUsername(req))
     .then((user) => res.json(user))
@@ -64,7 +72,7 @@ adminRouter.get('/users/:id', (req, res, next) => {
     .catch(next);
 });
 
-adminRouter.get('/users/:id/pii', (req, res, next) => {
+adminRouter.get('/users/:id/pii', requireAdminTicket, (req, res, next) => {
   revealUserPii(adminActor(req), paramId(req))
     .then((pii) => res.json(pii))
     .catch(next);
@@ -116,7 +124,7 @@ adminRouter.get('/log', (req, res, next) => {
     .catch(next);
 });
 
-adminRouter.post('/users/:id/ban', validateBody(banUserSchema), (req, res, next) => {
+adminRouter.post('/users/:id/ban', requireAdminTicket, validateBody(banUserSchema), (req, res, next) => {
   banUser(adminActor(req), paramId(req), req.body.reason)
     .then(async (user) => {
       await disconnectUserSockets(user.id);
@@ -125,7 +133,7 @@ adminRouter.post('/users/:id/ban', validateBody(banUserSchema), (req, res, next)
     .catch(next);
 });
 
-adminRouter.delete('/users/:id/ban', (req, res, next) => {
+adminRouter.delete('/users/:id/ban', requireAdminTicket, (req, res, next) => {
   unbanUser(adminActor(req), paramId(req))
     .then((user) => res.json(user))
     .catch(next);
@@ -149,11 +157,16 @@ adminRouter.get('/settings', (_req, res, next) => {
     .catch(next);
 });
 
-adminRouter.patch('/settings/profile-cards', validateBody(setProfileCardsSchema), (req, res, next) => {
-  setProfileCardsEnabled(adminActor(req), req.body.enabled)
-    .then((settings) => res.json(settings))
-    .catch(next);
-});
+adminRouter.patch(
+  '/settings/profile-cards',
+  requireAdminTicket,
+  validateBody(setProfileCardsSchema),
+  (req, res, next) => {
+    setProfileCardsEnabled(adminActor(req), req.body.enabled)
+      .then((settings) => res.json(settings))
+      .catch(next);
+  },
+);
 
 adminRouter.get('/reports', (req, res, next) => {
   const query = parseOrThrow(reportGroupViewSchema, req.query);

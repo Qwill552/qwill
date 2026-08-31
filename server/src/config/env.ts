@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ADMIN_TICKET_TTL_MINUTES } from '@messenger/shared';
 import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
 
@@ -36,6 +37,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET должен быть не короче 32 символов'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  ADMIN_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
+  ADMIN_TICKET_TTL_MINUTES: z.coerce.number().int().positive().default(ADMIN_TICKET_TTL_MINUTES),
 
   STORAGE_DIR: z.string().default('./storage'),
   APP_RELEASE_DIR: z.string().default('./app-releases'),

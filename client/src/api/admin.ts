@@ -1,16 +1,50 @@
-import type {
-  AdminLogPageDto,
-  AdminLogQuery,
-  AdminPiiDto,
-  AdminReportDto,
-  AdminSettingsDto,
-  AdminUserCardDto,
-  CreateReportInput,
-  ReportGroupDto,
-  ReportGroupView,
+import {
+  ADMIN_TICKET_HEADER,
+  ErrorCode,
+  type AdminLogPageDto,
+  type AdminLogQuery,
+  type AdminPiiDto,
+  type AdminReportDto,
+  type AdminSettingsDto,
+  type AdminTicketDto,
+  type AdminUserCardDto,
+  type CreateReportInput,
+  type ReportGroupDto,
+  type ReportGroupView,
 } from '@messenger/shared';
 
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
+
+let adminTicket: string | null = null;
+
+export function setAdminTicket(ticket: string | null): void {
+  adminTicket = ticket;
+}
+
+export function adminReauthRequest(password: string): Promise<AdminTicketDto> {
+  return apiRequest<AdminTicketDto>('/api/admin/reauth', { method: 'POST', body: { password } });
+}
+
+let reauthHandler: (() => Promise<boolean>) | null = null;
+
+export function setAdminReauthHandler(handler: (() => Promise<boolean>) | null): void {
+  reauthHandler = handler;
+}
+
+function ticketHeaders(): Record<string, string> {
+  return adminTicket ? { [ADMIN_TICKET_HEADER]: adminTicket } : {};
+}
+
+async function ticketed<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.code !== ErrorCode.ADMIN_TICKET_REQUIRED) throw error;
+    adminTicket = null;
+    if (!reauthHandler || !(await reauthHandler())) throw error;
+    return run();
+  }
+}
 
 export function findAdminUserByUsernameRequest(username: string): Promise<AdminUserCardDto> {
   return apiRequest<AdminUserCardDto>(`/api/admin/users/by-username/${encodeURIComponent(username)}`);
@@ -21,7 +55,9 @@ export function getAdminUserRequest(userId: string): Promise<AdminUserCardDto> {
 }
 
 export function revealAdminUserPiiRequest(userId: string): Promise<AdminPiiDto> {
-  return apiRequest<AdminPiiDto>(`/api/admin/users/${userId}/pii`);
+  return ticketed(() =>
+    apiRequest<AdminPiiDto>(`/api/admin/users/${userId}/pii`, { headers: ticketHeaders() }),
+  );
 }
 
 export function setAdminUserDisplayNameRequest(userId: string, displayName: string): Promise<AdminUserCardDto> {
@@ -59,14 +95,22 @@ export function muteUserSupportRequest(userId: string, until: string | null): Pr
 }
 
 export function banUserRequest(userId: string, reason: string): Promise<AdminUserCardDto> {
-  return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/ban`, {
-    method: 'POST',
-    body: { reason },
-  });
+  return ticketed(() =>
+    apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/ban`, {
+      method: 'POST',
+      body: { reason },
+      headers: ticketHeaders(),
+    }),
+  );
 }
 
 export function unbanUserRequest(userId: string): Promise<AdminUserCardDto> {
-  return apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/ban`, { method: 'DELETE' });
+  return ticketed(() =>
+    apiRequest<AdminUserCardDto>(`/api/admin/users/${userId}/ban`, {
+      method: 'DELETE',
+      headers: ticketHeaders(),
+    }),
+  );
 }
 
 export function setUserCardRequest(userId: string, disabled: boolean): Promise<AdminUserCardDto> {
@@ -81,10 +125,13 @@ export function getAdminSettingsRequest(): Promise<AdminSettingsDto> {
 }
 
 export function setProfileCardsRequest(enabled: boolean): Promise<AdminSettingsDto> {
-  return apiRequest<AdminSettingsDto>('/api/admin/settings/profile-cards', {
-    method: 'PATCH',
-    body: { enabled },
-  });
+  return ticketed(() =>
+    apiRequest<AdminSettingsDto>('/api/admin/settings/profile-cards', {
+      method: 'PATCH',
+      body: { enabled },
+      headers: ticketHeaders(),
+    }),
+  );
 }
 
 export function listReportGroupsRequest(view: ReportGroupView): Promise<ReportGroupDto[]> {

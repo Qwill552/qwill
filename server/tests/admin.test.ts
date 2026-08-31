@@ -1,4 +1,4 @@
-import { PROFILE_CARDS_SETTING_KEY } from '@messenger/shared';
+import { ADMIN_TICKET_HEADER, PROFILE_CARDS_SETTING_KEY } from '@messenger/shared';
 import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -29,6 +29,15 @@ async function registerUser(suffix: string, displayName: string): Promise<TestUs
 
 async function makeAdmin(user: TestUser): Promise<void> {
   await prisma.user.update({ where: { id: user.userId }, data: { role: 'admin' } });
+}
+
+async function adminTicket(user: TestUser): Promise<string> {
+  const res = await request
+    .post('/api/admin/reauth')
+    .set('Authorization', `Bearer ${user.token}`)
+    .send({ password: PASSWORD });
+  expect(res.status).toBe(200);
+  return res.body.ticket as string;
 }
 
 describe('администрирование (R-32A)', () => {
@@ -137,9 +146,11 @@ describe('администрирование (R-32A)', () => {
       await makeAdmin(admin);
       const target = await registerUser('banned', 'Нарушитель');
 
+      const ticket = await adminTicket(admin);
       const ban = await request
         .post(`/api/admin/users/${target.userId}/ban`)
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket)
         .send({ reason: 'Спам' });
       expect(ban.status).toBe(200);
       expect(ban.body.bannedAt).not.toBeNull();
@@ -158,7 +169,8 @@ describe('администрирование (R-32A)', () => {
 
       const unban = await request
         .delete(`/api/admin/users/${target.userId}/ban`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket);
       expect(unban.status).toBe(200);
       expect(unban.body.bannedAt).toBeNull();
 
@@ -175,6 +187,7 @@ describe('администрирование (R-32A)', () => {
       const res = await request
         .post(`/api/admin/users/${admin.userId}/ban`)
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, await adminTicket(admin))
         .send({ reason: 'Проверка' });
       expect(res.status).toBe(400);
     });
@@ -188,6 +201,7 @@ describe('администрирование (R-32A)', () => {
       const res = await request
         .post(`/api/admin/users/${other.userId}/ban`)
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, await adminTicket(admin))
         .send({ reason: 'Проверка' });
       expect(res.status).toBe(200);
     });
@@ -215,9 +229,11 @@ describe('администрирование (R-32A)', () => {
       const admin = await registerUser('switch', 'Рубильник');
       await makeAdmin(admin);
 
+      const ticket = await adminTicket(admin);
       const off = await request
         .patch('/api/admin/settings/profile-cards')
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket)
         .send({ enabled: false });
       expect(off.status).toBe(200);
       expect(off.body.profileCardsEnabled).toBe(false);
@@ -228,6 +244,7 @@ describe('администрирование (R-32A)', () => {
       const on = await request
         .patch('/api/admin/settings/profile-cards')
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket)
         .send({ enabled: true });
       expect(on.body.profileCardsEnabled).toBe(true);
     });
@@ -301,6 +318,7 @@ describe('администрирование (R-32A)', () => {
       await request
         .patch('/api/admin/settings/profile-cards')
         .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, await adminTicket(admin))
         .send({ enabled: true });
 
       const actions = await prisma.adminAction.findMany({ where: { adminId: admin.userId } });

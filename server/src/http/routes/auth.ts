@@ -1,4 +1,10 @@
-import { loginSchema, refreshSchema, registerSchema, type AuthResponse } from '@messenger/shared';
+import {
+  changePasswordSchema,
+  loginSchema,
+  refreshSchema,
+  registerSchema,
+  type AuthResponse,
+} from '@messenger/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 
 import { forbidden, unauthorized } from '../../lib/errors.js';
@@ -10,6 +16,7 @@ import {
   readRefreshToken,
   setSessionCookies,
 } from '../authCookies.js';
+import { requireAuth } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -61,6 +68,19 @@ authRouter.post('/refresh', validateBody(refreshSchema), requireCsrfToken, (req,
     .then((tokens) => respondWithSession(res, tokens, 200))
     .catch(next);
 });
+
+authRouter.post(
+  '/password',
+  authLimiter,
+  requireAuth,
+  validateBody(changePasswordSchema),
+  (req, res, next) => {
+    authService
+      .changePassword(req.userId!, req.body.currentPassword, req.body.newPassword)
+      .then(() => res.status(204).end())
+      .catch(next);
+  },
+);
 
 authRouter.post('/logout', validateBody(refreshSchema), requireCsrfToken, (req, res, next) => {
   const token = readRefreshToken(req);

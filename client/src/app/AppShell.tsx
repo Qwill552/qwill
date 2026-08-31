@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react';
 
+import { AdminReauthGate } from '../features/admin/ReauthDialog';
 import { CallOverlay } from '../features/calls/CallOverlay';
 import { AvatarViewer } from '../features/media/AvatarViewer';
 import { MediaViewer } from '../features/media/MediaViewer';
@@ -40,6 +41,7 @@ export function AppShell() {
       <CallOverlay />
       <MediaViewer />
       <AvatarViewer />
+      <AdminReauthGate />
       {updateModalOpen && <UpdateModal onClose={closeUpdateModal} />}
       <RequiredUpdateModal />
     </div>

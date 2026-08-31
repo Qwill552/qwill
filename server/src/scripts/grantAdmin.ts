@@ -1,9 +1,7 @@
-import { PASSWORD_MIN_LENGTH } from '@messenger/shared';
+import { ADMIN_PASSWORD_MIN_LENGTH, PASSWORD_MIN_LENGTH } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { grantAdminRole } from '../services/admin.js';
-
-const ADMIN_PASSWORD_MIN_LENGTH = 24;
 
 async function main(): Promise<void> {
   const username = process.argv[2];

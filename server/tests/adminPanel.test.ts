@@ -1,3 +1,4 @@
+import { ADMIN_TICKET_HEADER } from '@messenger/shared';
 import supertest from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -27,6 +28,15 @@ async function registerUser(suffix: string, displayName: string): Promise<TestUs
 
 async function makeAdmin(user: TestUser): Promise<void> {
   await prisma.user.update({ where: { id: user.userId }, data: { role: 'admin' } });
+}
+
+async function adminTicket(user: TestUser): Promise<string> {
+  const res = await request
+    .post('/api/admin/reauth')
+    .set('Authorization', `Bearer ${user.token}`)
+    .send({ password: PASSWORD });
+  expect(res.status).toBe(200);
+  return res.body.ticket as string;
 }
 
 describe('панель администрирования (R-32B)', () => {
@@ -131,9 +141,11 @@ describe('панель администрирования (R-32B)', () => {
       expect(cardRes.body.ip).toBeUndefined();
       expect(cardRes.body.sessions).toBeUndefined();
 
+      const ticket = await adminTicket(admin);
       const first = await request
         .get(`/api/admin/users/${target.userId}/pii`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket);
       expect(first.status).toBe(200);
       expect(Array.isArray(first.body.sessions)).toBe(true);
       expect(first.body.sessions.length).toBeGreaterThan(0);
@@ -141,7 +153,8 @@ describe('панель администрирования (R-32B)', () => {
 
       const second = await request
         .get(`/api/admin/users/${target.userId}/pii`)
-        .set('Authorization', `Bearer ${admin.token}`);
+        .set('Authorization', `Bearer ${admin.token}`)
+        .set(ADMIN_TICKET_HEADER, ticket);
       expect(second.status).toBe(200);
 
       const reveals = await prisma.adminAction.count({

@@ -1,4 +1,4 @@
-import type { ReportGroupDto, ReportGroupView } from '@messenger/shared';
+import { ErrorCode, type ReportGroupDto, type ReportGroupView } from '@messenger/shared';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -42,11 +42,21 @@ export function AdminScreen() {
   const [reportGroups, setReportGroups] = useState<ReportGroupDto[]>([]);
   const [reportsError, setReportsError] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<ReportGroupDto | null>(null);
+  const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
 
   const loadReports = useCallback((view: ReportGroupView) => {
     listReportGroupsRequest(view)
-      .then(setReportGroups)
-      .catch((error: unknown) => setReportsError(errorText(error)));
+      .then((groups) => {
+        setReportGroups(groups);
+        setPasswordChangeRequired(false);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === ErrorCode.PASSWORD_CHANGE_REQUIRED) {
+          setPasswordChangeRequired(true);
+          return;
+        }
+        setReportsError(errorText(error));
+      });
   }, []);
 
   useEffect(() => {
@@ -85,6 +95,14 @@ export function AdminScreen() {
         {role !== 'admin' ? (
           <Card caption="Администрирование">
             <Card.Row title="Нет доступа" subtitle="Этот экран только для администраторов" />
+          </Card>
+        ) : passwordChangeRequired ? (
+          <Card caption="Администрирование">
+            <Card.Row
+              title="Смените пароль"
+              subtitle="Роль выдана, но панель закрыта, пока пароль администратора не сменён на длинный"
+              onClick={() => navigate('/settings/password')}
+            />
           </Card>
         ) : (
           <>

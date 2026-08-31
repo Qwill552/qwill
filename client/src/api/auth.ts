@@ -32,6 +32,13 @@ export function logoutRequest(): Promise<void> {
   return apiRequest<void>('/api/auth/logout', { method: 'POST', body: {}, skipAuthRetry: true });
 }
 
+export function changePasswordRequest(currentPassword: string, newPassword: string): Promise<void> {
+  return apiRequest<void>('/api/auth/password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+  });
+}
+
 export function meRequest(): Promise<PublicUser> {
   return apiRequest<PublicUser>('/api/users/me');
 }

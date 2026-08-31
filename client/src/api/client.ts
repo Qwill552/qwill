@@ -85,6 +85,7 @@ interface RequestOptions {
   body?: unknown;
   /** Не повторять запрос после обновления токена — используется самими auth-эндпоинтами. */
   skipAuthRetry?: boolean;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
 }
 
@@ -102,6 +103,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...options.headers,
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: options.signal,

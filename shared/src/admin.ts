@@ -64,6 +64,28 @@ export type BanUserInput = z.infer<typeof banUserSchema>;
 export const setUserCardSchema = z.object({ disabled: z.boolean() });
 export type SetUserCardInput = z.infer<typeof setUserCardSchema>;
 
+export const adminReauthSchema = z.object({
+  password: z.string().min(1, 'Введите пароль'),
+});
+export type AdminReauthInput = z.infer<typeof adminReauthSchema>;
+
+export interface AdminTicketDto {
+  ticket: string;
+  expiresAt: string;
+}
+
+export const ADMIN_TICKET_HEADER = 'x-admin-ticket';
+export const ADMIN_TICKET_TTL_MINUTES = 15;
+export const ADMIN_REAUTH_FAIL_LIMIT = 5;
+export const ADMIN_REAUTH_LOCK_MINUTES = 15;
+
+export const ADMIN_TICKET_REQUIRED_MESSAGE = 'Подтвердите пароль администратора';
+export const ADMIN_TICKET_INVALID_MESSAGE = 'Подтверждение пароля истекло, введите его заново';
+export const ADMIN_PASSWORD_CHANGE_REQUIRED_MESSAGE =
+  'Смените пароль администратора — панель откроется после этого';
+export const ADMIN_REAUTH_LOCKED_MESSAGE = `Слишком много неверных паролей, подождите ${ADMIN_REAUTH_LOCK_MINUTES} минут`;
+export const LAST_ADMIN_MESSAGE = 'Это последний администратор';
+
 export const setProfileCardsSchema = z.object({ enabled: z.boolean() });
 export type SetProfileCardsInput = z.infer<typeof setProfileCardsSchema>;
 
@@ -157,6 +179,7 @@ export const ADMIN_ACTION_VALUES = [
   'role.revoke',
   'report.working',
   'report.close',
+  'reauth.fail',
 ] as const;
 export type AdminActionName = (typeof ADMIN_ACTION_VALUES)[number];
 

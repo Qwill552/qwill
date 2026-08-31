@@ -31,6 +31,7 @@ import { ChatScreen } from '../pages/ChatScreen';
 import { ChatsScreen } from '../pages/ChatsScreen';
 import { ContactsScreen } from '../pages/ContactsScreen';
 import { DeveloperScreen } from '../pages/DeveloperScreen';
+import { PasswordScreen } from '../pages/PasswordScreen';
 import { ProfileEditScreen } from '../pages/ProfileEditScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
@@ -97,6 +98,7 @@ const OVERLAY_TAB_TITLE: Record<string, string> = {
  *  на `parentPathOf` этого же пути — те же связи, что и у свайпа «назад» на телефоне. */
 const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
   '/settings/appearance': 'Настройки чатов',
+  '/settings/password': 'Пароль',
   '/settings/developer': 'Для разработчиков',
   '/settings/developer/call-trace': 'Трассировка звонка',
   '/profile/edit': 'Изменить профиль',
@@ -135,6 +137,7 @@ const RouteSwitch = memo(
         />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/settings/appearance" element={<AppearanceScreen />} />
+        <Route path="/settings/password" element={<PasswordScreen />} />
         <Route path="/settings/developer" element={<DeveloperScreen />} />
         <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />

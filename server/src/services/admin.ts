@@ -1,6 +1,11 @@
 import {
   ADMIN_LOG_PAGE_SIZE,
+  ADMIN_PASSWORD_CHANGE_REQUIRED_MESSAGE,
+  ADMIN_REAUTH_FAIL_LIMIT,
+  ADMIN_REAUTH_LOCK_MINUTES,
+  ADMIN_REAUTH_LOCKED_MESSAGE,
   ErrorCode,
+  LAST_ADMIN_MESSAGE,
   PROFILE_CARDS_SETTING_KEY,
   REPORTS_PER_DAY_LIMIT,
   toBioMode,
@@ -11,6 +16,7 @@ import {
   type AdminPiiDto,
   type AdminReportDto,
   type AdminSettingsDto,
+  type AdminTicketDto,
   type AdminUserCardDto,
   type AdminUserDto,
   type CreateReportInput,
@@ -25,6 +31,8 @@ import { prisma } from '../db/prisma.js';
 import { AppError, badRequest, banned, forbidden, notFound, rateLimited } from '../lib/errors.js';
 import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
+import { verifyPassword } from '../lib/password.js';
+import { signAdminTicket } from '../lib/tokens.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
 import { deleteCard } from './profileCard.js';
 import type { AdminAction, Report, Session, User } from '../generated/prisma/client.js';
@@ -49,14 +57,45 @@ export function toAdminUser(user: User): AdminUserDto {
 
 /**
  * Роль читается из базы на каждый запрос, а не из access-токена: токен живёт до истечения,
- * а разжалование и бан обязаны действовать сразу (R-32A). Отказ по mustChangePassword
- * включается в 32E — вместе со сменой пароля, без которой снять флаг нечем.
+ * а разжалование и бан обязаны действовать сразу (R-32A). Взведённый mustChangePassword
+ * запирает всю панель: роль, выданная скриптом, не работает до смены пароля на длинный (R-32E).
  */
 export async function assertAdmin(userId: string): Promise<User> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || toUserRole(user.role) !== 'admin') throw forbidden();
   if (user.bannedAt) throw banned(user.bannedReason);
+  if (user.mustChangePassword) {
+    throw forbidden(ADMIN_PASSWORD_CHANGE_REQUIRED_MESSAGE, ErrorCode.PASSWORD_CHANGE_REQUIRED);
+  }
   return user;
+}
+
+interface ReauthAttempts {
+  fails: number;
+  lockedUntil: number;
+}
+
+const reauthAttempts = new Map<string, ReauthAttempts>();
+
+export async function reauthAdmin(actor: AdminActor, password: string): Promise<AdminTicketDto> {
+  const attempts = reauthAttempts.get(actor.adminId);
+  if (attempts && attempts.lockedUntil > Date.now()) throw rateLimited(ADMIN_REAUTH_LOCKED_MESSAGE);
+
+  const admin = await assertAdmin(actor.adminId);
+  if (!(await verifyPassword(password, admin.passwordHash))) {
+    const fails = (attempts?.fails ?? 0) + 1;
+    reauthAttempts.set(actor.adminId, {
+      fails,
+      lockedUntil:
+        fails >= ADMIN_REAUTH_FAIL_LIMIT ? Date.now() + ADMIN_REAUTH_LOCK_MINUTES * 60 * 1000 : 0,
+    });
+    await recordAdminAction(actor, { action: 'reauth.fail', detail: { fails } });
+    throw new AppError(ErrorCode.INVALID_CREDENTIALS, 401, 'Неверный пароль');
+  }
+
+  reauthAttempts.delete(actor.adminId);
+  const ticket = signAdminTicket(actor.adminId);
+  return { ticket: ticket.ticket, expiresAt: ticket.expiresAt.toISOString() };
 }
 
 async function requireUser(userId: string): Promise<User> {
@@ -114,11 +153,16 @@ export async function getAdminUserCard(userId: string): Promise<AdminUserCardDto
   return buildUserCard(await requireUser(userId));
 }
 
-async function countOtherActiveAdmins(
+export async function assertNotLastAdmin(
   tx: Pick<typeof prisma, 'user'>,
-  exceptUserId: string,
-): Promise<number> {
-  return tx.user.count({ where: { role: 'admin', bannedAt: null, id: { not: exceptUserId } } });
+  target: Pick<User, 'id' | 'role'>,
+  action: string,
+): Promise<void> {
+  if (toUserRole(target.role) !== 'admin') return;
+  const others = await tx.user.count({
+    where: { role: 'admin', bannedAt: null, id: { not: target.id } },
+  });
+  if (others === 0) throw badRequest(ErrorCode.FORBIDDEN, `${LAST_ADMIN_MESSAGE}, ${action} нельзя`);
 }
 
 /**
@@ -136,9 +180,7 @@ export async function banUser(
   const user = await prisma.$transaction(async (tx) => {
     const target = await tx.user.findUnique({ where: { id: targetUserId } });
     if (!target) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
-    if (toUserRole(target.role) === 'admin' && (await countOtherActiveAdmins(tx, targetUserId)) === 0) {
-      throw badRequest(ErrorCode.FORBIDDEN, 'Нельзя забанить последнего администратора');
-    }
+    await assertNotLastAdmin(tx, target, 'забанить его');
 
     await tx.session.deleteMany({ where: { userId: targetUserId } });
     return tx.user.update({
@@ -419,10 +461,6 @@ export async function grantAdminRole(username: string): Promise<RoleChangeResult
   return { user: toAdminUser(user), changed: true };
 }
 
-/**
- * Проверка «остался ли ещё администратор» идёт внутри той же транзакции, что и запись:
- * иначе два одновременных запуска скрипта разжаловали бы обоих.
- */
 export async function revokeAdminRole(username: string): Promise<RoleChangeResult> {
   const normalized = username.trim().toLowerCase();
 
@@ -431,14 +469,7 @@ export async function revokeAdminRole(username: string): Promise<RoleChangeResul
     if (!existing) throw notFound(ErrorCode.NOT_FOUND, `Пользователь @${normalized} не найден`);
     if (toUserRole(existing.role) !== 'admin') return { user: existing, changed: false };
 
-    const others = await tx.user.count({ where: { role: 'admin', id: { not: existing.id } } });
-    if (others === 0) {
-      throw new AppError(
-        ErrorCode.FORBIDDEN,
-        403,
-        `@${normalized} — последний администратор, снять роль нельзя`,
-      );
-    }
+    await assertNotLastAdmin(tx, existing, 'снять роль');
 
     const user = await tx.user.update({ where: { id: existing.id }, data: { role: 'user' } });
     return { user, changed: true };

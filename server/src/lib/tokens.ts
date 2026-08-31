@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
+import type { UserRole } from '@messenger/shared';
 import jwt from 'jsonwebtoken';
 
 import { env } from '../config/env.js';
@@ -36,6 +37,37 @@ export function hashRefreshToken(token: string): string {
 export function refreshTokenExpiry(): Date {
   const days = env.REFRESH_TOKEN_TTL_DAYS;
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
+export function sessionExpiryForRole(role: UserRole): Date {
+  if (role !== 'admin') return refreshTokenExpiry();
+  return new Date(Date.now() + env.ADMIN_SESSION_TTL_HOURS * 60 * 60 * 1000);
+}
+
+export interface AdminTicketPayload {
+  sub: string;
+  purpose: 'admin';
+}
+
+export interface AdminTicket {
+  ticket: string;
+  expiresAt: Date;
+}
+
+export function signAdminTicket(userId: string): AdminTicket {
+  const minutes = env.ADMIN_TICKET_TTL_MINUTES;
+  const ticket = jwt.sign({ sub: userId, purpose: 'admin' } satisfies AdminTicketPayload, env.JWT_SECRET, {
+    expiresIn: `${minutes}m`,
+  });
+  return { ticket, expiresAt: new Date(Date.now() + minutes * 60 * 1000) };
+}
+
+export function verifyAdminTicket(token: string): AdminTicketPayload {
+  const payload = jwt.verify(token, env.JWT_SECRET);
+  if (typeof payload === 'string' || typeof payload.sub !== 'string' || payload.purpose !== 'admin') {
+    throw new Error('Некорректный админский билет');
+  }
+  return { sub: payload.sub, purpose: 'admin' };
 }
 
 export interface FileTokenPayload {

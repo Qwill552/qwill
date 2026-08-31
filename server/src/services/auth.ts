@@ -1,11 +1,18 @@
-import { ErrorCode } from '@messenger/shared';
+import {
+  ADMIN_PASSWORD_MIN_LENGTH,
+  ErrorCode,
+  PASSWORD_MIN_LENGTH,
+  toUserRole,
+  type UserRole,
+} from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { AppError, banned, unauthorized } from '../lib/errors.js';
+import { hashPassword, verifyPassword } from '../lib/password.js';
 import {
   generateRefreshToken,
   hashRefreshToken,
-  refreshTokenExpiry,
+  sessionExpiryForRole,
   signAccessToken,
   verifyAccessToken,
 } from '../lib/tokens.js';
@@ -33,7 +40,7 @@ async function issueSession(
     data: {
       userId: user.id,
       refreshTokenHash: hashRefreshToken(refreshToken),
-      expiresAt: refreshTokenExpiry(),
+      expiresAt: sessionExpiryForRole(toUserRole(user.role)),
       userAgent: client.userAgent,
       ip: originIp ?? client.ip ?? null,
       lastSeenIp: client.ip ?? null,
@@ -101,6 +108,33 @@ export async function assertNotBanned(userId: string): Promise<void> {
   });
   if (!user) throw unauthorized('Пользователь не найден');
   if (user.bannedAt) throw banned(user.bannedReason);
+}
+
+export function passwordMinLengthForRole(role: UserRole): number {
+  return role === 'admin' ? ADMIN_PASSWORD_MIN_LENGTH : PASSWORD_MIN_LENGTH;
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await getUserById(userId);
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    throw new AppError(ErrorCode.INVALID_CREDENTIALS, 400, 'Неверный текущий пароль');
+  }
+
+  const minLength = passwordMinLengthForRole(toUserRole(user.role));
+  if (newPassword.length < minLength) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 400, `Пароль не короче ${minLength} символов`, {
+      fields: { newPassword: `Пароль не короче ${minLength} символов` },
+    });
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
+  });
 }
 
 export async function requireUserFromAccessToken(authorizationHeader: string | undefined) {
