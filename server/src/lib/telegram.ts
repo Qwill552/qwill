@@ -12,6 +12,34 @@ const configured = Boolean(
   env.TELEGRAM_NOTIFY_ENABLED && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID,
 );
 
+export interface TelegramNotifyState {
+  configured: boolean;
+  missing: string[];
+}
+
+export function telegramNotifyState(): TelegramNotifyState {
+  const missing: string[] = [];
+  if (!env.TELEGRAM_NOTIFY_ENABLED) missing.push('TELEGRAM_NOTIFY_ENABLED');
+  if (!env.TELEGRAM_BOT_TOKEN) missing.push('TELEGRAM_BOT_TOKEN');
+  if (!env.TELEGRAM_ADMIN_CHAT_ID) missing.push('TELEGRAM_ADMIN_CHAT_ID');
+  return { configured, missing };
+}
+
+export async function sendTelegramMessageRaw(text: string): Promise<{ status: number; body: string }> {
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: env.TELEGRAM_ADMIN_CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    }),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  });
+  return { status: response.status, body: await response.text() };
+}
+
 const lastSentAt = new Map<string, number>();
 
 let hourStart = Date.now();

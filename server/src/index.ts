@@ -6,6 +6,7 @@ import { devHttpsCredentials, env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './db/prisma.js';
 import { logger } from './lib/logger.js';
 import { initProfileFonts } from './lib/profileFonts.js';
+import { telegramNotifyState } from './lib/telegram.js';
 import { createSocketServer } from './realtime/index.js';
 import { ensureStorageDirs } from './services/file.js';
 
@@ -26,6 +27,13 @@ async function main(): Promise<void> {
   });
   const scheme = devHttpsCredentials ? 'https' : 'http';
   logger.info(`Сервер слушает ${scheme}://localhost:${env.PORT} (${env.NODE_ENV})`);
+
+  const telegram = telegramNotifyState();
+  logger.info(
+    telegram.configured
+      ? 'Telegram-уведомления администратора включены'
+      : `Telegram-уведомления администратора выключены, не задано: ${telegram.missing.join(', ')}`,
+  );
 
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {

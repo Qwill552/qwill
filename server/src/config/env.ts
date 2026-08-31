@@ -15,6 +15,9 @@ if (existsSync(envFile)) {
   loadDotenv({ path: envFile, quiet: true });
 }
 
+export const envFilePath = envFile;
+export const envFileExists = existsSync(envFile);
+
 const bytes = z.coerce.number().int().positive();
 
 const envSchema = z.object({
