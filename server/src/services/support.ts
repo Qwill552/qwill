@@ -1,7 +1,7 @@
 import { ErrorCode, SUPPORT_ADMIN_USERNAME, SUPPORT_DAILY_MESSAGE_LIMIT } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
-import { badRequest, forbidden, notFound, rateLimited } from '../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { pairKeyFor } from './chat.js';
 
 const SUPPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -81,7 +81,7 @@ export async function assertSupportSendAllowed(chatId: string, userId: string): 
   });
   if (recent.length >= SUPPORT_DAILY_MESSAGE_LIMIT) {
     const nextAt = new Date(recent[0]!.createdAt.getTime() + SUPPORT_WINDOW_MS);
-    throw rateLimited(
+    throw forbidden(
       `Вы уже отправили ${SUPPORT_DAILY_MESSAGE_LIMIT} сообщений за сутки. Следующее можно будет отправить в ${formatMoscow(
         nextAt,
         { hour: '2-digit', minute: '2-digit' },

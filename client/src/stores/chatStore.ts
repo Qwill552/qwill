@@ -139,6 +139,9 @@ interface ChatState {
   presenceByUser: Record<string, PresenceInfo>;
   chatsLoaded: boolean;
   chatError: string | null;
+  /** Причина, по которой сервер отказал в отправке по существу (лимит обращений, заглушение):
+   *  чтобы человек увидел текст, а не только красный пузырь. Живёт до следующей отправки. */
+  sendRejectionByChat: Record<string, string>;
   myUserId: string | null;
   /** Чат, открытый в текущей вкладке — новые сообщения в нём читаются сразу же (секция 8). */
   activeChatId: string | null;
@@ -237,6 +240,8 @@ interface ChatState {
   updateLocalAttachment: (chatId: string, clientId: string, patch: Partial<LocalAttachmentState>) => void;
   /** Внутренний метод: помечает сообщение неотправленным по clientId. */
   setMessageFailed: (chatId: string, clientId: string) => void;
+  /** Снимает текст отказа — вызывается, как только человек пробует отправить снова. */
+  clearSendRejection: (chatId: string) => void;
 }
 
 function upsertChat(chats: ChatListItemDto[], chat: ChatListItemDto): ChatListItemDto[] {
@@ -485,6 +490,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   presenceByUser: {},
   chatsLoaded: false,
   chatError: null,
+  sendRejectionByChat: {},
   myUserId: null,
   activeChatId: null,
   membersByChat: {},
@@ -782,6 +788,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (isRetriableSendError(ack)) {
           scheduleOutboxRetry(() => void get().drainOutbox());
           return;
+        }
+
+        const reason = ack.error?.message;
+        if (reason) {
+          set((state) => ({ sendRejectionByChat: { ...state.sendRejectionByChat, [chatId]: reason } }));
         }
 
         void dequeueOutbox(clientId);
@@ -1167,6 +1178,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [chatId]: list.map((m) => (m.clientId === clientId ? { ...m, status: 'failed' } : m)),
         },
       };
+    });
+  },
+
+  clearSendRejection(chatId) {
+    set((state) => {
+      if (!(chatId in state.sendRejectionByChat)) return state;
+      const next = { ...state.sendRejectionByChat };
+      delete next[chatId];
+      return { sendRejectionByChat: next };
     });
   },
 

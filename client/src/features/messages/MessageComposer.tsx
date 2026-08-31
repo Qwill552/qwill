@@ -60,6 +60,8 @@ export function MessageComposer({
   const [recording, setRecording] = useState(false);
   const [recordingLocked, setRecordingLocked] = useState(false);
 
+  const sendRejection = useChatStore((s) => s.sendRejectionByChat[chatId]);
+  const clearSendRejection = useChatStore((s) => s.clearSendRejection);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const sendAttachmentMessage = useChatStore((s) => s.sendAttachmentMessage);
   const editMessage = useChatStore((s) => s.editMessage);
@@ -239,6 +241,7 @@ export function MessageComposer({
     const content = value.trim();
     if (!content || !user) return;
     markStopped();
+    clearSendRejection(chatId);
 
     if (context?.mode === 'edit') {
       try {
@@ -351,7 +354,7 @@ export function MessageComposer({
   return (
     <div className={styles.wrap}>
       {context && <ComposerContextBar context={context} onCancel={handleCancelContext} />}
-      {error && <p className={styles.error}>{error}</p>}
+      {(error ?? sendRejection) && <p className={styles.error}>{error ?? sendRejection}</p>}
 
       <form className={styles.composer} data-no-back-swipe onSubmit={handleSubmit}>
         {recording ? (
