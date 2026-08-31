@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { listReportGroupsRequest } from '../api/admin';
 import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
@@ -88,6 +89,15 @@ export function ChatsScreen() {
   const filterRowEnabled = folderTabsEnabled || isAdmin;
   const effectiveFilter = filterRowEnabled ? filter : 'all';
 
+  const [openReportGroupCount, setOpenReportGroupCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    listReportGroupsRequest('open')
+      .then((groups) => setOpenReportGroupCount(groups.length))
+      .catch(() => undefined);
+  }, [isAdmin]);
+
   const counts = useMemo(() => {
     const started = chats.filter((c) => !isEmptyPrivateChat(c));
     return {
@@ -96,8 +106,17 @@ export function ChatsScreen() {
       private: started.filter((c) => c.type === 'PRIVATE').length,
       groups: started.filter((c) => c.type === 'GROUP').length,
       support: started.filter((c) => c.isSupportRequest && c.unreadCount > 0).length,
+      reports: openReportGroupCount,
     };
-  }, [chats, isAdmin]);
+  }, [chats, isAdmin, openReportGroupCount]);
+
+  function handleFilterChange(next: ChatFilter): void {
+    if (next === 'reports') {
+      navigate('/admin');
+      return;
+    }
+    setFilter(next);
+  }
 
   useHotkey(layout === 'desktop', { code: 'KeyK', mod: true, allowInInput: true }, () => openSearchByHotkey());
   useHotkey(layout === 'desktop', { key: 'ArrowDown', mod: true, allowInInput: true }, () => stepChat(1));
@@ -352,7 +371,7 @@ export function ChatsScreen() {
         )}
 
         {filterRowEnabled && (
-          <ChatFilters value={filter} onChange={setFilter} counts={counts} admin={isAdmin} />
+          <ChatFilters value={filter} onChange={handleFilterChange} counts={counts} admin={isAdmin} />
         )}
       </div>
 

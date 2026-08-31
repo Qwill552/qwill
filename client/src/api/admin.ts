@@ -6,7 +6,8 @@ import type {
   AdminSettingsDto,
   AdminUserCardDto,
   CreateReportInput,
-  ReportStatus,
+  ReportGroupDto,
+  ReportGroupView,
 } from '@messenger/shared';
 
 import { apiRequest } from './client';
@@ -82,8 +83,16 @@ export function setProfileCardsRequest(enabled: boolean): Promise<AdminSettingsD
   });
 }
 
-export function listReportsRequest(status?: ReportStatus): Promise<AdminReportDto[]> {
-  return apiRequest<AdminReportDto[]>(`/api/admin/reports${status ? `?status=${status}` : ''}`);
+export function listReportGroupsRequest(view: ReportGroupView): Promise<ReportGroupDto[]> {
+  return apiRequest<ReportGroupDto[]>(`/api/admin/reports?view=${view}`);
+}
+
+export function markReportWorkingRequest(reportId: string): Promise<void> {
+  return apiRequest<void>(`/api/admin/reports/${reportId}`, { method: 'PATCH', body: { status: 'working' } });
+}
+
+export function closeReportRequest(reportId: string, resolution: string): Promise<void> {
+  return apiRequest<void>(`/api/admin/reports/${reportId}/close`, { method: 'PATCH', body: { resolution } });
 }
 
 export function createReportRequest(input: CreateReportInput): Promise<AdminReportDto> {

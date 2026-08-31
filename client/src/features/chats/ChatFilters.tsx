@@ -1,7 +1,7 @@
 import { Chip } from '../../ui/Chip';
 import styles from './ChatFilters.module.css';
 
-export type ChatFilter = 'all' | 'unread' | 'private' | 'groups' | 'support';
+export type ChatFilter = 'all' | 'unread' | 'private' | 'groups' | 'support' | 'reports';
 
 const FILTERS: { id: ChatFilter; label: string }[] = [
   { id: 'all', label: 'Все' },
@@ -10,9 +10,12 @@ const FILTERS: { id: ChatFilter; label: string }[] = [
   { id: 'groups', label: 'Группы' },
 ];
 
+/** «Жалобы» здесь не фильтрует список чатов — это быстрый переход в разбор жалоб на
+ *  /admin (R-32D), перехватывается в onChange вызывающего экрана. */
 const ADMIN_FILTERS: { id: ChatFilter; label: string }[] = [
   { id: 'all', label: 'Все' },
   { id: 'support', label: 'Предложка' },
+  { id: 'reports', label: 'Жалобы' },
 ];
 
 interface ChatFiltersProps {

@@ -1,14 +1,18 @@
-import { useRef, useState, type FormEvent } from 'react';
+import type { ReportGroupDto, ReportGroupView } from '@messenger/shared';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { findAdminUserByUsernameRequest } from '../api/admin';
+import { findAdminUserByUsernameRequest, listReportGroupsRequest } from '../api/admin';
 import { ApiError } from '../api/client';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { ReportDetail } from '../features/admin/ReportDetail';
+import { ReportGroupRow } from '../features/admin/ReportGroupRow';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../ui/Card';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import styles from './AdminScreen.module.css';
 
 function errorText(error: unknown): string {
@@ -16,9 +20,14 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Не удалось выполнить запрос';
 }
 
-/** Вкладка «Админ-панель»: поиск пользователя по username и переход в его карточку
- *  (R-32B). Ряд чипсов под поиском намеренно пуст — «Предложка» и «Жалобы» приходят
- *  в 32C и 32D. */
+const REPORT_VIEW_SEGMENTS: { value: ReportGroupView; label: string }[] = [
+  { value: 'open', label: 'Открытые' },
+  { value: 'closed', label: 'Закрытые' },
+];
+
+/** Вкладка «Админ-панель»: поиск пользователя по username, переход в его карточку (R-32B)
+ *  и разбор жалоб — группы по объекту, статусы, закрытие с решением (R-32D). Быстрый доступ
+ *  из списка чатов — третий чипс рядом с «Предложкой» (`ChatFilters`, R-32D). */
 export function AdminScreen() {
   const navigate = useNavigate();
   const isDesktop = useLayoutMode() === 'desktop';
@@ -28,6 +37,22 @@ export function AdminScreen() {
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [reportView, setReportView] = useState<ReportGroupView>('open');
+  const [reportGroups, setReportGroups] = useState<ReportGroupDto[]>([]);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<ReportGroupDto | null>(null);
+
+  const loadReports = useCallback((view: ReportGroupView) => {
+    listReportGroupsRequest(view)
+      .then(setReportGroups)
+      .catch((error: unknown) => setReportsError(errorText(error)));
+  }, []);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    loadReports(reportView);
+  }, [role, reportView, loadReports]);
 
   function handleSearch(event: FormEvent): void {
     event.preventDefault();
@@ -89,9 +114,35 @@ export function AdminScreen() {
                 onClick={() => navigate('/admin/log')}
               />
             </Card>
+
+            <Card caption="Жалобы">
+              <div className={styles.reportsSwitch}>
+                <SegmentedControl segments={REPORT_VIEW_SEGMENTS} value={reportView} onChange={setReportView} />
+              </div>
+              {reportsError && <Card.Row title="Ошибка" subtitle={reportsError} danger />}
+              {!reportsError && reportGroups.length === 0 && (
+                <Card.Row title={reportView === 'open' ? 'Открытых жалоб нет' : 'Закрытых жалоб нет'} />
+              )}
+              {reportGroups.map((group) => (
+                <ReportGroupRow
+                  key={`${group.kind}:${group.targetChatId ?? group.targetUserId}`}
+                  group={group}
+                  onOpen={() => setSelectedGroup(group)}
+                />
+              ))}
+            </Card>
           </>
         )}
       </div>
+
+      {selectedGroup && (
+        <ReportDetail
+          group={selectedGroup}
+          view={reportView}
+          onClose={() => setSelectedGroup(null)}
+          onChanged={() => loadReports(reportView)}
+        />
+      )}
     </div>
   );
 }

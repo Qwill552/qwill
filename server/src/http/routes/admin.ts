@@ -2,8 +2,10 @@ import {
   adminLogQuerySchema,
   adminUpdateProfileSchema,
   banUserSchema,
+  closeReportSchema,
+  markReportWorkingSchema,
   muteSupportSchema,
-  reportListQuerySchema,
+  reportGroupViewSchema,
   setProfileCardsSchema,
   setUserCardSchema,
 } from '@messenger/shared';
@@ -16,11 +18,13 @@ import {
   clearUserAvatar,
   clearUserBio,
   clearUserCard,
+  closeReportGroup,
   findAdminUserCardByUsername,
   getAdminSettings,
   getAdminUserCard,
   listAdminLog,
-  listReports,
+  listReportGroups,
+  markReportGroupWorking,
   muteUserSupport,
   revealUserPii,
   revokeUserSessions,
@@ -145,8 +149,20 @@ adminRouter.patch('/settings/profile-cards', validateBody(setProfileCardsSchema)
 });
 
 adminRouter.get('/reports', (req, res, next) => {
-  const query = parseOrThrow(reportListQuerySchema, req.query);
-  listReports(query.status)
-    .then((reports) => res.json(reports))
+  const query = parseOrThrow(reportGroupViewSchema, req.query);
+  listReportGroups(query.view)
+    .then((groups) => res.json(groups))
+    .catch(next);
+});
+
+adminRouter.patch('/reports/:id', validateBody(markReportWorkingSchema), (req, res, next) => {
+  markReportGroupWorking(adminActor(req), paramId(req))
+    .then(() => res.status(204).end())
+    .catch(next);
+});
+
+adminRouter.patch('/reports/:id/close', validateBody(closeReportSchema), (req, res, next) => {
+  closeReportGroup(adminActor(req), paramId(req), req.body.resolution)
+    .then(() => res.status(204).end())
     .catch(next);
 });

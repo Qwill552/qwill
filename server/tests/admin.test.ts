@@ -266,7 +266,7 @@ describe('администрирование (R-32A)', () => {
       expect(sixth.status).toBe(429);
     });
 
-    it('администратор видит список жалоб', async () => {
+    it('администратор видит сгруппированный список жалоб', async () => {
       const admin = await registerUser('reportadmin', 'Разбирающий');
       await makeAdmin(admin);
       const reporter = await registerUser('reporter2', 'Жалобщик 2');
@@ -279,7 +279,11 @@ describe('администрирование (R-32A)', () => {
 
       const list = await request.get('/api/admin/reports').set('Authorization', `Bearer ${admin.token}`);
       expect(list.status).toBe(200);
-      expect(list.body.some((report: { reporterId: string }) => report.reporterId === reporter.userId)).toBe(true);
+      const group = list.body.find((g: { targetUserId: string }) => g.targetUserId === target.userId);
+      expect(group).toBeDefined();
+      expect(group.kind).toBe('card');
+      expect(group.openCount).toBe(1);
+      expect(group.reports.some((r: { reporterId: string }) => r.reporterId === reporter.userId)).toBe(true);
     });
   });
 

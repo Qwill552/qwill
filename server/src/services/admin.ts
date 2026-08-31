@@ -14,12 +14,17 @@ import {
   type AdminUserCardDto,
   type AdminUserDto,
   type CreateReportInput,
+  type ReportEntryDto,
+  type ReportGroupDto,
+  type ReportGroupView,
   type ReportKind,
   type ReportStatus,
 } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { AppError, badRequest, banned, forbidden, notFound, rateLimited } from '../lib/errors.js';
+import { toAvatarColor } from '../lib/avatarColor.js';
+import { fileUrl } from '../lib/fileUrl.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
 import { deleteCard } from './profileCard.js';
 import type { AdminAction, Report, Session, User } from '../generated/prisma/client.js';
@@ -247,14 +252,147 @@ export async function createReport(reporterId: string, input: CreateReportInput)
   return toReportDto(report);
 }
 
-export async function listReports(status?: ReportStatus): Promise<AdminReportDto[]> {
+type ReportWithGroupRelations = Report & {
+  reporter: Pick<User, 'username'>;
+  targetUser: Pick<User, 'username' | 'displayName' | 'avatarFileId' | 'avatarColor'>;
+};
+
+function reportGroupKey(kind: string, targetUserId: string, targetChatId: string | null): string {
+  return kind === 'message' ? `message:${targetChatId}` : `${kind}:${targetUserId}`;
+}
+
+function toReportEntryDto(report: ReportWithGroupRelations): ReportEntryDto {
+  return {
+    id: report.id,
+    reporterId: report.reporterId,
+    reporterUsername: report.reporter.username,
+    comment: report.comment,
+    targetMessageId: report.targetMessageId,
+    status: report.status as ReportStatus,
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
+async function chatLabel(chatId: string): Promise<{ title: string; avatarUrl: string | null } | null> {
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    include: { members: { include: { user: { select: { displayName: true } } } } },
+  });
+  if (!chat) return null;
+  if (chat.type === 'GROUP') return { title: chat.title ?? 'Группа', avatarUrl: fileUrl(chat.avatarFileId) };
+  return { title: chat.members.map((member) => member.user.displayName).join(' ↔ '), avatarUrl: null };
+}
+
+/**
+ * Пять жалоб на одну визитку — одна строка с бейджем «5» (32D). Ключ группировки — chat для
+ * "message" (объект жалобы — переписка), targetUser для "card"/"profile" (объект — сам человек).
+ * "closed" собирает решение и время закрытия по самой свежей жалобе группы — если один и тот же
+ * объект закрывали не одной серией, а несколькими за историю, отдельные resolution в это поле
+ * не попадают, только последний; полный список жалоб группы виден в `reports`.
+ */
+export async function listReportGroups(view: ReportGroupView): Promise<ReportGroupDto[]> {
   const reports = await prisma.report.findMany({
-    where: status ? { status } : undefined,
+    where: view === 'closed' ? { status: 'closed' } : { status: { in: ['new', 'working'] } },
     orderBy: { createdAt: 'desc' },
     take: REPORTS_PAGE_SIZE,
-    include: { reporter: { select: { username: true } }, targetUser: { select: { username: true } } },
+    include: {
+      reporter: { select: { username: true } },
+      targetUser: { select: { username: true, displayName: true, avatarFileId: true, avatarColor: true } },
+    },
   });
-  return reports.map(toReportDto);
+
+  const groups = new Map<string, ReportWithGroupRelations[]>();
+  for (const report of reports) {
+    const key = reportGroupKey(report.kind, report.targetUserId, report.targetChatId);
+    const list = groups.get(key);
+    if (list) list.push(report);
+    else groups.set(key, [report]);
+  }
+
+  const dtos = await Promise.all(
+    [...groups.values()].map(async (groupReports): Promise<ReportGroupDto> => {
+      const sorted = [...groupReports].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const latest = sorted[0]!;
+      const chat = latest.kind === 'message' && latest.targetChatId ? await chatLabel(latest.targetChatId) : null;
+
+      const lastClosed =
+        view === 'closed'
+          ? [...groupReports].sort((a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0))[0]
+          : null;
+
+      return {
+        latestReportId: latest.id,
+        kind: latest.kind as ReportKind,
+        targetUserId: latest.targetUserId,
+        targetUsername: latest.targetUser.username,
+        targetDisplayName: latest.targetUser.displayName,
+        targetAvatarUrl: fileUrl(latest.targetUser.avatarFileId),
+        targetAvatarColor: toAvatarColor(latest.targetUser.avatarColor),
+        targetChatId: latest.targetChatId,
+        chatTitle: chat?.title ?? null,
+        chatAvatarUrl: chat?.avatarUrl ?? null,
+        openCount: groupReports.filter((report) => report.status !== 'closed').length,
+        hasNew: groupReports.some((report) => report.status === 'new'),
+        lastComment: latest.comment,
+        lastCreatedAt: latest.createdAt.toISOString(),
+        resolution: lastClosed?.resolution ?? null,
+        closedAt: lastClosed?.closedAt ? lastClosed.closedAt.toISOString() : null,
+        reports: sorted.map(toReportEntryDto),
+      };
+    }),
+  );
+
+  return dtos.sort((a, b) => (a.lastCreatedAt < b.lastCreatedAt ? 1 : -1));
+}
+
+interface ReportGroupMembers {
+  kind: string;
+  targetUserId: string;
+  targetChatId: string | null;
+  ids: string[];
+}
+
+async function findOpenReportGroup(reportId: string): Promise<ReportGroupMembers> {
+  const report = await prisma.report.findUnique({ where: { id: reportId } });
+  if (!report) throw notFound(ErrorCode.NOT_FOUND, 'Жалоба не найдена');
+
+  const where =
+    report.kind === 'message'
+      ? { kind: report.kind, targetChatId: report.targetChatId, status: { not: 'closed' } }
+      : { kind: report.kind, targetUserId: report.targetUserId, status: { not: 'closed' } };
+  const open = await prisma.report.findMany({ where, select: { id: true } });
+  if (open.length === 0) throw notFound(ErrorCode.NOT_FOUND, 'Жалоба не найдена');
+
+  return { kind: report.kind, targetUserId: report.targetUserId, targetChatId: report.targetChatId, ids: open.map((r) => r.id) };
+}
+
+/** «Взять в работу» и «Закрыть» действуют на всю группу разом — разбирать пять одинаковых
+ *  жалоб поштучно работы без смысла (32D). */
+export async function markReportGroupWorking(actor: AdminActor, reportId: string): Promise<void> {
+  const group = await findOpenReportGroup(reportId);
+
+  await prisma.report.updateMany({ where: { id: { in: group.ids } }, data: { status: 'working' } });
+  await recordAdminAction(actor, {
+    action: 'report.working',
+    targetUserId: group.targetUserId,
+    targetChatId: group.targetChatId,
+    detail: { kind: group.kind, count: group.ids.length },
+  });
+}
+
+export async function closeReportGroup(actor: AdminActor, reportId: string, resolution: string): Promise<void> {
+  const group = await findOpenReportGroup(reportId);
+
+  await prisma.report.updateMany({
+    where: { id: { in: group.ids } },
+    data: { status: 'closed', resolution, closedAt: new Date(), closedById: actor.adminId },
+  });
+  await recordAdminAction(actor, {
+    action: 'report.close',
+    targetUserId: group.targetUserId,
+    targetChatId: group.targetChatId,
+    detail: { kind: group.kind, count: group.ids.length, resolution },
+  });
 }
 
 export interface RoleChangeResult {
