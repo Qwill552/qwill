@@ -285,7 +285,7 @@ export function SearchReveal({
       {showWave && (
         <div ref={waveRef} className={styles.wave} style={waveStyle}>
           <div className={styles.waveBlobs} style={waveBlobsStyle}>
-            <AmbientBlobs secondary />
+            <AmbientBlobs />
           </div>
           <div ref={waveBodyRef} className={`${styles.waveBody} hide-native-scrollbar`} style={waveBodyStyle}>
             <ScrollIndicator target={waveBodyRef} />

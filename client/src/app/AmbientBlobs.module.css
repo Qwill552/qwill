@@ -1,7 +1,6 @@
-/* Буквально из референса (design-archive/reference/…/Pulse Messenger.dc.html, строки 44-48,
-   19): три размытых пятна фиксированного размера, opacity гасится на светлой теме токеном
-   --blob-opacity (там же, applyTheme). Значения не масштабируются под ширину карточки —
-   референс их не масштабирует тоже. */
+/* Буквально из референса (design-archive/reference/…/Pulse Messenger.dc.html, строки 44-48):
+   три размытых пятна фиксированного размера, opacity гасится на светлой теме токеном
+   --blob-opacity (там же, applyTheme). */
 
 .layer {
   position: absolute;
@@ -15,7 +14,6 @@
 .blob {
   position: absolute;
   border-radius: 50%;
-  animation: blob 18s ease-in-out infinite;
 }
 
 .blobBlue {
@@ -25,7 +23,6 @@
   height: 340px;
   background: radial-gradient(circle, rgba(77, 141, 255, 0.55), transparent 70%);
   filter: blur(40px);
-  animation-duration: 18s;
 }
 
 .blobViolet {
@@ -35,8 +32,6 @@
   height: 300px;
   background: radial-gradient(circle, rgba(160, 90, 255, 0.45), transparent 70%);
   filter: blur(46px);
-  animation-duration: 22s;
-  animation-delay: -7s;
 }
 
 .blobTeal {
@@ -46,22 +41,6 @@
   height: 320px;
   background: radial-gradient(circle, rgba(0, 190, 190, 0.32), transparent 70%);
   filter: blur(50px);
-  animation-duration: 26s;
-  animation-delay: -13s;
 }
 
-@keyframes blob {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(40px, -30px) scale(1.15);
-  }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .blob {
-    animation: none;
-  }
-}
