@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { matchPath, useLocation } from 'react-router-dom';
 
 import styles from './AmbientBlobs.module.css';
 
@@ -25,6 +26,18 @@ interface AmbientBlobsProps {
  *  капли под ними не нужны. */
 export function AmbientBlobs({ secondary = false }: AmbientBlobsProps) {
   const layerRef = useRef<HTMLDivElement>(null);
+  const coveredByChat = matchPath('/chats/:chatId', useLocation().pathname) !== null;
+
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    for (const blob of layer.children) {
+      for (const animation of blob.getAnimations()) {
+        if (coveredByChat) animation.pause();
+        else animation.play();
+      }
+    }
+  }, [coveredByChat]);
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
