@@ -7,7 +7,7 @@ import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
-import { formatLastSeen } from '../utils/presence';
+import { formatBirthday, formatLastSeen } from '../utils/presence';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
@@ -15,19 +15,6 @@ import { GlassButton } from '../ui/chrome/GlassButton';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import styles from './UserProfileScreen.module.css';
 
-function formatBirthday(iso: string): string {
-  return new Date(`${iso}T00:00:00.000Z`).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-/** Публичный профиль произвольного пользователя по его id — тот же состав, что видят
- *  обычные люди, но без привязки к чату: разбор жалобы открывает профиль человека, с которым
- *  у администратора переписки может не быть вовсе (R-32D). Медиа и «Написать» здесь нет —
- *  и то, и другое живёт в чате, а чата тут нет. */
 export function UserProfileScreen() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
