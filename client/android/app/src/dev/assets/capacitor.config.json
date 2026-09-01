@@ -3,7 +3,8 @@
   "appName": "Qwill Dev",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
   },
   "server": {
     "androidScheme": "https",

@@ -11,6 +11,7 @@ const config = JSON.parse(await readFile(source, 'utf8'));
 config.appId = 'com.qwill.app.dev';
 config.appName = 'Qwill Dev';
 config.server = { ...config.server, url: 'https://dev.qwill.mooo.com' };
+config.android = { ...config.android, webContentsDebuggingEnabled: true };
 
 await mkdir(targetDir, { recursive: true });
 await writeFile(path.join(targetDir, 'capacitor.config.json'), `${JSON.stringify(config, null, 2)}\n`, 'utf8');
