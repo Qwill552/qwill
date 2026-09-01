@@ -1,0 +1,56 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+
+.hint,
+.done {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.done {
+  padding: 4px 16px 20px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-name);
+  resize: vertical;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-caption);
+}
+
+.send {
+  min-height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-size: var(--font-name);
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.send:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

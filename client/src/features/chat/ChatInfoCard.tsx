@@ -2,6 +2,7 @@ import type { AttachmentDto, UserProfileDto } from '@messenger/shared';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { createReportRequest } from '../../api/admin';
 import { getUserProfileRequest } from '../../api/users';
 import { useCallStore } from '../../stores/callStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -14,6 +15,7 @@ import { Card } from '../../ui/Card';
 import { Icon } from '../../ui/Icon';
 import type { IconName } from '../../ui/icons/paths';
 import { Menu, type MenuItem } from '../../ui/Menu';
+import { ReportSheet } from '../reports/ReportSheet';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import styles from './ChatInfoCard.module.css';
 
@@ -75,6 +77,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [usernameCopied, setUsernameCopied] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
@@ -131,9 +134,11 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const menuItems: MenuItem[] = [
     { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
     { id: 'edit', label: 'Изменить контакт', icon: 'edit', onSelect: () => {} },
+    { id: 'report', label: 'Пожаловаться', icon: 'report', onSelect: () => setReporting(true) },
     { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} },
     { id: 'delete', label: 'Удалить контакт', icon: 'trash', danger: true, onSelect: () => {} },
   ];
+
 
   return (
     <div ref={scrollerRef} className={`${styles.scroller} ${card.root} hide-native-scrollbar`}>
@@ -239,6 +244,16 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
 
       {menuAnchor && (
         <Menu anchor={menuAnchor} onClose={() => setMenuAnchor(null)} items={menuItems} desktopWidth={246} />
+      )}
+
+      {reporting && (
+        <ReportSheet
+          hint={`Что не так с профилем «${other.displayName}»?`}
+          onClose={() => setReporting(false)}
+          onSend={(comment) =>
+            createReportRequest({ targetUserId: other.id, kind: 'profile', comment }).then(() => undefined)
+          }
+        />
       )}
     </div>
   );

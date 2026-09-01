@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { createReportRequest } from '../api/admin';
 import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
 import { useLayoutMode } from '../app/useLayoutMode';
@@ -23,6 +24,7 @@ import { MessageComposer, type ComposerContext } from '../features/messages/Mess
 import { isDeletableSelection } from '../features/messages/messageDeleting';
 import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
+import { ReportSheet } from '../features/reports/ReportSheet';
 import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
 import { useAuthStore } from '../stores/authStore';
@@ -91,6 +93,7 @@ export function ChatScreen() {
    *  измерения последние сообщения уезжали бы под него. */
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const composerRef = useRef<HTMLDivElement>(null);
 
   const chats = useChatStore((s) => s.chats);
@@ -158,6 +161,7 @@ export function ChatScreen() {
     setComposerContext(null);
     setGroupPanelOpen(openPanelRequested);
     setHeaderMenuAnchor(null);
+    setReporting(false);
     exitSelection();
   }, [chatId, exitSelection, openPanelRequested]);
 
@@ -297,6 +301,17 @@ export function ChatScreen() {
     },
   };
 
+  const lastForeignMessage = [...messages]
+    .reverse()
+    .find((message) => message.id > 0 && message.sender && message.sender.id !== myId);
+
+  const reportItem: MenuItem = {
+    id: 'report',
+    label: 'Пожаловаться',
+    icon: 'report',
+    onSelect: () => setReporting(true),
+  };
+
   const editItem: MenuItem = { id: 'edit', label: 'Изменить', icon: 'edit', onSelect: () => {} };
   const blockItem: MenuItem = { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} };
   const deleteItem: MenuItem = {
@@ -307,15 +322,17 @@ export function ChatScreen() {
     onSelect: () => setDeleteModalOpen(true),
   };
 
+  const canReport = !isService && !isSupportChat && lastForeignMessage !== undefined;
+
   const headerMenuItems: MenuItem[] = isService
     ? [muteItem]
     : isGroup
       ? isDesktop
-        ? [editItem, muteItem, blockItem]
-        : [profileItem, muteItem]
+        ? [editItem, muteItem, ...(canReport ? [reportItem] : []), blockItem]
+        : [profileItem, muteItem, ...(canReport ? [reportItem] : [])]
       : isDesktop
-        ? [editItem, muteItem, blockItem, deleteItem]
-        : [profileItem, muteItem, deleteItem];
+        ? [editItem, muteItem, ...(canReport ? [reportItem] : []), blockItem, deleteItem]
+        : [profileItem, muteItem, ...(canReport ? [reportItem] : []), deleteItem];
 
   if (!chatId) return null;
 
@@ -495,6 +512,22 @@ export function ChatScreen() {
           messageIds={forwardRequest}
           onClose={() => setForwardRequest(null)}
           onForwarded={exitSelection}
+        />
+      )}
+
+      {reporting && lastForeignMessage?.sender && (
+        <ReportSheet
+          hint={`Что не так в переписке «${activeChat?.title ?? 'чат'}»?`}
+          onClose={() => setReporting(false)}
+          onSend={(comment) =>
+            createReportRequest({
+              targetUserId: lastForeignMessage.sender!.id,
+              kind: 'message',
+              targetChatId: chatId,
+              targetMessageId: lastForeignMessage.id,
+              comment,
+            }).then(() => undefined)
+          }
         />
       )}
     </div>

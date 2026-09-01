@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { createReportRequest } from '../../api/admin';
-import { ApiError } from '../../api/client';
 import { Icon } from '../../ui/Icon';
-import { Sheet } from '../../ui/Sheet';
+import { ReportSheet } from '../reports/ReportSheet';
 import styles from './ProfileCardFrame.module.css';
 
 /** Сколько кадр может пробыть вне экрана, прежде чем его снимут: процессор освобождается,
@@ -170,61 +169,13 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
 
       {footer}
 
-      {reporting && <ReportSheet authorName={authorName} onClose={() => setReporting(false)} onSend={sendReport} />}
-    </div>
-  );
-}
-
-interface ReportSheetProps {
-  authorName: string;
-  onClose: () => void;
-  onSend: (comment: string) => Promise<void>;
-}
-
-function ReportSheet({ authorName, onClose, onSend }: ReportSheetProps) {
-  const [comment, setComment] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-
-  async function handleSend(): Promise<void> {
-    setSending(true);
-    setError(null);
-    try {
-      await onSend(comment.trim());
-      setSent(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось отправить жалобу');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <Sheet title="Пожаловаться" onClose={onClose}>
-      {sent ? (
-        <p className={styles.reportDone}>Жалоба отправлена. Её посмотрит человек.</p>
-      ) : (
-        <div className={styles.report}>
-          <p className={styles.reportHint}>Что не так с оформлением профиля «{authorName}»?</p>
-          <textarea
-            className={styles.reportInput}
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            rows={4}
-            autoFocus
-          />
-          {error && <p className={styles.reportError}>{error}</p>}
-          <button
-            type="button"
-            className={styles.reportSend}
-            onClick={() => void handleSend()}
-            disabled={sending || comment.trim() === ''}
-          >
-            Отправить
-          </button>
-        </div>
+      {reporting && (
+        <ReportSheet
+          hint={`Что не так с оформлением профиля «${authorName}»?`}
+          onClose={() => setReporting(false)}
+          onSend={sendReport}
+        />
       )}
-    </Sheet>
+    </div>
   );
 }
