@@ -1,4 +1,5 @@
 import {
+  ADMIN_CHAT_ACCESS_SETTING_KEY,
   ADMIN_LOG_PAGE_SIZE,
   ADMIN_PASSWORD_CHANGE_REQUIRED_MESSAGE,
   ADMIN_REAUTH_FAIL_LIMIT,
@@ -238,8 +239,17 @@ export async function getProfileCardsEnabled(): Promise<boolean> {
   return setting ? setting.value === 'true' : true;
 }
 
+export async function getAdminChatAccessEnabled(): Promise<boolean> {
+  const setting = await prisma.appSetting.findUnique({ where: { key: ADMIN_CHAT_ACCESS_SETTING_KEY } });
+  return setting?.value === 'true';
+}
+
 export async function getAdminSettings(): Promise<AdminSettingsDto> {
-  return { profileCardsEnabled: await getProfileCardsEnabled() };
+  const [profileCardsEnabled, adminChatAccessEnabled] = await Promise.all([
+    getProfileCardsEnabled(),
+    getAdminChatAccessEnabled(),
+  ]);
+  return { profileCardsEnabled, adminChatAccessEnabled };
 }
 
 export async function setProfileCardsEnabled(actor: AdminActor, enabled: boolean): Promise<AdminSettingsDto> {
@@ -251,7 +261,19 @@ export async function setProfileCardsEnabled(actor: AdminActor, enabled: boolean
   });
 
   await recordAdminAction(actor, { action: 'settings.profileCards', detail: { enabled } });
-  return { profileCardsEnabled: enabled };
+  return getAdminSettings();
+}
+
+export async function setAdminChatAccessEnabled(actor: AdminActor, enabled: boolean): Promise<AdminSettingsDto> {
+  const value = enabled ? 'true' : 'false';
+  await prisma.appSetting.upsert({
+    where: { key: ADMIN_CHAT_ACCESS_SETTING_KEY },
+    create: { key: ADMIN_CHAT_ACCESS_SETTING_KEY, value, updatedById: actor.adminId },
+    update: { value, updatedById: actor.adminId },
+  });
+
+  await recordAdminAction(actor, { action: 'settings.chatAccess', detail: { enabled } });
+  return getAdminSettings();
 }
 
 type ReportWithNames = Report & {

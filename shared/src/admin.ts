@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DISPLAY_NAME_MAX_LENGTH, DISPLAY_NAME_MIN_LENGTH } from './constants.js';
+import type { ChatMemberSummary, ChatType } from './chat.js';
 import type { AvatarColor, BioMode, UserRole } from './user.js';
 
 export const REPORT_KIND_VALUES = ['card', 'message', 'profile'] as const;
@@ -17,6 +18,11 @@ export const BAN_REASON_MAX_LENGTH = 500;
 
 /** Ключ глобального рубильника визиток в AppSetting; значение — "true"/"false". */
 export const PROFILE_CARDS_SETTING_KEY = 'profileCardsEnabled';
+
+export const ADMIN_CHAT_ACCESS_SETTING_KEY = 'adminChatAccessEnabled';
+
+export const ADMIN_CHAT_ACCESS_DISABLED_MESSAGE = 'Чтение переписки выключено рубильником';
+export const ADMIN_CHAT_NOT_REPORTED_MESSAGE = 'На этот чат нет открытой жалобы';
 
 export const createReportSchema = z
   .object({
@@ -89,6 +95,9 @@ export const LAST_ADMIN_MESSAGE = 'Это последний администр�
 export const setProfileCardsSchema = z.object({ enabled: z.boolean() });
 export type SetProfileCardsInput = z.infer<typeof setProfileCardsSchema>;
 
+export const setAdminChatAccessSchema = z.object({ enabled: z.boolean() });
+export type SetAdminChatAccessInput = z.infer<typeof setAdminChatAccessSchema>;
+
 export const muteSupportSchema = z.object({ until: z.string().datetime().nullable() });
 export type MuteSupportInput = z.infer<typeof muteSupportSchema>;
 
@@ -125,6 +134,17 @@ export interface AdminReportDto {
 
 export interface AdminSettingsDto {
   profileCardsEnabled: boolean;
+  adminChatAccessEnabled: boolean;
+}
+
+export interface AdminChatDto {
+  id: string;
+  type: ChatType;
+  title: string;
+  avatarUrl: string | null;
+  members: ChatMemberSummary[];
+  reportId: string;
+  reportedMessageIds: number[];
 }
 
 export interface ReportEntryDto {
@@ -180,6 +200,8 @@ export const ADMIN_ACTION_VALUES = [
   'report.working',
   'report.close',
   'reauth.fail',
+  'settings.chatAccess',
+  'chat.open',
 ] as const;
 export type AdminActionName = (typeof ADMIN_ACTION_VALUES)[number];
 

@@ -13,6 +13,7 @@ import { Router, raw } from 'express';
 import { env } from '../../config/env.js';
 import { unauthorized } from '../../lib/errors.js';
 import { signFileToken, verifyFileToken } from '../../lib/tokens.js';
+import { canAdminReadFile } from '../../services/adminChat.js';
 import * as fileService from '../../services/file.js';
 import { requireUserFromAccessToken } from '../../services/auth.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -69,11 +70,18 @@ filesRouter.patch(
   },
 );
 
+async function assertFileVisible(fileId: string, userId: string): Promise<void> {
+  try {
+    await fileService.assertFileAccess(fileId, userId);
+  } catch (error) {
+    if (!(await canAdminReadFile(fileId, userId))) throw error;
+  }
+}
+
 /** Короткоживущий токен для img/video src — Bearer-заголовок эти теги отправить не могут (секция 7). */
 filesRouter.get('/:id/token', requireAuth, (req, res, next) => {
   const fileId = paramId(req);
-  fileService
-    .assertFileAccess(fileId, req.userId!)
+  assertFileVisible(fileId, req.userId!)
     .then(() => res.json({ token: signFileToken(req.userId!, fileId) }))
     .catch(next);
 });
@@ -101,7 +109,7 @@ filesRouter.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   const fileId = paramId(req);
 
   resolveRequesterId(req, fileId)
-    .then((userId) => fileService.assertFileAccess(fileId, userId))
+    .then((userId) => assertFileVisible(fileId, userId))
     .then(() => fileService.getFileForServing(fileId))
     .then(async (info) => {
       const stat = await fs.stat(info.path);

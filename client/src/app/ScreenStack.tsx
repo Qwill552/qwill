@@ -43,6 +43,7 @@ import {
   DESKTOP_LIST_WIDTH_DEFAULT,
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
+import { AdminChatView } from '../features/admin/AdminChatView';
 import { ChatInfoCard } from '../features/chat/ChatInfoCard';
 import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
@@ -110,6 +111,7 @@ const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
   if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
+  if (matchPath('/admin/chats/:chatId', pathname)) return { title: 'Режим чтения', backTo: '/admin' };
   if (matchPath('/admin/users/:id/profile', pathname)) return { title: 'Профиль', backTo: '/admin' };
   if (matchPath('/admin/users/:id', pathname)) return { title: 'Пользователь', backTo: '/admin' };
   const subroute = OVERLAY_SUBROUTE_TITLE[pathname];
@@ -146,6 +148,7 @@ const RouteSwitch = memo(
         <Route path="/admin/users/:id" element={<AdminUserScreen />} />
         <Route path="/admin/users/:id/profile" element={<UserProfileScreen />} />
         <Route path="/admin/log" element={<AdminLogScreen />} />
+        <Route path="/admin/chats/:chatId" element={<AdminChatView />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
     );

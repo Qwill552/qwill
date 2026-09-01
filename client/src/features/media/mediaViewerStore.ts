@@ -1,4 +1,4 @@
-import type { AttachmentDto } from '@messenger/shared';
+import type { AttachmentDto, MessageDto } from '@messenger/shared';
 import { create } from 'zustand';
 
 import { useChatStore } from '../../stores/chatStore';
@@ -16,15 +16,14 @@ interface MediaViewerState {
   chatId: string | null;
   items: MediaViewerItem[];
   index: number;
+  readOnly: boolean;
   open: (chatId: string, attachmentId: string) => void;
   setIndex: (index: number) => void;
   dropMessage: (messageId: number) => void;
   close: () => void;
 }
 
-function collect(chatId: string): MediaViewerItem[] {
-  const chat = useChatStore.getState();
-  const messages = chat.messagesByChat[chatId] ?? [];
+function toItems(messages: MessageDto[], myId: string | null): MediaViewerItem[] {
   const items: MediaViewerItem[] = [];
 
   for (const message of messages) {
@@ -36,23 +35,39 @@ function collect(chatId: string): MediaViewerItem[] {
       attachment,
       senderName: message.sender?.displayName ?? '',
       createdAt: message.createdAt,
-      own: message.sender?.id === chat.myUserId,
+      own: message.sender?.id === myId,
     });
   }
 
   return items;
 }
 
+function collect(chatId: string): MediaViewerItem[] {
+  const chat = useChatStore.getState();
+  return toItems(chat.messagesByChat[chatId] ?? [], chat.myUserId);
+}
+
+let readOnlySource: { chatId: string; messages: () => MessageDto[] } | null = null;
+
+export function setReadOnlyMediaSource(chatId: string, messages: () => MessageDto[]): () => void {
+  readOnlySource = { chatId, messages };
+  return () => {
+    if (readOnlySource?.chatId === chatId) readOnlySource = null;
+  };
+}
+
 export const useMediaViewerStore = create<MediaViewerState>((set, get) => ({
   chatId: null,
   items: [],
   index: 0,
+  readOnly: false,
 
   open(chatId, attachmentId) {
-    const items = collect(chatId);
+    const readOnly = readOnlySource?.chatId === chatId;
+    const items = readOnly ? toItems(readOnlySource!.messages(), null) : collect(chatId);
     const index = items.findIndex((item) => item.attachment.id === attachmentId);
     if (index < 0) return;
-    set({ chatId, items, index });
+    set({ chatId, items, index, readOnly });
   },
 
   setIndex(index) {
@@ -64,14 +79,14 @@ export const useMediaViewerStore = create<MediaViewerState>((set, get) => ({
     const { items, index } = get();
     const next = items.filter((item) => item.messageId !== messageId);
     if (next.length === 0) {
-      set({ chatId: null, items: [], index: 0 });
+      set({ chatId: null, items: [], index: 0, readOnly: false });
       return;
     }
     set({ items: next, index: Math.min(next.length - 1, index) });
   },
 
   close() {
-    set({ chatId: null, items: [], index: 0 });
+    set({ chatId: null, items: [], index: 0, readOnly: false });
   },
 }));
 
@@ -83,8 +98,8 @@ export function openMediaViewer(chatId: string, attachmentId: string): void {
 // deleteMessage (MediaViewer.handleConfirmDelete) вызывает dropMessage сам, для чужого
 // удаления нужна эта подписка (R-15, «Проверка руками», п.9).
 useChatStore.subscribe((state) => {
-  const { chatId, items } = useMediaViewerStore.getState();
-  if (!chatId || items.length === 0) return;
+  const { chatId, items, readOnly } = useMediaViewerStore.getState();
+  if (readOnly || !chatId || items.length === 0) return;
   const list = state.messagesByChat[chatId];
   if (!list) return;
   for (const item of items) {

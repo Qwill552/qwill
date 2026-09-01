@@ -5,8 +5,10 @@ import {
   banUserSchema,
   closeReportSchema,
   markReportWorkingSchema,
+  messagesQuerySchema,
   muteSupportSchema,
   reportGroupViewSchema,
+  setAdminChatAccessSchema,
   setProfileCardsSchema,
   setUserCardSchema,
 } from '@messenger/shared';
@@ -31,11 +33,13 @@ import {
   reauthAdmin,
   revealUserPii,
   revokeUserSessions,
+  setAdminChatAccessEnabled,
   setProfileCardsEnabled,
   setUserCardDisabled,
   setUserDisplayName,
   unbanUser,
 } from '../../services/admin.js';
+import { getChatForAdmin, getMessagesForAdmin } from '../../services/adminChat.js';
 import { adminActor, requireAdmin, requireAdminTicket, requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -167,6 +171,34 @@ adminRouter.patch(
       .catch(next);
   },
 );
+
+adminRouter.patch(
+  '/settings/chat-access',
+  requireAdminTicket,
+  validateBody(setAdminChatAccessSchema),
+  (req, res, next) => {
+    setAdminChatAccessEnabled(adminActor(req), req.body.enabled)
+      .then((settings) => res.json(settings))
+      .catch(next);
+  },
+);
+
+adminRouter.get('/chats/:id', requireAdminTicket, (req, res, next) => {
+  getChatForAdmin(adminActor(req), paramId(req))
+    .then((chat) => res.json(chat))
+    .catch(next);
+});
+
+adminRouter.get('/chats/:id/messages', requireAdminTicket, (req, res, next) => {
+  try {
+    const { before, limit } = parseOrThrow(messagesQuerySchema, req.query);
+    getMessagesForAdmin(paramId(req), before, limit)
+      .then((page) => res.json(page))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
 
 adminRouter.get('/reports', (req, res, next) => {
   const query = parseOrThrow(reportGroupViewSchema, req.query);

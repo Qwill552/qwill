@@ -1,6 +1,7 @@
 import {
   ADMIN_TICKET_HEADER,
   ErrorCode,
+  type AdminChatDto,
   type AdminLogPageDto,
   type AdminLogQuery,
   type AdminPiiDto,
@@ -9,6 +10,7 @@ import {
   type AdminTicketDto,
   type AdminUserCardDto,
   type CreateReportInput,
+  type MessagesPage,
   type ReportGroupDto,
   type ReportGroupView,
 } from '@messenger/shared';
@@ -131,6 +133,27 @@ export function setProfileCardsRequest(enabled: boolean): Promise<AdminSettingsD
       body: { enabled },
       headers: ticketHeaders(),
     }),
+  );
+}
+
+export function setAdminChatAccessRequest(enabled: boolean): Promise<AdminSettingsDto> {
+  return ticketed(() =>
+    apiRequest<AdminSettingsDto>('/api/admin/settings/chat-access', {
+      method: 'PATCH',
+      body: { enabled },
+      headers: ticketHeaders(),
+    }),
+  );
+}
+
+export function getAdminChatRequest(chatId: string): Promise<AdminChatDto> {
+  return ticketed(() => apiRequest<AdminChatDto>(`/api/admin/chats/${chatId}`, { headers: ticketHeaders() }));
+}
+
+export function getAdminChatMessagesRequest(chatId: string, before?: number): Promise<MessagesPage> {
+  const query = before ? `?before=${before}` : '';
+  return ticketed(() =>
+    apiRequest<MessagesPage>(`/api/admin/chats/${chatId}/messages${query}`, { headers: ticketHeaders() }),
   );
 }
 

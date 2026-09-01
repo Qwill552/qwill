@@ -97,6 +97,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
   const setIndex = useMediaViewerStore((s) => s.setIndex);
   const dropMessage = useMediaViewerStore((s) => s.dropMessage);
   const closeViewer = useMediaViewerStore((s) => s.close);
+  const readOnly = useMediaViewerStore((s) => s.readOnly);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
 
   const viewport = useViewport();
@@ -424,11 +425,11 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   if (!current) return null;
 
-  const menuItems: MenuItem[] = [
-    { id: 'save', label: 'Сохранить', icon: 'download', onSelect: handleSave },
-    { id: 'forward', label: 'Переслать', icon: 'forward', onSelect: () => setForwarding(true) },
-  ];
-  if (current.own) {
+  const menuItems: MenuItem[] = [{ id: 'save', label: 'Сохранить', icon: 'download', onSelect: handleSave }];
+  if (!readOnly) {
+    menuItems.push({ id: 'forward', label: 'Переслать', icon: 'forward', onSelect: () => setForwarding(true) });
+  }
+  if (current.own && !readOnly) {
     menuItems.push({ id: 'delete', label: 'Удалить', icon: 'trash', danger: true, onSelect: handleDelete });
   }
 

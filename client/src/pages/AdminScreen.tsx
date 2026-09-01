@@ -1,8 +1,19 @@
-import { ErrorCode, type ReportGroupDto, type ReportGroupView } from '@messenger/shared';
+import {
+  ErrorCode,
+  type AdminSettingsDto,
+  type ReportGroupDto,
+  type ReportGroupView,
+} from '@messenger/shared';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { findAdminUserByUsernameRequest, listReportGroupsRequest } from '../api/admin';
+import {
+  findAdminUserByUsernameRequest,
+  getAdminSettingsRequest,
+  listReportGroupsRequest,
+  setAdminChatAccessRequest,
+  setProfileCardsRequest,
+} from '../api/admin';
 import { ApiError } from '../api/client';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
@@ -13,6 +24,7 @@ import { useAuthStore } from '../stores/authStore';
 import { Card } from '../ui/Card';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { Switch } from '../ui/Switch';
 import styles from './AdminScreen.module.css';
 
 function errorText(error: unknown): string {
@@ -44,6 +56,10 @@ export function AdminScreen() {
   const [selectedGroup, setSelectedGroup] = useState<ReportGroupDto | null>(null);
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
 
+  const [settings, setSettings] = useState<AdminSettingsDto | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
   const loadReports = useCallback((view: ReportGroupView) => {
     listReportGroupsRequest(view)
       .then((groups) => {
@@ -63,6 +79,22 @@ export function AdminScreen() {
     if (role !== 'admin') return;
     loadReports(reportView);
   }, [role, reportView, loadReports]);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    getAdminSettingsRequest()
+      .then(setSettings)
+      .catch(() => setSettings(null));
+  }, [role]);
+
+  function runSettings(action: () => Promise<AdminSettingsDto>): void {
+    setSettingsBusy(true);
+    setSettingsError(null);
+    action()
+      .then(setSettings)
+      .catch((error: unknown) => setSettingsError(errorText(error)))
+      .finally(() => setSettingsBusy(false));
+  }
 
   function handleSearch(event: FormEvent): void {
     event.preventDefault();
@@ -131,6 +163,42 @@ export function AdminScreen() {
                 subtitle="Кто, что и когда сделал"
                 onClick={() => navigate('/admin/log')}
               />
+            </Card>
+
+            <Card caption="Рубильники">
+              <Card.Row
+                title="HTML-визитки"
+                subtitle={
+                  settings?.profileCardsEnabled
+                    ? 'Показываются всем'
+                    : 'Скрыты у всех, код визиток сохраняется'
+                }
+                trailing={
+                  <Switch
+                    checked={settings?.profileCardsEnabled ?? false}
+                    onChange={(next) => runSettings(() => setProfileCardsRequest(next))}
+                    label="HTML-визитки"
+                    disabled={settingsBusy || !settings}
+                  />
+                }
+              />
+              <Card.Row
+                title="Чтение переписки по жалобе"
+                subtitle={
+                  settings?.adminChatAccessEnabled
+                    ? 'Чат с открытой жалобой открывается в режиме чтения'
+                    : 'Выключено — чат не отдаётся даже администратору'
+                }
+                trailing={
+                  <Switch
+                    checked={settings?.adminChatAccessEnabled ?? false}
+                    onChange={(next) => runSettings(() => setAdminChatAccessRequest(next))}
+                    label="Чтение переписки по жалобе"
+                    disabled={settingsBusy || !settings}
+                  />
+                }
+              />
+              {settingsError && <Card.Row title="Ошибка" subtitle={settingsError} danger />}
             </Card>
 
             <Card caption="Жалобы">

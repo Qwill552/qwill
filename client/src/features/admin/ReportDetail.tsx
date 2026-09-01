@@ -72,6 +72,11 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
     navigate(`/admin/users/${userId}`);
   }
 
+  function openChat(chatId: string): void {
+    onClose();
+    navigate(`/admin/chats/${chatId}`);
+  }
+
   async function runCardAction(action: () => Promise<AdminUserCardDto>): Promise<void> {
     setBusy(true);
     setError(null);
@@ -177,7 +182,11 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
 
         {group.kind === 'message' && (
           <Card caption="Объект жалобы">
-            <Card.Row title={group.chatTitle ?? 'Чат'} subtitle="Чтение переписки появится в 32G" />
+            <Card.Row
+              title={group.chatTitle ?? 'Чат'}
+              subtitle="Открыть переписку в режиме чтения"
+              onClick={group.targetChatId ? () => openChat(group.targetChatId!) : undefined}
+            />
           </Card>
         )}
 

@@ -1,0 +1,83 @@
+.screen {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.list {
+  --message-gap: 4px;
+
+  position: relative;
+  z-index: 2;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--message-gap);
+  overflow-x: clip;
+  overflow-y: auto;
+  padding: var(--chrome-space-top) 12px calc(var(--safe-bottom) + var(--space-6));
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.list > * {
+  flex-shrink: 0;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 2px 0;
+  border-radius: var(--radius-sm);
+}
+
+.reported {
+  background: var(--primary-soft);
+}
+
+.avatarSlot {
+  width: 36px;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+.loadMore {
+  align-self: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.loadMore:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.loadMore:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.start,
+.error {
+  align-self: center;
+  margin: var(--space-3) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  text-align: center;
+}
+
+.error {
+  color: var(--danger);
+}
