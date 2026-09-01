@@ -39,7 +39,7 @@ export type MessageWithRelations = Message & {
   announcement: Announcement | null;
 };
 
-function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
+export function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
   return {
     id: attachment.id,
     file: toFileDto(attachment.file),

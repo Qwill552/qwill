@@ -22,6 +22,36 @@ export const messagesSyncQuerySchema = z.object({
 });
 export type MessagesSyncQuery = z.infer<typeof messagesSyncQuerySchema>;
 
+export type ChatAttachmentCategory = 'media' | 'file' | 'voice' | 'gif';
+
+export const chatAttachmentsQuerySchema = z.object({
+  category: z.enum(['media', 'file', 'voice', 'gif']),
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
+});
+export type ChatAttachmentsQuery = z.infer<typeof chatAttachmentsQuerySchema>;
+
+export interface ChatAttachmentDto {
+  messageId: number;
+  createdAt: string;
+  senderId: string | null;
+  attachment: AttachmentDto;
+}
+
+export interface ChatAttachmentsPage {
+  items: ChatAttachmentDto[];
+  hasMore: boolean;
+}
+
+export interface ChatAttachmentCounts {
+  photos: number;
+  videos: number;
+  voices: number;
+  gifs: number;
+  audios: number;
+  files: number;
+}
+
 /** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).
  *  content — подпись; обязателен, только если вложения нет. */
 export const messageSendSchema = z

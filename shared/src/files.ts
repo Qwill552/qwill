@@ -41,6 +41,17 @@ export interface AttachmentDto {
   peaks: number[] | null;
 }
 
+export type ChatAttachmentKind = 'photo' | 'video' | 'gif' | 'voice' | 'audio' | 'file';
+
+export function categorizeAttachment(mimeType: string, peaks: number[] | null | undefined): ChatAttachmentKind {
+  if (peaks && peaks.length > 0) return 'voice';
+  if (mimeType === 'image/gif') return 'gif';
+  if (mimeType.startsWith('image/')) return 'photo';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  return 'file';
+}
+
 /**
  * sha256 обязателен и здесь: сервер проверяет им, что клиент и правда владеет содержимым
  * fileId (посчитал тот же хэш при initUpload), а не просто подставил чужой id — иначе можно

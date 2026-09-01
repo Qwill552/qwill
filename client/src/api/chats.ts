@@ -1,4 +1,7 @@
 import type {
+  ChatAttachmentCategory,
+  ChatAttachmentCounts,
+  ChatAttachmentsPage,
   ChatDto,
   ChatListResponse,
   ChatUpdatedEvent,
@@ -42,6 +45,20 @@ export function syncMessagesRequest(
   const params = new URLSearchParams({ sinceId: String(sinceId) });
   if (sinceUpdatedAt) params.set('sinceUpdatedAt', sinceUpdatedAt);
   return apiRequest<MessagesSyncResponse>(`/api/chats/${chatId}/sync?${params.toString()}`);
+}
+
+export function getChatAttachmentsRequest(
+  chatId: string,
+  category: ChatAttachmentCategory,
+  before?: number,
+): Promise<ChatAttachmentsPage> {
+  const params = new URLSearchParams({ category });
+  if (before !== undefined) params.set('before', String(before));
+  return apiRequest<ChatAttachmentsPage>(`/api/chats/${chatId}/attachments?${params.toString()}`);
+}
+
+export function getChatAttachmentCountsRequest(chatId: string): Promise<ChatAttachmentCounts> {
+  return apiRequest<ChatAttachmentCounts>(`/api/chats/${chatId}/attachments/counts`);
 }
 
 export function updateGroupRequest(chatId: string, input: UpdateGroupInput): Promise<ChatUpdatedEvent> {

@@ -1,5 +1,6 @@
 import {
   addMemberSchema,
+  chatAttachmentsQuerySchema,
   chatMuteSchema,
   createGroupSchema,
   createPrivateChatSchema,
@@ -23,6 +24,7 @@ import {
   syncPresenceBetween,
   unsubscribeUserFromChat,
 } from '../../realtime/index.js';
+import * as chatMediaService from '../../services/chatMedia.js';
 import * as chatService from '../../services/chat.js';
 import * as groupService from '../../services/group.js';
 import * as messageService from '../../services/message.js';
@@ -122,6 +124,25 @@ chatsRouter.get('/:id/sync', (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+chatsRouter.get('/:id/attachments', (req, res, next) => {
+  try {
+    const query = parseOrThrow(chatAttachmentsQuerySchema, req.query);
+    chatMediaService
+      .listChatAttachments(paramId(req, 'id'), req.userId!, query)
+      .then((page) => res.json(page))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.get('/:id/attachments/counts', (req, res, next) => {
+  chatMediaService
+    .countChatAttachments(paramId(req, 'id'), req.userId!)
+    .then((counts) => res.json(counts))
+    .catch(next);
 });
 
 chatsRouter.delete('/:id', (req, res, next) => {
