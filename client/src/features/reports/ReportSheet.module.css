@@ -1,11 +1,17 @@
 .body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 4px 16px 16px;
 }
 
-.hint,
+.hint {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-name);
+}
+
+.note,
 .done {
   margin: 0;
   color: var(--text-secondary);

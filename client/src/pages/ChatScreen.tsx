@@ -307,7 +307,7 @@ export function ChatScreen() {
 
   const reportItem: MenuItem = {
     id: 'report',
-    label: 'Пожаловаться',
+    label: 'Пожаловаться на переписку',
     icon: 'report',
     onSelect: () => setReporting(true),
   };
@@ -517,7 +517,8 @@ export function ChatScreen() {
 
       {reporting && lastForeignMessage?.sender && (
         <ReportSheet
-          hint={`Что не так в переписке «${activeChat?.title ?? 'чат'}»?`}
+          hint={`Жалоба на переписку «${activeChat?.title ?? 'чат'}»: на то, что вам здесь пишут и присылают.`}
+          note="Это не жалоба на профиль. Если дело в имени, фото, «О себе» или оформлении собеседника, пожалуйтесь из его профиля: «Ещё» → «Пожаловаться на профиль»."
           onClose={() => setReporting(false)}
           onSend={(comment) =>
             createReportRequest({

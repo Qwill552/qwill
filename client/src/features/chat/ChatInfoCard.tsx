@@ -134,7 +134,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const menuItems: MenuItem[] = [
     { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
     { id: 'edit', label: 'Изменить контакт', icon: 'edit', onSelect: () => {} },
-    { id: 'report', label: 'Пожаловаться', icon: 'report', onSelect: () => setReporting(true) },
+    { id: 'report', label: 'Пожаловаться на профиль', icon: 'report', onSelect: () => setReporting(true) },
     { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} },
     { id: 'delete', label: 'Удалить контакт', icon: 'trash', danger: true, onSelect: () => {} },
   ];
@@ -248,7 +248,8 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
 
       {reporting && (
         <ReportSheet
-          hint={`Что не так с профилем «${other.displayName}»?`}
+          hint={`Жалоба на профиль @${other.username}: имя, фото, «О себе», оформление.`}
+          note="Это не жалоба на переписку. Если дело в том, что вам пишут или присылают, пожалуйтесь из самого чата: «…» в шапке → «Пожаловаться на переписку»."
           onClose={() => setReporting(false)}
           onSend={(comment) =>
             createReportRequest({ targetUserId: other.id, kind: 'profile', comment }).then(() => undefined)

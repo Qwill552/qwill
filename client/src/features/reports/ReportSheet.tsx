@@ -6,11 +6,12 @@ import styles from './ReportSheet.module.css';
 
 interface ReportSheetProps {
   hint: string;
+  note: string;
   onClose: () => void;
   onSend: (comment: string) => Promise<void>;
 }
 
-export function ReportSheet({ hint, onClose, onSend }: ReportSheetProps) {
+export function ReportSheet({ hint, note, onClose, onSend }: ReportSheetProps) {
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function ReportSheet({ hint, onClose, onSend }: ReportSheetProps) {
       ) : (
         <div className={styles.body}>
           <p className={styles.hint}>{hint}</p>
+          <p className={styles.note}>{note}</p>
           <textarea
             className={styles.input}
             value={comment}

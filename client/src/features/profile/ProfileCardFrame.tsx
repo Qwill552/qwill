@@ -171,7 +171,8 @@ export function ProfileCardFrame({ cardUrl, authorId, authorName, autoStart = fa
 
       {reporting && (
         <ReportSheet
-          hint={`Что не так с оформлением профиля «${authorName}»?`}
+          hint={`Жалоба на оформление профиля «${authorName}»: на саму визитку, её вид и поведение.`}
+          note="На имя, фото и «О себе» жалуются из профиля: «Ещё» → «Пожаловаться на профиль». На то, что вам пишут, — из чата: «…» в шапке → «Пожаловаться на переписку»."
           onClose={() => setReporting(false)}
           onSend={sendReport}
         />
