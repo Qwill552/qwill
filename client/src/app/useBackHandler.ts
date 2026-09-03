@@ -54,8 +54,14 @@ export function useBackHandler(isOpen: boolean, onClose: () => void): void {
       window.history.pushState({ ...window.history.state, qwillOverlay: true, entryId: state.entryId }, '');
     }
 
+    function ourEntryIsStillCurrent(): boolean {
+      return window.history.state?.entryId === state.entryId;
+    }
+
     function handlePopState(): void {
+      if (ourEntryIsStillCurrent()) return;
       state.pushed = false;
+      openOverlays = Math.max(0, openOverlays - 1);
       onCloseRef.current();
     }
 

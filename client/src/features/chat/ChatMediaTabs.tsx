@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { getChatAttachmentCountsRequest } from '../../api/chats';
 import { haptic } from '../../ui/haptic';
 import { FilesTab } from './FilesTab';
-import { GifTab } from './GifTab';
 import { MediaTabGrid } from './MediaTabGrid';
 import { plural } from './plural';
 import { VoiceTab } from './VoiceTab';
@@ -458,7 +457,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
               {tab.id === 'media' && <MediaTabGrid chatId={chatId} />}
               {tab.id === 'file' && <FilesTab chatId={chatId} />}
               {tab.id === 'voice' && <VoiceTab chatId={chatId} />}
-              {tab.id === 'gif' && <GifTab chatId={chatId} />}
+              {tab.id === 'gif' && <MediaTabGrid chatId={chatId} category="gif" />}
             </div>
           );
         })}

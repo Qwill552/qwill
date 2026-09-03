@@ -1,3 +1,4 @@
+import type { ChatAttachmentCategory, ChatAttachmentDto } from '@messenger/shared';
 import { useEffect, useRef } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
@@ -12,16 +13,17 @@ const SKELETON_TILES = 12;
 
 interface MediaTabGridProps {
   chatId: string;
+  category?: ChatAttachmentCategory;
 }
 
-export function MediaTabGrid({ chatId }: MediaTabGridProps) {
-  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'media');
+export function MediaTabGrid({ chatId, category = 'media' }: MediaTabGridProps) {
+  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, category);
 
   const myUserId = useChatStore((s) => s.myUserId);
   const myName = useAuthStore((s) => s.user?.displayName ?? '');
   const otherName = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.otherMember?.displayName ?? '');
 
-  const itemsRef = useRef(items);
+  const itemsRef = useRef<ChatAttachmentDto[]>(items);
   itemsRef.current = items;
 
   useEffect(
