@@ -1,14 +1,19 @@
 package com.qwill.app;
 
+import android.app.DownloadManager;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.URLUtil;
 import android.webkit.WebView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 
@@ -37,6 +42,7 @@ public class MainActivity extends BridgeActivity {
 
         current = new WeakReference<>(this);
         consumeCallIntent(getIntent());
+        acceptDownloads();
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -81,6 +87,62 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         activity.runOnUiThread(activity::removeConnectingOverlay);
+    }
+
+    private void acceptDownloads() {
+        Bridge bridge = getBridge();
+        WebView webView = bridge == null ? null : bridge.getWebView();
+        if (webView == null) {
+            return;
+        }
+        webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) ->
+            enqueueDownload(url, userAgent, contentDisposition, mimeType));
+    }
+
+    private void enqueueDownload(String url, String userAgent, String contentDisposition, String mimeType) {
+        DownloadManager manager = getSystemService(DownloadManager.class);
+        if (manager == null) {
+            return;
+        }
+
+        String fileName = downloadFileName(url, contentDisposition, mimeType);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        request.setTitle(fileName);
+        request.setMimeType(mimeType);
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        if (userAgent != null) {
+            request.addRequestHeader("User-Agent", userAgent);
+        }
+        String cookie = CookieManager.getInstance().getCookie(url);
+        if (cookie != null) {
+            request.addRequestHeader("Cookie", cookie);
+        }
+
+        try {
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+        } catch (IllegalStateException unavailable) {
+            request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
+        }
+
+        try {
+            manager.enqueue(request);
+            Toast.makeText(this, getString(R.string.download_started, fileName), Toast.LENGTH_SHORT).show();
+        } catch (RuntimeException error) {
+            Toast.makeText(this, R.string.download_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String downloadFileName(String url, String contentDisposition, String mimeType) {
+        String named = null;
+        try {
+            named = Uri.parse(url).getQueryParameter("name");
+        } catch (UnsupportedOperationException opaque) {
+            named = null;
+        }
+        if (named == null || named.trim().isEmpty()) {
+            return URLUtil.guessFileName(url, contentDisposition, mimeType);
+        }
+        return named.trim().replaceAll("[\\\\/:*?\"<>|\\u0000-\\u001f]", "_");
     }
 
     private void consumeCallIntent(Intent intent) {

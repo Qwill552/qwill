@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useFileSrc } from '../../api/useFileSrc';
+import { downloadFile } from './downloadFile';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { GlassButton } from '../../ui/chrome/GlassButton';
@@ -133,13 +134,7 @@ function AvatarViewerStage({ url }: { url: string }) {
 
   function handleSave(): void {
     if (!src) return;
-    const link = document.createElement('a');
-    link.href = src;
-    link.download = 'avatar.jpg';
-    link.rel = 'noreferrer';
-    document.body.append(link);
-    link.click();
-    link.remove();
+    downloadFile(src, 'avatar.jpg');
   }
 
   return createPortal(

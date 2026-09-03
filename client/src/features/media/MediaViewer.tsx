@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from 'react-dom';
 
 import { useFileSrc } from '../../api/useFileSrc';
+import { downloadFile } from './downloadFile';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { useChatStore } from '../../stores/chatStore';
@@ -401,13 +402,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   function handleSave(): void {
     if (!streamSrc || !current) return;
-    const link = document.createElement('a');
-    link.href = streamSrc;
-    link.download = current.attachment.originalName;
-    link.rel = 'noreferrer';
-    document.body.append(link);
-    link.click();
-    link.remove();
+    downloadFile(streamSrc, current.attachment.originalName);
   }
 
   function handleDelete(): void {

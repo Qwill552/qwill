@@ -3,6 +3,7 @@ import type { ChatAttachmentDto } from '@messenger/shared';
 import { useFileSrc } from '../../api/useFileSrc';
 import { IconTile } from '../../ui/IconTile';
 import { Skeleton } from '../../ui/Skeleton';
+import { downloadFile } from '../media/downloadFile';
 import { fileKindFor } from '../media/fileKind';
 import { formatBytes } from '../messages/Attachment';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
@@ -18,14 +19,7 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
 
   function open(): void {
     if (!href) return;
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = attachment.originalName;
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    document.body.append(link);
-    link.click();
-    link.remove();
+    downloadFile(href, attachment.originalName);
   }
 
   return (
