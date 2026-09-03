@@ -28,6 +28,44 @@
   outline-offset: -2px;
 }
 
+.lead {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+}
+
+.progress {
+  position: absolute;
+  display: grid;
+  inset: -6px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--scrim-bg);
+  color: var(--text-on-primary);
+}
+
+.progress > * {
+  grid-area: 1 / 1;
+}
+
+.cancelGlyph {
+  color: var(--text-on-primary);
+}
+
+.ready {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--online);
+  color: var(--text-on-primary);
+}
+
 .info {
   display: flex;
   min-width: 0;

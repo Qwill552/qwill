@@ -1,12 +1,13 @@
 import type { ChatAttachmentDto } from '@messenger/shared';
 
-import { useFileSrc } from '../../api/useFileSrc';
+import { Icon } from '../../ui/Icon';
 import { IconTile } from '../../ui/IconTile';
 import { Skeleton } from '../../ui/Skeleton';
-import { downloadFile } from '../media/downloadFile';
 import { fileKindFor } from '../media/fileKind';
+import { useFileDownload } from '../media/useFileDownload';
 import { formatBytes } from '../messages/Attachment';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
+import { ProgressRing } from '../messages/ProgressRing';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './FilesTab.module.css';
 
@@ -15,16 +16,30 @@ const SKELETON_ROWS = 8;
 function FileRow({ item }: { item: ChatAttachmentDto }) {
   const { attachment } = item;
   const kind = fileKindFor(attachment.file.mimeType);
-  const href = useFileSrc(attachment.file.id, 'stream');
-
-  function open(): void {
-    if (!href) return;
-    downloadFile(href, attachment.originalName);
-  }
+  const { state, progress, activate, cancel } = useFileDownload(attachment);
+  const busy = state === 'downloading';
 
   return (
-    <button type="button" className={styles.row} onClick={open}>
-      <IconTile icon={kind.icon} tint={kind.tint} />
+    <button
+      type="button"
+      className={styles.row}
+      onClick={busy ? cancel : activate}
+      aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
+    >
+      <span className={styles.lead}>
+        <IconTile icon={kind.icon} tint={kind.tint} />
+        {busy && (
+          <span className={styles.progress}>
+            <ProgressRing progress={progress} />
+            <Icon name="close" size={14} className={styles.cancelGlyph} />
+          </span>
+        )}
+        {state === 'ready' && (
+          <span className={styles.ready} aria-hidden="true">
+            <Icon name="check" size={12} />
+          </span>
+        )}
+      </span>
       <span className={styles.info}>
         <span className={styles.name}>{attachment.originalName}</span>
         <span className={styles.meta}>
