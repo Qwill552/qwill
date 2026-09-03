@@ -1,25 +1,37 @@
 import type { AttachmentDto } from '@messenger/shared';
 import type { ReactNode } from 'react';
 
-import { useFileSrc } from '../../api/useFileSrc';
 import { Icon } from '../../ui/Icon';
 import { formatBytes } from '../messages/Attachment';
-import { downloadHref } from './downloadFile';
+import { ProgressRing } from '../messages/ProgressRing';
 import { fileKindFor } from './fileKind';
+import { useFileDownload } from './useFileDownload';
 import styles from './FileBubble.module.css';
 
 export function FileBubble({ attachment, meta }: { attachment: AttachmentDto; meta?: ReactNode }) {
-  const href = useFileSrc(attachment.file.id, 'stream');
+  const { state, progress, activate, cancel } = useFileDownload(attachment);
+  const busy = state === 'downloading';
 
   return (
-    <a
+    <button
+      type="button"
       className={styles.file}
-      href={href && downloadHref(href, attachment.originalName)}
-      download={attachment.originalName}
-      rel="noreferrer"
+      onClick={busy ? cancel : activate}
+      aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
     >
       <span className={styles.icon}>
         <Icon name={fileKindFor(attachment.file.mimeType).icon} size={22} />
+        {busy && (
+          <span className={styles.progress}>
+            <ProgressRing progress={progress} />
+            <Icon name="close" size={14} className={styles.cancelGlyph} />
+          </span>
+        )}
+        {state === 'ready' && (
+          <span className={styles.ready} aria-hidden="true">
+            <Icon name="check" size={12} />
+          </span>
+        )}
       </span>
       <span className={styles.info}>
         <span className={styles.name}>{attachment.originalName}</span>
@@ -28,6 +40,6 @@ export function FileBubble({ attachment, meta }: { attachment: AttachmentDto; me
           {meta}
         </span>
       </span>
-    </a>
+    </button>
   );
 }
