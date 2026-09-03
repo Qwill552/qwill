@@ -79,6 +79,13 @@ describe('groupAlbums', () => {
     expect(shape([message(1), message(2, { content: 'подпись' })])).toEqual([1, 1]);
   });
 
+  it('гифки в мозаику не склеиваются — ни между собой, ни с фото', () => {
+    const gif = (id: number): LocalMessage =>
+      message(id, { attachment: { ...photo(`a${id}`), file: { id: `file-a${id}`, mimeType: 'image/gif', size: 1000, url: '' } } });
+    expect(shape([gif(1), gif(2)])).toEqual([1, 1]);
+    expect(shape([message(1), gif(2), message(3)])).toEqual([1, 1, 1]);
+  });
+
   it('разные авторы в один альбом не попадают', () => {
     const other: ChatMemberSummary = { ...ME, id: 'other', username: 'o', displayName: 'О' };
     expect(shape([message(1), message(2, { sender: other })])).toEqual([1, 1]);

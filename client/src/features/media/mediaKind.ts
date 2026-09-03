@@ -7,3 +7,7 @@ export function isViewableMedia(attachment: AttachmentDto): boolean {
 export function isVideoAttachment(attachment: AttachmentDto): boolean {
   return attachment.file.mimeType.startsWith('video/');
 }
+
+export function isGifAttachment(attachment: AttachmentDto): boolean {
+  return attachment.file.mimeType === 'image/gif';
+}

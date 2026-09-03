@@ -1,17 +1,17 @@
 import type { ChatAttachmentDto } from '@messenger/shared';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Skeleton } from '../../ui/Skeleton';
 import { MediaTile } from '../media/MediaTile';
+import { mosaicLayout, normalizeRatio } from '../media/mosaicLayout';
 import { openMediaViewerList, useMediaViewerStore, type MediaViewerItem } from '../media/mediaViewerStore';
+import { mediaRatio } from '../media/useMediaSrc';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './GifTab.module.css';
 
-const SKELETON_TILES = 4;
-
-const TILE_STYLE = { width: '100%', height: 'auto' } as const;
+const SKELETON_ROWS = [3, 2, 3];
 
 export function GifTab({ chatId }: { chatId: string }) {
   const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'gif');
@@ -46,11 +46,17 @@ export function GifTab({ chatId }: { chatId: string }) {
     }));
   }
 
+  const layout = useMemo(() => mosaicLayout(items.map((item) => mediaRatio(item.attachment))), [items]);
+
   if (status === 'loading' && items.length === 0) {
     return (
-      <div className={styles.list} aria-busy="true">
-        {Array.from({ length: SKELETON_TILES }, (_, i) => (
-          <Skeleton key={i} className={styles.skeletonTile} width="100%" height="160px" />
+      <div className={styles.mosaic} aria-busy="true">
+        {SKELETON_ROWS.map((count, row) => (
+          <div key={row} className={styles.skeletonRow}>
+            {Array.from({ length: count }, (_, cell) => (
+              <Skeleton key={cell} className={styles.skeletonCell} width="100%" height="100%" />
+            ))}
+          </div>
         ))}
       </div>
     );
@@ -69,19 +75,33 @@ export function GifTab({ chatId }: { chatId: string }) {
 
   return (
     <>
-      <div className={styles.list}>
-        {items.map((item) => (
-          <MediaTile
-            key={item.attachment.id}
-            attachment={item.attachment}
-            chatId={chatId}
-            className={styles.tile}
-            style={TILE_STYLE}
-            fit="natural"
-            standalone
-            onOpen={() => openMediaViewerList(chatId, viewerItems(), item.attachment.id)}
-          />
-        ))}
+      <div className={styles.mosaic}>
+        {layout.rows.map((row) => {
+          const rowRatio = row.indexes.reduce(
+            (sum, index) => sum + normalizeRatio(mediaRatio(items[index]!.attachment)),
+            0,
+          );
+          return (
+            <div key={row.indexes.join('-')} className={styles.row} style={{ aspectRatio: rowRatio }}>
+              {row.indexes.map((index) => {
+                const item = items[index];
+                if (!item) return null;
+                const ratio = normalizeRatio(mediaRatio(item.attachment));
+                return (
+                  <div key={item.attachment.id} className={styles.cell} style={{ flexGrow: ratio }}>
+                    <MediaTile
+                      attachment={item.attachment}
+                      chatId={chatId}
+                      fit="natural"
+                      standalone
+                      onOpen={() => openMediaViewerList(chatId, viewerItems(), item.attachment.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
       {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
     </>

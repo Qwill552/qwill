@@ -1,12 +1,12 @@
 import type { MessageReactionDto } from '@messenger/shared';
 
 import type { LocalMessage } from '../../stores/chatStore';
-import { isViewableMedia } from './mediaKind';
+import { isGifAttachment, isViewableMedia } from './mediaKind';
 import { MOSAIC_MAX_ITEMS } from './mosaicLayout';
 
 function isAlbumMedia(message: LocalMessage): boolean {
   if (message.deletedAt || message.announcement || message.type === 'CALL') return false;
-  if (message.attachment) return isViewableMedia(message.attachment);
+  if (message.attachment) return isViewableMedia(message.attachment) && !isGifAttachment(message.attachment);
   return message.localAttachment?.kind === 'image' || message.localAttachment?.kind === 'video';
 }
 
