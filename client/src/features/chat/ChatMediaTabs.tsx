@@ -26,10 +26,12 @@ const SLIDE_EASE = 'cubic-bezier(.32,0,.22,1)';
 const SETTLE_MS = 420;
 const SETTLE_EASE = 'cubic-bezier(.18,1.1,.32,1)';
 const SETTLE_SLACK_MS = 40;
+const STICKY_EPSILON_PX = 1;
 
 interface Geometry {
   sticky: number;
   collapsed: number;
+  stuck: boolean;
 }
 
 interface Drag {
@@ -44,6 +46,7 @@ interface Drag {
   crossed: boolean;
   width: number;
   target: number | null;
+  direction: 1 | -1;
 }
 
 function countOf(counts: ChatAttachmentCounts, id: ChatAttachmentCategory): number {
@@ -189,7 +192,8 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     const inset = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
     const top = scroller.scrollTop + sentinel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
     const sticky = Math.max(0, top - inset);
-    return { sticky, collapsed: Math.max(0, scroller.scrollTop - sticky) };
+    const collapsed = scroller.scrollTop - sticky;
+    return { sticky, collapsed: Math.max(0, collapsed), stuck: collapsed >= -STICKY_EPSILON_PX };
   }
 
   function rememberedTop(target: number): number {
@@ -202,7 +206,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     slideGeometryRef.current = geo;
     setMounted((prev) => (prev.includes(target) ? prev : [...prev, target]));
     setSlide({ target, direction });
-    setPeek({ [target]: geo ? geo.collapsed - (geo.collapsed > 0 ? rememberedTop(target) : 0) : 0 });
+    setPeek({ [target]: geo ? geo.collapsed - (geo.stuck ? rememberedTop(target) : 0) : 0 });
   }
 
   function commitTo(target: number): void {
@@ -210,9 +214,9 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     const from = tabs[index];
     const to = tabs[target];
     if (geo && from && to) {
-      const restore = geo.collapsed > 0 ? rememberedTop(target) : 0;
+      const restore = geo.stuck ? rememberedTop(target) : 0;
       rememberedRef.current = { id: from.id, top: geo.collapsed };
-      pendingScrollRef.current = geo.collapsed > 0 ? geo.sticky + restore : null;
+      pendingScrollRef.current = geo.stuck ? geo.sticky + restore : null;
     }
     slideGeometryRef.current = null;
     setPeek({});
@@ -286,6 +290,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
       crossed: false,
       width: pagerRef.current?.offsetWidth ?? 1,
       target: null,
+      direction: 1,
     };
   }
 
@@ -314,6 +319,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
             return;
           }
           drag.target = target;
+          drag.direction = direction;
           drag.lastX = event.clientX;
           drag.lastTime = event.timeStamp;
           beginSlide(target, direction);
@@ -327,7 +333,8 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
       if (elapsed > 0) drag.velocity = (event.clientX - drag.lastX) / elapsed;
       drag.lastX = event.clientX;
       drag.lastTime = event.timeStamp;
-      drag.offset = Math.max(-drag.width, Math.min(drag.width, dx));
+      const travelled = Math.max(-drag.width, Math.min(drag.width, dx));
+      drag.offset = drag.direction === 1 ? Math.min(0, travelled) : Math.max(0, travelled);
       drag.progress = Math.abs(drag.offset) / drag.width;
       if (!drag.crossed && drag.progress >= SWIPE_THRESHOLD) {
         drag.crossed = true;
@@ -346,7 +353,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
       }
       if (drag.target === null) return;
 
-      const direction: 1 | -1 = drag.target > index ? 1 : -1;
+      const direction = drag.direction;
       pagerRef.current?.style.setProperty('--dx', `${drag.offset}px`);
 
       const toward = -direction * drag.velocity;
@@ -438,7 +445,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
               role="tabpanel"
               aria-labelledby={`chat-media-tab-${tab.id}`}
               className={`${styles.panel} ${slot === 0 ? styles.panelActive : ''}`}
-              hidden={slot !== 0 && slide === null}
+              hidden={slot !== 0 && slide?.target !== i}
               style={
                 slot === 0
                   ? { transform: 'translate3d(var(--dx), 0, 0)' }
