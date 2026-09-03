@@ -1,5 +1,5 @@
 .section {
-  --tabs-row-h: calc(var(--tap-min) + var(--space-2) * 2);
+  --tabs-row-h: calc(var(--chrome-h) + var(--space-2));
 
   position: relative;
   margin-top: var(--space-2);
@@ -12,14 +12,18 @@
 .row {
   position: sticky;
   z-index: 3;
-  top: var(--chrome-space-top);
+  top: 0;
   display: flex;
   overflow-x: auto;
   gap: var(--space-1);
-  padding: var(--space-2) var(--screen-pad-x);
-  border-bottom: 1px solid var(--chrome-border);
+  margin: 0 calc(var(--safe-right) + var(--chrome-pad-x)) var(--space-2)
+    calc(var(--safe-left) + var(--chrome-pad-x));
+  padding: calc((var(--chrome-h) - var(--tap-min)) / 2);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--chrome-radius);
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--chrome-shadow);
 }
 
 .tab {
@@ -44,8 +48,8 @@
 .tabPill {
   display: inline-flex;
   align-items: center;
-  height: 34px;
-  padding: 0 var(--space-3);
+  height: calc(var(--chrome-h) - var(--space-4));
+  padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-size: var(--font-meta);

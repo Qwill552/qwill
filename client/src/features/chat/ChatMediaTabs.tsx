@@ -169,12 +169,12 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
 
   function geometry(): Geometry | null {
     const scroller = scrollerRef.current;
-    const pager = pagerRef.current;
+    const section = sectionRef.current;
     const row = rowRef.current;
-    if (!scroller || !pager || !row) return null;
+    if (!scroller || !section || !row) return null;
     const inset = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
-    const pagerTop = scroller.scrollTop + pager.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    const sticky = Math.max(0, pagerTop - row.offsetHeight - inset);
+    const sectionTop = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    const sticky = Math.max(0, sectionTop + row.offsetTop - inset);
     return { scroller, sticky, collapsed: Math.max(0, scroller.scrollTop - sticky) };
   }
 
