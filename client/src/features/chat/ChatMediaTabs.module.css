@@ -88,11 +88,3 @@
 .pager[data-animating] .panel {
   transition: transform var(--slide-dur, var(--dur-tab)) var(--slide-ease, var(--ease-screen));
 }
-
-.soon {
-  margin: 0;
-  padding: var(--space-6) var(--screen-pad-x);
-  color: var(--text-tertiary);
-  font-size: var(--font-meta);
-  text-align: center;
-}

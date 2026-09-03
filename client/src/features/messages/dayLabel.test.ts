@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatChatRowWhen, formatDayLabel } from './dayLabel';
+import { formatAttachmentDateTime, formatChatRowWhen, formatDayLabel } from './dayLabel';
 
 const NOW = new Date(2026, 7, 27, 15, 0, 0);
 
@@ -66,5 +66,32 @@ describe('formatChatRowWhen', () => {
     const earlyTodayMorning = new Date(NOW);
     earlyTodayMorning.setHours(0, 5, 0, 0);
     expect(formatChatRowWhen(lateYesterdayEvening, earlyTodayMorning)).toBe('вчера');
+  });
+});
+
+describe('formatAttachmentDateTime', () => {
+  it('сегодня — «сегодня в ЧЧ:ММ», независимо от времени суток', () => {
+    expect(formatAttachmentDateTime(isoDaysAgo(0, 16, 33), NOW)).toBe('сегодня в 16:33');
+    expect(formatAttachmentDateTime(isoDaysAgo(0, 0, 5), NOW)).toBe('сегодня в 00:05');
+  });
+
+  it('граница считается по календарным дням, а не по 24 часам', () => {
+    const lateYesterdayEvening = isoDaysAgo(1, 23, 55);
+    const earlyTodayMorning = new Date(NOW);
+    earlyTodayMorning.setHours(0, 5, 0, 0);
+    expect(formatAttachmentDateTime(lateYesterdayEvening, earlyTodayMorning)).not.toContain('сегодня');
+  });
+
+  it('вчера и раньше в этом году — число и месяц сокращённо, с временем', () => {
+    expect(formatAttachmentDateTime(isoDaysAgo(1, 16, 33), NOW)).toBe('26 авг. в 16:33');
+    expect(formatAttachmentDateTime(isoDaysAgo(20, 9, 0), NOW)).toBe('7 авг. в 09:00');
+  });
+
+  it('прошлый год и раньше — дата с годом', () => {
+    const lastYear = new Date(2025, 7, 15, 16, 33, 0).toISOString();
+    const result = formatAttachmentDateTime(lastYear, NOW);
+    expect(result).toContain('2025');
+    expect(result).toContain('15 авг.');
+    expect(result).toContain('16:33');
   });
 });

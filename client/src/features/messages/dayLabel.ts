@@ -22,6 +22,17 @@ export function formatDayLabel(iso: string, now: Date = new Date()): string {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+export function formatAttachmentDateTime(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (daysBetween(now, date) === 0) return `сегодня в ${time}`;
+  const day =
+    date.getFullYear() === now.getFullYear()
+      ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+      : date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${day} в ${time}`;
+}
+
 export function formatChatRowWhen(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
   const diff = daysBetween(now, date);

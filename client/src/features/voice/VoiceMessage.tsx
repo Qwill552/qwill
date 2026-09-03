@@ -1,36 +1,13 @@
 import type { AttachmentDto } from '@messenger/shared';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
-import { useFileSrc } from '../../api/useFileSrc';
 import { Icon } from '../../ui/Icon';
 import { MessageMeta } from '../messages/MessageMeta';
+import { useVoicePlayback } from './useVoicePlayback';
 import styles from './VoiceMessage.module.css';
 
 const FALLBACK_PEAKS = Array.from({ length: 32 }, (_, i) => 0.3 + 0.25 * Math.abs(Math.sin(i * 0.7)));
 const SPEED_STEPS = [1, 1.5, 2] as const;
-const PLAYED_STORAGE_KEY = 'qwill:voice-played';
-
-let activeAudio: HTMLAudioElement | null = null;
-
-function loadPlayedSet(): Set<string> {
-  try {
-    const raw = localStorage.getItem(PLAYED_STORAGE_KEY);
-    return raw ? new Set<string>(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function markPlayed(attachmentId: string): void {
-  const played = loadPlayedSet();
-  if (played.has(attachmentId)) return;
-  played.add(attachmentId);
-  try {
-    localStorage.setItem(PLAYED_STORAGE_KEY, JSON.stringify([...played]));
-  } catch {
-    return;
-  }
-}
 
 function stopPointerBubble(event: ReactPointerEvent): void {
   event.stopPropagation();
@@ -53,63 +30,14 @@ interface VoiceMessageProps {
 }
 
 export function VoiceMessage({ attachment, own, createdAt, edited, status, read }: VoiceMessageProps) {
-  const src = useFileSrc(attachment.file.id, 'full');
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const { src, audioRef, playing, progress, durationMs, unheard, togglePlay, seekTo } = useVoicePlayback(
+    attachment,
+    own,
+  );
   const waveRef = useRef<HTMLDivElement>(null);
-
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [durationMs, setDurationMs] = useState(attachment.duration ?? 0);
   const [speedIndex, setSpeedIndex] = useState(0);
-  const [unheard, setUnheard] = useState(() => !own && !loadPlayedSet().has(attachment.id));
 
   const peaks = attachment.peaks && attachment.peaks.length > 0 ? attachment.peaks : FALLBACK_PEAKS;
-
-  useEffect(() => {
-    const audio: HTMLAudioElement = audioRef.current!;
-    if (!audio) return;
-
-    function onTimeUpdate(): void {
-      if (audio.duration) setProgress(audio.currentTime / audio.duration);
-    }
-    function onLoadedMetadata(): void {
-      if (Number.isFinite(audio.duration)) setDurationMs(audio.duration * 1000);
-    }
-    function onEnded(): void {
-      setPlaying(false);
-      setProgress(0);
-    }
-    function onPlay(): void {
-      if (activeAudio && activeAudio !== audio) activeAudio.pause();
-      activeAudio = audio;
-      setPlaying(true);
-      setUnheard(false);
-      markPlayed(attachment.id);
-    }
-    function onPause(): void {
-      setPlaying(false);
-    }
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-    };
-  }, [attachment.id]);
-
-  function togglePlay(): void {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) void audio.play();
-    else audio.pause();
-  }
 
   function cycleSpeed(): void {
     const nextIndex = (speedIndex + 1) % SPEED_STEPS.length;
@@ -118,13 +46,11 @@ export function VoiceMessage({ attachment, own, createdAt, edited, status, read 
   }
 
   function seekFromClientX(clientX: number): void {
-    const audio = audioRef.current;
     const wave = waveRef.current;
-    if (!audio || !wave || !audio.duration) return;
+    if (!wave) return;
     const rect = wave.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    audio.currentTime = ratio * audio.duration;
-    setProgress(ratio);
+    seekTo(ratio);
   }
 
   function handleWavePointerDown(event: ReactPointerEvent<HTMLDivElement>): void {

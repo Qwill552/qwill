@@ -3,8 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 
 import { getChatAttachmentCountsRequest } from '../../api/chats';
 import { haptic } from '../../ui/haptic';
+import { FilesTab } from './FilesTab';
+import { GifTab } from './GifTab';
 import { MediaTabGrid } from './MediaTabGrid';
 import { plural } from './plural';
+import { VoiceTab } from './VoiceTab';
 import styles from './ChatMediaTabs.module.css';
 
 const TAB_ORDER: { id: ChatAttachmentCategory; label: string }[] = [
@@ -452,7 +455,10 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
                   : { transform: `translate3d(calc(${slot * 100}% + var(--dx)), ${offset}px, 0)` }
               }
             >
-              {tab.id === 'media' ? <MediaTabGrid chatId={chatId} /> : <p className={styles.soon}>Скоро</p>}
+              {tab.id === 'media' && <MediaTabGrid chatId={chatId} />}
+              {tab.id === 'file' && <FilesTab chatId={chatId} />}
+              {tab.id === 'voice' && <VoiceTab chatId={chatId} />}
+              {tab.id === 'gif' && <GifTab chatId={chatId} />}
             </div>
           );
         })}
