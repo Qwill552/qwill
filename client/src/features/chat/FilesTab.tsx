@@ -16,8 +16,20 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
   const kind = fileKindFor(attachment.file.mimeType);
   const href = useFileSrc(attachment.file.id, 'stream');
 
+  function open(): void {
+    if (!href) return;
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = attachment.originalName;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    document.body.append(link);
+    link.click();
+    link.remove();
+  }
+
   return (
-    <a className={styles.row} href={href} download={attachment.originalName} target="_blank" rel="noreferrer">
+    <button type="button" className={styles.row} onClick={open}>
       <IconTile icon={kind.icon} tint={kind.tint} />
       <span className={styles.info}>
         <span className={styles.name}>{attachment.originalName}</span>
@@ -25,7 +37,7 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
           {formatBytes(attachment.file.size)} · {formatAttachmentDateTime(item.createdAt)}
         </span>
       </span>
-    </a>
+    </button>
   );
 }
 
