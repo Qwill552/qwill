@@ -35,17 +35,48 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Выпускается $SHA"
 
+      # CI пропускает пуши, где изменилась только документация, поэтому у верхнего коммита
+      # прогона может не быть вовсе. Тогда берётся ближайший предок с прогоном — и отдельно
+      # проверяется, что выше него правда нет ничего, кроме документации.
       - name: Проверить, что CI зелёный
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.resolve.outputs.sha }}
+          REPO: ${{ github.repository }}
         run: |
-          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" --jq '[.check_runs[] | select(.name == "ci")][0].conclusion // "нет прогона"')
-          if [ "$CONCLUSION" != "success" ]; then
-            echo "CI для $SHA не зелёный (conclusion: $CONCLUSION) — выпуск остановлен"
+          DOC_ONLY='^(.*\.md|references/.*|design-archive/.*)$'
+          CANDIDATE="$SHA"
+          CONCLUSION=""
+          for _ in $(seq 1 30); do
+            CONCLUSION=$(gh api "repos/$REPO/commits/$CANDIDATE/check-runs" --jq '[.check_runs[] | select(.name == "ci")][0].conclusion // ""')
+            if [ -n "$CONCLUSION" ]; then break; fi
+            PARENT=$(git rev-parse --quiet --verify "$CANDIDATE^" || true)
+            if [ -z "$PARENT" ]; then break; fi
+            CANDIDATE="$PARENT"
+          done
+
+          if [ -z "$CONCLUSION" ]; then
+            echo "Ни для $SHA, ни для его предков CI не запускался — выпуск остановлен"
             exit 1
           fi
-          echo "CI зелёный ($SHA), продолжаем"
+
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "CI для $CANDIDATE не зелёный (conclusion: $CONCLUSION) — выпуск остановлен"
+            exit 1
+          fi
+
+          if [ "$CANDIDATE" = "$SHA" ]; then
+            echo "CI зелёный ($SHA), продолжаем"
+            exit 0
+          fi
+
+          UNEXPECTED=$(git diff --name-only "$CANDIDATE" "$SHA" | grep -Ev "$DOC_ONLY" || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "У $SHA нет прогона CI, а над зелёным $CANDIDATE изменена не только документация:"
+            echo "$UNEXPECTED"
+            exit 1
+          fi
+          echo "CI зелёный на $CANDIDATE, выше него только документация — продолжаем"
 
       - name: Что уедет людям
         run: git log --oneline "origin/prod..$SHA" || echo "ветки prod ещё нет"

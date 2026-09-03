@@ -1,0 +1,38 @@
+name: Setup
+description: Node, зависимости из кэша и собранный shared
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v5
+      with:
+        node-version: "22"
+        cache: npm
+
+    # server/src/generated лежит вне node_modules и в .gitignore, поэтому кэшируется
+    # вместе с ними, а schema.prisma входит в ключ: иначе при правке модели из кэша
+    # приедет старый сгенерированный клиент.
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          shared/node_modules
+          server/node_modules
+          client/node_modules
+          desktop/node_modules
+          server/src/generated
+        key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'server/prisma/schema.prisma') }}
+
+    - name: Install dependencies
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --prefer-offline --no-audit --fund=false
+
+    # server и client резолвят @messenger/shared через dist/ (package.json "main"/"exports") —
+    # без сборки типы и рантайм-импорты не находятся (секция 1 project-design.md).
+    - name: Build shared package
+      shell: bash
+      run: npm run build -w @messenger/shared

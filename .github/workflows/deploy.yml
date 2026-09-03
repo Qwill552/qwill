@@ -9,6 +9,12 @@ on:
       ref:
         required: true
         type: string
+      # Имя артефакта с готовым release.tar.gz из этого же прогона. Пусто — собираем сами:
+      # так приходит прод из promote.yml, где ref произвольный и артефакта нет.
+      artifact:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   deploy:
@@ -16,6 +22,7 @@ jobs:
 
     permissions:
       contents: read
+      actions: read
 
     # Два одновременных деплоя, применяющих миграции, — надёжный способ испортить базу.
     # Группа своя на контур: базы разные, блокировать друг друга им незачем.
@@ -24,24 +31,24 @@ jobs:
       cancel-in-progress: false
 
     steps:
+      - name: Скачать готовый выпуск
+        if: inputs.artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+
       - name: Checkout
+        if: inputs.artifact == ''
         uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build shared package
-        run: npm run build -w @messenger/shared
+      - name: Setup
+        if: inputs.artifact == ''
+        uses: ./.github/actions/setup
 
       - name: Build server
+        if: inputs.artifact == ''
         run: npm run build -w @messenger/server
 
       # VITE_API_URL обязателен: фолбэк в client/src/api/client.ts хардкодит порт 3000,
@@ -49,6 +56,7 @@ jobs:
       # оба домена. VITE_VAPID_PUBLIC_KEY обязан совпадать с серверным, иначе пуши
       # перестают работать молча — пара общая для обоих контуров.
       - name: Build client
+        if: inputs.artifact == ''
         run: npm run build -w @messenger/client
         env:
           VITE_API_URL: ${{ inputs.channel == 'prod' && 'https://qwill.mooo.com' || 'https://dev.qwill.mooo.com' }}
@@ -58,6 +66,7 @@ jobs:
       # не попадает, а без него Prisma 7 не знает строку подключения.
       # server/assets — шрифты визитки: tsc их не компилирует, а сервер читает из этой папки.
       - name: Pack release
+        if: inputs.artifact == ''
         run: |
           tar czf release.tar.gz \
             package.json package-lock.json \
