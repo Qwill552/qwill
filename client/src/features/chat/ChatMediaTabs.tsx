@@ -2,6 +2,7 @@ import type { ChatAttachmentCategory, ChatAttachmentCounts } from '@messenger/sh
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { getChatAttachmentCountsRequest } from '../../api/chats';
+import { haptic } from '../../ui/haptic';
 import { MediaTabGrid } from './MediaTabGrid';
 import { plural } from './plural';
 import styles from './ChatMediaTabs.module.css';
@@ -15,13 +16,18 @@ const TAB_ORDER: { id: ChatAttachmentCategory; label: string }[] = [
 
 const SWIPE_LOCK_PX = 10;
 const SWIPE_DOMINANCE = 2;
-const COMMIT_RATIO = 0.28;
-const COMMIT_VELOCITY = 0.45;
+const SWIPE_THRESHOLD = 0.4;
+const SWIPE_VELOCITY = 0.344;
+const SLIDE_MIN_MS = 120;
+const SLIDE_MAX_MS = 400;
+const SLIDE_MIN_SPEED = 700;
+const SLIDE_SPEED_SCALE = 960;
+const SLIDE_EASE = 'cubic-bezier(.32,0,.22,1)';
+const SETTLE_MS = 420;
+const SETTLE_EASE = 'cubic-bezier(.18,1.1,.32,1)';
 const SETTLE_SLACK_MS = 40;
-const VELOCITY_WINDOW_MS = 40;
 
 interface Geometry {
-  scroller: HTMLElement;
   sticky: number;
   collapsed: number;
 }
@@ -32,6 +38,10 @@ interface Drag {
   startY: number;
   lastX: number;
   lastTime: number;
+  velocity: number;
+  offset: number;
+  progress: number;
+  crossed: boolean;
   width: number;
   target: number | null;
 }
@@ -60,6 +70,10 @@ function summaryOf(counts: ChatAttachmentCounts, id: ChatAttachmentCategory): st
   return `${counts.gifs} GIF`;
 }
 
+function reducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 interface ChatMediaTabsProps {
   chatId: string;
   onHeaderLabel?: (label: string | null) => void;
@@ -83,6 +97,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
   const pendingScrollRef = useRef<number | null>(null);
   const slideGeometryRef = useRef<Geometry | null>(null);
   const dragRef = useRef<Drag | null>(null);
+  const frameRef = useRef<number | null>(null);
   const settleRef = useRef<number | null>(null);
   const animatingRef = useRef(false);
 
@@ -142,6 +157,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     () => () => {
       onHeaderLabel?.(null);
       if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     },
     [onHeaderLabel],
   );
@@ -151,8 +167,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     const button = row?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index];
     if (!row || !button) return;
     const left = button.offsetLeft - (row.clientWidth - button.offsetWidth) / 2;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollTo({ left, behavior: reduced ? 'auto' : 'smooth' });
+    row.scrollTo({ left, behavior: reducedMotion() ? 'auto' : 'smooth' });
   }, [index]);
 
   useLayoutEffect(() => {
@@ -169,13 +184,12 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
 
   function geometry(): Geometry | null {
     const scroller = scrollerRef.current;
-    const section = sectionRef.current;
-    const row = rowRef.current;
-    if (!scroller || !section || !row) return null;
+    const sentinel = sentinelRef.current;
+    if (!scroller || !sentinel) return null;
     const inset = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
-    const sectionTop = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    const sticky = Math.max(0, sectionTop + row.offsetTop - inset);
-    return { scroller, sticky, collapsed: Math.max(0, scroller.scrollTop - sticky) };
+    const top = scroller.scrollTop + sentinel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    const sticky = Math.max(0, top - inset);
+    return { sticky, collapsed: Math.max(0, scroller.scrollTop - sticky) };
   }
 
   function rememberedTop(target: number): number {
@@ -206,13 +220,16 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     setIndex(target);
   }
 
-  function settle(target: number | null, direction: 1 | -1): void {
+  function settle(target: number | null, direction: 1 | -1, durationMs: number, easing: string): void {
     const pager = pagerRef.current;
     if (!pager) return;
+    const token = parseFloat(getComputedStyle(pager).getPropertyValue('--dur-tab')) || 0;
+    const duration = reducedMotion() ? token : durationMs;
     animatingRef.current = true;
+    pager.style.setProperty('--slide-dur', `${duration}ms`);
+    pager.style.setProperty('--slide-ease', easing);
     pager.dataset.animating = 'true';
     pager.style.setProperty('--dx', target === null ? '0px' : `${-direction * pager.offsetWidth}px`);
-    const duration = parseFloat(getComputedStyle(pager).getPropertyValue('--dur-tab')) || 0;
     if (settleRef.current !== null) window.clearTimeout(settleRef.current);
     settleRef.current = window.setTimeout(() => {
       settleRef.current = null;
@@ -232,8 +249,12 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
   function selectTab(target: number): void {
     if (target === index || target < 0 || target >= tabs.length || animatingRef.current) return;
     const direction = target > index ? 1 : -1;
+    const pager = pagerRef.current;
+    const token = pager ? parseFloat(getComputedStyle(pager).getPropertyValue('--dur-tab')) || 0 : 0;
     beginSlide(target, direction);
-    requestAnimationFrame(() => requestAnimationFrame(() => settle(target, direction)));
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => settle(target, direction, token, 'var(--ease-screen)')),
+    );
   }
 
   function focusTab(target: number): void {
@@ -259,14 +280,23 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
       startY: event.clientY,
       lastX: event.clientX,
       lastTime: event.timeStamp,
+      velocity: 0,
+      offset: 0,
+      progress: 0,
+      crossed: false,
       width: pagerRef.current?.offsetWidth ?? 1,
       target: null,
     };
   }
 
   useEffect(() => {
-    function paint(dx: number): void {
-      pagerRef.current?.style.setProperty('--dx', `${dx}px`);
+    function scheduleFrame(): void {
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const drag = dragRef.current;
+        if (drag) pagerRef.current?.style.setProperty('--dx', `${drag.offset}px`);
+      });
     }
 
     function handleMove(event: globalThis.PointerEvent): void {
@@ -284,6 +314,8 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
             return;
           }
           drag.target = target;
+          drag.lastX = event.clientX;
+          drag.lastTime = event.timeStamp;
           beginSlide(target, direction);
         } else if (Math.abs(dy) > SWIPE_LOCK_PX) {
           dragRef.current = null;
@@ -291,25 +323,50 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
         return;
       }
 
-      if (event.timeStamp - drag.lastTime > VELOCITY_WINDOW_MS) {
-        drag.lastX = event.clientX;
-        drag.lastTime = event.timeStamp;
+      const elapsed = event.timeStamp - drag.lastTime;
+      if (elapsed > 0) drag.velocity = (event.clientX - drag.lastX) / elapsed;
+      drag.lastX = event.clientX;
+      drag.lastTime = event.timeStamp;
+      drag.offset = Math.max(-drag.width, Math.min(drag.width, dx));
+      drag.progress = Math.abs(drag.offset) / drag.width;
+      if (!drag.crossed && drag.progress >= SWIPE_THRESHOLD) {
+        drag.crossed = true;
+        haptic();
       }
-      paint(Math.max(-drag.width, Math.min(drag.width, dx)));
+      scheduleFrame();
     }
 
     function release(event: globalThis.PointerEvent, cancelled: boolean): void {
       const drag = dragRef.current;
       if (!drag || event.pointerId !== drag.pointerId) return;
       dragRef.current = null;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
       if (drag.target === null) return;
+
       const direction: 1 | -1 = drag.target > index ? 1 : -1;
-      const dx = event.clientX - drag.startX;
-      const elapsed = Math.max(1, event.timeStamp - drag.lastTime);
-      const velocity = (event.clientX - drag.lastX) / elapsed;
-      const flung = Math.abs(velocity) > COMMIT_VELOCITY && Math.sign(velocity) === Math.sign(dx);
-      const passed = Math.abs(dx) > drag.width * COMMIT_RATIO || flung;
-      settle(!cancelled && passed ? drag.target : null, direction);
+      pagerRef.current?.style.setProperty('--dx', `${drag.offset}px`);
+
+      const toward = -direction * drag.velocity;
+      const flungOn = toward > SWIPE_VELOCITY;
+      const flungOff = -toward > SWIPE_VELOCITY;
+      const commit = !cancelled && (flungOn || (!flungOff && drag.progress > SWIPE_THRESHOLD));
+      const speed = Math.max(SLIDE_MIN_SPEED, Math.abs(drag.velocity) * SLIDE_SPEED_SCALE);
+
+      if (commit) {
+        const remaining = drag.width * (1 - drag.progress);
+        const duration = Math.min(SLIDE_MAX_MS, Math.max(SLIDE_MIN_MS, (remaining / speed) * 1000));
+        settle(drag.target, direction, duration, SLIDE_EASE);
+        return;
+      }
+
+      const remaining = drag.width * drag.progress;
+      const duration = flungOff
+        ? Math.min(SETTLE_MS, Math.max(SLIDE_MIN_MS, (remaining / speed) * 1000))
+        : SETTLE_MS;
+      settle(null, direction, duration, flungOff ? SLIDE_EASE : SETTLE_EASE);
     }
 
     function handleUp(event: globalThis.PointerEvent): void {

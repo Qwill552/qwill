@@ -86,7 +86,7 @@
 }
 
 .pager[data-animating] .panel {
-  transition: transform var(--dur-tab) var(--ease-screen);
+  transition: transform var(--slide-dur, var(--dur-tab)) var(--slide-ease, var(--ease-screen));
 }
 
 .soon {
