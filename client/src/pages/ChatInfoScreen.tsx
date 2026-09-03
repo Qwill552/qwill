@@ -1,13 +1,12 @@
-import type { AttachmentDto, UserProfileDto } from '@messenger/shared';
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import type { UserProfileDto } from '@messenger/shared';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { createReportRequest } from '../api/admin';
 import { getUserProfileRequest } from '../api/users';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
-import { MediaTile } from '../features/media/MediaTile';
-import { isViewableMedia } from '../features/media/mediaKind';
+import { ChatMediaTabs } from '../features/chat/ChatMediaTabs';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { ReportSheet } from '../features/reports/ReportSheet';
 import { useCallStore } from '../stores/callStore';
@@ -17,6 +16,7 @@ import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
+import { GlassPill } from '../ui/chrome/GlassPill';
 import { Icon } from '../ui/Icon';
 import { Menu, type MenuItem } from '../ui/Menu';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
@@ -32,10 +32,10 @@ export function ChatInfoScreen() {
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [usernameCopied, setUsernameCopied] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [attachmentSummary, setAttachmentSummary] = useState<string | null>(null);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
-  const messages = useChatStore((s) => (chatId ? s.messagesByChat[chatId] : undefined));
   const setChatMuted = useChatStore((s) => s.setChatMuted);
   const startCall = useCallStore((s) => s.startCall);
 
@@ -57,14 +57,6 @@ export function ChatInfoScreen() {
       cancelled = true;
     };
   }, [chat?.otherMember?.id]);
-
-  const media = useMemo(() => {
-    if (!messages) return [];
-    return messages
-      .filter((m) => m.attachment && !m.deletedAt && isViewableMedia(m.attachment))
-      .map((m) => m.attachment as AttachmentDto)
-      .reverse();
-  }, [messages]);
 
   useEffect(() => {
     if (!usernameCopied) return;
@@ -184,25 +176,18 @@ export function ChatInfoScreen() {
           )}
         </Card>
 
-        {media.length > 0 && (
-          <Card caption="Медиа">
-            <div className={styles.mediaGrid}>
-              {media.map((attachment) => (
-                <MediaTile
-                  key={attachment.id}
-                  attachment={attachment}
-                  chatId={chatId}
-                  className={styles.mediaThumb}
-                  standalone
-                />
-              ))}
-            </div>
-          </Card>
-        )}
+        <ChatMediaTabs chatId={chatId} onHeaderLabel={setAttachmentSummary} />
       </div>
 
       <ChromeBar>
         <GlassButton icon="back" label="Назад к чату" onClick={() => navigate(`/chats/${chatId}`)} />
+        {attachmentSummary && (
+          <GlassPill
+            className={styles.headerPill}
+            title={other.displayName}
+            subtitle={attachmentSummary}
+          />
+        )}
       </ChromeBar>
 
       {menuAnchor && (

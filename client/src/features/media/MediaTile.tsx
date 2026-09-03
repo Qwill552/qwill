@@ -23,6 +23,7 @@ interface MediaTileProps {
   onLongPressTile?: () => void;
   onTapSelect?: () => void;
   checkboxSlot?: ReactNode;
+  onOpen?: () => void;
 }
 
 export function formatMediaDuration(milliseconds: number): string {
@@ -44,12 +45,14 @@ export function MediaTile({
   onLongPressTile,
   onTapSelect,
   checkboxSlot,
+  onOpen,
 }: MediaTileProps) {
   const ref = useRef<HTMLButtonElement>(null);
   const src = useProgressiveSrc(attachment, ref);
   const video = isVideoAttachment(attachment);
   const natural = fit === 'natural';
   const albumSelectable = onLongPressTile !== undefined;
+  const open = onOpen ?? (() => openMediaViewer(chatId, attachment.id));
   const pointerStartRef = useRef<{ x: number; y: number; epoch: number } | null>(null);
   const longPressFiredRef = useRef(false);
 
@@ -90,7 +93,7 @@ export function MediaTile({
       onTapSelect?.();
       return;
     }
-    openMediaViewer(chatId, attachment.id);
+    open();
   }
 
   function handlePointerCancel(): void {
@@ -117,10 +120,10 @@ export function MediaTile({
         if (albumSelectable) {
           if (event.detail !== 0) return;
           if (selectionMode) onTapSelect?.();
-          else openMediaViewer(chatId, attachment.id);
+          else open();
           return;
         }
-        if (standalone || event.detail === 0) openMediaViewer(chatId, attachment.id);
+        if (standalone || event.detail === 0) open();
       }}
     >
       {src && (

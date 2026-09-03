@@ -128,25 +128,19 @@
   outline-offset: 2px;
 }
 
-.mediaGrid {
-  display: grid;
-  gap: 2px;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 2px;
+.headerPill {
+  min-width: 0;
+  animation: pill-in var(--dur-tab) var(--ease-screen);
 }
 
-.mediaThumb {
-  aspect-ratio: 1;
-  width: 100%;
-  background: var(--surface-3);
-}
+@keyframes pill-in {
+  from {
+    opacity: 0;
+  }
 
-.mediaThumb:first-child {
-  border-top-left-radius: var(--card-radius);
-}
-
-.mediaThumb:nth-child(3) {
-  border-top-right-radius: var(--card-radius);
+  to {
+    opacity: 1;
+  }
 }
 
 .bioText {

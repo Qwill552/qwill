@@ -1,0 +1,94 @@
+.section {
+  --tabs-row-h: calc(var(--tap-min) + var(--space-2) * 2);
+
+  position: relative;
+  margin-top: var(--space-2);
+}
+
+.sentinel {
+  height: 0;
+}
+
+.row {
+  position: sticky;
+  z-index: 3;
+  top: var(--chrome-space-top);
+  display: flex;
+  overflow-x: auto;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--screen-pad-x);
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+}
+
+.tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.tabPill {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background var(--dur-tab) var(--ease-screen),
+    color var(--dur-tab) var(--ease-screen);
+}
+
+.tabActive .tabPill {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.pager {
+  --dx: 0px;
+
+  position: relative;
+  overflow: hidden;
+  min-height: calc(100dvh - var(--chrome-space-top) - var(--tabs-row-h));
+  touch-action: pan-y;
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.panelActive {
+  position: relative;
+}
+
+.pager[data-animating] .panel {
+  transition: transform var(--dur-tab) var(--ease-screen);
+}
+
+.soon {
+  margin: 0;
+  padding: var(--space-6) var(--screen-pad-x);
+  color: var(--text-tertiary);
+  font-size: var(--font-meta);
+  text-align: center;
+}

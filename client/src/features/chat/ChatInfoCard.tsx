@@ -16,6 +16,7 @@ import { Icon } from '../../ui/Icon';
 import type { IconName } from '../../ui/icons/paths';
 import { Menu, type MenuItem } from '../../ui/Menu';
 import { ReportSheet } from '../reports/ReportSheet';
+import { plural } from './plural';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import styles from './ChatInfoCard.module.css';
 
@@ -29,14 +30,6 @@ interface AttachmentTally {
   icon: IconName;
   label: string;
   count: number;
-}
-
-function plural(count: number, one: string, few: string, many: string): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
-  return many;
 }
 
 function tally(attachments: AttachmentDto[]): AttachmentTally[] {
