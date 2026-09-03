@@ -12,7 +12,7 @@ export interface FastScrollBinding {
 }
 
 interface FastScrollerProps {
-  scrollerRef: RefObject<HTMLElement | null>;
+  scroller: HTMLElement | null;
   sentinelRef: RefObject<HTMLElement | null>;
   listRef: RefObject<HTMLElement | null>;
   itemsRef: RefObject<ChatAttachmentDto[]>;
@@ -47,7 +47,7 @@ function monthLabel(iso: string): string {
   return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${date.getFullYear()}`;
 }
 
-export function FastScroller({ scrollerRef, sentinelRef, listRef, itemsRef }: FastScrollerProps) {
+export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastScrollerProps) {
   const [offset, setOffset] = useState(0);
   const [visible, setVisible] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -62,7 +62,6 @@ export function FastScroller({ scrollerRef, sentinelRef, listRef, itemsRef }: Fa
   offsetRef.current = offset;
 
   function measure(): Metrics | null {
-    const scroller = scrollerRef.current;
     const sentinel = sentinelRef.current;
     const track = trackRef.current;
     const thumb = thumbRef.current;
@@ -120,11 +119,10 @@ export function FastScroller({ scrollerRef, sentinelRef, listRef, itemsRef }: Fa
   }
 
   useEffect(() => {
-    const scroller = scrollerRef.current;
     if (!scroller) return;
 
     function refresh(reveal: boolean): void {
-      const node = scrollerRef.current;
+      const node = scroller;
       const metrics = measure();
       if (!node || !metrics) return;
       apply(metrics, node.scrollTop);
@@ -156,12 +154,11 @@ export function FastScroller({ scrollerRef, sentinelRef, listRef, itemsRef }: Fa
       observer.disconnect();
       window.clearTimeout(hideTimer.current);
     };
-  }, [scrollerRef]);
+  }, [scroller]);
 
   useEffect(() => {
     function handleMove(event: globalThis.PointerEvent): void {
       const drag = dragRef.current;
-      const scroller = scrollerRef.current;
       if (!drag || event.pointerId !== drag.pointerId || !scroller) return;
       const metrics = measure();
       if (!metrics) return;

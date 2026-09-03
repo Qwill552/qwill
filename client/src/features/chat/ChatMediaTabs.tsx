@@ -95,6 +95,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable =
   const [slide, setSlide] = useState<{ target: number; direction: 1 | -1 } | null>(null);
   const [peek, setPeek] = useState<Record<number, number>>({});
   const [stuck, setStuck] = useState(false);
+  const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
 
   const sectionRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -136,6 +137,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable =
       node = node.parentElement;
     }
     scrollerRef.current = node;
+    setScrollerElement(node);
   }, [tabs.length]);
 
   useEffect(() => {
@@ -427,7 +429,7 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable =
 
       {fastScrollable && (
         <FastScroller
-          scrollerRef={scrollerRef}
+          scroller={scrollerElement}
           sentinelRef={sentinelRef}
           listRef={listElementRef}
           itemsRef={listItemsRef}
