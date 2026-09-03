@@ -1,4 +1,5 @@
 import type { ChatAttachmentDto } from '@messenger/shared';
+import { useEffect } from 'react';
 
 import { Icon } from '../../ui/Icon';
 import { IconTile } from '../../ui/IconTile';
@@ -8,6 +9,7 @@ import { useFileDownload } from '../media/useFileDownload';
 import { formatBytes } from '../messages/Attachment';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
 import { ProgressRing } from '../messages/ProgressRing';
+import type { FastScrollBinding } from './FastScroller';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './FilesTab.module.css';
 
@@ -50,8 +52,12 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
   );
 }
 
-export function FilesTab({ chatId }: { chatId: string }) {
+export function FilesTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
   const { items, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'file');
+
+  useEffect(() => {
+    fastScroll?.setItems(items);
+  }, [fastScroll, items]);
 
   if (status === 'loading' && items.length === 0) {
     return (
@@ -81,7 +87,7 @@ export function FilesTab({ chatId }: { chatId: string }) {
   }
 
   return (
-    <div className={styles.list}>
+    <div className={styles.list} ref={fastScroll?.listRef}>
       {items.map((item) => (
         <FileRow key={item.attachment.id} item={item} />
       ))}

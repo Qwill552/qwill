@@ -6,6 +6,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { Skeleton } from '../../ui/Skeleton';
 import { MediaTile } from '../media/MediaTile';
 import { openMediaViewerList, useMediaViewerStore, type MediaViewerItem } from '../media/mediaViewerStore';
+import type { FastScrollBinding } from './FastScroller';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './MediaTabGrid.module.css';
 
@@ -14,9 +15,10 @@ const SKELETON_TILES = 12;
 interface MediaTabGridProps {
   chatId: string;
   category?: ChatAttachmentCategory;
+  fastScroll?: FastScrollBinding;
 }
 
-export function MediaTabGrid({ chatId, category = 'media' }: MediaTabGridProps) {
+export function MediaTabGrid({ chatId, category = 'media', fastScroll }: MediaTabGridProps) {
   const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, category);
 
   const myUserId = useChatStore((s) => s.myUserId);
@@ -25,6 +27,10 @@ export function MediaTabGrid({ chatId, category = 'media' }: MediaTabGridProps) 
 
   const itemsRef = useRef<ChatAttachmentDto[]>(items);
   itemsRef.current = items;
+
+  useEffect(() => {
+    fastScroll?.setItems(items);
+  }, [fastScroll, items]);
 
   useEffect(
     () =>
@@ -74,7 +80,7 @@ export function MediaTabGrid({ chatId, category = 'media' }: MediaTabGridProps) 
 
   return (
     <>
-      <div className={styles.grid}>
+      <div className={styles.grid} ref={fastScroll?.listRef}>
         {items.map((item) => (
           <MediaTile
             key={item.attachment.id}

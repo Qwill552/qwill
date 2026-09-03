@@ -1,0 +1,71 @@
+.track {
+  position: sticky;
+  z-index: 4;
+  top: var(--tabs-row-h);
+  height: 0;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 0;
+  right: calc(var(--safe-right) + var(--space-1));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 28px;
+  height: 52px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity var(--dur-scrollbar) ease;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.thumb::before {
+  content: '';
+  position: absolute;
+  inset: -8px -10px;
+}
+
+.visible {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.dragging {
+  background: var(--primary-soft);
+  color: var(--primary);
+  cursor: grabbing;
+}
+
+.glyph {
+  display: block;
+}
+
+.label {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + var(--space-2));
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 var(--space-4);
+  transform: translateY(-50%);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}

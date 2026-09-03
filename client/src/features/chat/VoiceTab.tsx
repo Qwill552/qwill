@@ -1,4 +1,5 @@
 import type { ChatAttachmentDto } from '@messenger/shared';
+import { useEffect } from 'react';
 
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
@@ -6,6 +7,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { formatMediaDuration } from '../media/MediaTile';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
 import { useVoicePlayback } from '../voice/useVoicePlayback';
+import type { FastScrollBinding } from './FastScroller';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './VoiceTab.module.css';
 
@@ -35,8 +37,12 @@ function VoiceRow({ item, own, senderName }: { item: ChatAttachmentDto; own: boo
   );
 }
 
-export function VoiceTab({ chatId }: { chatId: string }) {
+export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
   const { items, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'voice');
+
+  useEffect(() => {
+    fastScroll?.setItems(items);
+  }, [fastScroll, items]);
   const myUserId = useChatStore((s) => s.myUserId);
   const otherName = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.otherMember?.displayName ?? '');
 
@@ -68,7 +74,7 @@ export function VoiceTab({ chatId }: { chatId: string }) {
   }
 
   return (
-    <div className={styles.list}>
+    <div className={styles.list} ref={fastScroll?.listRef}>
       {items.map((item) => (
         <VoiceRow key={item.attachment.id} item={item} own={item.senderId === myUserId} senderName={otherName} />
       ))}

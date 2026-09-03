@@ -1,8 +1,9 @@
-import type { ChatAttachmentCategory, ChatAttachmentCounts } from '@messenger/shared';
+import type { ChatAttachmentCategory, ChatAttachmentCounts, ChatAttachmentDto } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { getChatAttachmentCountsRequest } from '../../api/chats';
 import { haptic } from '../../ui/haptic';
+import { FastScroller, type FastScrollBinding } from './FastScroller';
 import { FilesTab } from './FilesTab';
 import { MediaTabGrid } from './MediaTabGrid';
 import { plural } from './plural';
@@ -29,6 +30,7 @@ const SETTLE_MS = 420;
 const SETTLE_EASE = 'cubic-bezier(.18,1.1,.32,1)';
 const SETTLE_SLACK_MS = 40;
 const STICKY_EPSILON_PX = 1;
+const FAST_SCROLL_MIN_ITEMS = 60;
 
 interface Geometry {
   sticky: number;
@@ -82,10 +84,11 @@ function reducedMotion(): boolean {
 interface ChatMediaTabsProps {
   chatId: string;
   onHeaderLabel?: (label: string | null) => void;
+  onFastScroll?: (active: boolean) => void;
   swipeable?: boolean;
 }
 
-export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatMediaTabsProps) {
+export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable = true }: ChatMediaTabsProps) {
   const [counts, setCounts] = useState<ChatAttachmentCounts | null>(null);
   const [index, setIndex] = useState(0);
   const [mounted, setMounted] = useState<number[]>([0]);
@@ -102,6 +105,8 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
   const pendingScrollRef = useRef<number | null>(null);
   const slideGeometryRef = useRef<Geometry | null>(null);
   const dragRef = useRef<Drag | null>(null);
+  const listElementRef = useRef<HTMLElement | null>(null);
+  const listItemsRef = useRef<ChatAttachmentDto[]>([]);
   const frameRef = useRef<number | null>(null);
   const settleRef = useRef<number | null>(null);
   const animatingRef = useRef(false);
@@ -152,6 +157,23 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
   }, [tabs.length]);
 
   const active = tabs[index];
+  const fastScrollable = counts !== null && active !== undefined && countOf(counts, active.id) >= FAST_SCROLL_MIN_ITEMS;
+
+  const fastScroll = useMemo<FastScrollBinding>(
+    () => ({
+      listRef: (element) => {
+        if (element) listElementRef.current = element;
+      },
+      setItems: (items) => {
+        listItemsRef.current = items;
+      },
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    onFastScroll?.(fastScrollable && stuck);
+  }, [onFastScroll, fastScrollable, stuck]);
 
   useEffect(() => {
     if (!onHeaderLabel) return;
@@ -161,10 +183,11 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
   useEffect(
     () => () => {
       onHeaderLabel?.(null);
+      onFastScroll?.(false);
       if (settleRef.current !== null) window.clearTimeout(settleRef.current);
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     },
-    [onHeaderLabel],
+    [onHeaderLabel, onFastScroll],
   );
 
   useEffect(() => {
@@ -402,6 +425,15 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
     <div ref={sectionRef} className={styles.section}>
       <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
 
+      {fastScrollable && (
+        <FastScroller
+          scrollerRef={scrollerRef}
+          sentinelRef={sentinelRef}
+          listRef={listElementRef}
+          itemsRef={listItemsRef}
+        />
+      )}
+
       <div
         ref={rowRef}
         className={`${styles.row} hide-native-scrollbar`}
@@ -454,10 +486,12 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, swipeable = true }: ChatM
                   : { transform: `translate3d(calc(${slot * 100}% + var(--dx)), ${offset}px, 0)` }
               }
             >
-              {tab.id === 'media' && <MediaTabGrid chatId={chatId} />}
-              {tab.id === 'file' && <FilesTab chatId={chatId} />}
-              {tab.id === 'voice' && <VoiceTab chatId={chatId} />}
-              {tab.id === 'gif' && <MediaTabGrid chatId={chatId} category="gif" />}
+              {tab.id === 'media' && <MediaTabGrid chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'file' && <FilesTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'voice' && <VoiceTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'gif' && (
+                <MediaTabGrid chatId={chatId} category="gif" fastScroll={slot === 0 ? fastScroll : undefined} />
+              )}
             </div>
           );
         })}

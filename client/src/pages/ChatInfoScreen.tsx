@@ -33,6 +33,7 @@ export function ChatInfoScreen() {
   const [usernameCopied, setUsernameCopied] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [attachmentSummary, setAttachmentSummary] = useState<string | null>(null);
+  const [fastScrollActive, setFastScrollActive] = useState(false);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
@@ -90,7 +91,7 @@ export function ChatInfoScreen() {
     <div className={styles.screen}>
       <AmbientBlobs />
       <div ref={scrollerRef} className={`${styles.scroller} hide-native-scrollbar`}>
-        <ScrollIndicator target={scrollerRef} />
+        {!fastScrollActive && <ScrollIndicator target={scrollerRef} />}
         <div className={styles.hero}>
           {avatarUrl ? (
             <button
@@ -176,7 +177,11 @@ export function ChatInfoScreen() {
           )}
         </Card>
 
-        <ChatMediaTabs chatId={chatId} onHeaderLabel={setAttachmentSummary} />
+        <ChatMediaTabs
+          chatId={chatId}
+          onHeaderLabel={setAttachmentSummary}
+          onFastScroll={setFastScrollActive}
+        />
       </div>
 
       <ChromeBar>
