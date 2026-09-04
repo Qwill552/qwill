@@ -1,21 +1,21 @@
 .grid {
   display: grid;
+  overflow: hidden;
   gap: 2px;
   grid-template-columns: repeat(3, 1fr);
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
 }
 
 .tile {
   aspect-ratio: 1;
   width: 100%;
   background: var(--surface-3);
-}
-
-.tile:first-child {
-  border-top-left-radius: var(--card-radius);
-}
-
-.tile:nth-child(3) {
-  border-top-right-radius: var(--card-radius);
 }
 
 .skeletonCell {
@@ -31,14 +31,6 @@
   position: absolute;
   top: 0;
   left: 0;
-}
-
-.skeletonCell:first-child {
-  border-top-left-radius: var(--card-radius);
-}
-
-.skeletonCell:nth-child(3) {
-  border-top-right-radius: var(--card-radius);
 }
 
 .sentinel {

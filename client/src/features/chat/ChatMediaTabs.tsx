@@ -86,9 +86,21 @@ interface ChatMediaTabsProps {
   onHeaderLabel?: (label: string | null) => void;
   onFastScroll?: (active: boolean) => void;
   swipeable?: boolean;
+  /** Вкладка, с которой открывается просмотр — десктопный клик по строке счётчика (PM-6). */
+  initialCategory?: ChatAttachmentCategory;
+  /** `onHeaderLabel` без гейта по `stuck` — десктопный просмотр не прокручивает шапку,
+   *  метка активной вкладки нужна сразу (PM-6). */
+  headerLabelAlways?: boolean;
 }
 
-export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable = true }: ChatMediaTabsProps) {
+export function ChatMediaTabs({
+  chatId,
+  onHeaderLabel,
+  onFastScroll,
+  swipeable = true,
+  initialCategory,
+  headerLabelAlways = false,
+}: ChatMediaTabsProps) {
   const [counts, setCounts] = useState<ChatAttachmentCounts | null>(null);
   const [index, setIndex] = useState(0);
   const [mounted, setMounted] = useState<number[]>([0]);
@@ -117,11 +129,21 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable =
     [counts],
   );
 
+  const initialCategoryRef = useRef(initialCategory);
+
   useEffect(() => {
     let cancelled = false;
     getChatAttachmentCountsRequest(chatId)
       .then((result) => {
-        if (!cancelled) setCounts(result);
+        if (cancelled) return;
+        setCounts(result);
+        const target = initialCategoryRef.current;
+        if (target) {
+          const position = TAB_ORDER.filter((tab) => countOf(result, tab.id) > 0).findIndex(
+            (tab) => tab.id === target,
+          );
+          if (position >= 0) setIndex(position);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -179,8 +201,9 @@ export function ChatMediaTabs({ chatId, onHeaderLabel, onFastScroll, swipeable =
 
   useEffect(() => {
     if (!onHeaderLabel) return;
-    onHeaderLabel(stuck && counts && active ? summaryOf(counts, active.id) : null);
-  }, [onHeaderLabel, stuck, counts, active]);
+    const label = counts && active ? summaryOf(counts, active.id) : null;
+    onHeaderLabel(headerLabelAlways || stuck ? label : null);
+  }, [onHeaderLabel, headerLabelAlways, stuck, counts, active]);
 
   useEffect(
     () => () => {

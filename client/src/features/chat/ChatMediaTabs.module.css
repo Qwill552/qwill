@@ -88,3 +88,9 @@
 .pager[data-animating] .panel {
   transition: transform var(--slide-dur, var(--dur-tab)) var(--slide-ease, var(--ease-screen));
 }
+
+@media (min-width: 900px) {
+  .pager {
+    min-height: 0;
+  }
+}
