@@ -12,7 +12,7 @@ import { isViewableMedia } from '../media/mediaKind';
 import { VoiceMessage } from '../voice/VoiceMessage';
 import { AttachmentView, isVoiceAttachment, LocalAttachmentPreview } from './Attachment';
 import { CallMessage } from './CallMessage';
-import { LinkPreviewCard } from './LinkPreviewCard';
+import { LinkPreviewCard, useRenderableLinkPreview } from './LinkPreviewCard';
 import { MessageMeta } from './MessageMeta';
 import { ReplyQuote } from './ReplyQuote';
 import styles from './MessageBubble.module.css';
@@ -55,6 +55,10 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
   const cancelMessage = useChatStore((s) => s.cancelMessage);
   const emojiOnly = bare ? emojiOnlyContent(message.content ?? '') : null;
 
+  const spans = message.content ? splitTextWithLinks(message.content) : null;
+  const firstLink = message.deletedAt ? null : (spans?.find((span) => span.kind === 'link')?.href ?? null);
+  const metaUnderCard = useRenderableLinkPreview(firstLink) !== null;
+
   function handleLinkClick(event: MouseEvent<HTMLAnchorElement>): void {
     if (!useChatStore.getState().selectionMode) return;
     event.preventDefault();
@@ -81,9 +85,6 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
       </div>
     );
   }
-
-  const spans = message.content ? splitTextWithLinks(message.content) : null;
-  const firstLink = message.deletedAt ? null : (spans?.find((span) => span.kind === 'link')?.href ?? null);
 
   const inlineMeta = (
     <MessageMeta
@@ -215,22 +216,33 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
                       ),
                     )
                   : null}
-                <span
-                  className={styles.pad}
-                  style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}
-                  aria-hidden="true"
-                />
+                {!metaUnderCard && (
+                  <span
+                    className={styles.pad}
+                    style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}
+                    aria-hidden="true"
+                  />
+                )}
               </span>
-              <MessageMeta
-                createdAt={message.createdAt}
-                own={own}
-                edited={Boolean(message.editedAt)}
-                status={status}
-                read={read}
-              />
+              {!metaUnderCard && (
+                <MessageMeta
+                  createdAt={message.createdAt}
+                  own={own}
+                  edited={Boolean(message.editedAt)}
+                  status={status}
+                  read={read}
+                />
+              )}
             </span>
           )}
-          {firstLink && <LinkPreviewCard url={firstLink} own={own} onLinkClick={handleLinkClick} />}
+          {firstLink && (
+            <LinkPreviewCard
+              url={firstLink}
+              own={own}
+              onLinkClick={handleLinkClick}
+              meta={inlineMeta}
+            />
+          )}
         </>
       )}
       {!bareMedia && children}

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import type { LinkPreviewDto } from '@messenger/shared';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import { useLinkPreviewStore } from '../../stores/linkPreviewStore';
@@ -7,23 +8,31 @@ import styles from './LinkPreviewCard.module.css';
 
 const STICK_BOTTOM_PX = 120;
 
+export function useRenderableLinkPreview(url: string | null): LinkPreviewDto | null {
+  const preview = useLinkPreviewStore((state) => (url ? state.previews[url] : undefined));
+  if (!preview || preview.status !== 'ready') return null;
+  if (!preview.siteName && !preview.title && !preview.description && !preview.imageUrl) return null;
+  return preview;
+}
+
 interface LinkPreviewCardProps {
   url: string;
   own: boolean;
   onLinkClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  meta?: ReactNode;
 }
 
-export function LinkPreviewCard({ url, own, onLinkClick }: LinkPreviewCardProps) {
-  const preview = useLinkPreviewStore((state) => state.previews[url]);
+export function LinkPreviewCard({ url, own, onLinkClick, meta }: LinkPreviewCardProps) {
+  const known = useLinkPreviewStore((state) => state.previews[url]);
   const request = useLinkPreviewStore((state) => state.request);
+  const ready = useRenderableLinkPreview(url);
   const slotRef = useRef<HTMLSpanElement>(null);
 
-  const ready = preview?.status === 'ready' ? preview : null;
   const imageSrc = useFileSrc(ready?.imageUrl ? fileIdFromUrl(ready.imageUrl) : null, 'full');
 
   useEffect(() => {
     const node = slotRef.current;
-    if (!node || preview) return;
+    if (!node || known) return;
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
@@ -31,7 +40,7 @@ export function LinkPreviewCard({ url, own, onLinkClick }: LinkPreviewCardProps)
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [url, preview, request]);
+  }, [url, known, request]);
 
   useLayoutEffect(() => {
     const node = slotRef.current;
@@ -54,14 +63,9 @@ export function LinkPreviewCard({ url, own, onLinkClick }: LinkPreviewCardProps)
     return () => observer.disconnect();
   }, []);
 
-  const title = ready?.title ?? null;
-  const description = ready?.description ?? null;
-  const siteName = ready?.siteName ?? null;
-  const empty = ready !== null && !title && !description && !siteName && !ready.imageUrl;
-
   return (
-    <span ref={slotRef} className={`${styles.slot} ${ready && !empty ? styles.slotFilled : ''}`}>
-      {ready && !empty && (
+    <span ref={slotRef} className={`${styles.slot} ${ready ? styles.slotFilled : ''}`}>
+      {ready && (
         <a
           className={`${styles.card} ${own ? styles.onOut : ''}`}
           href={url}
@@ -69,9 +73,9 @@ export function LinkPreviewCard({ url, own, onLinkClick }: LinkPreviewCardProps)
           rel="noopener noreferrer nofollow"
           onClick={onLinkClick}
         >
-          {siteName && <span className={styles.site}>{siteName}</span>}
-          {title && <span className={styles.title}>{title}</span>}
-          {description && <span className={styles.description}>{description}</span>}
+          {ready.siteName && <span className={styles.site}>{ready.siteName}</span>}
+          {ready.title && <span className={styles.title}>{ready.title}</span>}
+          {ready.description && <span className={styles.description}>{ready.description}</span>}
           {ready.imageUrl && (
             <span className={styles.imageBox}>
               {imageSrc && <img className={styles.image} src={imageSrc} alt="" loading="lazy" />}
@@ -79,6 +83,7 @@ export function LinkPreviewCard({ url, own, onLinkClick }: LinkPreviewCardProps)
           )}
         </a>
       )}
+      {ready && meta && <span className={styles.metaRow}>{meta}</span>}
     </span>
   );
 }
