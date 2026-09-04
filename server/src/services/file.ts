@@ -296,6 +296,7 @@ export async function storeServerFile(data: Buffer, mimeType: string): Promise<F
   const existing = await prisma.file.findUnique({ where: { sha256 } });
   if (existing) return existing;
 
+  await ensureStorageDirs();
   await fs.writeFile(path.join(FILES_DIR, sha256), data);
 
   try {

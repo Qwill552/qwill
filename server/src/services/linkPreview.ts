@@ -234,7 +234,10 @@ export async function fetchLinkPreview(url: string, options: LinkPreviewFetchOpt
     let imageFileId: string | null = null;
     if (parsed.imageUrl) {
       imageFileId = await downloadImage(parsed.imageUrl, options).catch((error: unknown) => {
-        logger.debug({ url, imageUrl: parsed.imageUrl, error }, 'Картинка превью не скачалась');
+        logger.info(
+          { url, imageUrl: parsed.imageUrl, reason: error instanceof Error ? error.message : error },
+          'Картинка превью не скачалась, превью остаётся без неё',
+        );
         return null;
       });
     }
