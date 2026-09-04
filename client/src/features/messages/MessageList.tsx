@@ -16,6 +16,7 @@ import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
 import { isDeletableMessage } from './messageDeleting';
+import type { FeedKeepRange } from './feedWindow';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
@@ -55,6 +56,23 @@ function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
   const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`);
   if (!node) return;
   el.scrollTop += node.getBoundingClientRect().top - anchor.top;
+}
+
+function keepRange(el: HTMLElement): FeedKeepRange | null {
+  const view = el.getBoundingClientRect();
+  const top = view.top - el.clientHeight;
+  const bottom = view.bottom + el.clientHeight;
+  let keepFromId: number | null = null;
+  let keepToId: number | null = null;
+  for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+    const rect = node.getBoundingClientRect();
+    if (rect.bottom <= top || rect.top >= bottom) continue;
+    const id = Number(node.dataset.messageId);
+    if (!Number.isFinite(id)) continue;
+    if (keepFromId === null) keepFromId = id;
+    keepToId = id;
+  }
+  return keepFromId === null || keepToId === null ? null : { keepFromId, keepToId };
 }
 
 interface MessageRowData {
@@ -330,6 +348,7 @@ export function MessageList({
     if (!el || !anchor) return;
     pendingAnchor.current = null;
     restoreAnchor(el, anchor);
+    stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
   }, [feedBounds]);
 
   useLayoutEffect(() => {
@@ -373,7 +392,7 @@ export function MessageList({
     if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current) return;
     loadingUp.current = true;
     pendingAnchor.current = rememberAnchor(el);
-    loadMore(chatId)
+    loadMore(chatId, keepRange(el))
       .catch(() => {
         pendingAnchor.current = null;
         retryUpAt.current = performance.now() + FEED_RETRY_MS;
@@ -384,10 +403,13 @@ export function MessageList({
   }, [chatId, hasMore, loadMore]);
 
   const requestDown = useCallback(() => {
-    if (!hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
+    const el = listRef.current;
+    if (!el || !hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
     loadingDown.current = true;
-    loadMoreAfter(chatId)
+    pendingAnchor.current = rememberAnchor(el);
+    loadMoreAfter(chatId, keepRange(el))
       .catch(() => {
+        pendingAnchor.current = null;
         retryDownAt.current = performance.now() + FEED_RETRY_MS;
       })
       .finally(() => {

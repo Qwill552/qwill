@@ -2,12 +2,12 @@ import type { ChatListItemDto, MessageDto } from '@messenger/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as chatsApi from '../api/chats';
-import { getMessagesRequest } from '../api/chats';
+import { getMessagesAfterRequest, getMessagesRequest } from '../api/chats';
 import { useChatStore } from './chatStore';
 
 vi.mock('../api/chats', async (importOriginal) => {
   const actual = await importOriginal<typeof chatsApi>();
-  return { ...actual, getMessagesRequest: vi.fn() };
+  return { ...actual, getMessagesRequest: vi.fn(), getMessagesAfterRequest: vi.fn() };
 });
 
 const CHAT_ID = 'window-chat';
@@ -130,6 +130,32 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
 
     expect(useChatStore.getState().feedEpochByChat[CHAT_ID]).toBe(before + 1);
     expect(ids()).toEqual([49, 50]);
+  });
+
+  it('догрузка вниз до конца снимает признак незамкнутого окна', async () => {
+    vi.mocked(getMessagesAfterRequest).mockResolvedValue({ messages: [message(12, 'other')], hasMore: false });
+
+    await useChatStore.getState().loadMoreAfter(CHAT_ID);
+
+    expect(ids()).toEqual([10, 11, 12]);
+    expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false);
+  });
+
+  it('догрузка вверх подрезает дальний низ и снова размыкает окно', async () => {
+    const long = Array.from({ length: 150 }, (_, i) => message(100 + i, 'other'));
+    useChatStore.setState({
+      messagesByChat: { [CHAT_ID]: long as never },
+      hasMoreAfterByChat: { [CHAT_ID]: false },
+    });
+    vi.mocked(getMessagesRequest).mockResolvedValue({ messages: [message(99, 'other')], hasMore: true });
+
+    await useChatStore.getState().loadMore(CHAT_ID, { keepFromId: 100, keepToId: 120 });
+
+    const list = useChatStore.getState().messagesByChat[CHAT_ID] ?? [];
+    expect(list).toHaveLength(150);
+    expect(list[0]!.id).toBe(99);
+    expect(list.at(-1)!.id).toBe(248);
+    expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(true);
   });
 
   it('фокус на уже загруженном сообщении не трогает ленту и растит счётчик', () => {

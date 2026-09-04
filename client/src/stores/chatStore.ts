@@ -83,6 +83,12 @@ import {
   reportCallEnded,
   reportIncomingCall,
 } from '../calls/nativeCall';
+import {
+  FEED_WINDOW_LIMIT,
+  mergeFeedPage,
+  trimFeedWindow,
+  type FeedKeepRange,
+} from '../features/messages/feedWindow';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -180,8 +186,8 @@ interface ChatState {
   openChatAt: (chatId: string, messageId: number) => Promise<boolean>;
   primeChatFromCache: (chatId: string) => Promise<void>;
   closeChat: () => void;
-  loadMore: (chatId: string) => Promise<void>;
-  loadMoreAfter: (chatId: string) => Promise<void>;
+  loadMore: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
+  loadMoreAfter: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
   focusMessage: (chatId: string, messageId: number) => void;
@@ -724,7 +730,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pendingEmptyChatDrop = { chatId, timer };
   },
 
-  async loadMore(chatId) {
+  async loadMore(chatId, keep) {
     const current = get().messagesByChat[chatId] ?? [];
     const oldest = current.find((m) => m.id > 0);
     if (!oldest) return;
@@ -732,16 +738,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const page = await getMessagesRequest(chatId, oldest.id);
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
-      const known = new Set(list.map((m) => m.id));
-      const prepended = page.messages.filter((m) => !known.has(m.id) && !m.deletedAt) as LocalMessage[];
+      const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
+      const merged = mergeFeedPage(list, fresh, 'older');
+      const cut = trimFeedWindow(merged, 'older', FEED_WINDOW_LIMIT, keep ?? null);
       return {
-        messagesByChat: { ...state.messagesByChat, [chatId]: [...prepended, ...list] },
+        messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
+        hasMoreAfterByChat: cut.trimmed
+          ? { ...state.hasMoreAfterByChat, [chatId]: true }
+          : state.hasMoreAfterByChat,
       };
     });
   },
 
-  async loadMoreAfter(chatId) {
+  async loadMoreAfter(chatId, keep) {
     if (!get().hasMoreAfterByChat[chatId]) return;
     const current = get().messagesByChat[chatId] ?? [];
     const newest = [...current].reverse().find((m) => m.id > 0);
@@ -750,13 +760,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const page = await getMessagesAfterRequest(chatId, newest.id);
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
-      const known = new Set(list.map((m) => m.id));
-      const appended = page.messages.filter((m) => !known.has(m.id) && !m.deletedAt) as LocalMessage[];
-      const pending = list.filter((m) => m.id < 0);
-      const settled = list.filter((m) => m.id > 0);
+      const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
+      const merged = mergeFeedPage(list, fresh, 'newer');
+      const cut = trimFeedWindow(merged, 'newer', FEED_WINDOW_LIMIT, keep ?? null);
       return {
-        messagesByChat: { ...state.messagesByChat, [chatId]: [...settled, ...appended, ...pending] },
+        messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
         hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },
+        hasMoreByChat: cut.trimmed ? { ...state.hasMoreByChat, [chatId]: true } : state.hasMoreByChat,
       };
     });
 
