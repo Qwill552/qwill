@@ -56,13 +56,13 @@ describe('chat.service.deleteChat (R-11)', () => {
     expect((await listChats(alice.userId)).some((c) => c.id === chatId)).toBe(false);
     expect((await listChats(bob.userId)).some((c) => c.id === chatId)).toBe(true);
 
-    const { messages } = await getMessages(chatId, alice.userId, undefined, 50);
+    const { messages } = await getMessages(chatId, alice.userId, {}, 50);
     expect(messages).toHaveLength(0);
 
     await post(chatId, bob.userId, 'новое сообщение');
 
     expect((await listChats(alice.userId)).some((c) => c.id === chatId)).toBe(true);
-    const page = await getMessages(chatId, alice.userId, undefined, 50);
+    const page = await getMessages(chatId, alice.userId, {}, 50);
     expect(page.messages).toHaveLength(1);
     expect(page.messages[0]?.content).toBe('новое сообщение');
   });

@@ -20,6 +20,8 @@ import type {
   MessageDto,
   MessageReactionEvent,
   MessageSendAck,
+  MessagesAround,
+  MessagesPage,
   MessageUpdatedEvent,
   PublicUser,
   UpdateGroupInput,
@@ -38,6 +40,8 @@ import {
   dropEmptyChatRequest,
   getChatRequest,
   getMembersRequest,
+  getMessagesAfterRequest,
+  getMessagesAroundRequest,
   getMessagesRequest,
   leaveGroupRequest,
   listChatsRequest,
@@ -130,6 +134,8 @@ interface ChatState {
   chats: ChatListItemDto[];
   messagesByChat: Record<string, LocalMessage[]>;
   hasMoreByChat: Record<string, boolean>;
+  hasMoreAfterByChat: Record<string, boolean>;
+  anchorByChat: Record<string, number>;
   historyByChat: Record<string, ChatHistoryState>;
   /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
   readCursorsByChat: Record<string, Record<string, number | null>>;
@@ -159,9 +165,12 @@ interface ChatState {
 
   loadChats: () => Promise<void>;
   openChat: (chatId: string) => Promise<void>;
+  openChatAt: (chatId: string, messageId: number) => Promise<boolean>;
   primeChatFromCache: (chatId: string) => Promise<void>;
   closeChat: () => void;
   loadMore: (chatId: string) => Promise<void>;
+  loadMoreAfter: (chatId: string) => Promise<void>;
+  jumpToLatest: (chatId: string) => Promise<void>;
   syncChatMessages: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
@@ -484,6 +493,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
   hasMoreByChat: {},
+  hasMoreAfterByChat: {},
+  anchorByChat: {},
   historyByChat: {},
   readCursorsByChat: {},
   typingByChat: {},
@@ -535,6 +546,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   async openChat(chatId) {
     cancelPendingEmptyChatDrop(chatId);
+    const windowed = get().anchorByChat[chatId] !== undefined;
     set((state) => ({
       chatError: null,
       activeChatId: chatId,
@@ -544,9 +556,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    if (!get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
+    if (!windowed && !get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
 
-    const [detail, page] = await Promise.allSettled([getChatRequest(chatId), getMessagesRequest(chatId)]);
+    const [detail, page] = await Promise.allSettled([
+      getChatRequest(chatId),
+      windowed ? Promise.resolve(null) : getMessagesRequest(chatId),
+    ]);
 
     if (detail.status === 'fulfilled') {
       get().applyChatDetail(detail.value);
@@ -556,15 +571,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     if (page.status === 'fulfilled') {
-      set((state) => ({
-        messagesByChat: {
-          ...state.messagesByChat,
-          [chatId]: mergeSyncedMessages(state.messagesByChat[chatId] ?? [], page.value.messages, []) as LocalMessage[],
-        },
-        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.value.hasMore },
-        historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
-      }));
-      void writeCachedMessages(page.value.messages);
+      if (page.value) {
+        set((state) => ({
+          messagesByChat: {
+            ...state.messagesByChat,
+            [chatId]: mergeSyncedMessages(
+              state.messagesByChat[chatId] ?? [],
+              page.value!.messages,
+              [],
+            ) as LocalMessage[],
+          },
+          hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.value!.hasMore },
+          historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
+        }));
+        void writeCachedMessages(page.value.messages);
+      }
       void get().restoreOutboxMessages();
     } else if (page.reason instanceof NetworkError) {
       if ((get().messagesByChat[chatId] ?? []).length === 0) {
@@ -575,9 +596,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       throw page.reason;
     }
 
+    if (get().hasMoreAfterByChat[chatId]) return;
+
     const messages = get().messagesByChat[chatId] ?? [];
     const lastReal = [...messages].reverse().find((m) => m.id > 0);
     if (lastReal) get().markRead(chatId, lastReal.id);
+  },
+
+  async openChatAt(chatId, messageId) {
+    let around: MessagesAround;
+    try {
+      around = await getMessagesAroundRequest(chatId, messageId);
+    } catch {
+      return false;
+    }
+
+    set((state) => ({
+      messagesByChat: { ...state.messagesByChat, [chatId]: around.messages as LocalMessage[] },
+      hasMoreByChat: { ...state.hasMoreByChat, [chatId]: around.hasMoreBefore },
+      hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: around.hasMoreAfter },
+      anchorByChat: { ...state.anchorByChat, [chatId]: messageId },
+      historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
+    }));
+    return true;
   },
 
   async primeChatFromCache(chatId) {
@@ -595,7 +636,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   closeChat() {
     const chatId = get().activeChatId;
-    set({ activeChatId: null, selectionMode: false, selectedIds: new Set() });
+    set((state) => {
+      if (!chatId || state.anchorByChat[chatId] === undefined) {
+        return { activeChatId: null, selectionMode: false, selectedIds: new Set<number>() };
+      }
+      const anchorByChat = { ...state.anchorByChat };
+      delete anchorByChat[chatId];
+      const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
+      delete hasMoreAfterByChat[chatId];
+      const messagesByChat = { ...state.messagesByChat };
+      delete messagesByChat[chatId];
+      const hasMoreByChat = { ...state.hasMoreByChat };
+      delete hasMoreByChat[chatId];
+      const historyByChat = { ...state.historyByChat };
+      delete historyByChat[chatId];
+      return {
+        activeChatId: null,
+        selectionMode: false,
+        selectedIds: new Set<number>(),
+        anchorByChat,
+        hasMoreAfterByChat,
+        messagesByChat,
+        hasMoreByChat,
+        historyByChat,
+      };
+    });
     if (!chatId) return;
 
     cancelPendingEmptyChatDrop(chatId);
@@ -625,7 +690,60 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
+  async loadMoreAfter(chatId) {
+    if (!get().hasMoreAfterByChat[chatId]) return;
+    const current = get().messagesByChat[chatId] ?? [];
+    const newest = [...current].reverse().find((m) => m.id > 0);
+    if (!newest) return;
+
+    const page = await getMessagesAfterRequest(chatId, newest.id);
+    set((state) => {
+      const list = state.messagesByChat[chatId] ?? [];
+      const known = new Set(list.map((m) => m.id));
+      const appended = page.messages.filter((m) => !known.has(m.id) && !m.deletedAt) as LocalMessage[];
+      const pending = list.filter((m) => m.id < 0);
+      const settled = list.filter((m) => m.id > 0);
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: [...settled, ...appended, ...pending] },
+        hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },
+      };
+    });
+
+    if (page.hasMore) return;
+    const last = [...(get().messagesByChat[chatId] ?? [])].reverse().find((m) => m.id > 0);
+    if (last) get().markRead(chatId, last.id);
+  },
+
+  async jumpToLatest(chatId) {
+    let page: MessagesPage;
+    try {
+      page = await getMessagesRequest(chatId);
+    } catch {
+      return;
+    }
+
+    set((state) => {
+      const anchorByChat = { ...state.anchorByChat };
+      delete anchorByChat[chatId];
+      const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
+      delete hasMoreAfterByChat[chatId];
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: page.messages as LocalMessage[] },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
+        anchorByChat,
+        hasMoreAfterByChat,
+      };
+    });
+
+    void writeCachedMessages(page.messages);
+    void get().restoreOutboxMessages();
+
+    const last = page.messages.at(-1);
+    if (last) get().markRead(chatId, last.id);
+  },
+
   async syncChatMessages(chatId) {
+    if (get().hasMoreAfterByChat[chatId]) return;
     const result = await syncChat(chatId);
     if (!result) return;
 
@@ -722,6 +840,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async sendMessage(chatId, content, sender, attachment, replyTo) {
+    if (get().hasMoreAfterByChat[chatId]) await get().jumpToLatest(chatId);
     const socket = getSocket();
     const clientId = crypto.randomUUID();
     const optimistic: LocalMessage = {
@@ -802,6 +921,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async sendAttachmentMessage(chatId, sender, file, options = {}) {
+    if (get().hasMoreAfterByChat[chatId]) await get().jumpToLatest(chatId);
     const socket = getSocket();
     if (!socket) return;
 
@@ -1464,6 +1584,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: [],
       messagesByChat: {},
       hasMoreByChat: {},
+      hasMoreAfterByChat: {},
+      anchorByChat: {},
       historyByChat: {},
       readCursorsByChat: {},
       typingByChat: {},
@@ -1493,7 +1615,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (previewUrl) URL.revokeObjectURL(previewUrl);
           nextList = [...list];
           nextList[pendingIndex] = message;
-        } else if (list.some((m) => m.id === message.id)) {
+        } else if (list.some((m) => m.id === message.id) || state.hasMoreAfterByChat[message.chatId]) {
           nextList = list;
         } else {
           nextList = [...list, message];
@@ -1505,7 +1627,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!chat) return state;
 
       const isMine = message.sender?.id === state.myUserId;
-      const isActive = state.activeChatId === message.chatId;
+      const isActive = state.activeChatId === message.chatId && !state.hasMoreAfterByChat[message.chatId];
       const unreadCount = isMine ? chat.unreadCount : isActive ? 0 : chat.unreadCount + 1;
 
       const updatedChat: ChatListItemDto = {
@@ -1526,7 +1648,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .catch(() => undefined);
     }
 
-    if (state.activeChatId === message.chatId && message.sender?.id !== state.myUserId && message.id > 0) {
+    if (
+      state.activeChatId === message.chatId &&
+      !state.hasMoreAfterByChat[message.chatId] &&
+      message.sender?.id !== state.myUserId &&
+      message.id > 0
+    ) {
       get().markRead(message.chatId, message.id);
     }
   },
@@ -1627,6 +1754,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete messagesByChat[chatId];
       const hasMoreByChat = { ...state.hasMoreByChat };
       delete hasMoreByChat[chatId];
+      const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
+      delete hasMoreAfterByChat[chatId];
+      const anchorByChat = { ...state.anchorByChat };
+      delete anchorByChat[chatId];
       const historyByChat = { ...state.historyByChat };
       delete historyByChat[chatId];
       const pinnedByChat = { ...state.pinnedByChat };
@@ -1638,6 +1769,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chats: state.chats.filter((c) => c.id !== chatId),
         messagesByChat,
         hasMoreByChat,
+        hasMoreAfterByChat,
+        anchorByChat,
         historyByChat,
         pinnedByChat,
         membersByChat,

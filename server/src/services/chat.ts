@@ -1,4 +1,12 @@
-import type { ChatDto, ChatListItemDto, ChatMemberSummary, MessageDto, MessagesPage, UpdateGroupDTO } from '@messenger/shared';
+import type {
+  ChatDto,
+  ChatListItemDto,
+  ChatMemberSummary,
+  MessageDto,
+  MessagesAround,
+  MessagesPage,
+  UpdateGroupDTO,
+} from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
@@ -315,26 +323,73 @@ export async function getCoMemberIds(userId: string): Promise<string[]> {
 export async function getMessages(
   chatId: string,
   userId: string,
-  before: number | undefined,
+  cursor: { before?: number; after?: number },
   limit: number,
 ): Promise<MessagesPage> {
   await assertMember(chatId, userId);
 
   const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
   const idFilter: { gt?: number; lt?: number } = {};
-  if (member.clearedUpToMessageId) idFilter.gt = member.clearedUpToMessageId;
-  if (before) idFilter.lt = before;
+  const floor = Math.max(member.clearedUpToMessageId ?? 0, cursor.after ?? 0);
+  if (floor > 0) idFilter.gt = floor;
+  if (cursor.before) idFilter.lt = cursor.before;
+
+  const forward = cursor.after !== undefined;
 
   const rows = await prisma.message.findMany({
     where: { chatId, ...(Object.keys(idFilter).length > 0 ? { id: idFilter } : {}) },
-    orderBy: { id: 'desc' },
+    orderBy: { id: forward ? 'asc' : 'desc' },
     take: limit + 1,
     include: messageInclude,
   });
 
   const hasMore = rows.length > limit;
-  const page = rows.slice(0, limit).reverse();
+  const page = rows.slice(0, limit);
+  if (!forward) page.reverse();
   return { messages: page.map(toMessageDto), hasMore };
+}
+
+export async function getMessagesAround(
+  chatId: string,
+  userId: string,
+  messageId: number,
+  limit: number,
+): Promise<MessagesAround> {
+  await assertMember(chatId, userId);
+
+  const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+  const floor = member.clearedUpToMessageId ?? 0;
+
+  const target = await prisma.message.findFirst({
+    where: { chatId, deletedAt: null, id: floor > 0 ? { equals: messageId, gt: floor } : messageId },
+    select: { id: true },
+  });
+  if (!target) throw notFound(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение недоступно');
+
+  const backCount = Math.ceil(limit / 2);
+  const forwardCount = limit - backCount;
+
+  const [backRows, forwardRows] = await Promise.all([
+    prisma.message.findMany({
+      where: { chatId, deletedAt: null, id: floor > 0 ? { lte: messageId, gt: floor } : { lte: messageId } },
+      orderBy: { id: 'desc' },
+      take: backCount + 1,
+      include: messageInclude,
+    }),
+    prisma.message.findMany({
+      where: { chatId, deletedAt: null, id: { gt: messageId } },
+      orderBy: { id: 'asc' },
+      take: forwardCount + 1,
+      include: messageInclude,
+    }),
+  ]);
+
+  const hasMoreBefore = backRows.length > backCount;
+  const hasMoreAfter = forwardRows.length > forwardCount;
+  const back = backRows.slice(0, backCount).reverse();
+  const forward = forwardRows.slice(0, forwardCount);
+
+  return { messages: [...back, ...forward].map(toMessageDto), hasMoreBefore, hasMoreAfter };
 }
 
 export interface GroupUpdateResult {

@@ -8,16 +8,28 @@ import { formatMediaDuration } from '../media/MediaTile';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
 import { useVoicePlayback } from '../voice/useVoicePlayback';
 import type { FastScrollBinding } from './FastScroller';
+import { useShowInChatMenu, useShowInChatTrigger } from './showInChat';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './VoiceTab.module.css';
 
 const SKELETON_ROWS = 6;
 
-function VoiceRow({ item, own, senderName }: { item: ChatAttachmentDto; own: boolean; senderName: string }) {
+function VoiceRow({
+  item,
+  own,
+  senderName,
+  onMenu,
+}: {
+  item: ChatAttachmentDto;
+  own: boolean;
+  senderName: string;
+  onMenu: (messageId: number, anchor: DOMRect) => void;
+}) {
   const { src, audioRef, playing, togglePlay } = useVoicePlayback(item.attachment, own);
+  const trigger = useShowInChatTrigger(item.messageId, onMenu);
 
   return (
-    <div className={styles.row}>
+    <div className={styles.row} {...trigger}>
       <audio ref={audioRef} src={src} preload="none" />
       <button
         type="button"
@@ -45,6 +57,7 @@ export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
   }, [fastScroll, items]);
   const myUserId = useChatStore((s) => s.myUserId);
   const otherName = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.otherMember?.displayName ?? '');
+  const menu = useShowInChatMenu(chatId);
 
   if (status === 'loading' && items.length === 0) {
     return (
@@ -76,9 +89,16 @@ export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
   return (
     <div className={styles.list} ref={fastScroll?.listRef}>
       {items.map((item) => (
-        <VoiceRow key={item.attachment.id} item={item} own={item.senderId === myUserId} senderName={otherName} />
+        <VoiceRow
+          key={item.attachment.id}
+          item={item}
+          own={item.senderId === myUserId}
+          senderName={otherName}
+          onMenu={menu.open}
+        />
       ))}
       {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {menu.node}
     </div>
   );
 }

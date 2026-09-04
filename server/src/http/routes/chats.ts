@@ -6,6 +6,8 @@ import {
   createGroupSchema,
   createPrivateChatSchema,
   deleteChatQuerySchema,
+  ErrorCode,
+  messagesAroundQuerySchema,
   messagesQuerySchema,
   messagesSyncQuerySchema,
   SocketEvent,
@@ -16,6 +18,7 @@ import {
 import type { Request } from 'express';
 import { Router } from 'express';
 
+import { badRequest } from '../../lib/errors.js';
 import { parseOrThrow } from '../../lib/validate.js';
 import { emitChatUpdated, emitMemberChanged } from '../../realtime/group-handlers.js';
 import {
@@ -100,10 +103,26 @@ chatsRouter.get('/:id', (req, res, next) => {
 
 chatsRouter.get('/:id/messages', (req, res, next) => {
   try {
-    const { before, limit } = parseOrThrow(messagesQuerySchema, req.query);
+    const { before, after, limit } = parseOrThrow(messagesQuerySchema, req.query);
     chatService
-      .getMessages(req.params.id, req.userId!, before, limit)
+      .getMessages(req.params.id, req.userId!, { before, after }, limit)
       .then((page) => res.json(page))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.get('/:id/messages/around/:messageId', (req, res, next) => {
+  try {
+    const { limit } = parseOrThrow(messagesAroundQuerySchema, req.query);
+    const messageId = Number.parseInt(paramId(req, 'messageId'), 10);
+    if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Некорректный номер сообщения');
+    }
+    chatService
+      .getMessagesAround(paramId(req, 'id'), req.userId!, messageId, limit)
+      .then((window) => res.json(window))
       .catch(next);
   } catch (error) {
     next(error);

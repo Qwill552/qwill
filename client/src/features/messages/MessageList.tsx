@@ -126,6 +126,10 @@ export function MessageList({
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
+  const hasMoreAfter = useChatStore((s) => s.hasMoreAfterByChat[chatId]) ?? false;
+  const anchorMessageId = useChatStore((s) => s.anchorByChat[chatId]) ?? null;
+  const loadMoreAfter = useChatStore((s) => s.loadMoreAfter);
+  const jumpToLatest = useChatStore((s) => s.jumpToLatest);
   const reconciled = useChatStore((s) => s.hasMoreByChat[chatId] !== undefined);
   const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
@@ -154,6 +158,7 @@ export function MessageList({
   /** Высота содержимого до догрузки истории — по ней восстанавливается позиция. */
   const prependAnchor = useRef<number | null>(null);
   const [showJump, setShowJump] = useState(false);
+  const pendingBottomRef = useRef(false);
 
   const myRole = members?.find((m) => m.userId === myId)?.role;
   const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
@@ -182,6 +187,26 @@ export function MessageList({
   /** Баннер закрепа — та же логика: не scrollIntoView (см. журнал ux-ui.md, этап 2), а свой
    *  scrollTo по измеренному offsetTop. Молча ничего не делает, если сообщение не догружено
    *  в текущую страницу истории — догрузки по id пока нет (вне объёма этого этапа). */
+  function rowNodeFor(el: HTMLDivElement, messageId: number): HTMLElement | null {
+    const exact = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    if (exact) return exact;
+    let candidate: HTMLElement | null = null;
+    for (const node of el.querySelectorAll<HTMLElement>('[data-message-id]')) {
+      const id = Number(node.dataset.messageId);
+      if (id > 0 && id <= messageId) candidate = node;
+    }
+    return candidate;
+  }
+
+  function scrollToAnchor(messageId: number): void {
+    const el = listRef.current;
+    const target = el ? rowNodeFor(el, messageId) : null;
+    if (!el || !target) return;
+    el.scrollTop = Math.max(0, target.offsetTop - el.clientHeight / 3);
+    target.dataset.flash = '1';
+    window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
+  }
+
   function scrollToMessage(messageId: number): void {
     const el = listRef.current;
     const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
@@ -194,18 +219,31 @@ export function MessageList({
     if (settledChatId.current === chatId || messages.length === 0) return;
     settledChatId.current = chatId;
     prevLength.current = messages.length;
+    if (anchorMessageId !== null) {
+      stuckToBottom.current = false;
+      scrollToAnchor(anchorMessageId);
+      return;
+    }
     stuckToBottom.current = true;
     scrollToBottom(false);
-  }, [chatId, messages.length]);
+  }, [chatId, messages.length, anchorMessageId]);
+
+  useLayoutEffect(() => {
+    if (!pendingBottomRef.current || messages.length === 0) return;
+    pendingBottomRef.current = false;
+    stuckToBottom.current = true;
+    setShowJump(false);
+    scrollToBottom(false);
+  });
 
   useEffect(() => {
     if (settledChatId.current !== chatId) {
       prevLength.current = messages.length;
       return;
     }
-    if (messages.length > prevLength.current && stuckToBottom.current) scrollToBottom(true);
+    if (messages.length > prevLength.current && stuckToBottom.current && !hasMoreAfter) scrollToBottom(true);
     prevLength.current = messages.length;
-  }, [chatId, messages.length]);
+  }, [chatId, messages.length, hasMoreAfter]);
 
   useEffect(() => {
     if (typing && stuckToBottom.current) scrollToBottom(true);
@@ -286,6 +324,16 @@ export function MessageList({
   function handleLoadMore(): void {
     prependAnchor.current = listRef.current?.scrollHeight ?? null;
     void loadMore(chatId);
+  }
+
+  function handleJump(): void {
+    if (!hasMoreAfter) {
+      scrollToBottom(true);
+      return;
+    }
+    void jumpToLatest(chatId).then(() => {
+      pendingBottomRef.current = true;
+    });
   }
 
   const rows = useMemo(() => {
@@ -504,6 +552,12 @@ export function MessageList({
           </div>
         ))}
 
+        {hasMoreAfter && (
+          <button className={styles.loadMore} type="button" onClick={() => void loadMoreAfter(chatId)}>
+            Показать дальше
+          </button>
+        )}
+
         {typing && (
           <div className={styles.typingRow}>
             <div className={styles.typingBubble}>
@@ -519,10 +573,10 @@ export function MessageList({
 
       <button
         type="button"
-        className={`${styles.jump} ${showJump ? '' : styles.jumpHidden}`}
+        className={`${styles.jump} ${showJump || hasMoreAfter ? '' : styles.jumpHidden}`}
         aria-label="К последним сообщениям"
-        tabIndex={showJump ? 0 : -1}
-        onClick={() => scrollToBottom(true)}
+        tabIndex={showJump || hasMoreAfter ? 0 : -1}
+        onClick={handleJump}
       >
         <Icon name="chevron-down" size={22} />
         <Badge count={unreadCount} small className={styles.jumpBadge} />

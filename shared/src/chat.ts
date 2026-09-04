@@ -13,9 +13,15 @@ export type CreatePrivateChatInput = z.infer<typeof createPrivateChatSchema>;
 
 export const messagesQuerySchema = z.object({
   before: z.coerce.number().int().positive().optional(),
+  after: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
 });
 export type MessagesQuery = z.infer<typeof messagesQuerySchema>;
+
+export const messagesAroundQuerySchema = z.object({
+  limit: z.coerce.number().int().min(2).max(100).default(MESSAGES_PAGE_SIZE),
+});
+export type MessagesAroundQuery = z.infer<typeof messagesAroundQuerySchema>;
 
 export const messagesSyncQuerySchema = z.object({
   sinceId: z.coerce.number().int().min(0).default(0),
@@ -327,6 +333,12 @@ export interface ChatListResponse {
 export interface MessagesPage {
   messages: MessageDto[];
   hasMore: boolean;
+}
+
+export interface MessagesAround {
+  messages: MessageDto[];
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
 }
 
 export interface MessagesSyncResponse {

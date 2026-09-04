@@ -12,6 +12,7 @@ import { DeleteMessageModal } from '../messages/DeleteMessageModal';
 import { ForwardSheet } from '../messages/ForwardSheet';
 import { fitRect, findMediaRect, flipTransform, type MediaRect } from './mediaAnchor';
 import { isVideoAttachment } from './mediaKind';
+import { useShowInChat } from '../chat/showInChat';
 import { useMediaViewerStore, type MediaViewerItem } from './mediaViewerStore';
 import { mediaRatio, usePreviewSrc, useViewerSrc } from './useMediaSrc';
 import styles from './MediaViewer.module.css';
@@ -98,7 +99,9 @@ function ViewerStage({ chatId }: { chatId: string }) {
   const setIndex = useMediaViewerStore((s) => s.setIndex);
   const dropMessage = useMediaViewerStore((s) => s.dropMessage);
   const closeViewer = useMediaViewerStore((s) => s.close);
+  const showInChat = useShowInChat();
   const readOnly = useMediaViewerStore((s) => s.readOnly);
+  const detached = useMediaViewerStore((s) => s.detached);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
 
   const viewport = useViewport();
@@ -410,6 +413,13 @@ function ViewerStage({ chatId }: { chatId: string }) {
     setDeleteConfirm(true);
   }
 
+  function handleShowInChat(): void {
+    if (!current || !chatId) return;
+    const { messageId } = current;
+    closeViewer();
+    void showInChat(chatId, messageId);
+  }
+
   function handleConfirmDelete(): void {
     setDeleteConfirm(false);
     if (!current) return;
@@ -421,6 +431,9 @@ function ViewerStage({ chatId }: { chatId: string }) {
   if (!current) return null;
 
   const menuItems: MenuItem[] = [{ id: 'save', label: 'Сохранить', icon: 'download', onSelect: handleSave }];
+  if (detached && chatId) {
+    menuItems.push({ id: 'show-in-chat', label: 'Показать в чате', icon: 'chats', onSelect: handleShowInChat });
+  }
   if (!readOnly) {
     menuItems.push({ id: 'forward', label: 'Переслать', icon: 'forward', onSelect: () => setForwarding(true) });
   }

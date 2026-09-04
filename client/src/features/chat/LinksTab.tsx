@@ -8,6 +8,7 @@ import { fileIdFromUrl } from '../../ui/Avatar';
 import { Skeleton } from '../../ui/Skeleton';
 import { avatarGradientFor } from '../../ui/tint';
 import type { FastScrollBinding } from './FastScroller';
+import { useShowInChatMenu, useShowInChatTrigger } from './showInChat';
 import { usePagedByMessage } from './useChatAttachments';
 import styles from './LinksTab.module.css';
 
@@ -21,7 +22,7 @@ function hostOf(url: string): string {
   }
 }
 
-function LinkRow({ item }: { item: ChatLinkDto }) {
+function LinkRow({ item, onMenu }: { item: ChatLinkDto; onMenu: (messageId: number, anchor: DOMRect) => void }) {
   const cached = useLinkPreviewStore((state) => state.previews[item.url]);
   const request = useLinkPreviewStore((state) => state.request);
   const prime = useLinkPreviewStore((state) => state.prime);
@@ -38,9 +39,10 @@ function LinkRow({ item }: { item: ChatLinkDto }) {
   }, [settled, item.preview, item.url, prime, request]);
 
   const host = hostOf(item.url);
+  const trigger = useShowInChatTrigger(item.messageId, onMenu);
 
   return (
-    <a className={styles.row} href={item.url} target="_blank" rel="noopener noreferrer nofollow">
+    <a className={styles.row} href={item.url} target="_blank" rel="noopener noreferrer nofollow" {...trigger}>
       <span className={styles.thumb} style={imageSrc ? undefined : { backgroundImage: avatarGradientFor(host) }}>
         {imageSrc ? <img className={styles.image} src={imageSrc} alt="" loading="lazy" /> : host.charAt(0).toUpperCase()}
       </span>
@@ -57,6 +59,7 @@ function LinkRow({ item }: { item: ChatLinkDto }) {
 export function LinksTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
   const loadPage = useCallback((before?: number) => getChatLinksRequest(chatId, before), [chatId]);
   const { items, status, hasMore, sentinelRef, retry } = usePagedByMessage(loadPage);
+  const menu = useShowInChatMenu(chatId);
 
   useEffect(() => {
     fastScroll?.setItems(items);
@@ -93,9 +96,10 @@ export function LinksTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
   return (
     <div className={styles.list} ref={fastScroll?.listRef}>
       {items.map((item, index) => (
-        <LinkRow key={`${item.messageId}:${index}`} item={item} />
+        <LinkRow key={`${item.messageId}:${index}`} item={item} onMenu={menu.open} />
       ))}
       {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {menu.node}
     </div>
   );
 }

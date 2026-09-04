@@ -9,6 +9,7 @@ import type {
   CreateGroupInput,
   CreatePrivateChatInput,
   GroupMemberDTO,
+  MessagesAround,
   MessagesPage,
   MessagesSyncResponse,
   UpdateGroupInput,
@@ -36,6 +37,14 @@ export function createGroupRequest(input: CreateGroupInput): Promise<ChatDto> {
 export function getMessagesRequest(chatId: string, before?: number): Promise<MessagesPage> {
   const query = before !== undefined ? `?before=${before}` : '';
   return apiRequest<MessagesPage>(`/api/chats/${chatId}/messages${query}`);
+}
+
+export function getMessagesAfterRequest(chatId: string, after: number): Promise<MessagesPage> {
+  return apiRequest<MessagesPage>(`/api/chats/${chatId}/messages?after=${after}`);
+}
+
+export function getMessagesAroundRequest(chatId: string, messageId: number): Promise<MessagesAround> {
+  return apiRequest<MessagesAround>(`/api/chats/${chatId}/messages/around/${messageId}`);
 }
 
 export function syncMessagesRequest(

@@ -10,16 +10,18 @@ import { formatBytes } from '../messages/Attachment';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
 import { ProgressRing } from '../messages/ProgressRing';
 import type { FastScrollBinding } from './FastScroller';
+import { useShowInChatMenu, useShowInChatTrigger } from './showInChat';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './FilesTab.module.css';
 
 const SKELETON_ROWS = 8;
 
-function FileRow({ item }: { item: ChatAttachmentDto }) {
+function FileRow({ item, onMenu }: { item: ChatAttachmentDto; onMenu: (messageId: number, anchor: DOMRect) => void }) {
   const { attachment } = item;
   const kind = fileKindFor(attachment.file.mimeType);
   const { state, progress, activate, cancel } = useFileDownload(attachment);
   const busy = state === 'downloading';
+  const trigger = useShowInChatTrigger(item.messageId, onMenu);
 
   return (
     <button
@@ -27,6 +29,7 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
       className={styles.row}
       onClick={busy ? cancel : activate}
       aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
+      {...trigger}
     >
       <span className={styles.lead}>
         <IconTile icon={kind.icon} tint={kind.tint} />
@@ -54,6 +57,7 @@ function FileRow({ item }: { item: ChatAttachmentDto }) {
 
 export function FilesTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
   const { items, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'file');
+  const menu = useShowInChatMenu(chatId);
 
   useEffect(() => {
     fastScroll?.setItems(items);
@@ -89,9 +93,10 @@ export function FilesTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
   return (
     <div className={styles.list} ref={fastScroll?.listRef}>
       {items.map((item) => (
-        <FileRow key={item.attachment.id} item={item} />
+        <FileRow key={item.attachment.id} item={item} onMenu={menu.open} />
       ))}
       {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {menu.node}
     </div>
   );
 }

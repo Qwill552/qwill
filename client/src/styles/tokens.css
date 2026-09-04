@@ -521,6 +521,7 @@
   --dur-press: 320ms; /* пружинное нажатие строки/вкладки на десктопе */
   --dur-scrollbar: 220ms; /* проявление/скрытие индикатора прокрутки */
   --dur-pulse: 1000ms; /* кольцо потерянной связи на экране звонка */
+  --dur-flash: 1500ms; /* подсветка сообщения после перехода «показать в чате» */
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-close: ease-in;
@@ -554,6 +555,7 @@
     --dur-press: 1ms;
     --dur-scrollbar: 1ms;
     --dur-pulse: 1ms;
+    --dur-flash: 1ms;
     --transition: 1ms linear;
   }
 }

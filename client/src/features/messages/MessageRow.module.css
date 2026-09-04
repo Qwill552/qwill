@@ -54,6 +54,21 @@
   opacity: 1;
 }
 
+.row[data-flash='1'] .highlight {
+  animation: jumpFlash var(--dur-flash) var(--ease-screen) both;
+}
+
+@keyframes jumpFlash {
+  0%,
+  55% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Слот чекбокса всегда в DOM (иначе появление 140 мс не от чего анимировать) — ширина
    схлопнута в ноль вне мультивыбора, содержимое рендерится только в режиме выбора. */
 .checkboxSlot {
