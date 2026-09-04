@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CHAT_TITLE_MAX_LENGTH, MESSAGE_BATCH_LIMIT, MESSAGE_MAX_LENGTH, MESSAGES_PAGE_SIZE } from './constants.js';
 import { isSingleEmoji } from './emoji.js';
 import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto } from './files.js';
+import type { LinkPreviewDto } from './links.js';
 import type { AvatarColor } from './user.js';
 
 export const createPrivateChatSchema = z.object({
@@ -50,6 +51,25 @@ export interface ChatAttachmentCounts {
   gifs: number;
   audios: number;
   files: number;
+  links: number;
+}
+
+export const chatLinksQuerySchema = z.object({
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
+});
+export type ChatLinksQuery = z.infer<typeof chatLinksQuerySchema>;
+
+export interface ChatLinkDto {
+  messageId: number;
+  createdAt: string;
+  url: string;
+  preview: LinkPreviewDto | null;
+}
+
+export interface ChatLinksPage {
+  items: ChatLinkDto[];
+  hasMore: boolean;
 }
 
 /** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).

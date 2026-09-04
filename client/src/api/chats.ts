@@ -3,6 +3,7 @@ import type {
   ChatAttachmentCounts,
   ChatAttachmentsPage,
   ChatDto,
+  ChatLinksPage,
   ChatListResponse,
   ChatUpdatedEvent,
   CreateGroupInput,
@@ -55,6 +56,13 @@ export function getChatAttachmentsRequest(
   const params = new URLSearchParams({ category });
   if (before !== undefined) params.set('before', String(before));
   return apiRequest<ChatAttachmentsPage>(`/api/chats/${chatId}/attachments?${params.toString()}`);
+}
+
+export function getChatLinksRequest(chatId: string, before?: number): Promise<ChatLinksPage> {
+  const params = new URLSearchParams();
+  if (before !== undefined) params.set('before', String(before));
+  const query = params.toString();
+  return apiRequest<ChatLinksPage>(`/api/chats/${chatId}/links${query ? `?${query}` : ''}`);
 }
 
 export function getChatAttachmentCountsRequest(chatId: string): Promise<ChatAttachmentCounts> {

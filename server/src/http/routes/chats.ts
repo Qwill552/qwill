@@ -1,6 +1,7 @@
 import {
   addMemberSchema,
   chatAttachmentsQuerySchema,
+  chatLinksQuerySchema,
   chatMuteSchema,
   createGroupSchema,
   createPrivateChatSchema,
@@ -143,6 +144,18 @@ chatsRouter.get('/:id/attachments/counts', (req, res, next) => {
     .countChatAttachments(paramId(req, 'id'), req.userId!)
     .then((counts) => res.json(counts))
     .catch(next);
+});
+
+chatsRouter.get('/:id/links', (req, res, next) => {
+  try {
+    const query = parseOrThrow(chatLinksQuerySchema, req.query);
+    chatMediaService
+      .listChatLinks(paramId(req, 'id'), req.userId!, query)
+      .then((page) => res.json(page))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
 });
 
 chatsRouter.delete('/:id', (req, res, next) => {

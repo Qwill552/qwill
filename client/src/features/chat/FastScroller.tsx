@@ -1,4 +1,3 @@
-import type { ChatAttachmentDto } from '@messenger/shared';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 import { Icon } from '../../ui/Icon';
@@ -6,16 +5,20 @@ import styles from './FastScroller.module.css';
 
 const HIDE_DELAY_MS = 1500;
 
+export interface FastScrollItem {
+  createdAt: string;
+}
+
 export interface FastScrollBinding {
   listRef: (element: HTMLElement | null) => void;
-  setItems: (items: ChatAttachmentDto[]) => void;
+  setItems: (items: FastScrollItem[]) => void;
 }
 
 interface FastScrollerProps {
   scroller: HTMLElement | null;
   sentinelRef: RefObject<HTMLElement | null>;
   listRef: RefObject<HTMLElement | null>;
-  itemsRef: RefObject<ChatAttachmentDto[]>;
+  itemsRef: RefObject<FastScrollItem[]>;
 }
 
 interface Metrics {

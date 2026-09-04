@@ -5,21 +5,25 @@ import { getChatAttachmentsRequest } from '../../api/chats';
 
 const LOAD_AHEAD_PX = 600;
 
-export interface UseChatAttachmentsResult {
-  items: ChatAttachmentDto[];
-  setItems: Dispatch<SetStateAction<ChatAttachmentDto[]>>;
+export interface PagedByMessage<T> {
+  items: T[];
+  setItems: Dispatch<SetStateAction<T[]>>;
   status: 'loading' | 'ready' | 'error';
   hasMore: boolean;
   sentinelRef: RefObject<HTMLDivElement | null>;
   retry: () => void;
 }
 
-export function useChatAttachments(chatId: string, category: ChatAttachmentCategory): UseChatAttachmentsResult {
-  const [items, setItems] = useState<ChatAttachmentDto[]>([]);
+export type UseChatAttachmentsResult = PagedByMessage<ChatAttachmentDto>;
+
+export function usePagedByMessage<T extends { messageId: number }>(
+  loadPage: (before?: number) => Promise<{ items: T[]; hasMore: boolean }>,
+): PagedByMessage<T> {
+  const [items, setItems] = useState<T[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [hasMore, setHasMore] = useState(true);
   const loadingRef = useRef(false);
-  const itemsRef = useRef<ChatAttachmentDto[]>([]);
+  const itemsRef = useRef<T[]>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   itemsRef.current = items;
@@ -30,7 +34,7 @@ export function useChatAttachments(chatId: string, category: ChatAttachmentCateg
       loadingRef.current = true;
       if (before === undefined) setStatus('loading');
       try {
-        const page = await getChatAttachmentsRequest(chatId, category, before);
+        const page = await loadPage(before);
         setItems((prev) => (before === undefined ? page.items : [...prev, ...page.items]));
         setHasMore(page.hasMore);
         setStatus('ready');
@@ -40,7 +44,7 @@ export function useChatAttachments(chatId: string, category: ChatAttachmentCateg
         loadingRef.current = false;
       }
     },
-    [chatId, category],
+    [loadPage],
   );
 
   useEffect(() => {
@@ -65,4 +69,12 @@ export function useChatAttachments(chatId: string, category: ChatAttachmentCateg
   }, [status, hasMore, items.length, load]);
 
   return { items, setItems, status, hasMore, sentinelRef, retry: () => void load() };
+}
+
+export function useChatAttachments(chatId: string, category: ChatAttachmentCategory): UseChatAttachmentsResult {
+  const loadPage = useCallback(
+    (before?: number) => getChatAttachmentsRequest(chatId, category, before),
+    [chatId, category],
+  );
+  return usePagedByMessage(loadPage);
 }

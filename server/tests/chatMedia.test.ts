@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
-import { countChatAttachments, listChatAttachments } from '../src/services/chatMedia.js';
+import { countChatAttachments, listChatAttachments, listChatLinks } from '../src/services/chatMedia.js';
 import { sendMessage } from '../src/services/message.js';
 
 const app = createApp();
@@ -64,8 +64,22 @@ async function postAttachment(
   return message.id;
 }
 
+async function postText(chatId: string, senderId: string, content: string): Promise<number> {
+  clientSeq += 1;
+  const message = await sendMessage({ chatId, senderId, clientId: `atm_${RUN_ID}_${clientSeq}`, content });
+  return message.id;
+}
+
+const LINK_HOST = '127.0.0.1';
+
+function testLink(path: string): string {
+  return `http://${LINK_HOST}/${RUN_ID}/${path}`;
+}
+
 describe('chatMedia.service (PM-1)', () => {
   afterAll(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await prisma.linkPreview.deleteMany({ where: { url: { contains: `/${RUN_ID}/` } } });
     await prisma.chat.deleteMany({ where: { id: { in: createdChatIds } } });
     await prisma.file.deleteMany({ where: { id: { in: createdFileIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
@@ -98,7 +112,7 @@ describe('chatMedia.service (PM-1)', () => {
     expect(files.items.map((i) => i.attachment.file.mimeType).sort()).toEqual(['application/pdf', 'audio/mpeg']);
 
     const counts = await countChatAttachments(chatId, alice.userId);
-    expect(counts).toEqual({ photos: 1, videos: 1, voices: 1, gifs: 1, audios: 1, files: 1 });
+    expect(counts).toEqual({ photos: 1, videos: 1, voices: 1, gifs: 1, audios: 1, files: 1, links: 0 });
   });
 
   it('удалённое сообщение не попадает никуда и не считается', async () => {
@@ -172,6 +186,65 @@ describe('chatMedia.service (PM-1)', () => {
     });
     expect(secondPage.hasMore).toBe(false);
     expect(secondPage.items.map((i) => i.messageId)).toEqual([ids[1], ids[0]]);
+  });
+
+  it('ссылки: три URL в сообщении дают три элемента, слово http без адреса — ни одного', async () => {
+    const alice = await registerUser('lnk_alice');
+    const bob = await registerUser('lnk_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    await postText(chatId, alice.userId, 'тут просто слово http и больше ничего');
+    const messageId = await postText(
+      chatId,
+      alice.userId,
+      `раз ${testLink('a')} два ${testLink('b')} три ${testLink('c')}`,
+    );
+
+    const page = await listChatLinks(chatId, alice.userId, { limit: 50 });
+    expect(page.items.map((item) => item.url)).toEqual([testLink('a'), testLink('b'), testLink('c')]);
+    expect(page.items.every((item) => item.messageId === messageId)).toBe(true);
+    expect(page.hasMore).toBe(false);
+
+    const counts = await countChatAttachments(chatId, alice.userId);
+    expect(counts.links).toBe(3);
+  });
+
+  it('ссылки: удалённое сообщение и очищенная история не отдаются', async () => {
+    const alice = await registerUser('lnkd_alice');
+    const bob = await registerUser('lnkd_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    const first = await postText(chatId, alice.userId, testLink('d1'));
+    const second = await postText(chatId, alice.userId, testLink('d2'));
+    const third = await postText(chatId, alice.userId, testLink('d3'));
+
+    await prisma.message.update({ where: { id: third }, data: { deletedAt: new Date() } });
+    await prisma.chatMember.update({
+      where: { chatId_userId: { chatId, userId: alice.userId } },
+      data: { clearedUpToMessageId: first },
+    });
+
+    const page = await listChatLinks(chatId, alice.userId, { limit: 50 });
+    expect(page.items.map((item) => item.messageId)).toEqual([second]);
+
+    const counts = await countChatAttachments(chatId, alice.userId);
+    expect(counts.links).toBe(1);
+  });
+
+  it('GET /api/chats/:id/links работает по HTTP и требует членства', async () => {
+    const alice = await registerUser('lnkh_alice');
+    const bob = await registerUser('lnkh_bob');
+    const eve = await registerUser('lnkh_eve');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await postText(chatId, alice.userId, `смотри ${testLink('h')}`);
+
+    const page = await request.get(`/api/chats/${chatId}/links`).set('Authorization', `Bearer ${alice.token}`);
+    expect(page.status).toBe(200);
+    expect(page.body.items).toHaveLength(1);
+    expect(page.body.items[0].url).toBe(testLink('h'));
+
+    const forbidden = await request.get(`/api/chats/${chatId}/links`).set('Authorization', `Bearer ${eve.token}`);
+    expect(forbidden.status).toBe(403);
   });
 
   it('GET /api/chats/:id/attachments и /attachments/counts работают по HTTP', async () => {

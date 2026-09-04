@@ -450,6 +450,7 @@ export function MessageList({
       <div
         className={`${styles.list} hide-native-scrollbar`}
         ref={listRef}
+        data-message-scroller="true"
         onScroll={handleScroll}
         onContextMenu={(event) => {
           const target = event.target as HTMLElement;

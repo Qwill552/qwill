@@ -1,18 +1,22 @@
-import type { ChatAttachmentCategory, ChatAttachmentCounts, ChatAttachmentDto } from '@messenger/shared';
+import type { ChatAttachmentCategory, ChatAttachmentCounts } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { getChatAttachmentCountsRequest } from '../../api/chats';
 import { haptic } from '../../ui/haptic';
-import { FastScroller, type FastScrollBinding } from './FastScroller';
+import { FastScroller, type FastScrollBinding, type FastScrollItem } from './FastScroller';
 import { FilesTab } from './FilesTab';
+import { LinksTab } from './LinksTab';
 import { MediaTabGrid } from './MediaTabGrid';
 import { plural } from './plural';
 import { VoiceTab } from './VoiceTab';
 import styles from './ChatMediaTabs.module.css';
 
-const TAB_ORDER: { id: ChatAttachmentCategory; label: string }[] = [
+type TabId = ChatAttachmentCategory | 'link';
+
+const TAB_ORDER: { id: TabId; label: string }[] = [
   { id: 'media', label: 'Медиа' },
   { id: 'file', label: 'Файлы' },
+  { id: 'link', label: 'Ссылки' },
   { id: 'voice', label: 'Голосовые' },
   { id: 'gif', label: 'GIF' },
 ];
@@ -53,14 +57,15 @@ interface Drag {
   direction: 1 | -1;
 }
 
-function countOf(counts: ChatAttachmentCounts, id: ChatAttachmentCategory): number {
+function countOf(counts: ChatAttachmentCounts, id: TabId): number {
   if (id === 'media') return counts.photos + counts.videos;
   if (id === 'file') return counts.audios + counts.files;
+  if (id === 'link') return counts.links;
   if (id === 'voice') return counts.voices;
   return counts.gifs;
 }
 
-function summaryOf(counts: ChatAttachmentCounts, id: ChatAttachmentCategory): string {
+function summaryOf(counts: ChatAttachmentCounts, id: TabId): string {
   if (id === 'media') {
     const parts: string[] = [];
     if (counts.photos > 0) parts.push(`${counts.photos} фото`);
@@ -70,6 +75,9 @@ function summaryOf(counts: ChatAttachmentCounts, id: ChatAttachmentCategory): st
   if (id === 'file') {
     const total = counts.audios + counts.files;
     return `${total} ${plural(total, 'файл', 'файла', 'файлов')}`;
+  }
+  if (id === 'link') {
+    return `${counts.links} ${plural(counts.links, 'ссылка', 'ссылки', 'ссылок')}`;
   }
   if (id === 'voice') {
     return `${counts.voices} ${plural(counts.voices, 'голосовое', 'голосовых', 'голосовых')}`;
@@ -114,12 +122,12 @@ export function ChatMediaTabs({
   const pagerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLElement | null>(null);
-  const rememberedRef = useRef<{ id: ChatAttachmentCategory; top: number } | null>(null);
+  const rememberedRef = useRef<{ id: TabId; top: number } | null>(null);
   const pendingScrollRef = useRef<number | null>(null);
   const slideGeometryRef = useRef<Geometry | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const listElementRef = useRef<HTMLElement | null>(null);
-  const listItemsRef = useRef<ChatAttachmentDto[]>([]);
+  const listItemsRef = useRef<FastScrollItem[]>([]);
   const frameRef = useRef<number | null>(null);
   const settleRef = useRef<number | null>(null);
   const animatingRef = useRef(false);
@@ -513,6 +521,7 @@ export function ChatMediaTabs({
             >
               {tab.id === 'media' && <MediaTabGrid chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
               {tab.id === 'file' && <FilesTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'link' && <LinksTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
               {tab.id === 'voice' && <VoiceTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
               {tab.id === 'gif' && (
                 <MediaTabGrid chatId={chatId} category="gif" fastScroll={slot === 0 ? fastScroll : undefined} />
