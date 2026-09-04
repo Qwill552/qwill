@@ -32,6 +32,30 @@ const COLLAPSE_AT = 0.55;
 /** Дозор на случай, если rAF встанет (вкладка ушла в фон) и распад не доиграет сам. */
 const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
+const FEED_LOAD_AHEAD_PX = 600;
+const FEED_RETRY_MS = 4000;
+
+interface RowAnchor {
+  id: string;
+  top: number;
+}
+
+function rememberAnchor(el: HTMLElement): RowAnchor | null {
+  const viewTop = el.getBoundingClientRect().top;
+  for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+    const rect = node.getBoundingClientRect();
+    if (rect.bottom <= viewTop) continue;
+    const id = node.dataset.messageId;
+    return id === undefined ? null : { id, top: rect.top };
+  }
+  return null;
+}
+
+function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
+  const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`);
+  if (!node) return;
+  el.scrollTop += node.getBoundingClientRect().top - anchor.top;
+}
 
 interface MessageRowData {
   message: LocalMessage;
@@ -153,6 +177,7 @@ export function MessageList({
   }, [chatId, isGroup, loadMembers]);
 
   const feedKey = `${chatId}#${feedEpoch}`;
+  const feedBounds = `${feedKey}:${messages[0]?.id ?? 0}:${messages[messages.length - 1]?.id ?? 0}:${messages.length}`;
 
   const listRef = useRef<HTMLDivElement>(null);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
@@ -160,8 +185,13 @@ export function MessageList({
   const prevLength = useRef(0);
   const settledFeedKey = useRef<string | null>(null);
   const suppressAppear = useRef(false);
-  /** Высота содержимого до догрузки истории — по ней восстанавливается позиция. */
-  const prependAnchor = useRef<number | null>(null);
+  const pendingAnchor = useRef<RowAnchor | null>(null);
+  const topTriggerRef = useRef<HTMLDivElement>(null);
+  const bottomTriggerRef = useRef<HTMLDivElement>(null);
+  const loadingUp = useRef(false);
+  const loadingDown = useRef(false);
+  const retryUpAt = useRef(0);
+  const retryDownAt = useRef(0);
   const [showJump, setShowJump] = useState(false);
 
   const myRole = members?.find((m) => m.userId === myId)?.role;
@@ -215,6 +245,8 @@ export function MessageList({
     const replaced = settledFeedKey.current?.startsWith(`${chatId}#`) ?? false;
     settledFeedKey.current = feedKey;
     prevLength.current = messages.length;
+    retryUpAt.current = 0;
+    retryDownAt.current = 0;
     if (replaced) suppressAppear.current = true;
     if (focus) {
       stuckToBottom.current = false;
@@ -292,14 +324,13 @@ export function MessageList({
     return () => cancelAnimationFrame(frame);
   }, [emojiPanelOpen]);
 
-  // Догрузка истории вверх не должна дёргать позицию: сохраняем scrollHeight до вставки
-  // и возвращаем разницу сразу после неё, до кадра отрисовки.
   useLayoutEffect(() => {
     const el = listRef.current;
-    if (!el || prependAnchor.current === null) return;
-    el.scrollTop += el.scrollHeight - prependAnchor.current;
-    prependAnchor.current = null;
-  }, [messages.length]);
+    const anchor = pendingAnchor.current;
+    if (!el || !anchor) return;
+    pendingAnchor.current = null;
+    restoreAnchor(el, anchor);
+  }, [feedBounds]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -337,6 +368,60 @@ export function MessageList({
     return () => observer.disconnect();
   }, [chatId]);
 
+  const requestUp = useCallback(() => {
+    const el = listRef.current;
+    if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current) return;
+    loadingUp.current = true;
+    pendingAnchor.current = rememberAnchor(el);
+    loadMore(chatId)
+      .catch(() => {
+        pendingAnchor.current = null;
+        retryUpAt.current = performance.now() + FEED_RETRY_MS;
+      })
+      .finally(() => {
+        loadingUp.current = false;
+      });
+  }, [chatId, hasMore, loadMore]);
+
+  const requestDown = useCallback(() => {
+    if (!hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
+    loadingDown.current = true;
+    loadMoreAfter(chatId)
+      .catch(() => {
+        retryDownAt.current = performance.now() + FEED_RETRY_MS;
+      })
+      .finally(() => {
+        loadingDown.current = false;
+      });
+  }, [chatId, hasMoreAfter, loadMoreAfter]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    const top = topTriggerRef.current;
+    const bottom = bottomTriggerRef.current;
+    if (!el || !top || !bottom) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (entry.target === top) requestUp();
+          else requestDown();
+        }
+      },
+      { root: el, rootMargin: `${FEED_LOAD_AHEAD_PX}px 0px ${FEED_LOAD_AHEAD_PX}px 0px` },
+    );
+    observer.observe(top);
+    observer.observe(bottom);
+    return () => observer.disconnect();
+  }, [requestUp, requestDown]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || el.scrollHeight >= el.clientHeight * 2) return;
+    requestUp();
+    requestDown();
+  }, [feedBounds, requestUp, requestDown]);
+
   function handleScroll(): void {
     const el = listRef.current;
     if (!el) return;
@@ -347,11 +432,10 @@ export function MessageList({
     stuckToBottom.current = distance < STICK_THRESHOLD;
     if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
     else if (distance < STICK_THRESHOLD) setShowJump(false);
-  }
 
-  function handleLoadMore(): void {
-    prependAnchor.current = listRef.current?.scrollHeight ?? null;
-    void loadMore(chatId);
+    const ahead = Math.max(FEED_LOAD_AHEAD_PX, el.clientHeight);
+    if (el.scrollTop < ahead) requestUp();
+    if (distance < ahead) requestDown();
   }
 
   function handleJump(): void {
@@ -540,11 +624,7 @@ export function MessageList({
 
         <div className={styles.filler} />
 
-        {hasMore && (
-          <button className={styles.loadMore} type="button" onClick={handleLoadMore}>
-            Показать историю
-          </button>
-        )}
+        <div className={styles.trigger} ref={topTriggerRef} aria-hidden="true" />
 
         {displayEntries.length === 0 && !hasMore && historyState === 'ready' && (
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
@@ -578,11 +658,7 @@ export function MessageList({
           </div>
         ))}
 
-        {hasMoreAfter && (
-          <button className={styles.loadMore} type="button" onClick={() => void loadMoreAfter(chatId)}>
-            Показать дальше
-          </button>
-        )}
+        <div className={styles.trigger} ref={bottomTriggerRef} aria-hidden="true" />
 
         {typing && (
           <div className={styles.typingRow}>

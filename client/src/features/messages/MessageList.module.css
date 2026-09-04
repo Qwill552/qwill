@@ -43,20 +43,9 @@
   flex-shrink: 0;
 }
 
-.loadMore {
-  align-self: center;
-  display: block;
-  margin: var(--space-3) auto;
-  padding: 5px var(--space-4);
-  border: 1px solid rgba(var(--pulse-glass), 0.09);
-  border-radius: var(--radius-pill);
-  background: rgba(var(--pulse-dock), 0.5);
-  backdrop-filter: blur(8px) saturate(160%);
-  color: rgba(var(--pulse-ink), 0.72);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+.trigger {
+  height: 0;
+  pointer-events: none;
 }
 
 /* Короткая переписка прижимается к низу, а не висит под шапкой. Отдельная распорка,

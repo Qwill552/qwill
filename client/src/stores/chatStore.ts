@@ -730,10 +730,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!oldest) return;
 
     const page = await getMessagesRequest(chatId, oldest.id);
-    set((state) => ({
-      messagesByChat: { ...state.messagesByChat, [chatId]: [...page.messages, ...current] },
-      hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-    }));
+    set((state) => {
+      const list = state.messagesByChat[chatId] ?? [];
+      const known = new Set(list.map((m) => m.id));
+      const prepended = page.messages.filter((m) => !known.has(m.id) && !m.deletedAt) as LocalMessage[];
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: [...prepended, ...list] },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
+      };
+    });
   },
 
   async loadMoreAfter(chatId) {
