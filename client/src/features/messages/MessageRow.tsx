@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { useReactionPrefsStore } from '../../stores/reactionPrefsStore';
 import { Avatar } from '../../ui/Avatar';
-import { currentScrollEpoch, exceedsMoveThreshold } from '../../ui/gestures/gestureReducer';
+import { currentScrollEpoch, exceedsMoveThreshold, LONG_PRESS_MS } from '../../ui/gestures/gestureReducer';
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { useSwipeAction } from '../../ui/gestures/useSwipeAction';
 import { useTapGesture } from '../../ui/gestures/useTapGesture';
@@ -52,6 +52,8 @@ interface MessageRowProps {
   onForwardRequest: (messageIds: number[]) => void;
   children: ReactNode;
 }
+
+const LINK_SELECTOR = 'a[href]:not([download])';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -155,6 +157,7 @@ export function MessageRow({
   const skipGesturesRef = useRef(false);
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
+  const linkPressRef = useRef<{ x: number; y: number; timer: ReturnType<typeof setTimeout> | null } | null>(null);
   const menuSeqRef = useRef(0);
   const [menu, setMenu] = useState<{
     rect: DOMRect;
@@ -270,12 +273,34 @@ export function MessageRow({
       ? { tile, x: event.clientX, y: event.clientY, epoch: currentScrollEpoch() }
       : null;
 
+    if (linkPressRef.current?.timer) clearTimeout(linkPressRef.current.timer);
+    const link = target.closest(LINK_SELECTOR);
+    if (link && !isMouse) {
+      const epoch = currentScrollEpoch();
+      const timer = setTimeout(() => {
+        linkPressRef.current = null;
+        if (epoch !== currentScrollEpoch()) return;
+        if (selectionMode || menu !== null || !menuAvailable) return;
+        tap.cancel();
+        haptic();
+        openMenu(null);
+      }, LONG_PRESS_MS);
+      linkPressRef.current = { x: event.clientX, y: event.clientY, timer };
+    } else {
+      linkPressRef.current = null;
+    }
+
     longPress.onPointerDown(event);
     if (!isMouse) swipe.onPointerDown(event);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
     if (skipGesturesRef.current) return;
+    const linkPress = linkPressRef.current;
+    if (linkPress?.timer && exceedsMoveThreshold(event.clientX - linkPress.x, event.clientY - linkPress.y)) {
+      clearTimeout(linkPress.timer);
+      linkPressRef.current = null;
+    }
     longPress.onPointerMove(event);
     swipe.onPointerMove(event);
   }
@@ -285,6 +310,9 @@ export function MessageRow({
       skipGesturesRef.current = false;
       return;
     }
+
+    if (linkPressRef.current?.timer) clearTimeout(linkPressRef.current.timer);
+    linkPressRef.current = null;
 
     longPress.onPointerUp();
     const wasDrag = swipe.onPointerUp();
@@ -310,6 +338,12 @@ export function MessageRow({
       }
       const mediaId = mediaTap.tile.dataset.mediaId;
       if (mediaId && canAct) openMediaViewer(chatId, mediaId);
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest(LINK_SELECTOR)) {
+      tap.cancel();
+      suppressTapRef.current = false;
       return;
     }
 
@@ -342,6 +376,8 @@ export function MessageRow({
 
   function handlePointerCancel(): void {
     mediaTapRef.current = null;
+    if (linkPressRef.current?.timer) clearTimeout(linkPressRef.current.timer);
+    linkPressRef.current = null;
     if (skipGesturesRef.current) {
       skipGesturesRef.current = false;
       return;

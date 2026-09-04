@@ -96,6 +96,20 @@
   -webkit-touch-callout: default;
 }
 
+.link {
+  color: var(--primary);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.out .link {
+  color: var(--link-out);
+}
+
 .pad {
   display: inline-block;
   height: 1px;

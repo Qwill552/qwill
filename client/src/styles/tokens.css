@@ -95,6 +95,7 @@
   --text-tertiary: #9aa0b0;
   --text-on-primary: #ffffff;
   --text-on-out: #ffffff;
+  --link-out: #d9e8ff;
   --meta-on-out: rgb(255 255 255 / 85%);
 
   --border: #e1e4ec;
@@ -167,6 +168,7 @@
   --text-tertiary: #666d80;
   --text-on-primary: #ffffff;
   --text-on-out: #ffffff;
+  --link-out: #d9e8ff;
   --meta-on-out: rgb(255 255 255 / 85%);
 
   --border: #262c3c;

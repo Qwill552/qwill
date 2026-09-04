@@ -11,4 +11,5 @@ export * from './push.js';
 export * from './search.js';
 export * from './socket.js';
 export * from './support.js';
+export * from './text.js';
 export * from './user.js';

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { splitTextWithLinks } from '@messenger/shared';
+import { Fragment, type MouseEvent, type ReactNode } from 'react';
 
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
@@ -52,6 +53,12 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
   const retryMessage = useChatStore((s) => s.retryMessage);
   const cancelMessage = useChatStore((s) => s.cancelMessage);
   const emojiOnly = bare ? emojiOnlyContent(message.content ?? '') : null;
+
+  function handleLinkClick(event: MouseEvent<HTMLAnchorElement>): void {
+    if (!useChatStore.getState().selectionMode) return;
+    event.preventDefault();
+    useChatStore.getState().toggleSelected(message.id);
+  }
 
   if (emojiOnly) {
     return (
@@ -186,7 +193,24 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
           {!bareMedia && !fileOnly && (
             <span className={styles.textRow}>
               <span className={styles.text} data-selectable="true">
-                {message.content ? parseEmoji(message.content) : null}
+                {message.content
+                  ? splitTextWithLinks(message.content).map((span, i) =>
+                      span.kind === 'link' ? (
+                        <a
+                          key={i}
+                          href={span.href!}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className={styles.link}
+                          onClick={handleLinkClick}
+                        >
+                          {span.value}
+                        </a>
+                      ) : (
+                        <Fragment key={i}>{parseEmoji(span.value)}</Fragment>
+                      ),
+                    )
+                  : null}
                 <span
                   className={styles.pad}
                   style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}

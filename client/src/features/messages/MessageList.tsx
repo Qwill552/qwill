@@ -452,7 +452,12 @@ export function MessageList({
         ref={listRef}
         onScroll={handleScroll}
         onContextMenu={(event) => {
-          if ((event.target as HTMLElement).closest('[data-selectable]')) return;
+          const target = event.target as HTMLElement;
+          if (target.closest('a[href]')) {
+            event.preventDefault();
+            return;
+          }
+          if (target.closest('[data-selectable]')) return;
           event.preventDefault();
         }}
       >
