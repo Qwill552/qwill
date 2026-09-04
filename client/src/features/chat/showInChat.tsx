@@ -8,14 +8,16 @@ import { Menu } from '../../ui/Menu';
 
 export function useShowInChat(): (chatId: string, messageId: number) => Promise<void> {
   const navigate = useNavigate();
-  const openChatAt = useChatStore((s) => s.openChatAt);
 
   return useCallback(
     async (chatId: string, messageId: number) => {
-      await openChatAt(chatId, messageId);
+      const store = useChatStore.getState();
+      const loaded = store.messagesByChat[chatId]?.some((m) => m.id === messageId) ?? false;
+      if (loaded) store.focusMessage(chatId, messageId);
+      else await store.openChatAt(chatId, messageId);
       navigate(`/chats/${chatId}`);
     },
-    [navigate, openChatAt],
+    [navigate],
   );
 }
 

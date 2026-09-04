@@ -120,6 +120,17 @@ function asSender(user: PublicUser): ChatMemberSummary {
 
 export type ChatHistoryState = 'loading' | 'ready' | 'offline';
 
+export interface FeedFocus {
+  messageId: number;
+  seq: number;
+}
+
+interface ReplaceFeedOptions {
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
+  focus?: number;
+}
+
 interface PresenceInfo {
   online: boolean;
   lastSeenAt: string;
@@ -135,7 +146,8 @@ interface ChatState {
   messagesByChat: Record<string, LocalMessage[]>;
   hasMoreByChat: Record<string, boolean>;
   hasMoreAfterByChat: Record<string, boolean>;
-  anchorByChat: Record<string, number>;
+  feedEpochByChat: Record<string, number>;
+  focusByChat: Record<string, FeedFocus>;
   historyByChat: Record<string, ChatHistoryState>;
   /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
   readCursorsByChat: Record<string, Record<string, number | null>>;
@@ -171,6 +183,8 @@ interface ChatState {
   loadMore: (chatId: string) => Promise<void>;
   loadMoreAfter: (chatId: string) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
+  replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
+  focusMessage: (chatId: string, messageId: number) => void;
   syncChatMessages: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
@@ -494,7 +508,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messagesByChat: {},
   hasMoreByChat: {},
   hasMoreAfterByChat: {},
-  anchorByChat: {},
+  feedEpochByChat: {},
+  focusByChat: {},
   historyByChat: {},
   readCursorsByChat: {},
   typingByChat: {},
@@ -544,9 +559,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
     void get().restoreOutboxMessages();
   },
 
+  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus }) {
+    set((state) => {
+      const current = state.messagesByChat[chatId] ?? [];
+      const settled = messages.filter((m) => !m.deletedAt) as LocalMessage[];
+      const pending = current.filter((m) => m.id < 0);
+
+      const focusByChat = { ...state.focusByChat };
+      if (focus === undefined) delete focusByChat[chatId];
+      else focusByChat[chatId] = { messageId: focus, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1 };
+
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: [...settled, ...pending] },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: hasMoreBefore },
+        hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: hasMoreAfter },
+        feedEpochByChat: { ...state.feedEpochByChat, [chatId]: (state.feedEpochByChat[chatId] ?? 0) + 1 },
+        focusByChat,
+        historyByChat: { ...state.historyByChat, [chatId]: 'ready' as ChatHistoryState },
+      };
+    });
+  },
+
+  focusMessage(chatId, messageId) {
+    set((state) => ({
+      focusByChat: {
+        ...state.focusByChat,
+        [chatId]: { messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1 },
+      },
+    }));
+  },
+
   async openChat(chatId) {
     cancelPendingEmptyChatDrop(chatId);
-    const windowed = get().anchorByChat[chatId] !== undefined;
+    const windowed = get().hasMoreAfterByChat[chatId] === true;
     set((state) => ({
       chatError: null,
       activeChatId: chatId,
@@ -611,13 +656,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return false;
     }
 
-    set((state) => ({
-      messagesByChat: { ...state.messagesByChat, [chatId]: around.messages as LocalMessage[] },
-      hasMoreByChat: { ...state.hasMoreByChat, [chatId]: around.hasMoreBefore },
-      hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: around.hasMoreAfter },
-      anchorByChat: { ...state.anchorByChat, [chatId]: messageId },
-      historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
-    }));
+    get().replaceFeed(chatId, around.messages, {
+      hasMoreBefore: around.hasMoreBefore,
+      hasMoreAfter: around.hasMoreAfter,
+      focus: messageId,
+    });
     return true;
   },
 
@@ -637,11 +680,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   closeChat() {
     const chatId = get().activeChatId;
     set((state) => {
-      if (!chatId || state.anchorByChat[chatId] === undefined) {
-        return { activeChatId: null, selectionMode: false, selectedIds: new Set<number>() };
-      }
-      const anchorByChat = { ...state.anchorByChat };
-      delete anchorByChat[chatId];
+      const base = { activeChatId: null, selectionMode: false, selectedIds: new Set<number>() };
+      if (!chatId) return base;
+
+      const focusByChat = { ...state.focusByChat };
+      delete focusByChat[chatId];
+      if (state.hasMoreAfterByChat[chatId] !== true) return { ...base, focusByChat };
+
       const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
       delete hasMoreAfterByChat[chatId];
       const messagesByChat = { ...state.messagesByChat };
@@ -650,15 +695,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete hasMoreByChat[chatId];
       const historyByChat = { ...state.historyByChat };
       delete historyByChat[chatId];
+      const feedEpochByChat = { ...state.feedEpochByChat };
+      delete feedEpochByChat[chatId];
       return {
-        activeChatId: null,
-        selectionMode: false,
-        selectedIds: new Set<number>(),
-        anchorByChat,
+        ...base,
+        focusByChat,
         hasMoreAfterByChat,
         messagesByChat,
         hasMoreByChat,
         historyByChat,
+        feedEpochByChat,
       };
     });
     if (!chatId) return;
@@ -722,18 +768,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
-    set((state) => {
-      const anchorByChat = { ...state.anchorByChat };
-      delete anchorByChat[chatId];
-      const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
-      delete hasMoreAfterByChat[chatId];
-      return {
-        messagesByChat: { ...state.messagesByChat, [chatId]: page.messages as LocalMessage[] },
-        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-        anchorByChat,
-        hasMoreAfterByChat,
-      };
-    });
+    get().replaceFeed(chatId, page.messages, { hasMoreBefore: page.hasMore, hasMoreAfter: false });
 
     void writeCachedMessages(page.messages);
     void get().restoreOutboxMessages();
@@ -1585,7 +1620,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messagesByChat: {},
       hasMoreByChat: {},
       hasMoreAfterByChat: {},
-      anchorByChat: {},
+      feedEpochByChat: {},
+      focusByChat: {},
       historyByChat: {},
       readCursorsByChat: {},
       typingByChat: {},
@@ -1756,8 +1792,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete hasMoreByChat[chatId];
       const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
       delete hasMoreAfterByChat[chatId];
-      const anchorByChat = { ...state.anchorByChat };
-      delete anchorByChat[chatId];
+      const feedEpochByChat = { ...state.feedEpochByChat };
+      delete feedEpochByChat[chatId];
+      const focusByChat = { ...state.focusByChat };
+      delete focusByChat[chatId];
       const historyByChat = { ...state.historyByChat };
       delete historyByChat[chatId];
       const pinnedByChat = { ...state.pinnedByChat };
@@ -1770,7 +1808,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesByChat,
         hasMoreByChat,
         hasMoreAfterByChat,
-        anchorByChat,
+        feedEpochByChat,
+        focusByChat,
         historyByChat,
         pinnedByChat,
         membersByChat,

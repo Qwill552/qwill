@@ -31,6 +31,7 @@ const STICK_THRESHOLD = 120;
 const COLLAPSE_AT = 0.55;
 /** Дозор на случай, если rAF встанет (вкладка ушла в фон) и распад не доиграет сам. */
 const WATCHDOG_BUFFER_MS = 400;
+const FOCUS_HOLD_MS = 500;
 
 interface MessageRowData {
   message: LocalMessage;
@@ -127,7 +128,8 @@ export function MessageList({
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
   const hasMoreAfter = useChatStore((s) => s.hasMoreAfterByChat[chatId]) ?? false;
-  const anchorMessageId = useChatStore((s) => s.anchorByChat[chatId]) ?? null;
+  const focus = useChatStore((s) => s.focusByChat[chatId]) ?? null;
+  const feedEpoch = useChatStore((s) => s.feedEpochByChat[chatId]) ?? 0;
   const loadMoreAfter = useChatStore((s) => s.loadMoreAfter);
   const jumpToLatest = useChatStore((s) => s.jumpToLatest);
   const reconciled = useChatStore((s) => s.hasMoreByChat[chatId] !== undefined);
@@ -150,15 +152,17 @@ export function MessageList({
     if (isGroup) void loadMembers(chatId);
   }, [chatId, isGroup, loadMembers]);
 
+  const feedKey = `${chatId}#${feedEpoch}`;
+
   const listRef = useRef<HTMLDivElement>(null);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
   const stuckToBottom = useRef(true);
   const prevLength = useRef(0);
-  const settledChatId = useRef<string | null>(null);
+  const settledFeedKey = useRef<string | null>(null);
+  const suppressAppear = useRef(false);
   /** Высота содержимого до догрузки истории — по ней восстанавливается позиция. */
   const prependAnchor = useRef<number | null>(null);
   const [showJump, setShowJump] = useState(false);
-  const pendingBottomRef = useRef(false);
 
   const myRole = members?.find((m) => m.userId === myId)?.role;
   const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
@@ -174,7 +178,7 @@ export function MessageList({
   }
   useEffect(() => {
     unreadAnchor.current = null;
-  }, [chatId]);
+  }, [feedKey]);
 
   /** Скроллим сам контейнер, а не через scrollIntoView: тот тянет за собой все скроллящиеся
    *  предки, и однажды уже утащил вниз всю оболочку вместе с плавающей хромой. */
@@ -198,15 +202,6 @@ export function MessageList({
     return candidate;
   }
 
-  function scrollToAnchor(messageId: number): void {
-    const el = listRef.current;
-    const target = el ? rowNodeFor(el, messageId) : null;
-    if (!el || !target) return;
-    el.scrollTop = Math.max(0, target.offsetTop - el.clientHeight / 3);
-    target.dataset.flash = '1';
-    window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
-  }
-
   function scrollToMessage(messageId: number): void {
     const el = listRef.current;
     const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
@@ -216,34 +211,64 @@ export function MessageList({
   }
 
   useLayoutEffect(() => {
-    if (settledChatId.current === chatId || messages.length === 0) return;
-    settledChatId.current = chatId;
+    if (settledFeedKey.current === feedKey || messages.length === 0) return;
+    const replaced = settledFeedKey.current?.startsWith(`${chatId}#`) ?? false;
+    settledFeedKey.current = feedKey;
     prevLength.current = messages.length;
-    if (anchorMessageId !== null) {
+    if (replaced) suppressAppear.current = true;
+    if (focus) {
       stuckToBottom.current = false;
-      scrollToAnchor(anchorMessageId);
       return;
     }
     stuckToBottom.current = true;
-    scrollToBottom(false);
-  }, [chatId, messages.length, anchorMessageId]);
-
-  useLayoutEffect(() => {
-    if (!pendingBottomRef.current || messages.length === 0) return;
-    pendingBottomRef.current = false;
-    stuckToBottom.current = true;
     setShowJump(false);
     scrollToBottom(false);
-  });
+  }, [feedKey, chatId, messages.length, focus]);
+
+  useLayoutEffect(() => {
+    if (!focus) return;
+    const el = listRef.current;
+    if (!el) return;
+    const target = rowNodeFor(el, focus.messageId);
+    if (!target) return;
+
+    stuckToBottom.current = false;
+    function place(): void {
+      el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
+    }
+    place();
+    target.dataset.flash = '1';
+    const flashTimer = window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
+
+    const observer = new ResizeObserver(place);
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) observer.observe(node);
+
+    function release(): void {
+      observer.disconnect();
+      el!.removeEventListener('pointerdown', release);
+      el!.removeEventListener('wheel', release);
+      el!.removeEventListener('touchstart', release);
+    }
+    el.addEventListener('pointerdown', release);
+    el.addEventListener('wheel', release, { passive: true });
+    el.addEventListener('touchstart', release, { passive: true });
+    const holdTimer = window.setTimeout(release, FOCUS_HOLD_MS);
+
+    return () => {
+      window.clearTimeout(flashTimer);
+      window.clearTimeout(holdTimer);
+      release();
+    };
+  }, [focus]);
 
   useEffect(() => {
-    if (settledChatId.current !== chatId) {
+    if (settledFeedKey.current !== feedKey) {
       prevLength.current = messages.length;
       return;
     }
     if (messages.length > prevLength.current && stuckToBottom.current && !hasMoreAfter) scrollToBottom(true);
     prevLength.current = messages.length;
-  }, [chatId, messages.length, hasMoreAfter]);
+  }, [feedKey, messages.length, hasMoreAfter]);
 
   useEffect(() => {
     if (typing && stuckToBottom.current) scrollToBottom(true);
@@ -280,6 +305,8 @@ export function MessageList({
     const el = listRef.current;
     if (!el) return;
     const seen = appearSeen.current;
+    const suppressed = suppressAppear.current;
+    suppressAppear.current = false;
     const appearing: HTMLElement[] = [];
     let viewTop = 0;
     let viewBottom = 0;
@@ -287,6 +314,7 @@ export function MessageList({
     for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
       if (seen.has(node)) continue;
       seen.add(node);
+      if (suppressed) continue;
       if (!measuredView) {
         const view = el.getBoundingClientRect();
         viewTop = view.top;
@@ -331,9 +359,7 @@ export function MessageList({
       scrollToBottom(true);
       return;
     }
-    void jumpToLatest(chatId).then(() => {
-      pendingBottomRef.current = true;
-    });
+    void jumpToLatest(chatId);
   }
 
   const rows = useMemo(() => {
@@ -407,16 +433,16 @@ export function MessageList({
   // потерял бы загруженную картинку и заново проиграл входную анимацию `bubIn`.
   const [leavingRows, setLeavingRows] = useState<Map<RowKey, LeavingRow>>(() => new Map());
   const prevRenderRowsRef = useRef<RenderRow[]>(renderRows);
-  const prevRowsChatIdRef = useRef<string>(chatId);
+  const prevRowsFeedKeyRef = useRef<string>(feedKey);
   const prevReconciledRef = useRef<boolean>(reconciled);
   const previousRows = prevRenderRowsRef.current;
-  const sameChat = prevRowsChatIdRef.current === chatId;
+  const sameFeed = prevRowsFeedKeyRef.current === feedKey;
   const wasReconciled = prevReconciledRef.current;
   prevRenderRowsRef.current = renderRows;
-  prevRowsChatIdRef.current = chatId;
+  prevRowsFeedKeyRef.current = feedKey;
   prevReconciledRef.current = reconciled;
 
-  if (!sameChat) {
+  if (!sameFeed) {
     if (leavingRows.size > 0) setLeavingRows(new Map());
   } else if (previousRows !== renderRows || leavingRows.size > 0) {
     const liveKeys = new Set(renderRows.map((entry) => entry.key));

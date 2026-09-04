@@ -52,14 +52,15 @@ function ids(): number[] {
   return (useChatStore.getState().messagesByChat[CHAT_ID] ?? []).map((m) => m.id);
 }
 
-describe('окно вокруг сообщения в chatStore (PM-10)', () => {
+describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)', () => {
   beforeEach(() => {
     useChatStore.setState({
       chats: [chat(0)],
       messagesByChat: { [CHAT_ID]: [message(10, 'other'), message(11, 'me')] },
       hasMoreByChat: { [CHAT_ID]: true },
       hasMoreAfterByChat: { [CHAT_ID]: true },
-      anchorByChat: { [CHAT_ID]: 10 },
+      feedEpochByChat: { [CHAT_ID]: 1 },
+      focusByChat: { [CHAT_ID]: { messageId: 10, seq: 1 } },
       activeChatId: CHAT_ID,
       myUserId: 'me',
     });
@@ -77,17 +78,68 @@ describe('окно вокруг сообщения в chatStore (PM-10)', () => 
     expect(useChatStore.getState().chats[0]!.unreadCount).toBe(1);
   });
 
-  it('возврат в конец ленты снимает якорь и снова принимает живые сообщения', async () => {
+  it('возврат в конец ленты снимает окно и снова принимает живые сообщения', async () => {
     vi.mocked(getMessagesRequest).mockResolvedValue({ messages: [message(20, 'other')], hasMore: true });
 
     await useChatStore.getState().jumpToLatest(CHAT_ID);
 
-    expect(useChatStore.getState().anchorByChat[CHAT_ID]).toBeUndefined();
-    expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBeUndefined();
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toBeUndefined();
+    expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false);
     expect(ids()).toEqual([20]);
 
     useChatStore.getState().applyIncomingMessage(message(21, 'other'));
 
     expect(ids()).toEqual([20, 21]);
+  });
+
+  it('подмена ленты не пускает в неё мягко удалённые сообщения', () => {
+    const removed = { ...message(30, 'other'), deletedAt: new Date().toISOString(), content: null } as MessageDto;
+
+    useChatStore.getState().replaceFeed(CHAT_ID, [message(29, 'other'), removed, message(31, 'me')], {
+      hasMoreBefore: true,
+      hasMoreAfter: true,
+    });
+
+    expect(ids()).toEqual([29, 31]);
+  });
+
+  it('подмена ленты сохраняет неотправленное из очереди', () => {
+    useChatStore.setState({
+      messagesByChat: { [CHAT_ID]: [message(10, 'other'), { ...message(-5, 'me'), status: 'sending' } as never] },
+    });
+
+    useChatStore.getState().replaceFeed(CHAT_ID, [message(40, 'other')], {
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+    });
+
+    expect(ids()).toEqual([40, -5]);
+  });
+
+  it('подмена поднимает эпоху ленты, а обычная догрузка — нет', async () => {
+    const before = useChatStore.getState().feedEpochByChat[CHAT_ID] ?? 0;
+
+    useChatStore.getState().replaceFeed(CHAT_ID, [message(50, 'other')], {
+      hasMoreBefore: true,
+      hasMoreAfter: true,
+    });
+    expect(useChatStore.getState().feedEpochByChat[CHAT_ID]).toBe(before + 1);
+
+    vi.mocked(getMessagesRequest).mockResolvedValue({ messages: [message(49, 'other')], hasMore: false });
+    await useChatStore.getState().loadMore(CHAT_ID);
+
+    expect(useChatStore.getState().feedEpochByChat[CHAT_ID]).toBe(before + 1);
+    expect(ids()).toEqual([49, 50]);
+  });
+
+  it('фокус на уже загруженном сообщении не трогает ленту и растит счётчик', () => {
+    const epoch = useChatStore.getState().feedEpochByChat[CHAT_ID] ?? 0;
+
+    useChatStore.getState().focusMessage(CHAT_ID, 10);
+    useChatStore.getState().focusMessage(CHAT_ID, 10);
+
+    expect(useChatStore.getState().feedEpochByChat[CHAT_ID] ?? 0).toBe(epoch);
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toEqual({ messageId: 10, seq: 3 });
+    expect(ids()).toEqual([10, 11]);
   });
 });
