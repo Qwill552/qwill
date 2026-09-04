@@ -113,6 +113,16 @@ export const cardViewLimiter = rateLimit({
   handler: sendRateLimited,
 });
 
+export const linkPreviewLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.userId ?? (req.ip ? ipKeyGenerator(req.ip) : 'unknown'),
+  skip: skipInTest,
+  handler: sendRateLimited,
+});
+
 /** Остальные запросы — 200/мин на IP (секция 8). */
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,

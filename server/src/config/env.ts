@@ -65,6 +65,17 @@ const envSchema = z.object({
   /// Не задан — маршрут выключен целиком: рассылать объявления некому и незачем.
   ANNOUNCE_TOKEN: z.string().min(16).optional(),
 
+  LINK_PREVIEW_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+  LINK_PREVIEW_PAGE_MAX_BYTES: bytes.default(512 * 1024),
+  LINK_PREVIEW_IMAGE_MAX_BYTES: bytes.default(5 * 1024 * 1024),
+  LINK_PREVIEW_IMAGE_MAX_DIMENSION: z.coerce.number().int().positive().default(800),
+  LINK_PREVIEW_MAX_REDIRECTS: z.coerce.number().int().min(0).default(3),
+  LINK_PREVIEW_FETCHES_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  LINK_PREVIEW_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  LINK_PREVIEW_FAILED_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  LINK_PREVIEW_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  LINK_PREVIEW_USER_AGENT: z.string().default('QwillLinkPreview/1.0'),
+
   LIVEKIT_URL: z.string().min(1, 'LIVEKIT_URL обязателен'),
   LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY обязателен'),
   LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET обязателен'),

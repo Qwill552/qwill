@@ -269,7 +269,12 @@ async function enforceStorageLimit(): Promise<void> {
 
   let overBy = totalBytes - limitBytes;
   const candidates = await prisma.file.findMany({
-    where: { attachments: { none: {} }, thumbnailOfAttachments: { none: {} }, avatarOfUsers: { none: {} } },
+    where: {
+      attachments: { none: {} },
+      thumbnailOfAttachments: { none: {} },
+      avatarOfUsers: { none: {} },
+      linkPreviews: { none: {} },
+    },
     orderBy: { createdAt: 'asc' },
     take: 500,
   });
@@ -283,6 +288,22 @@ async function enforceStorageLimit(): Promise<void> {
 
   if (overBy > 0) {
     logger.warn({ overBy }, 'STORAGE_POLICY=evict не смог освободить место — невостребованных файлов не осталось');
+  }
+}
+
+export async function storeServerFile(data: Buffer, mimeType: string): Promise<File> {
+  const sha256 = hashBuffer(data);
+  const existing = await prisma.file.findUnique({ where: { sha256 } });
+  if (existing) return existing;
+
+  await fs.writeFile(path.join(FILES_DIR, sha256), data);
+
+  try {
+    return await prisma.file.create({
+      data: { sha256, storedName: sha256, mimeType, size: BigInt(data.length) },
+    });
+  } catch {
+    return prisma.file.findUniqueOrThrow({ where: { sha256 } });
   }
 }
 
@@ -330,13 +351,17 @@ export async function assertAvatarEligible(fileId: string, sha256: string): Prom
 
 /**
  * Доступ к файлу разрешён, если он чей-то аватар пользователя (условно публичны в рамках
- * приложения), либо аватар группы, участником которой является userId (в отличие от аватара
+ * приложения), либо картинка OG-превью (взята с публичного адреса, к чату не привязана, PM-8),
+ * либо аватар группы, участником которой является userId (в отличие от аватара
  * пользователя — не публичен, виден только участникам), либо вложен в сообщение чата, участником
  * которого является userId (секция 3, 7).
  */
 export async function assertFileAccess(fileId: string, userId: string): Promise<void> {
   const isUserAvatar = await prisma.user.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
   if (isUserAvatar) return;
+
+  const isLinkPreviewImage = await prisma.linkPreview.findFirst({ where: { imageFileId: fileId }, select: { url: true } });
+  if (isLinkPreviewImage) return;
 
   const chatAvatarOf = await prisma.chat.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
   if (chatAvatarOf) {

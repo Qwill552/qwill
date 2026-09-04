@@ -43,6 +43,12 @@ enum CallStatus {
   DECLINED
 }
 
+enum LinkPreviewStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 model User {
   id String @id @default(cuid(2))
 
@@ -298,12 +304,32 @@ model File {
   uploadedByUserId String?
   uploadedBy       User?   @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
-  attachments            Attachment[] @relation("AttachmentFile")
-  thumbnailOfAttachments Attachment[] @relation("AttachmentThumbnail")
-  avatarOfUsers          User[]       @relation("UserAvatar")
-  avatarOfChats          Chat[]       @relation("ChatAvatar")
+  attachments            Attachment[]  @relation("AttachmentFile")
+  thumbnailOfAttachments Attachment[]  @relation("AttachmentThumbnail")
+  avatarOfUsers          User[]        @relation("UserAvatar")
+  avatarOfChats          Chat[]        @relation("ChatAvatar")
+  linkPreviews           LinkPreview[] @relation("LinkPreviewImage")
 
   @@index([sourceSha256])
+}
+
+model LinkPreview {
+  url String @id
+
+  status      LinkPreviewStatus @default(PENDING)
+  siteName    String?
+  title       String?
+  description String?
+
+  imageFileId String?
+  image       File?   @relation("LinkPreviewImage", fields: [imageFileId], references: [id], onDelete: SetNull)
+
+  fetchedAt DateTime?
+  expiresAt DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([imageFileId])
 }
 
 model Reaction {
