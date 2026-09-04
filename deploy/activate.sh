@@ -24,7 +24,7 @@ ln -sfn "$ROOT/shared/storage" "$RELEASE/storage"
 ln -sfn "$ROOT/shared/app-releases" "$RELEASE/app-releases"
 
 cd "$RELEASE"
-npm ci
+npm ci --omit=dev --no-audit --no-fund
 npm run db:deploy -w @messenger/server
 
 chown -R qwill:qwill "$RELEASE"
