@@ -159,6 +159,51 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(true);
   });
 
+  it('запас впрок растит накопитель и не двигает его дальний край', async () => {
+    const base = Array.from({ length: 50 }, (_, i) => message(1000 + i, 'other'));
+    useChatStore.setState({
+      messagesByChat: { [CHAT_ID]: base as never },
+      hasMoreByChat: { [CHAT_ID]: true },
+      hasMoreAfterByChat: { [CHAT_ID]: false },
+    });
+
+    let oldest = 1000;
+    vi.mocked(getMessagesRequest).mockImplementation(async () => {
+      const page = Array.from({ length: 50 }, (_, i) => message(oldest - 50 + i, 'other'));
+      oldest -= 50;
+      return { messages: page, hasMore: true };
+    });
+
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 100, { keepFromId: 1000, keepToId: 1049 });
+
+    await vi.waitFor(() => expect(ids()).toHaveLength(150));
+    expect(ids()[0]).toBe(900);
+    expect(ids().at(-1)).toBe(1049);
+  });
+
+  it('при полном запасе фоновая догрузка в сеть не ходит', () => {
+    vi.mocked(getMessagesRequest).mockClear();
+
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 0, null);
+
+    expect(getMessagesRequest).not.toHaveBeenCalled();
+  });
+
+  it('запас впрок вниз доводит накопитель до конца истории', async () => {
+    useChatStore.setState({
+      messagesByChat: { [CHAT_ID]: [message(10, 'other')] as never },
+      hasMoreAfterByChat: { [CHAT_ID]: true },
+    });
+    vi.mocked(getMessagesAfterRequest)
+      .mockResolvedValueOnce({ messages: [message(11, 'other')], hasMore: true })
+      .mockResolvedValueOnce({ messages: [message(12, 'other')], hasMore: false });
+
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'newer', 100, null);
+
+    await vi.waitFor(() => expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false));
+    expect(ids()).toEqual([10, 11, 12]);
+  });
+
   it('фокус на уже загруженном сообщении не трогает ленту и растит счётчик', () => {
     const epoch = useChatStore.getState().feedEpochByChat[CHAT_ID] ?? 0;
 
@@ -168,5 +213,24 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     expect(useChatStore.getState().feedEpochByChat[CHAT_ID] ?? 0).toBe(epoch);
     expect(useChatStore.getState().focusByChat[CHAT_ID]).toEqual({ messageId: 10, seq: 3 });
     expect(ids()).toEqual([10, 11]);
+  });
+
+  it('сорвавшаяся фоновая догрузка молчит и не долбит сервер', async () => {
+    const failing = 'window-chat-offline';
+    useChatStore.setState({
+      messagesByChat: { [failing]: [message(10, 'other')] as never },
+      hasMoreByChat: { [failing]: true },
+    });
+    vi.mocked(getMessagesRequest).mockClear();
+    vi.mocked(getMessagesRequest).mockRejectedValue(new Error('нет сети'));
+
+    useChatStore.getState().prefetchFeed(failing, 'older', 100, null);
+    await vi.waitFor(() => expect(getMessagesRequest).toHaveBeenCalledTimes(1));
+
+    useChatStore.getState().prefetchFeed(failing, 'older', 100, null);
+    await Promise.resolve();
+
+    expect(getMessagesRequest).toHaveBeenCalledTimes(1);
+    expect(useChatStore.getState().messagesByChat[failing]).toHaveLength(1);
   });
 });

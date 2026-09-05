@@ -19,6 +19,8 @@ import { isDeletableMessage } from './messageDeleting';
 import {
   boundsAround,
   clampBounds,
+  FEED_PREFETCH_MARGIN,
+  FEED_RETRY_MS,
   FEED_SLICE_LIMIT,
   FEED_SLICE_STEP,
   sameBounds,
@@ -45,7 +47,6 @@ const COLLAPSE_AT = 0.55;
 const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
 const FEED_LOAD_AHEAD_PX = 600;
-const FEED_RETRY_MS = 4000;
 
 interface RowAnchor {
   id: string;
@@ -78,6 +79,14 @@ function keepRange(slice: LocalMessage[]): FeedKeepRange | null {
     keepToId = message.id;
   }
   return keepFromId === null || keepToId === null ? null : { keepFromId, keepToId };
+}
+
+function sameRows(a: LocalMessage[], b: LocalMessage[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 function lastSettledId(list: LocalMessage[]): number | null {
@@ -190,6 +199,7 @@ export function MessageList({
   const reconciled = useChatStore((s) => s.hasMoreByChat[chatId] !== undefined);
   const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
+  const prefetchFeed = useChatStore((s) => s.prefetchFeed);
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const pinMessage = useChatStore((s) => s.pinMessage);
@@ -224,6 +234,7 @@ export function MessageList({
   const retryUpAt = useRef(0);
   const retryDownAt = useRef(0);
   const pendingTail = useRef(false);
+  const prefetchSide = useRef<FeedSide>('older');
   const [showJump, setShowJump] = useState(false);
 
   const [bounds, setBounds] = useState<FeedBounds>({ fromId: null, toId: null });
@@ -245,7 +256,10 @@ export function MessageList({
   }
 
   const view = useMemo(() => clampBounds(messages, liveBounds, FEED_SLICE_LIMIT), [messages, liveBounds]);
-  const slice = useMemo(() => messages.slice(view.from, view.to + 1), [messages, view]);
+  const sliceRef = useRef<LocalMessage[]>([]);
+  const nextSlice = messages.slice(view.from, view.to + 1);
+  if (!sameRows(sliceRef.current, nextSlice)) sliceRef.current = nextSlice;
+  const slice = sliceRef.current;
   const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
   const isViewportNewest = view.to >= messages.length - 1 && !hasMoreAfter;
 
@@ -484,6 +498,7 @@ export function MessageList({
   }
 
   function nearEdge(side: FeedSide): void {
+    prefetchSide.current = side;
     if (growSlice(side)) return;
     if (side === 'older') requestUp();
     else requestDown();
@@ -491,6 +506,12 @@ export function MessageList({
 
   const nearEdgeRef = useRef(nearEdge);
   nearEdgeRef.current = nearEdge;
+
+  useEffect(() => {
+    const side = prefetchSide.current;
+    const unseen = side === 'older' ? view.from : messages.length - 1 - view.to;
+    prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen, keepRange(slice));
+  }, [chatId, messages, view, slice, prefetchFeed]);
 
   useEffect(() => {
     const el = listRef.current;

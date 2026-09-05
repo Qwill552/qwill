@@ -85,9 +85,12 @@ import {
 } from '../calls/nativeCall';
 import {
   FEED_ACCUMULATOR_LIMIT,
+  FEED_PAGE_SIZE,
+  FEED_RETRY_MS,
   mergeFeedPage,
   trimFeedWindow,
   type FeedKeepRange,
+  type FeedSide,
 } from '../features/messages/feedWindow';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
@@ -188,6 +191,7 @@ interface ChatState {
   closeChat: () => void;
   loadMore: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
   loadMoreAfter: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
+  prefetchFeed: (chatId: string, side: FeedSide, budget: number, keep: FeedKeepRange | null) => void;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
   focusMessage: (chatId: string, messageId: number) => void;
@@ -448,6 +452,20 @@ function scheduleOutboxRetry(drain: () => void): void {
     outboxRetryTimer = null;
     drain();
   }, nextRetryDelayMs(outboxRetryAttempt));
+}
+
+const feedLoadsInFlight = new Set<string>();
+const feedPrefetchInFlight = new Set<string>();
+const feedPrefetchRetryAt = new Map<string, number>();
+
+function feedEdgeId(list: LocalMessage[] | undefined, side: FeedSide): number | null {
+  if (!list || list.length === 0) return null;
+  if (side === 'older') return list[0]!.id;
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const id = list[i]!.id;
+    if (id > 0) return id;
+  }
+  return null;
 }
 
 interface MessageRemovalResult {
@@ -735,7 +753,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const oldest = current.find((m) => m.id > 0);
     if (!oldest) return;
 
-    const page = await getMessagesRequest(chatId, oldest.id);
+    const key = `${chatId}:older`;
+    if (feedLoadsInFlight.has(key)) return;
+    feedLoadsInFlight.add(key);
+    let page: MessagesPage;
+    try {
+      page = await getMessagesRequest(chatId, oldest.id);
+    } finally {
+      feedLoadsInFlight.delete(key);
+    }
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
@@ -757,7 +783,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const newest = [...current].reverse().find((m) => m.id > 0);
     if (!newest) return;
 
-    const page = await getMessagesAfterRequest(chatId, newest.id);
+    const key = `${chatId}:newer`;
+    if (feedLoadsInFlight.has(key)) return;
+    feedLoadsInFlight.add(key);
+    let page: MessagesPage;
+    try {
+      page = await getMessagesAfterRequest(chatId, newest.id);
+    } finally {
+      feedLoadsInFlight.delete(key);
+    }
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
@@ -773,6 +807,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (page.hasMore) return;
     const last = [...(get().messagesByChat[chatId] ?? [])].reverse().find((m) => m.id > 0);
     if (last) get().markRead(chatId, last.id);
+  },
+
+  prefetchFeed(chatId, side, budget, keep) {
+    if (budget <= 0) return;
+
+    const key = `${chatId}:${side}`;
+    if (feedPrefetchInFlight.has(key) || feedLoadsInFlight.has(key)) return;
+    if (performance.now() < (feedPrefetchRetryAt.get(key) ?? 0)) return;
+
+    feedPrefetchInFlight.add(key);
+    void (async () => {
+      try {
+        let left = budget;
+        while (left > 0) {
+          const state = get();
+          const more = side === 'older' ? state.hasMoreByChat[chatId] : state.hasMoreAfterByChat[chatId];
+          if (!more) return;
+
+          const edge = feedEdgeId(state.messagesByChat[chatId], side);
+          try {
+            if (side === 'older') await get().loadMore(chatId, keep);
+            else await get().loadMoreAfter(chatId, keep);
+          } catch {
+            feedPrefetchRetryAt.set(key, performance.now() + FEED_RETRY_MS);
+            return;
+          }
+
+          if (feedEdgeId(get().messagesByChat[chatId], side) === edge) return;
+          left -= FEED_PAGE_SIZE;
+        }
+      } finally {
+        feedPrefetchInFlight.delete(key);
+      }
+    })();
   },
 
   async jumpToLatest(chatId) {
