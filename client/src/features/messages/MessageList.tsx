@@ -43,8 +43,6 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
-/** Плавно едет только близкий прыжок; дальше — мгновенно, иначе лента ловит по дороге
- *  новые сообщения при отставании на несколько экранов. В экранах высоты вьюпорта. */
 const SCROLL_ANIMATE_SCREENS = 2;
 /** Доля распада, после которой строка начинает схлопывать высоту: соседи съезжают, пока пыль ещё летит. */
 const COLLAPSE_AT = 0.55;
@@ -53,9 +51,8 @@ const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
 const FEED_LOAD_AHEAD_PX = 600;
 const SCROLL_IDLE_MS = 150;
-/** Потолок на «мы сейчас едем вниз сами»: дольше этого срока свои scroll-события не
- *  прикрываются, даже если прокрутка так и не доехала. */
 const AUTO_SCROLL_GUARD_MS = 700;
+const TYPING_BUBBLE_IN_FEED: boolean = false;
 
 interface RowAnchor {
   id: string;
@@ -81,10 +78,6 @@ function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
   el.scrollTop += drift;
 }
 
-/** `scrollHeight` включает нижний `padding` — резерв под композер (48–160px в зависимости
- *  от высоты композера и safe-area). Без вычитания «в самом низу» по факту оказывается
- *  где-то посреди этого запаса, а не там, где лежит последний пузырь — порог прилипания
- *  тогда не совпадает с тем, что человек видит глазами. */
 function bottomReserve(el: HTMLElement): number {
   return parseFloat(getComputedStyle(el).paddingBottom) || 0;
 }
@@ -249,16 +242,7 @@ export function MessageList({
   const liveIds = useRef<Set<number>>(new Set());
   const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
-  /** `scrollHeight` на конец прошлого коммита. Разница со свежим — рост контента, который
-   *  вычитается из расстояния до низа: так видно, где человек стоял ДО того, как пузырь
-   *  встал в ленту. Высота, в отличие от `scrollTop`, не зависит от того, доиграла ли
-   *  плавная прокрутка, поэтому число не врёт посреди анимации. */
   const prevScrollHeight = useRef(0);
-  /** До какого момента едет наша собственная прокрутка к низу. Её scroll-события
-   *  неотличимы от жеста человека, и без этой отсечки высокий пузырь (фото) первым же
-   *  кадром анимации отклеивал ленту от низа сам у себя: расстояние в тот момент ещё
-   *  велико. Не флаг, а срок: анимация может и не доехать (контент растёт по дороге,
-   *  прокрутку перехватили) — залипнуть в «мы едем вниз» насовсем нельзя. */
   const autoScrollUntil = useRef(0);
   const prevLastId = useRef<number | null>(null);
   const wasNewest = useRef(true);
@@ -312,13 +296,6 @@ export function MessageList({
   const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
   const isViewportNewest = view.to >= messages.length - 1 && !hasMoreAfter;
 
-  // Окно может сдвинуться и без явного requestUp/requestDown/growSlice — например, когда
-  // фоновая подгрузка «впрок» (prefetchFeed) или просто пришедшее сообщение раздвигают
-  // messages настолько, что открытое до конца окно (toId: null) упирается в FEED_SLICE_LIMIT
-  // и клэмпается по низу. Явные вызовы уже помнят якорь сами (см. growSlice/requestUp/
-  // requestDown) — эта проверка ловит только то, что осталось не помнено: если сигнатура
-  // среза уже изменилась, а якорь никто не поставил, ставим его прямо тут, пока DOM ещё
-  // отражает прошлый рендер (совсем как в rememberScrollPositionRef у telegram-tt).
   const lastSliceSignature = useRef(sliceSignature);
   if (lastSliceSignature.current !== sliceSignature) {
     lastSliceSignature.current = sliceSignature;
@@ -453,18 +430,13 @@ export function MessageList({
     wasNewest.current = isViewportNewest;
   }, [feedKey, messages, isViewportNewest, myId]);
 
-  // Без scroll-события высота контента не узнала бы, что геометрия сдвинулась (пузырь
-  // печатания пропал, композер подрос) — досматриваем её после КАЖДОГО коммита, а не
-  // только по факту прокрутки. Объявлен сразу после решающего эффекта: в один и тот же
-  // коммит решение о прокрутке читает ещё вчерашнюю высоту, а это досматривание готовит
-  // свежую — для следующего сообщения.
   useLayoutEffect(() => {
     const el = listRef.current;
     if (el) prevScrollHeight.current = el.scrollHeight;
   });
 
   useEffect(() => {
-    if (typing && stuckToBottom.current) scrollToBottom(true);
+    if (TYPING_BUBBLE_IN_FEED && typing && stuckToBottom.current) scrollToBottom(true);
   }, [typing]);
 
   // Резерв места под композер едет CSS-переходом (--dur-menu), а прокрутка за ним сама не
@@ -499,10 +471,6 @@ export function MessageList({
     const anchor = pendingAnchor.current;
     if (!anchor) return;
     pendingAnchor.current = null;
-    // Низ выигрывает у якоря. Иначе решающий эффект (объявлен выше, отрабатывает раньше)
-    // начинает ехать вниз за новым пузырём, а этот — тем же кадром возвращает ленту к
-    // якорю: то самое «дёргает вниз и сразу обратно». У telegram-tt обе ветки живут в
-    // одной цепочке `if / else if` и по построению не могут сработать вместе.
     if (stuckToBottom.current) {
       if (performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
     } else {
@@ -902,7 +870,7 @@ export function MessageList({
 
         <div className={styles.trigger} ref={bottomTriggerRef} aria-hidden="true" />
 
-        {typing && (
+        {TYPING_BUBBLE_IN_FEED && typing && (
           <div className={styles.typingRow}>
             <div className={styles.typingBubble}>
               <span className={styles.dot} />
