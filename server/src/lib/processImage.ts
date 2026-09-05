@@ -66,6 +66,15 @@ export async function computeBlurhash(input: Buffer): Promise<string | null> {
   }
 }
 
+export async function imageDimensions(input: Buffer): Promise<{ width: number; height: number } | null> {
+  try {
+    const meta = await sharp(input, { failOn: 'none' }).metadata();
+    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface ProcessImageOptions {
   maxDimension: number;
   maxBytes: number;

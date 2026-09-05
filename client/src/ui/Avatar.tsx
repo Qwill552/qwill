@@ -53,21 +53,18 @@ export function Avatar({
 
   return (
     <div className={`${styles.wrap} ${className ?? ''}`} style={{ width: size, height: size }}>
-      {src ? (
-        <img className={styles.image} src={src} alt="" />
-      ) : (
-        <div
-          className={`${styles.circle} ${shadow ? styles.shadow : ''}`}
-          style={{
-            fontSize: size * 0.35,
-            ['--avatar-gradient' as string]: color
-              ? avatarGradientForColor(color)
-              : avatarGradientFor(colorKey ?? label),
-          }}
-        >
-          {label.charAt(0).toUpperCase()}
-        </div>
-      )}
+      <div
+        className={`${styles.circle} ${shadow ? styles.shadow : ''}`}
+        style={{
+          fontSize: size * 0.35,
+          ['--avatar-gradient' as string]: color
+            ? avatarGradientForColor(color)
+            : avatarGradientFor(colorKey ?? label),
+        }}
+      >
+        {label.charAt(0).toUpperCase()}
+      </div>
+      {src && <img className={styles.image} src={src} alt="" />}
       {online && <span className={styles.onlineDot} />}
     </div>
   );

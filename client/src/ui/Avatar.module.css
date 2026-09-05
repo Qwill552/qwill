@@ -6,10 +6,12 @@
 /* Буквально AV из референса: двухцветный градиент, захешированный от человека
  * (avatarGradientFor в ui/tint.ts) — список чатов выглядит разноцветным, но узнаваемым. */
 .circle {
+  position: absolute;
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
+  inset: 0;
   border-radius: 50%;
   background: var(--avatar-gradient);
   color: #fff;
@@ -23,11 +25,24 @@
 
 .image {
   composes: no-native-media-menu from global;
+  position: absolute;
   display: block;
   width: 100%;
   height: 100%;
+  inset: 0;
   border-radius: 50%;
   object-fit: cover;
+  animation: avatarFadeIn var(--dur-media-fade) var(--ease-screen) both;
+}
+
+@keyframes avatarFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* Точка «в сети» — буквально 13px/2.5px на аватаре списка чатов (52-54px). Кольцо —

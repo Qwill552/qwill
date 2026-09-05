@@ -1,7 +1,7 @@
 export const FEED_PAGE_SIZE = 50;
 export const FEED_ACCUMULATOR_LIMIT = 1000;
-export const FEED_SLICE_LIMIT = 120;
-export const FEED_SLICE_STEP = 30;
+export const FEED_SLICE_LIMIT = 80;
+export const FEED_SLICE_STEP = 20;
 export const FEED_PREFETCH_MARGIN = 100;
 export const FEED_RETRY_MS = 4000;
 

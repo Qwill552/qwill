@@ -15,7 +15,7 @@ interface MediaTileProps {
   chatId: string;
   className?: string;
   style?: CSSProperties;
-  fit?: 'cover' | 'natural';
+  fit?: 'cover' | 'contain';
   overlay?: string;
   standalone?: boolean;
   selected?: boolean;
@@ -51,7 +51,6 @@ export function MediaTile({
   const src = useDecodedSrc(useProgressiveSrc(attachment, ref, chatId));
   const blurRef = useBlurhashCanvas(attachment.blurhash);
   const video = isVideoAttachment(attachment);
-  const natural = fit === 'natural';
   const albumSelectable = onLongPressTile !== undefined;
   const open = onOpen ?? (() => openMediaViewer(chatId, attachment.id));
   const pointerStartRef = useRef<{ x: number; y: number; epoch: number } | null>(null);
@@ -109,7 +108,7 @@ export function MediaTile({
       type="button"
       data-media-tile="true"
       data-media-id={attachment.id}
-      className={`${styles.tile} ${natural ? styles.tileNatural : ''} ${selected ? styles.tileSelected : ''} ${className ?? ''}`}
+      className={`${styles.tile} ${selected ? styles.tileSelected : ''} ${className ?? ''}`}
       style={style}
       aria-label={video ? `Видео ${attachment.originalName}` : `Фото ${attachment.originalName}`}
       aria-pressed={albumSelectable && selectionMode ? selected : undefined}
@@ -139,7 +138,7 @@ export function MediaTile({
 
       {src && (
         <img
-          className={`${natural ? styles.natural : styles.cover} ${styles.shown}`}
+          className={`${fit === 'contain' ? styles.contain : styles.cover} ${styles.shown}`}
           src={src}
           alt=""
           decoding="async"

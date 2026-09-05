@@ -4,18 +4,20 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import type { MediaKind } from '../../cache/db';
+import { MEDIA_LOAD_MARGIN_PX, useMediaFeed } from './mediaFeedScope';
 
-const ORIGINAL_PRELOAD_MARGIN = '300px';
 export function needsOriginalInList(attachment: AttachmentDto): boolean {
   return attachment.file.mimeType === 'image/gif';
 }
 
 export function useReachedViewport(ref: RefObject<Element | null>): boolean {
+  const feed = useMediaFeed();
   const [reached, setReached] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
     if (!node || reached) return;
+    if (feed) return feed.observeForLoading(node, () => setReached(true));
     if (typeof IntersectionObserver === 'undefined') {
       setReached(true);
       return;
@@ -25,16 +27,17 @@ export function useReachedViewport(ref: RefObject<Element | null>): boolean {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) setReached(true);
       },
-      { rootMargin: ORIGINAL_PRELOAD_MARGIN },
+      { rootMargin: `${MEDIA_LOAD_MARGIN_PX}px` },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [ref, reached]);
+  }, [ref, reached, feed]);
 
   return reached;
 }
 
 export function useDecodedSrc(src: string | undefined): string | undefined {
+  const feed = useMediaFeed();
   const [decoded, setDecoded] = useState<string>();
 
   useEffect(() => {
@@ -44,12 +47,20 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
     }
 
     let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
     const probe = new Image();
     probe.src = src;
     probe
       .decode()
       .then(() => {
-        if (!cancelled) setDecoded(src);
+        if (cancelled) return;
+        if (feed?.isMoving()) {
+          unsubscribe = feed.whenSettled(() => {
+            if (!cancelled) setDecoded(src);
+          });
+          return;
+        }
+        setDecoded(src);
       })
       .catch(() => {
         if (!cancelled) setDecoded(undefined);
@@ -57,8 +68,9 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
-  }, [src]);
+  }, [src, feed]);
 
   return decoded;
 }
@@ -96,10 +108,10 @@ export function mediaKindOf(attachment: AttachmentDto): MediaKind {
   return kind === 'gif' ? 'photo' : kind;
 }
 
-export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null): string | undefined {
+export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null, enabled = true): string | undefined {
   const fileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
   const hasDownscaled = Boolean(attachment.preview ?? attachment.thumbnail);
-  return useFileSrc(fileId, {
+  return useFileSrc(enabled ? fileId : null, {
     tier: hasDownscaled ? 'thumb' : 'full',
     chatId,
     kind: mediaKindOf(attachment),
@@ -112,7 +124,7 @@ export function useProgressiveSrc(
   chatId: string | null,
 ): string | undefined {
   const reached = useReachedViewport(ref);
-  const preview = usePreviewSrc(attachment, chatId);
+  const preview = usePreviewSrc(attachment, chatId, reached);
   const wanted = needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
   const original = useDecodedSrc(useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) }));
   return original ?? preview;

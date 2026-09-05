@@ -12,6 +12,7 @@ import { cssDurationMs } from '../../ui/motion';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { isServiceChat } from '../chat/serviceChat';
 import { groupAlbums, mergeReactions } from '../media/albums';
+import { MediaFeedContext, useMediaFeedScope } from '../media/mediaFeedScope';
 import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
@@ -239,6 +240,7 @@ export function MessageList({
   const feedKey = `${chatId}#${feedEpoch}`;
 
   const listRef = useRef<HTMLDivElement>(null);
+  const mediaFeed = useMediaFeedScope(listRef);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
   const liveIds = useRef<Set<number>>(new Set());
   const scrollIdle = useRef(0);
@@ -808,7 +810,7 @@ export function MessageList({
   }, [displayEntries]);
 
   return (
-    <>
+    <MediaFeedContext.Provider value={mediaFeed}>
       {pinnedMessage &&
         pinnedSlot &&
         createPortal(
@@ -905,7 +907,7 @@ export function MessageList({
         <Icon name="chevron-down" size={22} />
         <Badge count={unreadCount} small className={styles.jumpBadge} />
       </button>
-    </>
+    </MediaFeedContext.Provider>
   );
 }
 

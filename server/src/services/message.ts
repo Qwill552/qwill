@@ -17,7 +17,7 @@ import { toAvatarColor } from '../lib/avatarColor.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { logger } from '../lib/logger.js';
-import { computeBlurhash } from '../lib/processImage.js';
+import { computeBlurhash, imageDimensions } from '../lib/processImage.js';
 import { presenceStore } from '../realtime/presence.js';
 import { notifySupportMessage } from './adminNotify.js';
 import { assertChatWritable, assertMember } from './chat.js';
@@ -272,24 +272,20 @@ async function buildAttachmentCreate(input: MessageAttachmentInput) {
     await assertFileOwnershipProof(input.previewFileId, input.previewSha256);
   }
 
+  const thumbnailBytes = input.thumbnailFileId ? await readStoredFile(input.thumbnailFileId) : null;
+  const measured = input.width && input.height ? null : thumbnailBytes ? await imageDimensions(thumbnailBytes) : null;
+
   return {
     fileId: input.fileId,
     thumbnailFileId: input.thumbnailFileId,
     previewFileId: input.previewFileId,
     originalName: input.originalName,
-    width: input.width,
-    height: input.height,
+    width: input.width ?? measured?.width,
+    height: input.height ?? measured?.height,
     duration: input.duration,
     peaks: input.peaks ?? [],
-    blurhash: await thumbnailBlurhash(input.thumbnailFileId),
+    blurhash: thumbnailBytes ? await computeBlurhash(thumbnailBytes) : null,
   };
-}
-
-async function thumbnailBlurhash(thumbnailFileId: string | undefined): Promise<string | null> {
-  if (!thumbnailFileId) return null;
-  const bytes = await readStoredFile(thumbnailFileId);
-  if (!bytes) return null;
-  return computeBlurhash(bytes);
 }
 
 async function getMessageInChatOrThrow(chatId: string, messageId: number): Promise<Message> {
