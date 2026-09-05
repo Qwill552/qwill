@@ -21,6 +21,7 @@ function photo(id: string): AttachmentDto {
     id,
     file: { id: `file-${id}`, mimeType: 'image/jpeg', size: 1000, url: '' },
     thumbnail: null,
+    preview: null,
     originalName: `${id}.jpg`,
     width: 1200,
     height: 800,

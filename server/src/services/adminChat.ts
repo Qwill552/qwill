@@ -86,7 +86,7 @@ export async function getMessagesForAdmin(
 
 async function chatIdOfFile(fileId: string): Promise<string | null> {
   const attachment = await prisma.attachment.findFirst({
-    where: { OR: [{ fileId }, { thumbnailFileId: fileId }] },
+    where: { OR: [{ fileId }, { thumbnailFileId: fileId }, { previewFileId: fileId }] },
     select: { message: { select: { chatId: true } } },
   });
   if (attachment) return attachment.message.chatId;

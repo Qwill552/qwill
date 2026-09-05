@@ -269,6 +269,10 @@ model Attachment {
   thumbnailFileId String?
   thumbnail       File?   @relation("AttachmentThumbnail", fields: [thumbnailFileId], references: [id], onDelete: SetNull)
 
+  /// Уменьшенная копия миниатюры (512 px), уходящая в ленту вместо неё — КЭШ-14.
+  previewFileId String?
+  preview       File?   @relation("AttachmentPreview", fields: [previewFileId], references: [id], onDelete: SetNull)
+
   originalName String
   width        Int?
   height       Int?
@@ -282,6 +286,7 @@ model Attachment {
   @@index([messageId])
   @@index([fileId])
   @@index([thumbnailFileId])
+  @@index([previewFileId])
 }
 
 model File {
@@ -308,6 +313,7 @@ model File {
 
   attachments            Attachment[]  @relation("AttachmentFile")
   thumbnailOfAttachments Attachment[]  @relation("AttachmentThumbnail")
+  previewOfAttachments   Attachment[]  @relation("AttachmentPreview")
   avatarOfUsers          User[]        @relation("UserAvatar")
   avatarOfChats          Chat[]        @relation("ChatAvatar")
   linkPreviews           LinkPreview[] @relation("LinkPreviewImage")

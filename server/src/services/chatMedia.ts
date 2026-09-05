@@ -72,6 +72,7 @@ export async function listChatAttachments(
     include: {
       file: true,
       thumbnail: true,
+      preview: true,
       message: { select: { id: true, createdAt: true, senderId: true } },
     },
     orderBy: { message: { id: 'desc' } },

@@ -1196,6 +1196,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       let thumbnailFileId: string | undefined;
       let thumbnailSha256: string | undefined;
+      let previewFileId: string | undefined;
+      let previewSha256: string | undefined;
       let width: number | undefined;
       let height: number | undefined;
       let videoDuration: number | undefined;
@@ -1213,6 +1215,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         thumbnailSha256 = uploadedThumb.sha256;
         width = prepared.width;
         height = prepared.height;
+
+        const previewFile = new File([prepared.preview], 'preview.jpg', { type: 'image/jpeg' });
+        const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
+        previewFileId = uploadedPreview.id;
+        previewSha256 = uploadedPreview.sha256;
       } else if (isVideo) {
         const thumb = await generateVideoThumbnail(file);
         const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
@@ -1221,6 +1228,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         width = thumb.width;
         height = thumb.height;
         videoDuration = thumb.duration;
+
+        const previewAssets = await buildImageAssets(thumb.file);
+        const previewFile = new File([previewAssets.preview], 'preview.jpg', { type: 'image/jpeg' });
+        const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
+        previewFileId = uploadedPreview.id;
+        previewSha256 = uploadedPreview.sha256;
       }
 
       const uploaded = await uploadFile(
@@ -1238,6 +1251,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sha256: uploaded.sha256,
         thumbnailFileId,
         thumbnailSha256,
+        previewFileId,
+        previewSha256,
         originalName: file.name,
         width,
         height,

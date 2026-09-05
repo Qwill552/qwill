@@ -32,7 +32,7 @@ type ForwardOriginWithRelations = Message & { sender: User | null };
 
 export type MessageWithRelations = Message & {
   sender: User | null;
-  attachments: (Attachment & { file: File; thumbnail: File | null })[];
+  attachments: (Attachment & { file: File; thumbnail: File | null; preview: File | null })[];
   reactions: Reaction[];
   replyTo: ReplyWithRelations | null;
   forwardedFrom: ForwardOriginWithRelations | null;
@@ -40,11 +40,14 @@ export type MessageWithRelations = Message & {
   announcement: Announcement | null;
 };
 
-export function toAttachmentDto(attachment: Attachment & { file: File; thumbnail: File | null }): AttachmentDto {
+export function toAttachmentDto(
+  attachment: Attachment & { file: File; thumbnail: File | null; preview: File | null },
+): AttachmentDto {
   return {
     id: attachment.id,
     file: toFileDto(attachment.file),
     thumbnail: attachment.thumbnail ? toFileDto(attachment.thumbnail) : null,
+    preview: attachment.preview ? toFileDto(attachment.preview) : null,
     originalName: attachment.originalName,
     width: attachment.width,
     height: attachment.height,
@@ -154,7 +157,7 @@ export function toMessageDto(message: MessageWithRelations): MessageDto {
 
 export const messageInclude = {
   sender: true,
-  attachments: { include: { file: true, thumbnail: true } },
+  attachments: { include: { file: true, thumbnail: true, preview: true } },
   reactions: true,
   replyTo: { include: { sender: true, attachments: { select: { id: true } } } },
   forwardedFrom: { include: { sender: true } },
@@ -258,14 +261,21 @@ async function buildAttachmentCreate(input: MessageAttachmentInput) {
   await assertFileOwnershipProof(input.fileId, input.sha256);
   if (input.thumbnailFileId) {
     if (!input.thumbnailSha256) {
-      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Не хватает sha256 превью');
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Не хватает sha256 миниатюры');
     }
     await assertFileOwnershipProof(input.thumbnailFileId, input.thumbnailSha256);
+  }
+  if (input.previewFileId) {
+    if (!input.previewSha256) {
+      throw badRequest(ErrorCode.VALIDATION_FAILED, 'Не хватает sha256 превью');
+    }
+    await assertFileOwnershipProof(input.previewFileId, input.previewSha256);
   }
 
   return {
     fileId: input.fileId,
     thumbnailFileId: input.thumbnailFileId,
+    previewFileId: input.previewFileId,
     originalName: input.originalName,
     width: input.width,
     height: input.height,
@@ -433,6 +443,7 @@ export async function forwardMessages(input: ForwardMessagesInput): Promise<Mess
                 create: {
                   fileId: attachment.fileId,
                   thumbnailFileId: attachment.thumbnailFileId,
+                  previewFileId: attachment.previewFileId,
                   originalName: attachment.originalName,
                   width: attachment.width,
                   height: attachment.height,

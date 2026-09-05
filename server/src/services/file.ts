@@ -272,6 +272,7 @@ async function enforceStorageLimit(): Promise<void> {
     where: {
       attachments: { none: {} },
       thumbnailOfAttachments: { none: {} },
+      previewOfAttachments: { none: {} },
       avatarOfUsers: { none: {} },
       linkPreviews: { none: {} },
     },
@@ -379,7 +380,7 @@ export async function assertFileAccess(fileId: string, userId: string): Promise<
   }
 
   const attachment = await prisma.attachment.findFirst({
-    where: { OR: [{ fileId }, { thumbnailFileId: fileId }] },
+    where: { OR: [{ fileId }, { thumbnailFileId: fileId }, { previewFileId: fileId }] },
     select: { message: { select: { chatId: true } } },
   });
   if (attachment) {

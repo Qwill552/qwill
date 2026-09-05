@@ -97,8 +97,10 @@ export function mediaKindOf(attachment: AttachmentDto): MediaKind {
 }
 
 export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null): string | undefined {
-  return useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, {
-    tier: attachment.thumbnail ? 'thumb' : 'full',
+  const fileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
+  const hasDownscaled = Boolean(attachment.preview ?? attachment.thumbnail);
+  return useFileSrc(fileId, {
+    tier: hasDownscaled ? 'thumb' : 'full',
     chatId,
     kind: mediaKindOf(attachment),
   });

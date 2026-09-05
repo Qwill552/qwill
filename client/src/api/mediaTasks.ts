@@ -1,12 +1,14 @@
-import { THUMBNAIL_JPEG_QUALITY, THUMBNAIL_MAX_DIMENSION } from '@messenger/shared';
+import {
+  PREVIEW_JPEG_QUALITY,
+  PREVIEW_MAX_DIMENSION,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_MAX_DIMENSION,
+} from '@messenger/shared';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { canvasToJpegBlob, downscaleInSteps, fitDimensions, loadImageFromBlob } from './imageCanvas';
 import type { HashJob, ImageJob, MediaJob, MediaJobResult } from './mediaWorker';
-
-export const PREVIEW_MAX_DIMENSION = 512;
-export const PREVIEW_JPEG_QUALITY = 0.7;
 
 const HASH_CHUNK_SIZE = 8 * 1024 * 1024;
 

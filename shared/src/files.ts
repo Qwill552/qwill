@@ -34,6 +34,7 @@ export interface AttachmentDto {
   id: string;
   file: FileDto;
   thumbnail: FileDto | null;
+  preview: FileDto | null;
   originalName: string;
   width: number | null;
   height: number | null;
@@ -84,6 +85,8 @@ export const messageAttachmentInputSchema = z.object({
   sha256: sha256Schema,
   thumbnailFileId: z.string().min(1).optional(),
   thumbnailSha256: sha256Schema.optional(),
+  previewFileId: z.string().min(1).optional(),
+  previewSha256: sha256Schema.optional(),
   originalName: z.string().trim().min(1).max(255),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
