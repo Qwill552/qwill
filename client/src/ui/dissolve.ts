@@ -119,7 +119,8 @@ export function startDissolve(element: HTMLElement, { durationMs, onDone }: Diss
   let finished = false;
 
   function step(now: number): void {
-    const progress = Math.min(1, (now - start) / durationMs);
+    const elapsedMs = Math.max(0, now - start);
+    const progress = Math.min(1, elapsedMs / durationMs);
     map.setAttribute('scale', (DISPLACE_MAX * Math.pow(progress, DISPLACE_CURVE)).toFixed(1));
     const fade = Math.max(0, (progress - FADE_START) / (1 - FADE_START));
     element.style.opacity = Math.pow(1 - fade, FADE_CURVE).toFixed(3);
