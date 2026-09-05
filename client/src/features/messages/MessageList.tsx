@@ -53,6 +53,9 @@ const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
 const FEED_LOAD_AHEAD_PX = 600;
 const SCROLL_IDLE_MS = 150;
+/** Потолок на «мы сейчас едем вниз сами»: дольше этого срока свои scroll-события не
+ *  прикрываются, даже если прокрутка так и не доехала. */
+const AUTO_SCROLL_GUARD_MS = 700;
 
 interface RowAnchor {
   id: string;
@@ -246,12 +249,17 @@ export function MessageList({
   const liveIds = useRef<Set<number>>(new Set());
   const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
-  /** `scrollHeight - scrollTop` на момент последнего события прокрутки — расстояние от
-   *  верха вьюпорта до низа контента. В отличие от булева `stuckToBottom`, при решении
-   *  о прокрутке к новому сообщению это число комбинируется со СВЕЖИМ `clientHeight`
-   *  (мог смениться без единого scroll — вырос композер, приехал предпросмотр ссылки),
-   *  а не с тем, что было на момент последней прокрутки. */
-  const scrollOffset = useRef(0);
+  /** `scrollHeight` на конец прошлого коммита. Разница со свежим — рост контента, который
+   *  вычитается из расстояния до низа: так видно, где человек стоял ДО того, как пузырь
+   *  встал в ленту. Высота, в отличие от `scrollTop`, не зависит от того, доиграла ли
+   *  плавная прокрутка, поэтому число не врёт посреди анимации. */
+  const prevScrollHeight = useRef(0);
+  /** До какого момента едет наша собственная прокрутка к низу. Её scroll-события
+   *  неотличимы от жеста человека, и без этой отсечки высокий пузырь (фото) первым же
+   *  кадром анимации отклеивал ленту от низа сам у себя: расстояние в тот момент ещё
+   *  велико. Не флаг, а срок: анимация может и не доехать (контент растёт по дороге,
+   *  прокрутку перехватили) — залипнуть в «мы едем вниз» насовсем нельзя. */
+  const autoScrollUntil = useRef(0);
   const prevLastId = useRef<number | null>(null);
   const wasNewest = useRef(true);
   const settledFeedKey = useRef<string | null>(null);
@@ -343,8 +351,9 @@ export function MessageList({
     if (!el) return;
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
     const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
+    autoScrollUntil.current = performance.now() + AUTO_SCROLL_GUARD_MS;
+    stuckToBottom.current = true;
     el.scrollTo({ top: el.scrollHeight, behavior });
-    scrollOffset.current = el.clientHeight;
   }
 
   /** Баннер закрепа — та же логика: не scrollIntoView (см. журнал ux-ui.md, этап 2), а свой
@@ -431,10 +440,11 @@ export function MessageList({
     if (lastId !== prevLastId.current && wasNewest.current) {
       const el = listRef.current;
       const own = lastMessage !== null && lastMessage.sender?.id === myId;
-      const bottomOffset = el ? scrollOffset.current - el.clientHeight - bottomReserve(el) : 0;
-      const wasAtBottom = bottomOffset <= STICK_THRESHOLD;
-      if (own || wasAtBottom) {
-        stuckToBottom.current = true;
+      const growth = el ? Math.max(0, el.scrollHeight - prevScrollHeight.current) : 0;
+      const distanceBefore = el
+        ? el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) - growth
+        : 0;
+      if (own || stuckToBottom.current || distanceBefore <= STICK_THRESHOLD) {
         setShowJump(false);
         scrollToBottom(true);
       }
@@ -443,14 +453,14 @@ export function MessageList({
     wasNewest.current = isViewportNewest;
   }, [feedKey, messages, isViewportNewest, myId]);
 
-  // Без scroll-события `scrollOffset` не узнал бы, что геометрия сдвинулась (пузырь
+  // Без scroll-события высота контента не узнала бы, что геометрия сдвинулась (пузырь
   // печатания пропал, композер подрос) — досматриваем её после КАЖДОГО коммита, а не
   // только по факту прокрутки. Объявлен сразу после решающего эффекта: в один и тот же
-  // коммит решение о прокрутке читает ещё вчерашнее число, а это досматривание готовит
-  // свежее — для следующего сообщения.
+  // коммит решение о прокрутке читает ещё вчерашнюю высоту, а это досматривание готовит
+  // свежую — для следующего сообщения.
   useLayoutEffect(() => {
     const el = listRef.current;
-    if (el) scrollOffset.current = el.scrollHeight - el.scrollTop;
+    if (el) prevScrollHeight.current = el.scrollHeight;
   });
 
   useEffect(() => {
@@ -489,9 +499,16 @@ export function MessageList({
     const anchor = pendingAnchor.current;
     if (!anchor) return;
     pendingAnchor.current = null;
-    restoreAnchor(el, anchor);
-    scrollOffset.current = el.scrollHeight - el.scrollTop;
-    stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
+    // Низ выигрывает у якоря. Иначе решающий эффект (объявлен выше, отрабатывает раньше)
+    // начинает ехать вниз за новым пузырём, а этот — тем же кадром возвращает ленту к
+    // якорю: то самое «дёргает вниз и сразу обратно». У telegram-tt обе ветки живут в
+    // одной цепочке `if / else if` и по построению не могут сработать вместе.
+    if (stuckToBottom.current) {
+      if (performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+    } else {
+      restoreAnchor(el, anchor);
+      stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
+    }
     if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
   }, [sliceSignature]);
 
@@ -633,11 +650,17 @@ export function MessageList({
     // Скролл отменяет любой висящий жест сообщения — long-press/окно двойного тапа
     // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
     bumpScrollEpoch();
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el);
-    scrollOffset.current = el.scrollHeight - el.scrollTop;
-    stuckToBottom.current = distance < STICK_THRESHOLD;
-    if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
-    else if (distance < STICK_THRESHOLD) setShowJump(false);
+    const raw = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const distance = raw - bottomReserve(el);
+    prevScrollHeight.current = el.scrollHeight;
+    if (performance.now() < autoScrollUntil.current) {
+      if (raw <= 1) autoScrollUntil.current = 0;
+      stuckToBottom.current = true;
+    } else {
+      stuckToBottom.current = distance < STICK_THRESHOLD;
+      if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
+      else if (distance < STICK_THRESHOLD) setShowJump(false);
+    }
 
     const ahead = Math.max(FEED_LOAD_AHEAD_PX, el.clientHeight);
     if (el.scrollTop < ahead) nearEdge('older');
@@ -823,6 +846,12 @@ export function MessageList({
         ref={listRef}
         data-message-scroller="true"
         onScroll={handleScroll}
+        onWheel={() => {
+          autoScrollUntil.current = 0;
+        }}
+        onTouchMove={() => {
+          autoScrollUntil.current = 0;
+        }}
         onContextMenu={(event) => {
           const target = event.target as HTMLElement;
           if (target.closest('a[href]')) {
