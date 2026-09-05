@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeFeedPage, trimFeedWindow, type FeedItem } from './feedWindow';
+import {
+  boundsAround,
+  clampBounds,
+  mergeFeedPage,
+  sameBounds,
+  shiftBounds,
+  tailBounds,
+  trimFeedWindow,
+  type FeedBounds,
+  type FeedItem,
+} from './feedWindow';
 
 function feed(...ids: number[]): FeedItem[] {
   return ids.map((id) => ({ id }));
@@ -83,5 +93,83 @@ describe('скользящий срез ленты', () => {
 
     expect(result.trimmed).toBe(false);
     expect(ids(result.list)).toEqual([1, 2, 3, 4, 5, 6, 7, -1]);
+  });
+});
+
+describe('границы среза рендера', () => {
+  const limit = 6;
+  const list = feed(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+  it('хвост накопителя приклеен к низу и держит размер среза', () => {
+    const bounds = tailBounds(list, limit);
+
+    expect(bounds).toEqual({ fromId: 5, toId: null });
+    expect(clampBounds(list, bounds, limit)).toEqual({ from: 4, to: 9 });
+  });
+
+  it('лента короче предела вся целиком в срезе', () => {
+    const short = feed(1, 2, 3);
+
+    expect(tailBounds(short, limit)).toEqual({ fromId: null, toId: null });
+    expect(clampBounds(short, { fromId: null, toId: null }, limit)).toEqual({ from: 0, to: 2 });
+  });
+
+  it('окно вокруг сообщения не создаёт дыр и не выходит за края', () => {
+    expect(clampBounds(list, boundsAround(list, 5, limit), limit)).toEqual({ from: 1, to: 6 });
+    expect(clampBounds(list, boundsAround(list, 1, limit), limit)).toEqual({ from: 0, to: 5 });
+    expect(clampBounds(list, boundsAround(list, 10, limit), limit)).toEqual({ from: 4, to: 9 });
+  });
+
+  it('окно вокруг незагруженного сообщения падает на хвост', () => {
+    expect(boundsAround(list, 99, limit)).toEqual(tailBounds(list, limit));
+  });
+
+  it('расширение вверх сдвигает срез, не меняя его размера', () => {
+    const bounds = shiftBounds(list, tailBounds(list, limit), 'older', 2, limit);
+
+    expect(bounds).toEqual({ fromId: 3, toId: 8 });
+    expect(clampBounds(list, bounds, limit)).toEqual({ from: 2, to: 7 });
+  });
+
+  it('расширение не выходит за пределы накопителя и приклеивается к краю', () => {
+    const top = shiftBounds(list, { fromId: 3, toId: 8 }, 'older', 10, limit);
+    expect(top).toEqual({ fromId: null, toId: 6 });
+
+    const bottom = shiftBounds(list, { fromId: null, toId: 6 }, 'newer', 10, limit);
+    expect(bottom).toEqual({ fromId: 5, toId: null });
+  });
+
+  it('на самом краю расширение оставляет границы прежними', () => {
+    const top = { fromId: null, toId: 6 };
+    expect(sameBounds(shiftBounds(list, top, 'older', 2, limit), top)).toBe(true);
+
+    const tail = tailBounds(list, limit);
+    expect(sameBounds(shiftBounds(list, tail, 'newer', 2, limit), tail)).toBe(true);
+  });
+
+  it('приклеенный к низу срез сам вбирает пришедшее живое сообщение', () => {
+    const bounds = tailBounds(list, limit);
+    const grown = [...list, ...feed(11)];
+
+    expect(clampBounds(grown, bounds, limit)).toEqual({ from: 5, to: 10 });
+  });
+
+  it('приклеенный к верху срез вбирает догруженную сверху страницу', () => {
+    const bounds: FeedBounds = { fromId: null, toId: 16 };
+    const grown = feed(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20);
+
+    expect(clampBounds(grown, bounds, limit)).toEqual({ from: 0, to: 5 });
+  });
+
+  it('исчезнувшая граница берётся по ближайшему соседу', () => {
+    const gap = feed(1, 2, 5, 6, 7, 8);
+
+    expect(clampBounds(gap, { fromId: 3, toId: 7 }, limit)).toEqual({ from: 2, to: 4 });
+  });
+
+  it('неотправленное с конца ленты не путает границы хвоста', () => {
+    const withPending = [...list, ...feed(-1)];
+
+    expect(clampBounds(withPending, { fromId: null, toId: null }, limit)).toEqual({ from: 5, to: 10 });
   });
 });

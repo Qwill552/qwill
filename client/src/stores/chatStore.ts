@@ -84,7 +84,7 @@ import {
   reportIncomingCall,
 } from '../calls/nativeCall';
 import {
-  FEED_WINDOW_LIMIT,
+  FEED_ACCUMULATOR_LIMIT,
   mergeFeedPage,
   trimFeedWindow,
   type FeedKeepRange,
@@ -740,7 +740,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
       const merged = mergeFeedPage(list, fresh, 'older');
-      const cut = trimFeedWindow(merged, 'older', FEED_WINDOW_LIMIT, keep ?? null);
+      const cut = trimFeedWindow(merged, 'older', FEED_ACCUMULATOR_LIMIT, keep ?? null);
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
@@ -762,7 +762,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
       const merged = mergeFeedPage(list, fresh, 'newer');
-      const cut = trimFeedWindow(merged, 'newer', FEED_WINDOW_LIMIT, keep ?? null);
+      const cut = trimFeedWindow(merged, 'newer', FEED_ACCUMULATOR_LIMIT, keep ?? null);
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
         hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },

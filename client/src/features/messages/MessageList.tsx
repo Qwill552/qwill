@@ -16,7 +16,18 @@ import { DateDivider, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
 import { isDeletableMessage } from './messageDeleting';
-import type { FeedKeepRange } from './feedWindow';
+import {
+  boundsAround,
+  clampBounds,
+  FEED_SLICE_LIMIT,
+  FEED_SLICE_STEP,
+  sameBounds,
+  shiftBounds,
+  tailBounds,
+  type FeedBounds,
+  type FeedKeepRange,
+  type FeedSide,
+} from './feedWindow';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
@@ -58,21 +69,23 @@ function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
   el.scrollTop += node.getBoundingClientRect().top - anchor.top;
 }
 
-function keepRange(el: HTMLElement): FeedKeepRange | null {
-  const view = el.getBoundingClientRect();
-  const top = view.top - el.clientHeight;
-  const bottom = view.bottom + el.clientHeight;
+function keepRange(slice: LocalMessage[]): FeedKeepRange | null {
   let keepFromId: number | null = null;
   let keepToId: number | null = null;
-  for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
-    const rect = node.getBoundingClientRect();
-    if (rect.bottom <= top || rect.top >= bottom) continue;
-    const id = Number(node.dataset.messageId);
-    if (!Number.isFinite(id)) continue;
-    if (keepFromId === null) keepFromId = id;
-    keepToId = id;
+  for (const message of slice) {
+    if (message.id < 0) continue;
+    if (keepFromId === null) keepFromId = message.id;
+    keepToId = message.id;
   }
   return keepFromId === null || keepToId === null ? null : { keepFromId, keepToId };
+}
+
+function lastSettledId(list: LocalMessage[]): number | null {
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const id = list[i]!.id;
+    if (id > 0) return id;
+  }
+  return null;
 }
 
 interface MessageRowData {
@@ -195,12 +208,12 @@ export function MessageList({
   }, [chatId, isGroup, loadMembers]);
 
   const feedKey = `${chatId}#${feedEpoch}`;
-  const feedBounds = `${feedKey}:${messages[0]?.id ?? 0}:${messages[messages.length - 1]?.id ?? 0}:${messages.length}`;
 
   const listRef = useRef<HTMLDivElement>(null);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
   const stuckToBottom = useRef(true);
-  const prevLength = useRef(0);
+  const prevLastId = useRef<number | null>(null);
+  const wasNewest = useRef(true);
   const settledFeedKey = useRef<string | null>(null);
   const suppressAppear = useRef(false);
   const pendingAnchor = useRef<RowAnchor | null>(null);
@@ -210,7 +223,31 @@ export function MessageList({
   const loadingDown = useRef(false);
   const retryUpAt = useRef(0);
   const retryDownAt = useRef(0);
+  const pendingTail = useRef(false);
   const [showJump, setShowJump] = useState(false);
+
+  const [bounds, setBounds] = useState<FeedBounds>({ fromId: null, toId: null });
+  const boundsFeedRef = useRef(feedKey);
+  const boundsFocusRef = useRef(focus?.seq ?? 0);
+
+  let liveBounds = bounds;
+  if (boundsFeedRef.current !== feedKey) {
+    boundsFeedRef.current = feedKey;
+    boundsFocusRef.current = focus?.seq ?? 0;
+    liveBounds = focus
+      ? boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT)
+      : tailBounds(messages, FEED_SLICE_LIMIT);
+    setBounds(liveBounds);
+  } else if (focus && boundsFocusRef.current !== focus.seq) {
+    boundsFocusRef.current = focus.seq;
+    liveBounds = boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT);
+    setBounds(liveBounds);
+  }
+
+  const view = useMemo(() => clampBounds(messages, liveBounds, FEED_SLICE_LIMIT), [messages, liveBounds]);
+  const slice = useMemo(() => messages.slice(view.from, view.to + 1), [messages, view]);
+  const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
+  const isViewportNewest = view.to >= messages.length - 1 && !hasMoreAfter;
 
   const myRole = members?.find((m) => m.userId === myId)?.role;
   const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
@@ -262,7 +299,7 @@ export function MessageList({
     if (settledFeedKey.current === feedKey || messages.length === 0) return;
     const replaced = settledFeedKey.current?.startsWith(`${chatId}#`) ?? false;
     settledFeedKey.current = feedKey;
-    prevLength.current = messages.length;
+    prevLastId.current = messages[messages.length - 1]?.id ?? null;
     retryUpAt.current = 0;
     retryDownAt.current = 0;
     if (replaced) suppressAppear.current = true;
@@ -312,13 +349,16 @@ export function MessageList({
   }, [focus]);
 
   useEffect(() => {
+    const lastId = messages[messages.length - 1]?.id ?? null;
     if (settledFeedKey.current !== feedKey) {
-      prevLength.current = messages.length;
+      prevLastId.current = lastId;
+      wasNewest.current = isViewportNewest;
       return;
     }
-    if (messages.length > prevLength.current && stuckToBottom.current && !hasMoreAfter) scrollToBottom(true);
-    prevLength.current = messages.length;
-  }, [feedKey, messages.length, hasMoreAfter]);
+    if (lastId !== prevLastId.current && wasNewest.current && stuckToBottom.current) scrollToBottom(true);
+    prevLastId.current = lastId;
+    wasNewest.current = isViewportNewest;
+  }, [feedKey, messages, isViewportNewest]);
 
   useEffect(() => {
     if (typing && stuckToBottom.current) scrollToBottom(true);
@@ -344,12 +384,22 @@ export function MessageList({
 
   useLayoutEffect(() => {
     const el = listRef.current;
+    if (!el) return;
+    if (pendingTail.current) {
+      pendingTail.current = false;
+      pendingAnchor.current = null;
+      stuckToBottom.current = true;
+      setShowJump(false);
+      scrollToBottom(false);
+      return;
+    }
     const anchor = pendingAnchor.current;
-    if (!el || !anchor) return;
+    if (!anchor) return;
     pendingAnchor.current = null;
     restoreAnchor(el, anchor);
     stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
-  }, [feedBounds]);
+    if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
+  }, [sliceSignature]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -387,12 +437,16 @@ export function MessageList({
     return () => observer.disconnect();
   }, [chatId]);
 
-  const requestUp = useCallback(() => {
+  function requestUp(): void {
     const el = listRef.current;
-    if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current) return;
+    if (!el || !hasMore || view.from > 0 || loadingUp.current || performance.now() < retryUpAt.current) return;
     loadingUp.current = true;
     pendingAnchor.current = rememberAnchor(el);
-    loadMore(chatId, keepRange(el))
+    if (liveBounds.toId === null) {
+      const tail = lastSettledId(messages);
+      if (tail !== null) setBounds({ fromId: null, toId: tail });
+    }
+    loadMore(chatId, keepRange(slice))
       .catch(() => {
         pendingAnchor.current = null;
         retryUpAt.current = performance.now() + FEED_RETRY_MS;
@@ -400,14 +454,16 @@ export function MessageList({
       .finally(() => {
         loadingUp.current = false;
       });
-  }, [chatId, hasMore, loadMore]);
+  }
 
-  const requestDown = useCallback(() => {
+  function requestDown(): void {
     const el = listRef.current;
-    if (!el || !hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
+    if (!el || !hasMoreAfter || view.to < messages.length - 1) return;
+    if (loadingDown.current || performance.now() < retryDownAt.current) return;
     loadingDown.current = true;
     pendingAnchor.current = rememberAnchor(el);
-    loadMoreAfter(chatId, keepRange(el))
+    if (liveBounds.toId !== null) setBounds({ fromId: liveBounds.fromId, toId: null });
+    loadMoreAfter(chatId, keepRange(slice))
       .catch(() => {
         pendingAnchor.current = null;
         retryDownAt.current = performance.now() + FEED_RETRY_MS;
@@ -415,7 +471,26 @@ export function MessageList({
       .finally(() => {
         loadingDown.current = false;
       });
-  }, [chatId, hasMoreAfter, loadMoreAfter]);
+  }
+
+  function growSlice(side: FeedSide): boolean {
+    const el = listRef.current;
+    if (!el) return false;
+    const next = shiftBounds(messages, liveBounds, side, FEED_SLICE_STEP, FEED_SLICE_LIMIT);
+    if (sameBounds(next, liveBounds)) return false;
+    pendingAnchor.current = rememberAnchor(el);
+    setBounds(next);
+    return true;
+  }
+
+  function nearEdge(side: FeedSide): void {
+    if (growSlice(side)) return;
+    if (side === 'older') requestUp();
+    else requestDown();
+  }
+
+  const nearEdgeRef = useRef(nearEdge);
+  nearEdgeRef.current = nearEdge;
 
   useEffect(() => {
     const el = listRef.current;
@@ -426,8 +501,7 @@ export function MessageList({
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          if (entry.target === top) requestUp();
-          else requestDown();
+          nearEdgeRef.current(entry.target === top ? 'older' : 'newer');
         }
       },
       { root: el, rootMargin: `${FEED_LOAD_AHEAD_PX}px 0px ${FEED_LOAD_AHEAD_PX}px 0px` },
@@ -435,14 +509,14 @@ export function MessageList({
     observer.observe(top);
     observer.observe(bottom);
     return () => observer.disconnect();
-  }, [requestUp, requestDown]);
+  }, [chatId]);
 
   useEffect(() => {
     const el = listRef.current;
     if (!el || el.scrollHeight >= el.clientHeight * 2) return;
-    requestUp();
-    requestDown();
-  }, [feedBounds, requestUp, requestDown]);
+    nearEdgeRef.current('older');
+    nearEdgeRef.current('newer');
+  }, [sliceSignature]);
 
   function handleScroll(): void {
     const el = listRef.current;
@@ -456,20 +530,25 @@ export function MessageList({
     else if (distance < STICK_THRESHOLD) setShowJump(false);
 
     const ahead = Math.max(FEED_LOAD_AHEAD_PX, el.clientHeight);
-    if (el.scrollTop < ahead) requestUp();
-    if (distance < ahead) requestDown();
+    if (el.scrollTop < ahead) nearEdge('older');
+    if (distance < ahead) nearEdge('newer');
   }
 
   function handleJump(): void {
     if (!hasMoreAfter) {
-      scrollToBottom(true);
+      if (view.to >= messages.length - 1) {
+        scrollToBottom(true);
+        return;
+      }
+      pendingTail.current = true;
+      setBounds(tailBounds(messages, FEED_SLICE_LIMIT));
       return;
     }
     void jumpToLatest(chatId);
   }
 
   const rows = useMemo(() => {
-    const albums = groupAlbums(messages);
+    const albums = groupAlbums(slice);
 
     return albums.flatMap((album, index) => {
       const message = album[0];
@@ -505,7 +584,7 @@ export function MessageList({
         },
       ];
     });
-  }, [messages]);
+  }, [slice]);
 
   const renderRows = useMemo<RenderRow[]>(() => {
     const albumSeen = new Map<string, number>();
@@ -697,9 +776,9 @@ export function MessageList({
 
       <button
         type="button"
-        className={`${styles.jump} ${showJump || hasMoreAfter ? '' : styles.jumpHidden}`}
+        className={`${styles.jump} ${showJump || !isViewportNewest ? '' : styles.jumpHidden}`}
         aria-label="К последним сообщениям"
-        tabIndex={showJump || hasMoreAfter ? 0 : -1}
+        tabIndex={showJump || !isViewportNewest ? 0 : -1}
         onClick={handleJump}
       >
         <Icon name="chevron-down" size={22} />

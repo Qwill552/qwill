@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as chatsApi from '../api/chats';
 import { getMessagesAfterRequest, getMessagesRequest } from '../api/chats';
+import { FEED_ACCUMULATOR_LIMIT } from '../features/messages/feedWindow';
 import { useChatStore } from './chatStore';
 
 vi.mock('../api/chats', async (importOriginal) => {
@@ -142,7 +143,7 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
   });
 
   it('догрузка вверх подрезает дальний низ и снова размыкает окно', async () => {
-    const long = Array.from({ length: 150 }, (_, i) => message(100 + i, 'other'));
+    const long = Array.from({ length: FEED_ACCUMULATOR_LIMIT }, (_, i) => message(100 + i, 'other'));
     useChatStore.setState({
       messagesByChat: { [CHAT_ID]: long as never },
       hasMoreAfterByChat: { [CHAT_ID]: false },
@@ -152,9 +153,9 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     await useChatStore.getState().loadMore(CHAT_ID, { keepFromId: 100, keepToId: 120 });
 
     const list = useChatStore.getState().messagesByChat[CHAT_ID] ?? [];
-    expect(list).toHaveLength(150);
+    expect(list).toHaveLength(FEED_ACCUMULATOR_LIMIT);
     expect(list[0]!.id).toBe(99);
-    expect(list.at(-1)!.id).toBe(248);
+    expect(list.at(-1)!.id).toBe(100 + FEED_ACCUMULATOR_LIMIT - 2);
     expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(true);
   });
 
