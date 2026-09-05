@@ -15,8 +15,11 @@ export interface ChatFeedPosition {
   fromId: number | null;
   toId: number | null;
   anchorId: number | null;
+  anchorOffset: number;
   atTail: boolean;
 }
+
+const appRunId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 export async function readCachedChats(): Promise<ChatListItemDto[]> {
   const db = await openCacheDb();
@@ -85,10 +88,11 @@ export async function readCachedPosition(chatId: string): Promise<ChatFeedPositi
   try {
     const stored = await db.get('chatPositions', chatId);
     if (!stored) return null;
+    if (stored.runId !== appRunId) return null;
     if (Date.now() - stored.savedAt > CACHED_POSITION_TTL_MS) return null;
 
-    const { fromId, toId, anchorId, atTail } = stored;
-    return { fromId, toId, anchorId, atTail };
+    const { fromId, toId, anchorId, anchorOffset, atTail } = stored;
+    return { fromId, toId, anchorId, anchorOffset, atTail };
   } catch {
     return null;
   }
@@ -99,7 +103,7 @@ export async function writeCachedPosition(chatId: string, position: ChatFeedPosi
   if (!db) return;
 
   try {
-    await db.put('chatPositions', { chatId, ...position, savedAt: Date.now() });
+    await db.put('chatPositions', { chatId, ...position, runId: appRunId, savedAt: Date.now() });
   } catch {
     return;
   }

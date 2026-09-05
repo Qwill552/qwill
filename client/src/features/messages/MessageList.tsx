@@ -51,6 +51,9 @@ const COLLAPSE_AT = 0.55;
 /** Дозор на случай, если rAF встанет (вкладка ушла в фон) и распад не доиграет сам. */
 const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
+/** Восстановленное место держим дольше: строки выше якоря дорастают до своей высоты по мере
+ *  загрузки картинок, а `overflow-anchor` у ленты выключен — без этого лента уползает вверх. */
+const RESTORE_HOLD_MS = 2500;
 const FEED_LOAD_AHEAD_PX = 600;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
@@ -391,8 +394,14 @@ export function MessageList({
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     const quiet = focus.quiet === true;
+    const offset = focus.offset ?? 0;
     function place(): void {
-      el!.scrollTop = Math.max(0, target!.offsetTop - (quiet ? 0 : el!.clientHeight / 3));
+      if (quiet) {
+        const top = target!.getBoundingClientRect().top - el!.getBoundingClientRect().top;
+        el!.scrollTop = Math.max(0, el!.scrollTop + top - offset);
+        return;
+      }
+      el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
     }
     place();
     if (!quiet) target.dataset.flash = '1';
@@ -412,7 +421,7 @@ export function MessageList({
     el.addEventListener('pointerdown', release);
     el.addEventListener('wheel', release, { passive: true });
     el.addEventListener('touchstart', release, { passive: true });
-    const holdTimer = window.setTimeout(release, FOCUS_HOLD_MS);
+    const holdTimer = window.setTimeout(release, quiet ? RESTORE_HOLD_MS : FOCUS_HOLD_MS);
 
     return () => {
       window.clearTimeout(flashTimer);
@@ -593,6 +602,7 @@ export function MessageList({
       fromId: liveBounds.fromId,
       toId: liveBounds.toId,
       anchorId,
+      anchorOffset: anchor && el ? anchor.top - el.getBoundingClientRect().top : 0,
       atTail: isViewportNewest && stuckToBottom.current,
     });
   };

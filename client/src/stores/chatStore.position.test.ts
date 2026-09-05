@@ -117,7 +117,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('записанная позиция поднимает окно вокруг неё, а не хвост', async () => {
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, atTail: false });
+    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
@@ -131,7 +131,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('позиция без якоря поднимает окно вокруг начала среза', async () => {
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: null, atTail: false });
+    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: null, anchorOffset: -24, atTail: false });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
@@ -139,7 +139,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('atTail открывает хвост, как раньше', async () => {
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: null, anchorId: 140, atTail: true });
+    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: null, anchorId: 140, anchorOffset: -24, atTail: true });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
@@ -159,7 +159,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('сообщений вокруг позиции в кэше нет — открывается хвост и ничего не падает', async () => {
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, atTail: false });
+    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false });
     vi.mocked(readCachedMessages).mockResolvedValue([]);
 
     await useChatStore.getState().openChat(CHAT_ID);
@@ -172,7 +172,7 @@ describe('chatStore: позиция в чате переживает выход 
 
   it('лента уже в памяти — позиция ставит срез на место, не подменяя ленту', async () => {
     useChatStore.setState({ messagesByChat: { [CHAT_ID]: history.slice() } });
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, atTail: false });
+    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
@@ -182,7 +182,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('уход из чата записывает запомненную позицию', async () => {
-    const position = { fromId: 100, toId: 180, anchorId: 140, atTail: false };
+    const position = { fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false };
     await useChatStore.getState().openChat(CHAT_ID);
     useChatStore.getState().rememberPosition(CHAT_ID, position);
 
@@ -200,7 +200,7 @@ describe('chatStore: позиция в чате переживает выход 
   });
 
   it('смена аккаунта не оставляет чужой позиции в памяти', () => {
-    useChatStore.getState().rememberPosition(CHAT_ID, { fromId: 1, toId: 80, anchorId: 40, atTail: false });
+    useChatStore.getState().rememberPosition(CHAT_ID, { fromId: 1, toId: 80, anchorId: 40, anchorOffset: 0, atTail: false });
 
     useChatStore.getState().reset();
 

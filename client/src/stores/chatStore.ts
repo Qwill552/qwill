@@ -137,13 +137,15 @@ export interface FeedFocus {
   messageId: number;
   seq: number;
   quiet?: boolean;
+  offset?: number;
 }
 
 interface ReplaceFeedOptions {
   hasMoreBefore: boolean;
   hasMoreAfter: boolean;
   focus?: number;
-  quietFocus?: boolean;
+  focusQuiet?: boolean;
+  focusOffset?: number;
 }
 
 interface PresenceInfo {
@@ -211,7 +213,7 @@ interface ChatState {
   returnToTail: (chatId: string) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
-  focusMessage: (chatId: string, messageId: number, quiet?: boolean) => void;
+  focusMessage: (chatId: string, messageId: number, quiet?: boolean, offset?: number) => void;
   syncChatMessages: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
@@ -608,7 +610,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     void get().restoreOutboxMessages();
   },
 
-  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, quietFocus }) {
+  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset }) {
     void writeCachedMessages(messages);
     set((state) => {
       const current = state.messagesByChat[chatId] ?? [];
@@ -617,7 +619,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const focusByChat = { ...state.focusByChat };
       if (focus === undefined) delete focusByChat[chatId];
-      else focusByChat[chatId] = { messageId: focus, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet: quietFocus };
+      else {
+        focusByChat[chatId] = {
+          messageId: focus,
+          seq: (state.focusByChat[chatId]?.seq ?? 0) + 1,
+          quiet: focusQuiet,
+          offset: focusOffset,
+        };
+      }
 
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: [...settled, ...pending] },
@@ -630,11 +639,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  focusMessage(chatId, messageId, quiet) {
+  focusMessage(chatId, messageId, quiet, offset) {
     set((state) => ({
       focusByChat: {
         ...state.focusByChat,
-        [chatId]: { messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet },
+        [chatId]: { messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet, offset },
       },
     }));
   },
@@ -655,10 +664,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const anchorId = position.anchorId ?? position.fromId ?? position.toId;
     if (anchorId === null) return;
+    const offset = position.anchorId === null ? 0 : position.anchorOffset;
 
     const list = get().messagesByChat[chatId];
     if (list) {
-      if (list.some((message) => message.id === anchorId)) get().focusMessage(chatId, anchorId, true);
+      if (list.some((message) => message.id === anchorId)) get().focusMessage(chatId, anchorId, true, offset);
       return;
     }
 
@@ -669,7 +679,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasMoreBefore: true,
       hasMoreAfter: true,
       focus: anchorId,
-      quietFocus: true,
+      focusQuiet: true,
+      focusOffset: offset,
     });
   },
 

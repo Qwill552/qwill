@@ -27,7 +27,9 @@ export interface CachedChatPosition {
   fromId: number | null;
   toId: number | null;
   anchorId: number | null;
+  anchorOffset: number;
   atTail: boolean;
+  runId: string;
   savedAt: number;
 }
 
