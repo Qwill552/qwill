@@ -78,6 +78,14 @@ function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
   el.scrollTop += drift;
 }
 
+/** `scrollHeight` включает нижний `padding` — резерв под композер (48–160px в зависимости
+ *  от высоты композера и safe-area). Без вычитания «в самом низу» по факту оказывается
+ *  где-то посреди этого запаса, а не там, где лежит последний пузырь — порог прилипания
+ *  тогда не совпадает с тем, что человек видит глазами. */
+function bottomReserve(el: HTMLElement): number {
+  return parseFloat(getComputedStyle(el).paddingBottom) || 0;
+}
+
 function keepRange(slice: LocalMessage[]): FeedKeepRange | null {
   let keepFromId: number | null = null;
   let keepToId: number | null = null;
@@ -296,6 +304,22 @@ export function MessageList({
   const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
   const isViewportNewest = view.to >= messages.length - 1 && !hasMoreAfter;
 
+  // Окно может сдвинуться и без явного requestUp/requestDown/growSlice — например, когда
+  // фоновая подгрузка «впрок» (prefetchFeed) или просто пришедшее сообщение раздвигают
+  // messages настолько, что открытое до конца окно (toId: null) упирается в FEED_SLICE_LIMIT
+  // и клэмпается по низу. Явные вызовы уже помнят якорь сами (см. growSlice/requestUp/
+  // requestDown) — эта проверка ловит только то, что осталось не помнено: если сигнатура
+  // среза уже изменилась, а якорь никто не поставил, ставим его прямо тут, пока DOM ещё
+  // отражает прошлый рендер (совсем как в rememberScrollPositionRef у telegram-tt).
+  const lastSliceSignature = useRef(sliceSignature);
+  if (lastSliceSignature.current !== sliceSignature) {
+    lastSliceSignature.current = sliceSignature;
+    const el = listRef.current;
+    if (el && settledFeedKey.current === feedKey && pendingAnchor.current === null && !stuckToBottom.current) {
+      pendingAnchor.current = rememberAnchor(el);
+    }
+  }
+
   const myRole = members?.find((m) => m.userId === myId)?.role;
   const isGroupAdmin = isGroup && (myRole === 'OWNER' || myRole === 'ADMIN');
   /** Приватный чат — закреплять может любой участник; группа — только OWNER/ADMIN
@@ -407,7 +431,7 @@ export function MessageList({
     if (lastId !== prevLastId.current && wasNewest.current) {
       const el = listRef.current;
       const own = lastMessage !== null && lastMessage.sender?.id === myId;
-      const bottomOffset = el ? scrollOffset.current - el.clientHeight : 0;
+      const bottomOffset = el ? scrollOffset.current - el.clientHeight - bottomReserve(el) : 0;
       const wasAtBottom = bottomOffset <= STICK_THRESHOLD;
       if (own || wasAtBottom) {
         stuckToBottom.current = true;
@@ -418,6 +442,16 @@ export function MessageList({
     prevLastId.current = lastId;
     wasNewest.current = isViewportNewest;
   }, [feedKey, messages, isViewportNewest, myId]);
+
+  // Без scroll-события `scrollOffset` не узнал бы, что геометрия сдвинулась (пузырь
+  // печатания пропал, композер подрос) — досматриваем её после КАЖДОГО коммита, а не
+  // только по факту прокрутки. Объявлен сразу после решающего эффекта: в один и тот же
+  // коммит решение о прокрутке читает ещё вчерашнее число, а это досматривание готовит
+  // свежее — для следующего сообщения.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el) scrollOffset.current = el.scrollHeight - el.scrollTop;
+  });
 
   useEffect(() => {
     if (typing && stuckToBottom.current) scrollToBottom(true);
@@ -457,7 +491,7 @@ export function MessageList({
     pendingAnchor.current = null;
     restoreAnchor(el, anchor);
     scrollOffset.current = el.scrollHeight - el.scrollTop;
-    stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
+    stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
     if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
   }, [sliceSignature]);
 
@@ -599,7 +633,7 @@ export function MessageList({
     // Скролл отменяет любой висящий жест сообщения — long-press/окно двойного тапа
     // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
     bumpScrollEpoch();
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el);
     scrollOffset.current = el.scrollHeight - el.scrollTop;
     stuckToBottom.current = distance < STICK_THRESHOLD;
     if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
