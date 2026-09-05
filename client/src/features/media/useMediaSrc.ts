@@ -1,5 +1,6 @@
-import { categorizeAttachment, type AttachmentDto } from '@messenger/shared';
-import { useEffect, useState, type RefObject } from 'react';
+import { categorizeAttachment, isBlurhash, type AttachmentDto } from '@messenger/shared';
+import { decode as decodeBlurhash } from 'blurhash';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import type { MediaKind } from '../../cache/db';
@@ -60,6 +61,34 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
   }, [src]);
 
   return decoded;
+}
+
+export const BLURHASH_CANVAS_SIDE = 32;
+
+export function decodeBlurhashPixels(blurhash: string | null | undefined): Uint8ClampedArray | null {
+  if (!isBlurhash(blurhash)) return null;
+  try {
+    return decodeBlurhash(blurhash, BLURHASH_CANVAS_SIDE, BLURHASH_CANVAS_SIDE);
+  } catch {
+    return null;
+  }
+}
+
+export function useBlurhashCanvas(blurhash: string | null | undefined): RefObject<HTMLCanvasElement | null> {
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    const pixels = decodeBlurhashPixels(blurhash);
+    if (!canvas || !pixels) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const image = context.createImageData(BLURHASH_CANVAS_SIDE, BLURHASH_CANVAS_SIDE);
+    image.data.set(pixels);
+    context.putImageData(image, 0, 0);
+  }, [blurhash]);
+
+  return ref;
 }
 
 export function mediaKindOf(attachment: AttachmentDto): MediaKind {

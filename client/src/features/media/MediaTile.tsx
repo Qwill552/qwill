@@ -7,7 +7,7 @@ import { haptic } from '../../ui/haptic';
 import { Icon } from '../../ui/Icon';
 import { isVideoAttachment } from './mediaKind';
 import { openMediaViewer } from './mediaViewerStore';
-import { useProgressiveSrc } from './useMediaSrc';
+import { BLURHASH_CANVAS_SIDE, useBlurhashCanvas, useDecodedSrc, useProgressiveSrc } from './useMediaSrc';
 import styles from './MediaTile.module.css';
 
 interface MediaTileProps {
@@ -48,7 +48,8 @@ export function MediaTile({
   onOpen,
 }: MediaTileProps) {
   const ref = useRef<HTMLButtonElement>(null);
-  const src = useProgressiveSrc(attachment, ref, chatId);
+  const src = useDecodedSrc(useProgressiveSrc(attachment, ref, chatId));
+  const blurRef = useBlurhashCanvas(attachment.blurhash);
   const video = isVideoAttachment(attachment);
   const natural = fit === 'natural';
   const albumSelectable = onLongPressTile !== undefined;
@@ -126,9 +127,19 @@ export function MediaTile({
         if (standalone || event.detail === 0) open();
       }}
     >
+      {attachment.blurhash && (
+        <canvas
+          ref={blurRef}
+          className={`${styles.blur} ${src ? styles.blurGone : ''}`}
+          width={BLURHASH_CANVAS_SIDE}
+          height={BLURHASH_CANVAS_SIDE}
+          aria-hidden="true"
+        />
+      )}
+
       {src && (
         <img
-          className={natural ? styles.natural : styles.cover}
+          className={`${natural ? styles.natural : styles.cover} ${styles.shown}`}
           src={src}
           alt=""
           decoding="async"

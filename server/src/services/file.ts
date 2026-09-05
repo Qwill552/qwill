@@ -308,6 +308,12 @@ export async function storeServerFile(data: Buffer, mimeType: string): Promise<F
   }
 }
 
+export async function readStoredFile(fileId: string): Promise<Buffer | null> {
+  const file = await prisma.file.findUnique({ where: { id: fileId } });
+  if (!file) return null;
+  return fs.readFile(path.join(FILES_DIR, file.storedName)).catch(() => null);
+}
+
 export interface FileAccessInfo {
   storedName: string;
   mimeType: string;

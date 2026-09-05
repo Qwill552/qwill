@@ -1,9 +1,11 @@
 import {
+  blurhashSchema,
   ErrorCode,
   PROCESSED_IMAGE_MAX_FRAMES,
   PROCESSED_IMAGE_MAX_PIXELS,
   PROCESSED_IMAGE_MAX_SIDE,
 } from '@messenger/shared';
+import { encode as encodeBlurhash } from 'blurhash';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 
@@ -38,6 +40,30 @@ export interface ProcessedImage {
   width: number;
   height: number;
   frames: number;
+}
+
+const BLURHASH_SIDE = 32;
+const BLURHASH_COMPONENTS_X = 4;
+const BLURHASH_COMPONENTS_Y = 3;
+
+export async function computeBlurhash(input: Buffer): Promise<string | null> {
+  try {
+    const { data, info } = await sharp(input, { failOn: 'none' })
+      .resize(BLURHASH_SIDE, BLURHASH_SIDE, { fit: 'inside' })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const hash = encodeBlurhash(
+      new Uint8ClampedArray(data),
+      info.width,
+      info.height,
+      BLURHASH_COMPONENTS_X,
+      BLURHASH_COMPONENTS_Y,
+    );
+    return blurhashSchema.safeParse(hash).success ? hash : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface ProcessImageOptions {

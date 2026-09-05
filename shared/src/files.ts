@@ -39,6 +39,19 @@ export interface AttachmentDto {
   height: number | null;
   duration: number | null;
   peaks: number[] | null;
+  blurhash: string | null;
+}
+
+export const BLURHASH_MAX_LENGTH = 64;
+
+export const blurhashSchema = z
+  .string()
+  .min(6)
+  .max(BLURHASH_MAX_LENGTH)
+  .regex(/^[\w#$%*+,\-.:;=?@[\]^{|}~]+$/, 'Некорректный BlurHash');
+
+export function isBlurhash(value: string | null | undefined): value is string {
+  return typeof value === 'string' && blurhashSchema.safeParse(value).success;
 }
 
 export type ChatAttachmentKind = 'photo' | 'video' | 'gif' | 'voice' | 'audio' | 'file';

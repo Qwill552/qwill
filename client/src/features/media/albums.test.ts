@@ -26,6 +26,7 @@ function photo(id: string): AttachmentDto {
     height: 800,
     duration: null,
     peaks: null,
+    blurhash: null,
   };
 }
 

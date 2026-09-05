@@ -17,10 +17,11 @@ import { toAvatarColor } from '../lib/avatarColor.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { logger } from '../lib/logger.js';
+import { computeBlurhash } from '../lib/processImage.js';
 import { presenceStore } from '../realtime/presence.js';
 import { notifySupportMessage } from './adminNotify.js';
 import { assertChatWritable, assertMember } from './chat.js';
-import { assertFileOwnershipProof, toFileDto } from './file.js';
+import { assertFileOwnershipProof, readStoredFile, toFileDto } from './file.js';
 import * as pushService from './push.js';
 import { assertSupportSendAllowed, incomingSupportMessageAdminId } from './support.js';
 import { ChatRole } from '../generated/prisma/client.js';
@@ -49,6 +50,7 @@ export function toAttachmentDto(attachment: Attachment & { file: File; thumbnail
     height: attachment.height,
     duration: attachment.duration,
     peaks: attachment.peaks.length > 0 ? attachment.peaks : null,
+    blurhash: attachment.blurhash,
   };
 }
 
@@ -269,7 +271,15 @@ async function buildAttachmentCreate(input: MessageAttachmentInput) {
     height: input.height,
     duration: input.duration,
     peaks: input.peaks ?? [],
+    blurhash: await thumbnailBlurhash(input.thumbnailFileId),
   };
+}
+
+async function thumbnailBlurhash(thumbnailFileId: string | undefined): Promise<string | null> {
+  if (!thumbnailFileId) return null;
+  const bytes = await readStoredFile(thumbnailFileId);
+  if (!bytes) return null;
+  return computeBlurhash(bytes);
 }
 
 async function getMessageInChatOrThrow(chatId: string, messageId: number): Promise<Message> {
@@ -428,6 +438,7 @@ export async function forwardMessages(input: ForwardMessagesInput): Promise<Mess
                   height: attachment.height,
                   duration: attachment.duration,
                   peaks: attachment.peaks,
+                  blurhash: attachment.blurhash,
                 },
               },
             }

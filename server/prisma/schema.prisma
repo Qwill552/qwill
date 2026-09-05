@@ -276,6 +276,8 @@ model Attachment {
   duration     Int?
   /// Амплитуды волны голосового (0..1), посчитанные клиентом (этап 7, ux-ui/07-composer.md). Пусто у остальных вложений.
   peaks        Float[] @default([])
+  /// BlurHash миниатюры (КЭШ-12): пузырь окрашен в первом кадре, до любой загрузки байтов.
+  blurhash     String?
 
   @@index([messageId])
   @@index([fileId])

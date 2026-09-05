@@ -14,7 +14,7 @@ import { fitRect, findMediaRect, flipTransform, type MediaRect } from './mediaAn
 import { isVideoAttachment } from './mediaKind';
 import { useShowInChat } from '../chat/showInChat';
 import { useMediaViewerStore, type MediaViewerItem } from './mediaViewerStore';
-import { mediaRatio, usePreviewSrc, useViewerSrc } from './useMediaSrc';
+import { BLURHASH_CANVAS_SIDE, mediaRatio, useBlurhashCanvas, usePreviewSrc, useViewerSrc } from './useMediaSrc';
 import styles from './MediaViewer.module.css';
 
 const MIN_SCALE = 1;
@@ -567,6 +567,7 @@ function ViewerPage({
   const chatId = useMediaViewerStore((s) => s.chatId);
   const poster = usePreviewSrc(item.attachment, chatId);
   const imageSrc = useViewerSrc(item.attachment, wantOriginal, chatId);
+  const blurRef = useBlurhashCanvas(item.attachment.blurhash);
   const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, { tier: 'stream' });
 
   useLayoutEffect(() => {
@@ -581,6 +582,16 @@ function ViewerPage({
         className={`${styles.media} ${animated ? styles.mediaAnimated : ''} ${active ? styles.mediaActive : ''}`}
         style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
       >
+        {item.attachment.blurhash && (
+          <canvas
+            ref={blurRef}
+            className={`${styles.blur} ${(video ? poster : imageSrc) ? styles.blurGone : ''}`}
+            width={BLURHASH_CANVAS_SIDE}
+            height={BLURHASH_CANVAS_SIDE}
+            aria-hidden="true"
+          />
+        )}
+
         {video ? (
           <video className={styles.video} src={videoSrc} poster={poster} controls playsInline preload="metadata" />
         ) : (

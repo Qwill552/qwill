@@ -25,9 +25,36 @@
   background: var(--scrim-bg);
 }
 
+.blur {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  opacity: 1;
+  transition: opacity var(--dur-media-fade) var(--ease-screen);
+}
+
+.blurGone {
+  opacity: 0;
+}
+
 .cover,
 .natural {
   display: block;
+}
+
+.shown {
+  animation: mediaFadeIn var(--dur-media-fade) var(--ease-screen) both;
+}
+
+@keyframes mediaFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .cover {
