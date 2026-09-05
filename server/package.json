@@ -16,6 +16,7 @@
     "grant-admin": "node dist/scripts/grantAdmin.js",
     "revoke-admin": "node dist/scripts/revokeAdmin.js",
     "telegram-check": "node dist/scripts/telegramCheck.js",
+    "backfill-blurhash": "node dist/scripts/backfillBlurhash.js",
     "test": "vitest run"
   },
   "dependencies": {
