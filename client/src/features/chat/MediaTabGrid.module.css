@@ -3,6 +3,9 @@
   overflow: hidden;
   gap: 2px;
   grid-template-columns: repeat(3, 1fr);
+}
+
+.gridSelecting {
   border-radius: var(--card-radius) var(--card-radius) 0 0;
 }
 
