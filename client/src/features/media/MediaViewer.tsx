@@ -443,6 +443,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   const chromeHidden = !chrome || !entered || closing || dismissing;
   const wantOriginal = settled || zoom.scale > MIN_SCALE;
+  const promoteActive = gesturing || closing || !entered || zoom.scale > MIN_SCALE;
 
   return createPortal(
     <div
@@ -474,6 +475,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
                 box={active ? target : fitRect(mediaRatio(item.attachment) ?? 1, viewport.width, viewport.height)}
                 animated={active && !gesturing}
                 active={active}
+                promote={active && promoteActive}
                 wantOriginal={active && wantOriginal}
                 registerMedia={registerMedia}
                 onNaturalRatio={active ? setNaturalRatio : undefined}
@@ -549,6 +551,7 @@ function ViewerPage({
   box,
   animated,
   active,
+  promote,
   wantOriginal,
   registerMedia,
   onNaturalRatio,
@@ -558,6 +561,7 @@ function ViewerPage({
   box: MediaRect;
   animated: boolean;
   active: boolean;
+  promote: boolean;
   wantOriginal: boolean;
   registerMedia: (node: HTMLElement | null) => void;
   onNaturalRatio?: (ratio: number) => void;
@@ -579,7 +583,7 @@ function ViewerPage({
     <div className={styles.page} style={{ left: `${offset}%` }}>
       <div
         ref={nodeRef}
-        className={`${styles.media} ${animated ? styles.mediaAnimated : ''} ${active ? styles.mediaActive : ''}`}
+        className={`${styles.media} ${animated ? styles.mediaAnimated : ''} ${promote ? styles.mediaActive : ''}`}
         style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
       >
         {item.attachment.blurhash && (
