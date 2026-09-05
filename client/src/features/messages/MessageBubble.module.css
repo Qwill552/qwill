@@ -31,6 +31,10 @@
   backdrop-filter: none;
 }
 
+.out {
+  backdrop-filter: none;
+}
+
 /* Градиент 140° — единственное яркое пятно на тёмных обоях. */
 .out {
   border-radius: 20px 20px 7px 20px;
