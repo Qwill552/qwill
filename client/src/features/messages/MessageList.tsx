@@ -43,6 +43,9 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
+/** Плавно едет только близкий прыжок; дальше — мгновенно, иначе лента ловит по дороге
+ *  новые сообщения при отставании на несколько экранов. В экранах высоты вьюпорта. */
+const SCROLL_ANIMATE_SCREENS = 2;
 /** Доля распада, после которой строка начинает схлопывать высоту: соседи съезжают, пока пыль ещё летит. */
 const COLLAPSE_AT = 0.55;
 /** Дозор на случай, если rAF встанет (вкладка ушла в фон) и распад не доиграет сам. */
@@ -235,6 +238,12 @@ export function MessageList({
   const liveIds = useRef<Set<number>>(new Set());
   const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
+  /** `scrollHeight - scrollTop` на момент последнего события прокрутки — расстояние от
+   *  верха вьюпорта до низа контента. В отличие от булева `stuckToBottom`, при решении
+   *  о прокрутке к новому сообщению это число комбинируется со СВЕЖИМ `clientHeight`
+   *  (мог смениться без единого scroll — вырос композер, приехал предпросмотр ссылки),
+   *  а не с тем, что было на момент последней прокрутки. */
+  const scrollOffset = useRef(0);
   const prevLastId = useRef<number | null>(null);
   const wasNewest = useRef(true);
   const settledFeedKey = useRef<string | null>(null);
@@ -308,7 +317,10 @@ export function MessageList({
   function scrollToBottom(smooth: boolean): void {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    scrollOffset.current = el.clientHeight;
   }
 
   /** Баннер закрепа — та же логика: не scrollIntoView (см. журнал ux-ui.md, этап 2), а свой
@@ -384,17 +396,28 @@ export function MessageList({
     };
   }, [focus]);
 
-  useEffect(() => {
-    const lastId = messages[messages.length - 1]?.id ?? null;
+  useLayoutEffect(() => {
+    const lastMessage = messages[messages.length - 1] ?? null;
+    const lastId = lastMessage?.id ?? null;
     if (settledFeedKey.current !== feedKey) {
       prevLastId.current = lastId;
       wasNewest.current = isViewportNewest;
       return;
     }
-    if (lastId !== prevLastId.current && wasNewest.current && stuckToBottom.current) scrollToBottom(true);
+    if (lastId !== prevLastId.current && wasNewest.current) {
+      const el = listRef.current;
+      const own = lastMessage !== null && lastMessage.sender?.id === myId;
+      const bottomOffset = el ? scrollOffset.current - el.clientHeight : 0;
+      const wasAtBottom = bottomOffset <= STICK_THRESHOLD;
+      if (own || wasAtBottom) {
+        stuckToBottom.current = true;
+        setShowJump(false);
+        scrollToBottom(true);
+      }
+    }
     prevLastId.current = lastId;
     wasNewest.current = isViewportNewest;
-  }, [feedKey, messages, isViewportNewest]);
+  }, [feedKey, messages, isViewportNewest, myId]);
 
   useEffect(() => {
     if (typing && stuckToBottom.current) scrollToBottom(true);
@@ -433,6 +456,7 @@ export function MessageList({
     if (!anchor) return;
     pendingAnchor.current = null;
     restoreAnchor(el, anchor);
+    scrollOffset.current = el.scrollHeight - el.scrollTop;
     stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
     if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
   }, [sliceSignature]);
@@ -576,6 +600,7 @@ export function MessageList({
     // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
     bumpScrollEpoch();
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    scrollOffset.current = el.scrollHeight - el.scrollTop;
     stuckToBottom.current = distance < STICK_THRESHOLD;
     if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
     else if (distance < STICK_THRESHOLD) setShowJump(false);
