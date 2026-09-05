@@ -214,6 +214,7 @@ export function MessageList({
   const loadMore = useChatStore((s) => s.loadMore);
   const prefetchFeed = useChatStore((s) => s.prefetchFeed);
   const trimFeed = useChatStore((s) => s.trimFeed);
+  const pruneHistoryCache = useChatStore((s) => s.pruneHistoryCache);
   const setViewportNewest = useChatStore((s) => s.setViewportNewest);
   const returnToTail = useChatStore((s) => s.returnToTail);
   const markRead = useChatStore((s) => s.markRead);
@@ -649,10 +650,10 @@ export function MessageList({
     if (distance < ahead) nearEdge('newer');
 
     window.clearTimeout(scrollIdle.current);
-    scrollIdle.current = window.setTimeout(
-      () => trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current)),
-      SCROLL_IDLE_MS,
-    );
+    scrollIdle.current = window.setTimeout(() => {
+      trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current));
+      pruneHistoryCache();
+    }, SCROLL_IDLE_MS);
   }
 
   function handleJump(): void {

@@ -57,6 +57,7 @@ import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment, type OutboxEntry } from '../cache/db';
 import { removeCachedMediaByFileIds } from '../cache/mediaCache';
 import {
+  pruneCachedHistory,
   readCachedChats,
   readCachedMessages,
   removeCachedChat,
@@ -196,6 +197,7 @@ interface ChatState {
   loadMoreAfter: (chatId: string) => Promise<void>;
   prefetchFeed: (chatId: string, side: FeedSide, budget: number) => void;
   trimFeed: (chatId: string, side: FeedSide, keep: FeedKeepRange | null) => void;
+  pruneHistoryCache: () => void;
   setViewportNewest: (chatId: string, value: boolean | null) => void;
   returnToTail: (chatId: string) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
@@ -597,6 +599,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus }) {
+    void writeCachedMessages(messages);
     set((state) => {
       const current = state.messagesByChat[chatId] ?? [];
       const settled = messages.filter((m) => !m.deletedAt) as LocalMessage[];
@@ -778,6 +781,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
       };
     });
+    void writeCachedMessages(page.messages);
   },
 
   async loadMoreAfter(chatId) {
@@ -803,7 +807,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },
       };
     });
-
+    void writeCachedMessages(page.messages);
   },
 
   setViewportNewest(chatId, value) {
@@ -850,6 +854,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  pruneHistoryCache() {
+    void pruneCachedHistory(get().activeChatId);
+  },
+
   prefetchFeed(chatId, side, budget) {
     if (budget <= 0) return;
 
@@ -894,7 +902,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     get().replaceFeed(chatId, page.messages, { hasMoreBefore: page.hasMore, hasMoreAfter: false });
 
-    void writeCachedMessages(page.messages);
     void get().restoreOutboxMessages();
   },
 

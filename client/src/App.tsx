@@ -5,6 +5,7 @@ import { AppRouter } from './app/AppRouter';
 import { DesktopTitleBar } from './app/DesktopTitleBar';
 import { registerServiceWorker } from './app/serviceWorker';
 import { startCacheMaintenance } from './cache/mediaCache';
+import { pruneCachedHistory } from './cache/messageCache';
 import { warmEmojiAssets } from './features/emoji/emojiIndex';
 import { isDesktopShell } from './native/desktop';
 import { useAuthStore } from './stores/authStore';
@@ -21,6 +22,7 @@ export function App() {
     void bootstrap();
     void registerServiceWorker();
     startCacheMaintenance();
+    void pruneCachedHistory(null);
     warmEmojiAssets();
   }, [bootstrap]);
 

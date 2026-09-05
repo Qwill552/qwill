@@ -1,8 +1,18 @@
-import type { ChatListItemDto, MessageDto } from '@messenger/shared';
+import { MESSAGES_PAGE_SIZE, type ChatListItemDto, type MessageDto } from '@messenger/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearAllCache, openCacheDb } from './db';
-import { readCachedChats, readCachedMessages, removeCachedChat, removeCachedMessages, writeCachedChats, writeCachedMessages } from './messageCache';
+import {
+  CACHED_HISTORY_LIMIT,
+  pruneCachedHistory,
+  readCachedChats,
+  readCachedMessages,
+  removeCachedChat,
+  removeCachedMessages,
+  selectHistoryPruneVictims,
+  writeCachedChats,
+  writeCachedMessages,
+} from './messageCache';
 
 function message(id: number, chatId = 'c1'): MessageDto {
   return {
@@ -104,5 +114,107 @@ describe('messageCache', () => {
     expect(await readCachedMessages('c1')).toEqual([]);
     expect(await readCachedMessages('c2')).toHaveLength(1);
     expect(await db?.get('syncCursors', 'c1')).toBeUndefined();
+  });
+
+  it('страница из догрузки истории пополняет уже закэшированные сообщения', async () => {
+    await writeCachedMessages([message(10), message(11)]);
+
+    await writeCachedMessages([message(8), message(9)]);
+
+    expect((await readCachedMessages('c1')).map((m) => m.id)).toEqual([8, 9, 10, 11]);
+  });
+
+  it('чтение хвоста не превышает потолок на чат', async () => {
+    const total = CACHED_HISTORY_LIMIT + 10;
+    await writeCachedMessages(Array.from({ length: total }, (_, i) => message(i + 1)));
+
+    const tail = await readCachedMessages('c1');
+
+    expect(tail).toHaveLength(CACHED_HISTORY_LIMIT);
+    expect(tail[0]!.id).toBe(total - CACHED_HISTORY_LIMIT + 1);
+    expect(tail.at(-1)!.id).toBe(total);
+  });
+
+  it('чтение с around отдаёт окно вокруг нужного id без дыр', async () => {
+    const total = CACHED_HISTORY_LIMIT + 500;
+    await writeCachedMessages(Array.from({ length: total }, (_, i) => message(i + 1)));
+
+    const targetId = Math.floor(total / 2);
+    const window = await readCachedMessages('c1', targetId);
+
+    expect(window).toHaveLength(CACHED_HISTORY_LIMIT);
+    expect(window.some((m) => m.id === targetId)).toBe(true);
+    for (let i = 1; i < window.length; i += 1) {
+      expect(window[i]!.id).toBe(window[i - 1]!.id + 1);
+    }
+  });
+
+  it('around на id вне кэша отдаёт хвост вместо ошибки', async () => {
+    await writeCachedMessages([message(1), message(2), message(3)]);
+
+    const window = await readCachedMessages('c1', 999);
+
+    expect(window.map((m) => m.id)).toEqual([1, 2, 3]);
+  });
+
+  it('уборка не трогает чаты, пока общий потолок не превышен', async () => {
+    await writeCachedChats([chat('c1')]);
+    await writeCachedMessages(Array.from({ length: MESSAGES_PAGE_SIZE * 2 }, (_, i) => message(i + 1, 'c1')));
+
+    await pruneCachedHistory(null);
+
+    expect(await readCachedMessages('c1')).toHaveLength(MESSAGES_PAGE_SIZE * 2);
+  });
+
+  it('уборка подрезает старый чат до последней страницы и не трогает открытый', async () => {
+    await writeCachedChats([
+      { ...chat('c1'), updatedAt: '2026-01-01T00:00:00.000Z' },
+      { ...chat('c2'), updatedAt: '2026-02-01T00:00:00.000Z' },
+    ]);
+    await writeCachedMessages(Array.from({ length: MESSAGES_PAGE_SIZE + 10 }, (_, i) => message(i + 1, 'c1')));
+    await writeCachedMessages([message(1, 'c2'), message(2, 'c2')]);
+
+    await pruneCachedHistory('c2', 10);
+
+    const c1After = await readCachedMessages('c1');
+    expect(c1After).toHaveLength(MESSAGES_PAGE_SIZE);
+    expect(c1After.at(-1)!.id).toBe(MESSAGES_PAGE_SIZE + 10);
+    expect(await readCachedMessages('c2')).toHaveLength(2);
+  });
+});
+
+describe('selectHistoryPruneVictims', () => {
+  it('не трогает ничего, пока общий потолок не превышен', () => {
+    const chats = [{ chatId: 'c1', updatedAt: '2026-01-01', count: 300 }];
+
+    expect(selectHistoryPruneVictims(chats, 300, null, 500, 50)).toEqual([]);
+  });
+
+  it('не трогает открытый чат, даже если он самый старый', () => {
+    const chats = [
+      { chatId: 'c1', updatedAt: '2026-01-01', count: 300 },
+      { chatId: 'c2', updatedAt: '2026-02-01', count: 300 },
+    ];
+
+    expect(selectHistoryPruneVictims(chats, 600, 'c1', 500, 50)).toEqual([{ chatId: 'c2', drop: 250 }]);
+  });
+
+  it('подрезает чаты по возрастанию updatedAt, пока не уложится в потолок', () => {
+    const chats = [
+      { chatId: 'old', updatedAt: '2026-01-01', count: 300 },
+      { chatId: 'mid', updatedAt: '2026-02-01', count: 300 },
+      { chatId: 'new', updatedAt: '2026-03-01', count: 300 },
+    ];
+
+    expect(selectHistoryPruneVictims(chats, 900, null, 700, 50)).toEqual([{ chatId: 'old', drop: 250 }]);
+  });
+
+  it('пропускает чаты, уже уложившиеся в страницу', () => {
+    const chats = [
+      { chatId: 'small', updatedAt: '2026-01-01', count: 50 },
+      { chatId: 'big', updatedAt: '2026-02-01', count: 300 },
+    ];
+
+    expect(selectHistoryPruneVictims(chats, 350, null, 100, 50)).toEqual([{ chatId: 'big', drop: 250 }]);
   });
 });

@@ -22,6 +22,7 @@ vi.mock('../cache/messageCache', () => ({
   writeCachedMessages: vi.fn(async () => undefined),
   removeCachedMessages: vi.fn(async () => undefined),
   removeCachedChat: vi.fn(async () => undefined),
+  pruneCachedHistory: vi.fn(async () => undefined),
 }));
 
 vi.mock('../api/chats', async (importOriginal) => {
