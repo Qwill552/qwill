@@ -14,6 +14,7 @@
   gap: var(--message-gap);
   overflow-x: clip;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
     calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 40px);
   overscroll-behavior: contain;

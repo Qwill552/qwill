@@ -189,9 +189,10 @@ interface ChatState {
   openChatAt: (chatId: string, messageId: number) => Promise<boolean>;
   primeChatFromCache: (chatId: string) => Promise<void>;
   closeChat: () => void;
-  loadMore: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
-  loadMoreAfter: (chatId: string, keep?: FeedKeepRange | null) => Promise<void>;
-  prefetchFeed: (chatId: string, side: FeedSide, budget: number, keep: FeedKeepRange | null) => void;
+  loadMore: (chatId: string) => Promise<void>;
+  loadMoreAfter: (chatId: string) => Promise<void>;
+  prefetchFeed: (chatId: string, side: FeedSide, budget: number) => void;
+  trimFeed: (chatId: string, side: FeedSide, keep: FeedKeepRange | null) => void;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
   focusMessage: (chatId: string, messageId: number) => void;
@@ -748,7 +749,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pendingEmptyChatDrop = { chatId, timer };
   },
 
-  async loadMore(chatId, keep) {
+  async loadMore(chatId) {
     const current = get().messagesByChat[chatId] ?? [];
     const oldest = current.find((m) => m.id > 0);
     if (!oldest) return;
@@ -765,19 +766,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
-      const merged = mergeFeedPage(list, fresh, 'older');
-      const cut = trimFeedWindow(merged, 'older', FEED_ACCUMULATOR_LIMIT, keep ?? null);
       return {
-        messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
+        messagesByChat: { ...state.messagesByChat, [chatId]: mergeFeedPage(list, fresh, 'older') },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
-        hasMoreAfterByChat: cut.trimmed
-          ? { ...state.hasMoreAfterByChat, [chatId]: true }
-          : state.hasMoreAfterByChat,
       };
     });
   },
 
-  async loadMoreAfter(chatId, keep) {
+  async loadMoreAfter(chatId) {
     if (!get().hasMoreAfterByChat[chatId]) return;
     const current = get().messagesByChat[chatId] ?? [];
     const newest = [...current].reverse().find((m) => m.id > 0);
@@ -795,12 +791,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
-      const merged = mergeFeedPage(list, fresh, 'newer');
-      const cut = trimFeedWindow(merged, 'newer', FEED_ACCUMULATOR_LIMIT, keep ?? null);
       return {
-        messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
+        messagesByChat: { ...state.messagesByChat, [chatId]: mergeFeedPage(list, fresh, 'newer') },
         hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },
-        hasMoreByChat: cut.trimmed ? { ...state.hasMoreByChat, [chatId]: true } : state.hasMoreByChat,
       };
     });
 
@@ -809,7 +802,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (last) get().markRead(chatId, last.id);
   },
 
-  prefetchFeed(chatId, side, budget, keep) {
+  trimFeed(chatId, side, keep) {
+    if (keep === null) return;
+    set((state) => {
+      const list = state.messagesByChat[chatId];
+      if (!list || list.length <= FEED_ACCUMULATOR_LIMIT) return {};
+
+      const cut = trimFeedWindow(list, side, FEED_ACCUMULATOR_LIMIT, keep);
+      if (!cut.trimmed) return {};
+
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: cut.list },
+        hasMoreByChat: side === 'newer' ? { ...state.hasMoreByChat, [chatId]: true } : state.hasMoreByChat,
+        hasMoreAfterByChat:
+          side === 'older' ? { ...state.hasMoreAfterByChat, [chatId]: true } : state.hasMoreAfterByChat,
+      };
+    });
+  },
+
+  prefetchFeed(chatId, side, budget) {
     if (budget <= 0) return;
 
     const key = `${chatId}:${side}`;
@@ -827,8 +838,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           const edge = feedEdgeId(state.messagesByChat[chatId], side);
           try {
-            if (side === 'older') await get().loadMore(chatId, keep);
-            else await get().loadMoreAfter(chatId, keep);
+            if (side === 'older') await get().loadMore(chatId);
+            else await get().loadMoreAfter(chatId);
           } catch {
             feedPrefetchRetryAt.set(key, performance.now() + FEED_RETRY_MS);
             return;

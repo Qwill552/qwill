@@ -47,6 +47,7 @@ const COLLAPSE_AT = 0.55;
 const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
 const FEED_LOAD_AHEAD_PX = 600;
+const SCROLL_IDLE_MS = 150;
 
 interface RowAnchor {
   id: string;
@@ -67,7 +68,9 @@ function rememberAnchor(el: HTMLElement): RowAnchor | null {
 function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
   const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`);
   if (!node) return;
-  el.scrollTop += node.getBoundingClientRect().top - anchor.top;
+  const drift = node.getBoundingClientRect().top - anchor.top;
+  if (Math.abs(drift) <= 1) return;
+  el.scrollTop += drift;
 }
 
 function keepRange(slice: LocalMessage[]): FeedKeepRange | null {
@@ -200,6 +203,7 @@ export function MessageList({
   const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
   const prefetchFeed = useChatStore((s) => s.prefetchFeed);
+  const trimFeed = useChatStore((s) => s.trimFeed);
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const pinMessage = useChatStore((s) => s.pinMessage);
@@ -217,15 +221,18 @@ export function MessageList({
     if (isGroup) void loadMembers(chatId);
   }, [chatId, isGroup, loadMembers]);
 
+
   const feedKey = `${chatId}#${feedEpoch}`;
 
   const listRef = useRef<HTMLDivElement>(null);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
+  const liveIds = useRef<Set<number>>(new Set());
+  const prevMessages = useRef<LocalMessage[]>(messages);
+  const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
   const prevLastId = useRef<number | null>(null);
   const wasNewest = useRef(true);
   const settledFeedKey = useRef<string | null>(null);
-  const suppressAppear = useRef(false);
   const pendingAnchor = useRef<RowAnchor | null>(null);
   const topTriggerRef = useRef<HTMLDivElement>(null);
   const bottomTriggerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +243,16 @@ export function MessageList({
   const pendingTail = useRef(false);
   const prefetchSide = useRef<FeedSide>('older');
   const [showJump, setShowJump] = useState(false);
+
+  if (prevMessages.current !== messages) {
+    const previous = prevMessages.current;
+    prevMessages.current = messages;
+    const previousLast = previous[previous.length - 1]?.id;
+    const appended = previousLast === undefined ? -1 : messages.findIndex((m) => m.id === previousLast);
+    if (appended !== -1 && messages.length > previous.length) {
+      for (let i = appended + 1; i < messages.length; i += 1) liveIds.current.add(messages[i]!.id);
+    }
+  }
 
   const [bounds, setBounds] = useState<FeedBounds>({ fromId: null, toId: null });
   const boundsFeedRef = useRef(feedKey);
@@ -311,12 +328,10 @@ export function MessageList({
 
   useLayoutEffect(() => {
     if (settledFeedKey.current === feedKey || messages.length === 0) return;
-    const replaced = settledFeedKey.current?.startsWith(`${chatId}#`) ?? false;
     settledFeedKey.current = feedKey;
     prevLastId.current = messages[messages.length - 1]?.id ?? null;
     retryUpAt.current = 0;
     retryDownAt.current = 0;
-    if (replaced) suppressAppear.current = true;
     if (focus) {
       stuckToBottom.current = false;
       return;
@@ -419,26 +434,13 @@ export function MessageList({
     const el = listRef.current;
     if (!el) return;
     const seen = appearSeen.current;
-    const suppressed = suppressAppear.current;
-    suppressAppear.current = false;
-    const appearing: HTMLElement[] = [];
-    let viewTop = 0;
-    let viewBottom = 0;
-    let measuredView = false;
+    const live = liveIds.current;
+    liveIds.current = new Set();
     for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
       if (seen.has(node)) continue;
       seen.add(node);
-      if (suppressed) continue;
-      if (!measuredView) {
-        const view = el.getBoundingClientRect();
-        viewTop = view.top;
-        viewBottom = view.bottom;
-        measuredView = true;
-      }
-      const rect = node.getBoundingClientRect();
-      if (rect.bottom > viewTop && rect.top < viewBottom) appearing.push(node);
+      if (live.has(Number(node.dataset.messageId))) node.dataset.appear = '1';
     }
-    for (const node of appearing) node.dataset.appear = '1';
   });
 
   useEffect(() => {
@@ -460,7 +462,7 @@ export function MessageList({
       const tail = lastSettledId(messages);
       if (tail !== null) setBounds({ fromId: null, toId: tail });
     }
-    loadMore(chatId, keepRange(slice))
+    loadMore(chatId)
       .catch(() => {
         pendingAnchor.current = null;
         retryUpAt.current = performance.now() + FEED_RETRY_MS;
@@ -477,7 +479,7 @@ export function MessageList({
     loadingDown.current = true;
     pendingAnchor.current = rememberAnchor(el);
     if (liveBounds.toId !== null) setBounds({ fromId: liveBounds.fromId, toId: null });
-    loadMoreAfter(chatId, keepRange(slice))
+    loadMoreAfter(chatId)
       .catch(() => {
         pendingAnchor.current = null;
         retryDownAt.current = performance.now() + FEED_RETRY_MS;
@@ -507,10 +509,12 @@ export function MessageList({
   const nearEdgeRef = useRef(nearEdge);
   nearEdgeRef.current = nearEdge;
 
+  useEffect(() => () => window.clearTimeout(scrollIdle.current), [chatId]);
+
   useEffect(() => {
     const side = prefetchSide.current;
     const unseen = side === 'older' ? view.from : messages.length - 1 - view.to;
-    prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen, keepRange(slice));
+    prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen);
   }, [chatId, messages, view, slice, prefetchFeed]);
 
   useEffect(() => {
@@ -553,6 +557,12 @@ export function MessageList({
     const ahead = Math.max(FEED_LOAD_AHEAD_PX, el.clientHeight);
     if (el.scrollTop < ahead) nearEdge('older');
     if (distance < ahead) nearEdge('newer');
+
+    window.clearTimeout(scrollIdle.current);
+    scrollIdle.current = window.setTimeout(
+      () => trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current)),
+      SCROLL_IDLE_MS,
+    );
   }
 
   function handleJump(): void {

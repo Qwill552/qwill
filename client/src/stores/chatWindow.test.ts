@@ -142,7 +142,7 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false);
   });
 
-  it('догрузка вверх подрезает дальний низ и снова размыкает окно', async () => {
+  it('обрезка накопителя срезает дальний низ и снова размыкает окно', async () => {
     const long = Array.from({ length: FEED_ACCUMULATOR_LIMIT }, (_, i) => message(100 + i, 'other'));
     useChatStore.setState({
       messagesByChat: { [CHAT_ID]: long as never },
@@ -150,13 +150,28 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     });
     vi.mocked(getMessagesRequest).mockResolvedValue({ messages: [message(99, 'other')], hasMore: true });
 
-    await useChatStore.getState().loadMore(CHAT_ID, { keepFromId: 100, keepToId: 120 });
+    await useChatStore.getState().loadMore(CHAT_ID);
+    expect(useChatStore.getState().messagesByChat[CHAT_ID]).toHaveLength(FEED_ACCUMULATOR_LIMIT + 1);
+
+    useChatStore.getState().trimFeed(CHAT_ID, 'older', { keepFromId: 100, keepToId: 120 });
 
     const list = useChatStore.getState().messagesByChat[CHAT_ID] ?? [];
     expect(list).toHaveLength(FEED_ACCUMULATOR_LIMIT);
     expect(list[0]!.id).toBe(99);
     expect(list.at(-1)!.id).toBe(100 + FEED_ACCUMULATOR_LIMIT - 2);
     expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(true);
+  });
+
+  it('обрезка останавливается на краю нарисованного', () => {
+    const long = Array.from({ length: FEED_ACCUMULATOR_LIMIT + 40 }, (_, i) => message(100 + i, 'other'));
+    useChatStore.setState({ messagesByChat: { [CHAT_ID]: long as never } });
+
+    useChatStore.getState().trimFeed(CHAT_ID, 'newer', { keepFromId: 110, keepToId: 1139 });
+
+    const list = useChatStore.getState().messagesByChat[CHAT_ID] ?? [];
+    expect(list).toHaveLength(FEED_ACCUMULATOR_LIMIT + 30);
+    expect(list[0]!.id).toBe(110);
+    expect(list.at(-1)!.id).toBe(100 + FEED_ACCUMULATOR_LIMIT + 39);
   });
 
   it('запас впрок растит накопитель и не двигает его дальний край', async () => {
@@ -174,7 +189,7 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
       return { messages: page, hasMore: true };
     });
 
-    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 100, { keepFromId: 1000, keepToId: 1049 });
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 100);
 
     await vi.waitFor(() => expect(ids()).toHaveLength(150));
     expect(ids()[0]).toBe(900);
@@ -184,7 +199,7 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
   it('при полном запасе фоновая догрузка в сеть не ходит', () => {
     vi.mocked(getMessagesRequest).mockClear();
 
-    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 0, null);
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'older', 0);
 
     expect(getMessagesRequest).not.toHaveBeenCalled();
   });
@@ -198,7 +213,7 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
       .mockResolvedValueOnce({ messages: [message(11, 'other')], hasMore: true })
       .mockResolvedValueOnce({ messages: [message(12, 'other')], hasMore: false });
 
-    useChatStore.getState().prefetchFeed(CHAT_ID, 'newer', 100, null);
+    useChatStore.getState().prefetchFeed(CHAT_ID, 'newer', 100);
 
     await vi.waitFor(() => expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false));
     expect(ids()).toEqual([10, 11, 12]);
@@ -224,10 +239,10 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
     vi.mocked(getMessagesRequest).mockClear();
     vi.mocked(getMessagesRequest).mockRejectedValue(new Error('нет сети'));
 
-    useChatStore.getState().prefetchFeed(failing, 'older', 100, null);
+    useChatStore.getState().prefetchFeed(failing, 'older', 100);
     await vi.waitFor(() => expect(getMessagesRequest).toHaveBeenCalledTimes(1));
 
-    useChatStore.getState().prefetchFeed(failing, 'older', 100, null);
+    useChatStore.getState().prefetchFeed(failing, 'older', 100);
     await Promise.resolve();
 
     expect(getMessagesRequest).toHaveBeenCalledTimes(1);
