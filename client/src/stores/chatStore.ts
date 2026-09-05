@@ -157,6 +157,9 @@ interface ChatState {
   hasMoreAfterByChat: Record<string, boolean>;
   feedEpochByChat: Record<string, number>;
   focusByChat: Record<string, FeedFocus>;
+  viewportNewestByChat: Record<string, boolean>;
+  tailRequestByChat: Record<string, number>;
+  liveMessageByChat: Record<string, number>;
   historyByChat: Record<string, ChatHistoryState>;
   /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
   readCursorsByChat: Record<string, Record<string, number | null>>;
@@ -193,6 +196,8 @@ interface ChatState {
   loadMoreAfter: (chatId: string) => Promise<void>;
   prefetchFeed: (chatId: string, side: FeedSide, budget: number) => void;
   trimFeed: (chatId: string, side: FeedSide, keep: FeedKeepRange | null) => void;
+  setViewportNewest: (chatId: string, value: boolean | null) => void;
+  returnToTail: (chatId: string) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
   focusMessage: (chatId: string, messageId: number) => void;
@@ -455,6 +460,10 @@ function scheduleOutboxRetry(drain: () => void): void {
   }, nextRetryDelayMs(outboxRetryAttempt));
 }
 
+function isFeedLive(state: Pick<ChatState, 'viewportNewestByChat' | 'hasMoreAfterByChat'>, chatId: string): boolean {
+  return state.viewportNewestByChat[chatId] ?? state.hasMoreAfterByChat[chatId] !== true;
+}
+
 const feedLoadsInFlight = new Set<string>();
 const feedPrefetchInFlight = new Set<string>();
 const feedPrefetchRetryAt = new Map<string, number>();
@@ -535,6 +544,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   hasMoreAfterByChat: {},
   feedEpochByChat: {},
   focusByChat: {},
+  viewportNewestByChat: {},
+  tailRequestByChat: {},
+  liveMessageByChat: {},
   historyByChat: {},
   readCursorsByChat: {},
   typingByChat: {},
@@ -666,11 +678,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       throw page.reason;
     }
 
-    if (get().hasMoreAfterByChat[chatId]) return;
-
-    const messages = get().messagesByChat[chatId] ?? [];
-    const lastReal = [...messages].reverse().find((m) => m.id > 0);
-    if (lastReal) get().markRead(chatId, lastReal.id);
   },
 
   async openChatAt(chatId, messageId) {
@@ -797,9 +804,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
     });
 
-    if (page.hasMore) return;
-    const last = [...(get().messagesByChat[chatId] ?? [])].reverse().find((m) => m.id > 0);
-    if (last) get().markRead(chatId, last.id);
+  },
+
+  setViewportNewest(chatId, value) {
+    set((state) => {
+      if (value === null) {
+        if (!(chatId in state.viewportNewestByChat)) return {};
+        const viewportNewestByChat = { ...state.viewportNewestByChat };
+        delete viewportNewestByChat[chatId];
+        return { viewportNewestByChat };
+      }
+      if (state.viewportNewestByChat[chatId] === value) return {};
+      return { viewportNewestByChat: { ...state.viewportNewestByChat, [chatId]: value } };
+    });
+  },
+
+  async returnToTail(chatId) {
+    if (get().hasMoreAfterByChat[chatId]) {
+      await get().jumpToLatest(chatId);
+      return;
+    }
+    set((state) => ({
+      tailRequestByChat: {
+        ...state.tailRequestByChat,
+        [chatId]: (state.tailRequestByChat[chatId] ?? 0) + 1,
+      },
+    }));
   },
 
   trimFeed(chatId, side, keep) {
@@ -866,9 +896,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     void writeCachedMessages(page.messages);
     void get().restoreOutboxMessages();
-
-    const last = page.messages.at(-1);
-    if (last) get().markRead(chatId, last.id);
   },
 
   async syncChatMessages(chatId) {
@@ -969,7 +996,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async sendMessage(chatId, content, sender, attachment, replyTo) {
-    if (get().hasMoreAfterByChat[chatId]) await get().jumpToLatest(chatId);
+    if (!isFeedLive(get(), chatId)) await get().returnToTail(chatId);
     const socket = getSocket();
     const clientId = crypto.randomUUID();
     const optimistic: LocalMessage = {
@@ -1004,6 +1031,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     set((state) => ({
+      liveMessageByChat: { ...state.liveMessageByChat, [chatId]: optimistic.id },
       messagesByChat: {
         ...state.messagesByChat,
         [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
@@ -1050,7 +1078,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async sendAttachmentMessage(chatId, sender, file, options = {}) {
-    if (get().hasMoreAfterByChat[chatId]) await get().jumpToLatest(chatId);
+    if (!isFeedLive(get(), chatId)) await get().returnToTail(chatId);
     const socket = getSocket();
     if (!socket) return;
 
@@ -1098,6 +1126,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     set((state) => ({
+      liveMessageByChat: { ...state.liveMessageByChat, [chatId]: optimistic.id },
       messagesByChat: {
         ...state.messagesByChat,
         [chatId]: [...(state.messagesByChat[chatId] ?? []), optimistic],
@@ -1716,6 +1745,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasMoreAfterByChat: {},
       feedEpochByChat: {},
       focusByChat: {},
+      viewportNewestByChat: {},
+      tailRequestByChat: {},
+      liveMessageByChat: {},
       historyByChat: {},
       readCursorsByChat: {},
       typingByChat: {},
@@ -1745,10 +1777,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (previewUrl) URL.revokeObjectURL(previewUrl);
           nextList = [...list];
           nextList[pendingIndex] = message;
-        } else if (list.some((m) => m.id === message.id) || state.hasMoreAfterByChat[message.chatId]) {
+        } else if (list.some((m) => m.id === message.id) || !isFeedLive(state, message.chatId)) {
           nextList = list;
         } else {
           nextList = [...list, message];
+          state = {
+            ...state,
+            liveMessageByChat: { ...state.liveMessageByChat, [message.chatId]: message.id },
+          };
         }
         state = { ...state, messagesByChat: { ...state.messagesByChat, [message.chatId]: nextList } };
       }
@@ -1757,7 +1793,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!chat) return state;
 
       const isMine = message.sender?.id === state.myUserId;
-      const isActive = state.activeChatId === message.chatId && !state.hasMoreAfterByChat[message.chatId];
+      const isActive = state.activeChatId === message.chatId && isFeedLive(state, message.chatId);
       const unreadCount = isMine ? chat.unreadCount : isActive ? 0 : chat.unreadCount + 1;
 
       const updatedChat: ChatListItemDto = {
@@ -1778,14 +1814,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .catch(() => undefined);
     }
 
-    if (
-      state.activeChatId === message.chatId &&
-      !state.hasMoreAfterByChat[message.chatId] &&
-      message.sender?.id !== state.myUserId &&
-      message.id > 0
-    ) {
-      get().markRead(message.chatId, message.id);
-    }
   },
 
   // Не часть публичного интерфейса стора — заменяет сообщение по id (правка) либо убирает
@@ -1890,6 +1918,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete feedEpochByChat[chatId];
       const focusByChat = { ...state.focusByChat };
       delete focusByChat[chatId];
+      const viewportNewestByChat = { ...state.viewportNewestByChat };
+      delete viewportNewestByChat[chatId];
+      const tailRequestByChat = { ...state.tailRequestByChat };
+      delete tailRequestByChat[chatId];
+      const liveMessageByChat = { ...state.liveMessageByChat };
+      delete liveMessageByChat[chatId];
       const historyByChat = { ...state.historyByChat };
       delete historyByChat[chatId];
       const pinnedByChat = { ...state.pinnedByChat };
@@ -1904,6 +1938,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreAfterByChat,
         feedEpochByChat,
         focusByChat,
+        viewportNewestByChat,
+        tailRequestByChat,
+        liveMessageByChat,
         historyByChat,
         pinnedByChat,
         membersByChat,

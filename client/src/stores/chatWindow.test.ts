@@ -62,6 +62,8 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
       hasMoreAfterByChat: { [CHAT_ID]: true },
       feedEpochByChat: { [CHAT_ID]: 1 },
       focusByChat: { [CHAT_ID]: { messageId: 10, seq: 1 } },
+      viewportNewestByChat: {},
+      tailRequestByChat: {},
       activeChatId: CHAT_ID,
       myUserId: 'me',
     });
@@ -217,6 +219,54 @@ describe('окно вокруг сообщения в chatStore (PM-10, PM-10a)'
 
     await vi.waitFor(() => expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false));
     expect(ids()).toEqual([10, 11, 12]);
+  });
+
+  it('отцепленный срез не пускает в ленту живое сообщение, даже когда накопитель целый', () => {
+    useChatStore.setState({
+      hasMoreAfterByChat: { [CHAT_ID]: false },
+      viewportNewestByChat: { [CHAT_ID]: false },
+    });
+
+    useChatStore.getState().applyIncomingMessage(message(99, 'other'));
+
+    expect(ids()).toEqual([10, 11]);
+    expect(useChatStore.getState().chats[0]!.unreadCount).toBe(1);
+  });
+
+  it('срез, дотянутый до конца, снова принимает живые сообщения', () => {
+    useChatStore.setState({
+      hasMoreAfterByChat: { [CHAT_ID]: false },
+      viewportNewestByChat: { [CHAT_ID]: true },
+    });
+
+    useChatStore.getState().applyIncomingMessage(message(99, 'other'));
+
+    expect(ids()).toEqual([10, 11, 99]);
+  });
+
+  it('возврат в конец при целом накопителе идёт без запроса', async () => {
+    useChatStore.setState({
+      hasMoreAfterByChat: { [CHAT_ID]: false },
+      viewportNewestByChat: { [CHAT_ID]: false },
+    });
+    vi.mocked(getMessagesRequest).mockClear();
+
+    await useChatStore.getState().returnToTail(CHAT_ID);
+
+    expect(getMessagesRequest).not.toHaveBeenCalled();
+    expect(useChatStore.getState().tailRequestByChat[CHAT_ID]).toBe(1);
+    expect(ids()).toEqual([10, 11]);
+  });
+
+  it('возврат в конец при обрезанном накопителе идёт запросом', async () => {
+    vi.mocked(getMessagesRequest).mockClear();
+    vi.mocked(getMessagesRequest).mockResolvedValue({ messages: [message(20, 'other')], hasMore: true });
+
+    await useChatStore.getState().returnToTail(CHAT_ID);
+
+    expect(getMessagesRequest).toHaveBeenCalledTimes(1);
+    expect(useChatStore.getState().hasMoreAfterByChat[CHAT_ID]).toBe(false);
+    expect(ids()).toEqual([20]);
   });
 
   it('фокус на уже загруженном сообщении не трогает ленту и растит счётчик', () => {

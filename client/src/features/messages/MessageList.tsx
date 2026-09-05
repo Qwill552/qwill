@@ -19,6 +19,7 @@ import { isDeletableMessage } from './messageDeleting';
 import {
   boundsAround,
   clampBounds,
+  FEED_PAGE_SIZE,
   FEED_PREFETCH_MARGIN,
   FEED_RETRY_MS,
   FEED_SLICE_LIMIT,
@@ -198,12 +199,16 @@ export function MessageList({
   const focus = useChatStore((s) => s.focusByChat[chatId]) ?? null;
   const feedEpoch = useChatStore((s) => s.feedEpochByChat[chatId]) ?? 0;
   const loadMoreAfter = useChatStore((s) => s.loadMoreAfter);
-  const jumpToLatest = useChatStore((s) => s.jumpToLatest);
   const reconciled = useChatStore((s) => s.hasMoreByChat[chatId] !== undefined);
   const historyState = useChatStore((s) => s.historyByChat[chatId]) ?? 'loading';
   const loadMore = useChatStore((s) => s.loadMore);
   const prefetchFeed = useChatStore((s) => s.prefetchFeed);
   const trimFeed = useChatStore((s) => s.trimFeed);
+  const setViewportNewest = useChatStore((s) => s.setViewportNewest);
+  const returnToTail = useChatStore((s) => s.returnToTail);
+  const markRead = useChatStore((s) => s.markRead);
+  const tailRequest = useChatStore((s) => s.tailRequestByChat[chatId]) ?? 0;
+  const liveMessage = useChatStore((s) => s.liveMessageByChat[chatId]) ?? 0;
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const pinMessage = useChatStore((s) => s.pinMessage);
@@ -227,7 +232,6 @@ export function MessageList({
   const listRef = useRef<HTMLDivElement>(null);
   const appearSeen = useRef<WeakSet<HTMLElement>>(new WeakSet());
   const liveIds = useRef<Set<number>>(new Set());
-  const prevMessages = useRef<LocalMessage[]>(messages);
   const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
   const prevLastId = useRef<number | null>(null);
@@ -240,23 +244,19 @@ export function MessageList({
   const loadingDown = useRef(false);
   const retryUpAt = useRef(0);
   const retryDownAt = useRef(0);
-  const pendingTail = useRef(false);
   const prefetchSide = useRef<FeedSide>('older');
+  const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
 
-  if (prevMessages.current !== messages) {
-    const previous = prevMessages.current;
-    prevMessages.current = messages;
-    const previousLast = previous[previous.length - 1]?.id;
-    const appended = previousLast === undefined ? -1 : messages.findIndex((m) => m.id === previousLast);
-    if (appended !== -1 && messages.length > previous.length) {
-      for (let i = appended + 1; i < messages.length; i += 1) liveIds.current.add(messages[i]!.id);
-    }
+  if (liveSeen.current !== liveMessage) {
+    liveSeen.current = liveMessage;
+    if (liveMessage !== 0) liveIds.current.add(liveMessage);
   }
 
   const [bounds, setBounds] = useState<FeedBounds>({ fromId: null, toId: null });
   const boundsFeedRef = useRef(feedKey);
   const boundsFocusRef = useRef(focus?.seq ?? 0);
+  const boundsTailRef = useRef(tailRequest);
 
   let liveBounds = bounds;
   if (boundsFeedRef.current !== feedKey) {
@@ -269,6 +269,12 @@ export function MessageList({
   } else if (focus && boundsFocusRef.current !== focus.seq) {
     boundsFocusRef.current = focus.seq;
     liveBounds = boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT);
+    setBounds(liveBounds);
+  }
+
+  if (boundsTailRef.current !== tailRequest) {
+    boundsTailRef.current = tailRequest;
+    liveBounds = tailBounds(messages, FEED_SLICE_LIMIT);
     setBounds(liveBounds);
   }
 
@@ -412,16 +418,16 @@ export function MessageList({
   }, [emojiPanelOpen]);
 
   useLayoutEffect(() => {
+    if (tailRequest === 0) return;
+    pendingAnchor.current = null;
+    stuckToBottom.current = true;
+    setShowJump(false);
+    scrollToBottom(false);
+  }, [tailRequest]);
+
+  useLayoutEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    if (pendingTail.current) {
-      pendingTail.current = false;
-      pendingAnchor.current = null;
-      stuckToBottom.current = true;
-      setShowJump(false);
-      scrollToBottom(false);
-      return;
-    }
     const anchor = pendingAnchor.current;
     if (!anchor) return;
     pendingAnchor.current = null;
@@ -458,7 +464,7 @@ export function MessageList({
     if (!el || !hasMore || view.from > 0 || loadingUp.current || performance.now() < retryUpAt.current) return;
     loadingUp.current = true;
     pendingAnchor.current = rememberAnchor(el);
-    if (liveBounds.toId === null) {
+    if (liveBounds.toId === null && messages.length + FEED_PAGE_SIZE > FEED_SLICE_LIMIT) {
       const tail = lastSettledId(messages);
       if (tail !== null) setBounds({ fromId: null, toId: tail });
     }
@@ -510,6 +516,25 @@ export function MessageList({
   nearEdgeRef.current = nearEdge;
 
   useEffect(() => () => window.clearTimeout(scrollIdle.current), [chatId]);
+
+  useEffect(() => {
+    setViewportNewest(chatId, isViewportNewest);
+  }, [chatId, isViewportNewest, setViewportNewest]);
+
+  useEffect(() => () => setViewportNewest(chatId, null), [chatId, setViewportNewest]);
+
+  const markedUpTo = useRef(0);
+  useEffect(() => {
+    markedUpTo.current = 0;
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!isViewportNewest) return;
+    const last = lastSettledId(messages);
+    if (last === null || last <= markedUpTo.current) return;
+    markedUpTo.current = last;
+    markRead(chatId, last);
+  }, [chatId, messages, isViewportNewest, markRead]);
 
   useEffect(() => {
     const side = prefetchSide.current;
@@ -566,16 +591,11 @@ export function MessageList({
   }
 
   function handleJump(): void {
-    if (!hasMoreAfter) {
-      if (view.to >= messages.length - 1) {
-        scrollToBottom(true);
-        return;
-      }
-      pendingTail.current = true;
-      setBounds(tailBounds(messages, FEED_SLICE_LIMIT));
+    if (!hasMoreAfter && view.to >= messages.length - 1) {
+      scrollToBottom(true);
       return;
     }
-    void jumpToLatest(chatId);
+    void returnToTail(chatId);
   }
 
   const rows = useMemo(() => {
