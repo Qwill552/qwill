@@ -22,6 +22,15 @@ export interface CachedMediaMeta {
   lastUsedAt: number;
 }
 
+export interface CachedChatPosition {
+  chatId: string;
+  fromId: number | null;
+  toId: number | null;
+  anchorId: number | null;
+  atTail: boolean;
+  savedAt: number;
+}
+
 export interface SyncCursor {
   chatId: string;
   maxId: number;
@@ -51,6 +60,7 @@ interface CacheSchema extends DBSchema {
   chats: { key: string; value: ChatListItemDto };
   messages: { key: [string, number]; value: MessageDto; indexes: { byChat: string } };
   syncCursors: { key: string; value: SyncCursor };
+  chatPositions: { key: string; value: CachedChatPosition; indexes: { bySavedAt: number } };
   media: { key: string; value: CachedMedia; indexes: { byLastUsed: number } };
   mediaMeta: {
     key: string;
@@ -65,12 +75,13 @@ export type CacheDb = IDBPDatabase<CacheSchema>;
 type UpgradeTransaction = IDBPTransaction<CacheSchema, StoreNames<CacheSchema>[], 'versionchange'>;
 
 const DB_NAME = 'qwill-cache';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORE_NAMES: StoreNames<CacheSchema>[] = [
   'chats',
   'messages',
   'syncCursors',
+  'chatPositions',
   'media',
   'mediaMeta',
   'outbox',
@@ -108,6 +119,10 @@ export function openCacheDb(): Promise<CacheDb | null> {
         meta.createIndex('byChat', 'chatId');
         meta.createIndex('byKind', 'kind');
         void backfillMediaMeta(tx).catch(() => undefined);
+      }
+
+      if (oldVersion < 3) {
+        db.createObjectStore('chatPositions', { keyPath: 'chatId' }).createIndex('bySavedAt', 'savedAt');
       }
     },
   }).catch(() => null);

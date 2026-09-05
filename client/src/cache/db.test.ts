@@ -22,6 +22,7 @@ describe('миграция со старой базы', () => {
 
     expect(await db!.count('media')).toBe(1);
     expect(meta).toEqual({ fileId: 'legacy', chatId: null, kind: 'other', tier: 'thumb', size: 11, lastUsedAt: 42 });
+    expect(db!.objectStoreNames.contains('chatPositions')).toBe(true);
   });
 });
 
@@ -35,6 +36,7 @@ describe('cache db', () => {
 
     expect(db).not.toBeNull();
     expect([...db!.objectStoreNames].sort()).toEqual([
+      'chatPositions',
       'chats',
       'media',
       'mediaMeta',

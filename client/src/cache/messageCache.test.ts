@@ -4,14 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAllCache, openCacheDb } from './db';
 import {
   CACHED_HISTORY_LIMIT,
+  CACHED_POSITION_TTL_MS,
   pruneCachedHistory,
+  pruneCachedPositions,
   readCachedChats,
   readCachedMessages,
+  readCachedPosition,
   removeCachedChat,
   removeCachedMessages,
   selectHistoryPruneVictims,
   writeCachedChats,
   writeCachedMessages,
+  writeCachedPosition,
 } from './messageCache';
 
 function message(id: number, chatId = 'c1'): MessageDto {
@@ -116,6 +120,14 @@ describe('messageCache', () => {
     expect(await db?.get('syncCursors', 'c1')).toBeUndefined();
   });
 
+  it('removeCachedChat убирает и позицию чата', async () => {
+    await writeCachedPosition('c1', { fromId: 10, toId: 90, anchorId: 40, atTail: false });
+
+    await removeCachedChat('c1');
+
+    expect(await readCachedPosition('c1')).toBeNull();
+  });
+
   it('страница из догрузки истории пополняет уже закэшированные сообщения', async () => {
     await writeCachedMessages([message(10), message(11)]);
 
@@ -216,5 +228,78 @@ describe('selectHistoryPruneVictims', () => {
     ];
 
     expect(selectHistoryPruneVictims(chats, 350, null, 100, 50)).toEqual([{ chatId: 'big', drop: 250 }]);
+  });
+});
+
+describe('позиция в чате', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+  });
+
+  it('записанная позиция читается обратно', async () => {
+    await writeCachedPosition('c1', { fromId: 10, toId: 90, anchorId: 42, atTail: false });
+
+    expect(await readCachedPosition('c1')).toEqual({ fromId: 10, toId: 90, anchorId: 42, atTail: false });
+  });
+
+  it('позиции нет — читается null, а не ошибка', async () => {
+    expect(await readCachedPosition('нет-такого-чата')).toBeNull();
+  });
+
+  it('запись старше месяца считается протухшей', async () => {
+    const db = await openCacheDb();
+    await db?.put('chatPositions', {
+      chatId: 'c1',
+      fromId: 1,
+      toId: 80,
+      anchorId: 20,
+      atTail: false,
+      savedAt: Date.now() - CACHED_POSITION_TTL_MS - 1000,
+    });
+
+    expect(await readCachedPosition('c1')).toBeNull();
+  });
+
+  it('уборка оставляет последние позиции и выбрасывает остальные', async () => {
+    const db = await openCacheDb();
+    for (let index = 0; index < 5; index += 1) {
+      await db?.put('chatPositions', {
+        chatId: `c${index}`,
+        fromId: 1,
+        toId: 80,
+        anchorId: 20,
+        atTail: false,
+        savedAt: Date.now() - (5 - index) * 1000,
+      });
+    }
+
+    await pruneCachedPositions(2);
+
+    expect((await db!.getAll('chatPositions')).map((position) => position.chatId).sort()).toEqual(['c3', 'c4']);
+  });
+
+  it('очистка кэша при смене аккаунта убирает позиции', async () => {
+    await writeCachedPosition('c1', { fromId: 10, toId: 90, anchorId: 42, atTail: false });
+
+    await clearAllCache();
+
+    expect(await readCachedPosition('c1')).toBeNull();
+  });
+
+  it('уборка выбрасывает протухшие записи, даже если потолок не превышен', async () => {
+    const db = await openCacheDb();
+    await db?.put('chatPositions', {
+      chatId: 'старый',
+      fromId: 1,
+      toId: 80,
+      anchorId: 20,
+      atTail: false,
+      savedAt: Date.now() - CACHED_POSITION_TTL_MS - 1000,
+    });
+    await writeCachedPosition('свежий', { fromId: 1, toId: 80, anchorId: 20, atTail: false });
+
+    await pruneCachedPositions();
+
+    expect((await db!.getAll('chatPositions')).map((position) => position.chatId)).toEqual(['свежий']);
   });
 });

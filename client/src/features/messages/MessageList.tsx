@@ -216,6 +216,8 @@ export function MessageList({
   const trimFeed = useChatStore((s) => s.trimFeed);
   const pruneHistoryCache = useChatStore((s) => s.pruneHistoryCache);
   const setViewportNewest = useChatStore((s) => s.setViewportNewest);
+  const rememberPosition = useChatStore((s) => s.rememberPosition);
+  const savePosition = useChatStore((s) => s.savePosition);
   const returnToTail = useChatStore((s) => s.returnToTail);
   const markRead = useChatStore((s) => s.markRead);
   const tailRequest = useChatStore((s) => s.tailRequestByChat[chatId]) ?? 0;
@@ -267,7 +269,9 @@ export function MessageList({
     if (liveMessage !== 0) liveIds.current.add(liveMessage);
   }
 
-  const [bounds, setBounds] = useState<FeedBounds>({ fromId: null, toId: null });
+  const [bounds, setBounds] = useState<FeedBounds>(() =>
+    focus ? boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT) : { fromId: null, toId: null },
+  );
   const boundsFeedRef = useRef(feedKey);
   const boundsFocusRef = useRef(focus?.seq ?? 0);
   const boundsTailRef = useRef(tailRequest);
@@ -386,12 +390,15 @@ export function MessageList({
 
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
+    const quiet = focus.quiet === true;
     function place(): void {
-      el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
+      el!.scrollTop = Math.max(0, target!.offsetTop - (quiet ? 0 : el!.clientHeight / 3));
     }
     place();
-    target.dataset.flash = '1';
-    const flashTimer = window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
+    if (!quiet) target.dataset.flash = '1';
+    const flashTimer = quiet
+      ? 0
+      : window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
 
     const observer = new ResizeObserver(place);
     for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) observer.observe(node);
@@ -576,6 +583,37 @@ export function MessageList({
 
   useEffect(() => () => window.clearTimeout(scrollIdle.current), [chatId]);
 
+  const capturePosition = useRef<() => void>(() => undefined);
+  capturePosition.current = () => {
+    if (messages.length === 0) return;
+    const el = listRef.current;
+    const anchor = el ? rememberAnchor(el) : null;
+    const anchorId = anchor && Number(anchor.id) > 0 ? Number(anchor.id) : null;
+    rememberPosition(chatId, {
+      fromId: liveBounds.fromId,
+      toId: liveBounds.toId,
+      anchorId,
+      atTail: isViewportNewest && stuckToBottom.current,
+    });
+  };
+
+  useEffect(() => {
+    capturePosition.current();
+  }, [sliceSignature]);
+
+  useEffect(() => {
+    function onVisibilityChange(): void {
+      if (document.visibilityState !== 'hidden') return;
+      capturePosition.current();
+      savePosition(chatId);
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      savePosition(chatId);
+    };
+  }, [chatId, savePosition]);
+
   useEffect(() => {
     setViewportNewest(chatId, isViewportNewest);
   }, [chatId, isViewportNewest, setViewportNewest]);
@@ -651,6 +689,7 @@ export function MessageList({
 
     window.clearTimeout(scrollIdle.current);
     scrollIdle.current = window.setTimeout(() => {
+      capturePosition.current();
       trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current));
       pruneHistoryCache();
     }, SCROLL_IDLE_MS);

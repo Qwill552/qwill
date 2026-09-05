@@ -7,6 +7,17 @@ export const CACHED_HISTORY_LIMIT = Math.max(FEED_ACCUMULATOR_LIMIT, MESSAGES_PA
 
 export const CACHED_TOTAL_LIMIT = 20000;
 
+export const CACHED_POSITIONS_LIMIT = 20;
+
+export const CACHED_POSITION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface ChatFeedPosition {
+  fromId: number | null;
+  toId: number | null;
+  anchorId: number | null;
+  atTail: boolean;
+}
+
 export async function readCachedChats(): Promise<ChatListItemDto[]> {
   const db = await openCacheDb();
   if (!db) return [];
@@ -67,12 +78,65 @@ export async function removeCachedMessages(chatId: string, ids: number[]): Promi
   await tx.done;
 }
 
+export async function readCachedPosition(chatId: string): Promise<ChatFeedPosition | null> {
+  const db = await openCacheDb();
+  if (!db) return null;
+
+  try {
+    const stored = await db.get('chatPositions', chatId);
+    if (!stored) return null;
+    if (Date.now() - stored.savedAt > CACHED_POSITION_TTL_MS) return null;
+
+    const { fromId, toId, anchorId, atTail } = stored;
+    return { fromId, toId, anchorId, atTail };
+  } catch {
+    return null;
+  }
+}
+
+export async function writeCachedPosition(chatId: string, position: ChatFeedPosition): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  try {
+    await db.put('chatPositions', { chatId, ...position, savedAt: Date.now() });
+  } catch {
+    return;
+  }
+}
+
+export async function pruneCachedPositions(limit: number = CACHED_POSITIONS_LIMIT): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  try {
+    const stored = await db.getAllFromIndex('chatPositions', 'bySavedAt');
+    const oldest = Date.now() - CACHED_POSITION_TTL_MS;
+    const kept = new Set(
+      stored
+        .filter((position) => position.savedAt >= oldest)
+        .slice(-limit)
+        .map((position) => position.chatId),
+    );
+
+    const victims = stored.filter((position) => !kept.has(position.chatId));
+    if (victims.length === 0) return;
+
+    const tx = db.transaction('chatPositions', 'readwrite');
+    await Promise.all(victims.map((position) => tx.store.delete(position.chatId)));
+    await tx.done;
+  } catch {
+    return;
+  }
+}
+
 export async function removeCachedChat(chatId: string): Promise<void> {
   const db = await openCacheDb();
   if (!db) return;
 
   await db.delete('chats', chatId);
   await db.delete('syncCursors', chatId);
+  await db.delete('chatPositions', chatId);
 
   const keys = await db.getAllKeysFromIndex('messages', 'byChat', chatId);
   const tx = db.transaction('messages', 'readwrite');
@@ -122,6 +186,8 @@ export async function pruneCachedHistory(
 ): Promise<void> {
   const db = await openCacheDb();
   if (!db) return;
+
+  await pruneCachedPositions();
 
   try {
     const total = await db.count('messages');

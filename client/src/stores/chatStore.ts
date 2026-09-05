@@ -60,10 +60,13 @@ import {
   pruneCachedHistory,
   readCachedChats,
   readCachedMessages,
+  readCachedPosition,
   removeCachedChat,
   removeCachedMessages,
   writeCachedChats,
   writeCachedMessages,
+  writeCachedPosition,
+  type ChatFeedPosition,
 } from '../cache/messageCache';
 import {
   bumpAttempts,
@@ -133,12 +136,14 @@ export type ChatHistoryState = 'loading' | 'ready' | 'offline';
 export interface FeedFocus {
   messageId: number;
   seq: number;
+  quiet?: boolean;
 }
 
 interface ReplaceFeedOptions {
   hasMoreBefore: boolean;
   hasMoreAfter: boolean;
   focus?: number;
+  quietFocus?: boolean;
 }
 
 interface PresenceInfo {
@@ -158,6 +163,7 @@ interface ChatState {
   hasMoreAfterByChat: Record<string, boolean>;
   feedEpochByChat: Record<string, number>;
   focusByChat: Record<string, FeedFocus>;
+  positionByChat: Record<string, ChatFeedPosition>;
   viewportNewestByChat: Record<string, boolean>;
   tailRequestByChat: Record<string, number>;
   liveMessageByChat: Record<string, number>;
@@ -198,11 +204,14 @@ interface ChatState {
   prefetchFeed: (chatId: string, side: FeedSide, budget: number) => void;
   trimFeed: (chatId: string, side: FeedSide, keep: FeedKeepRange | null) => void;
   pruneHistoryCache: () => void;
+  rememberPosition: (chatId: string, position: ChatFeedPosition) => void;
+  savePosition: (chatId: string) => void;
+  restorePosition: (chatId: string) => Promise<void>;
   setViewportNewest: (chatId: string, value: boolean | null) => void;
   returnToTail: (chatId: string) => Promise<void>;
   jumpToLatest: (chatId: string) => Promise<void>;
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
-  focusMessage: (chatId: string, messageId: number) => void;
+  focusMessage: (chatId: string, messageId: number, quiet?: boolean) => void;
   syncChatMessages: (chatId: string) => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
@@ -546,6 +555,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   hasMoreAfterByChat: {},
   feedEpochByChat: {},
   focusByChat: {},
+  positionByChat: {},
   viewportNewestByChat: {},
   tailRequestByChat: {},
   liveMessageByChat: {},
@@ -598,7 +608,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     void get().restoreOutboxMessages();
   },
 
-  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus }) {
+  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, quietFocus }) {
     void writeCachedMessages(messages);
     set((state) => {
       const current = state.messagesByChat[chatId] ?? [];
@@ -607,7 +617,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const focusByChat = { ...state.focusByChat };
       if (focus === undefined) delete focusByChat[chatId];
-      else focusByChat[chatId] = { messageId: focus, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1 };
+      else focusByChat[chatId] = { messageId: focus, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet: quietFocus };
 
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: [...settled, ...pending] },
@@ -620,18 +630,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  focusMessage(chatId, messageId) {
+  focusMessage(chatId, messageId, quiet) {
     set((state) => ({
       focusByChat: {
         ...state.focusByChat,
-        [chatId]: { messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1 },
+        [chatId]: { messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet },
       },
     }));
   },
 
+  rememberPosition(chatId, position) {
+    set((state) => ({ positionByChat: { ...state.positionByChat, [chatId]: position } }));
+  },
+
+  savePosition(chatId) {
+    const position = get().positionByChat[chatId];
+    if (!position) return;
+    void writeCachedPosition(chatId, position);
+  },
+
+  async restorePosition(chatId) {
+    const position = await readCachedPosition(chatId);
+    if (!position || position.atTail) return;
+
+    const anchorId = position.anchorId ?? position.fromId ?? position.toId;
+    if (anchorId === null) return;
+
+    const list = get().messagesByChat[chatId];
+    if (list) {
+      if (list.some((message) => message.id === anchorId)) get().focusMessage(chatId, anchorId, true);
+      return;
+    }
+
+    const around = await readCachedMessages(chatId, anchorId).catch(() => [] as MessageDto[]);
+    if (!around.some((message) => message.id === anchorId)) return;
+
+    get().replaceFeed(chatId, around, {
+      hasMoreBefore: true,
+      hasMoreAfter: true,
+      focus: anchorId,
+      quietFocus: true,
+    });
+  },
+
   async openChat(chatId) {
     cancelPendingEmptyChatDrop(chatId);
-    const windowed = get().hasMoreAfterByChat[chatId] === true;
+    let windowed = get().hasMoreAfterByChat[chatId] === true;
     set((state) => ({
       chatError: null,
       activeChatId: chatId,
@@ -641,7 +685,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    if (!windowed && !get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
+    if (!windowed) {
+      await get().restorePosition(chatId);
+      if (!get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
+      windowed = get().hasMoreAfterByChat[chatId] === true;
+    }
 
     const [detail, page] = await Promise.allSettled([
       getChatRequest(chatId),
@@ -714,6 +762,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   closeChat() {
     const chatId = get().activeChatId;
+    if (chatId) get().savePosition(chatId);
     set((state) => {
       const base = { activeChatId: null, selectionMode: false, selectedIds: new Set<number>() };
       if (!chatId) return base;
@@ -1767,6 +1816,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasMoreAfterByChat: {},
       feedEpochByChat: {},
       focusByChat: {},
+      positionByChat: {},
       viewportNewestByChat: {},
       tailRequestByChat: {},
       liveMessageByChat: {},
@@ -1940,6 +1990,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       delete feedEpochByChat[chatId];
       const focusByChat = { ...state.focusByChat };
       delete focusByChat[chatId];
+      const positionByChat = { ...state.positionByChat };
+      delete positionByChat[chatId];
       const viewportNewestByChat = { ...state.viewportNewestByChat };
       delete viewportNewestByChat[chatId];
       const tailRequestByChat = { ...state.tailRequestByChat };
@@ -1960,6 +2012,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreAfterByChat,
         feedEpochByChat,
         focusByChat,
+        positionByChat,
         viewportNewestByChat,
         tailRequestByChat,
         liveMessageByChat,
