@@ -53,7 +53,7 @@ const WATCHDOG_BUFFER_MS = 400;
 const FOCUS_HOLD_MS = 500;
 /** Восстановленное место держим дольше: строки выше якоря дорастают до своей высоты по мере
  *  загрузки картинок, а `overflow-anchor` у ленты выключен — без этого лента уползает вверх. */
-const RESTORE_HOLD_MS = 2500;
+const RESTORE_HOLD_MS = 1200;
 const FEED_LOAD_AHEAD_PX = 600;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
@@ -395,13 +395,15 @@ export function MessageList({
     stuckToBottom.current = false;
     const quiet = focus.quiet === true;
     const offset = focus.offset ?? 0;
+    if (quiet) pendingAnchor.current = null;
     function place(): void {
-      if (quiet) {
-        const top = target!.getBoundingClientRect().top - el!.getBoundingClientRect().top;
-        el!.scrollTop = Math.max(0, el!.scrollTop + top - offset);
+      if (!quiet) {
+        el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
         return;
       }
-      el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
+      const node = el!.querySelector<HTMLElement>(`[data-message-id="${focus!.messageId}"]`);
+      if (!node || el!.clientHeight === 0) return;
+      el!.scrollTop = Math.max(0, node.offsetTop - offset);
     }
     place();
     if (!quiet) target.dataset.flash = '1';
