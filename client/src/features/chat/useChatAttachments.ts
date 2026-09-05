@@ -2,6 +2,7 @@ import type { ChatAttachmentCategory, ChatAttachmentDto } from '@messenger/share
 import { useCallback, useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 
 import { getChatAttachmentsRequest } from '../../api/chats';
+import { scrollParentOf } from '../../ui/scrollParent';
 
 const LOAD_AHEAD_PX = 600;
 
@@ -62,7 +63,7 @@ export function usePagedByMessage<T extends { messageId: number }>(
         const last = itemsRef.current.at(-1);
         if (last) void load(last.messageId);
       },
-      { rootMargin: `0px 0px ${LOAD_AHEAD_PX}px 0px` },
+      { root: scrollParentOf(sentinel), rootMargin: `0px 0px ${LOAD_AHEAD_PX}px 0px` },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();

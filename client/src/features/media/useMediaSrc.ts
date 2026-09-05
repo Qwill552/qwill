@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import type { MediaKind } from '../../cache/db';
+import { scrollParentOf } from '../../ui/scrollParent';
 import { MEDIA_LOAD_MARGIN_PX, useMediaFeed } from './mediaFeedScope';
 
 export function needsOriginalInList(attachment: AttachmentDto): boolean {
@@ -27,7 +28,7 @@ export function useReachedViewport(ref: RefObject<Element | null>): boolean {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) setReached(true);
       },
-      { rootMargin: `${MEDIA_LOAD_MARGIN_PX}px` },
+      { root: scrollParentOf(node), rootMargin: `${MEDIA_LOAD_MARGIN_PX}px` },
     );
     observer.observe(node);
     return () => observer.disconnect();
