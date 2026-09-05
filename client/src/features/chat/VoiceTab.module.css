@@ -33,6 +33,39 @@
   outline-offset: 2px;
 }
 
+.checkboxButton {
+  display: grid;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.checkboxButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.checkbox {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-on-primary);
+  transition: background var(--dur-check) var(--ease-screen), border-color var(--dur-check) var(--ease-screen);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
 .info {
   display: flex;
   min-width: 0;

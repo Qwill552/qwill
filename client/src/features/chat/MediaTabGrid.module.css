@@ -18,6 +18,33 @@
   background: var(--surface-3);
 }
 
+.tileSelected {
+  border-radius: var(--radius-tile);
+  transform: scale(0.92);
+  transition: transform var(--dur-check) var(--ease-screen), border-radius var(--dur-check) var(--ease-screen);
+}
+
+.checkbox {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-on-primary);
+  transition: background var(--dur-check) var(--ease-screen), border-color var(--dur-check) var(--ease-screen);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
 .skeletonCell {
   position: relative;
   display: block;

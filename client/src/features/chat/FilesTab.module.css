@@ -33,6 +33,25 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
+  width: var(--icon-tile);
+  height: var(--icon-tile);
+}
+
+.checkbox {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-on-primary);
+  transition: background var(--dur-check) var(--ease-screen), border-color var(--dur-check) var(--ease-screen);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 .progress {

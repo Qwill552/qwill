@@ -1,17 +1,41 @@
 import type { ChatAttachmentCategory, ChatAttachmentCounts } from '@messenger/shared';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 
 import { getChatAttachmentCountsRequest } from '../../api/chats';
+import { useBackHandler } from '../../app/useBackHandler';
+import { useChatStore } from '../../stores/chatStore';
 import { haptic } from '../../ui/haptic';
+import { DeleteMessageModal } from '../messages/DeleteMessageModal';
+import { ForwardSheet } from '../messages/ForwardSheet';
+import { isDeletableSelection } from '../messages/messageDeleting';
 import { FastScroller, type FastScrollBinding, type FastScrollItem } from './FastScroller';
 import { FilesTab } from './FilesTab';
 import { LinksTab } from './LinksTab';
+import { MediaSelectionBar } from './MediaSelectionBar';
 import { MediaTabGrid } from './MediaTabGrid';
+import type { AttachmentSelectionBinding, AttachmentSelectionItem } from './mediaSelection';
 import { plural } from './plural';
+import { useShowInChat } from './showInChat';
 import { VoiceTab } from './VoiceTab';
 import styles from './ChatMediaTabs.module.css';
 
 type TabId = ChatAttachmentCategory | 'link';
+type SelectableTabId = Exclude<TabId, 'link'>;
+
+function isSelectableTab(id: TabId): id is SelectableTabId {
+  return id !== 'link';
+}
+
+const EMPTY_SELECTED_IDS: ReadonlySet<number> = new Set();
 
 const TAB_ORDER: { id: TabId; label: string }[] = [
   { id: 'media', label: 'Медиа' },
@@ -116,6 +140,18 @@ export function ChatMediaTabs({
   const [peek, setPeek] = useState<Record<number, number>>({});
   const [stuck, setStuck] = useState(false);
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
+  const [selection, setSelection] = useState<{ tab: SelectableTabId; entries: Map<number, string | null> } | null>(
+    null,
+  );
+  const [pendingRemoval, setPendingRemoval] = useState<{ tab: SelectableTabId; ids: ReadonlySet<number> } | null>(
+    null,
+  );
+  const [forwarding, setForwarding] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const myUserId = useChatStore((s) => s.myUserId);
+  const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
+  const showInChat = useShowInChat();
 
   const sectionRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -139,9 +175,72 @@ export function ChatMediaTabs({
 
   const initialCategoryRef = useRef(initialCategory);
 
+  const refreshCounts = useCallback(() => getChatAttachmentCountsRequest(chatId), [chatId]);
+
+  const exitSelection = useCallback(() => setSelection(null), []);
+
+  const enterSelection = useCallback((tab: SelectableTabId, item: AttachmentSelectionItem) => {
+    setSelection({ tab, entries: new Map([[item.messageId, item.senderId]]) });
+  }, []);
+
+  const toggleSelected = useCallback((tab: SelectableTabId, item: AttachmentSelectionItem) => {
+    setSelection((prev) => {
+      if (!prev || prev.tab !== tab) return prev;
+      const entries = new Map(prev.entries);
+      if (entries.has(item.messageId)) entries.delete(item.messageId);
+      else entries.set(item.messageId, item.senderId);
+      return entries.size === 0 ? null : { tab, entries };
+    });
+  }, []);
+
+  useBackHandler(selection !== null, exitSelection);
+
+  function selectionBindingFor(tab: SelectableTabId): AttachmentSelectionBinding {
+    const active = selection?.tab === tab;
+    return {
+      active,
+      selectedIds: active ? new Set(selection!.entries.keys()) : EMPTY_SELECTED_IDS,
+      pendingRemoval: pendingRemoval?.tab === tab ? pendingRemoval.ids : null,
+      onLongPress: (item) => enterSelection(tab, item),
+      onTap: (item) => toggleSelected(tab, item),
+    };
+  }
+
+  const selectionIds = selection ? [...selection.entries.keys()] : [];
+  const canShowSelectionInChat = selectionIds.length === 1;
+  const canDeleteSelection = isDeletableSelection(
+    selectionIds.map((id) => {
+      const senderId = selection!.entries.get(id) ?? null;
+      return { id, deletedAt: null, sender: senderId ? { id: senderId } : null };
+    }),
+    myUserId,
+    false,
+  );
+
+  function handleShowSelectionInChat(): void {
+    const messageId = selectionIds[0];
+    if (messageId === undefined) return;
+    exitSelection();
+    void showInChat(chatId, messageId);
+  }
+
+  function handleDeleteSelection(): void {
+    const tab = selection?.tab;
+    const ids = selectionIds;
+    setConfirmingDelete(false);
+    if (!tab || ids.length === 0) return;
+    deleteMessagesBatch(chatId, ids)
+      .then(() => {
+        setPendingRemoval({ tab, ids: new Set(ids) });
+        exitSelection();
+        refreshCounts().then(setCounts).catch(() => undefined);
+      })
+      .catch(() => undefined);
+  }
+
   useEffect(() => {
     let cancelled = false;
-    getChatAttachmentCountsRequest(chatId)
+    refreshCounts()
       .then((result) => {
         if (cancelled) return;
         setCounts(result);
@@ -157,7 +256,7 @@ export function ChatMediaTabs({
     return () => {
       cancelled = true;
     };
-  }, [chatId]);
+  }, [refreshCounts]);
 
   useEffect(() => {
     let node = sectionRef.current?.parentElement ?? null;
@@ -309,7 +408,7 @@ export function ChatMediaTabs({
   }
 
   function selectTab(target: number): void {
-    if (target === index || target < 0 || target >= tabs.length || animatingRef.current) return;
+    if (selection || target === index || target < 0 || target >= tabs.length || animatingRef.current) return;
     const direction = target > index ? 1 : -1;
     const pager = pagerRef.current;
     const token = pager ? parseFloat(getComputedStyle(pager).getPropertyValue('--dur-tab')) || 0 : 0;
@@ -334,7 +433,7 @@ export function ChatMediaTabs({
   }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>): void {
-    if (!swipeable || tabs.length < 2 || !event.isPrimary || event.pointerType === 'mouse') return;
+    if (selection || !swipeable || tabs.length < 2 || !event.isPrimary || event.pointerType === 'mouse') return;
     if (animatingRef.current) return;
     dragRef.current = {
       pointerId: event.pointerId,
@@ -467,33 +566,45 @@ export function ChatMediaTabs({
         />
       )}
 
-      <div
-        ref={rowRef}
-        className={`${styles.row} hide-native-scrollbar`}
-        role="tablist"
-        aria-label="Вложения чата"
-        data-no-back-swipe="true"
-        onKeyDown={handleTabKeyDown}
-      >
-        {tabs.map((tab, i) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            id={`chat-media-tab-${tab.id}`}
-            aria-selected={i === index}
-            aria-controls={`chat-media-panel-${tab.id}`}
-            tabIndex={i === index ? 0 : -1}
-            className={`${styles.tab} ${i === index ? styles.tabActive : ''}`}
-            onClick={() => {
-              selectTab(i);
-              focusTab(i);
-            }}
-          >
-            <span className={styles.tabPill}>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      {selection ? (
+        <MediaSelectionBar
+          count={selectionIds.length}
+          canShowInChat={canShowSelectionInChat}
+          canDelete={canDeleteSelection}
+          onClose={exitSelection}
+          onShowInChat={handleShowSelectionInChat}
+          onForward={() => setForwarding(true)}
+          onDelete={() => setConfirmingDelete(true)}
+        />
+      ) : (
+        <div
+          ref={rowRef}
+          className={`${styles.row} hide-native-scrollbar`}
+          role="tablist"
+          aria-label="Вложения чата"
+          data-no-back-swipe="true"
+          onKeyDown={handleTabKeyDown}
+        >
+          {tabs.map((tab, i) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`chat-media-tab-${tab.id}`}
+              aria-selected={i === index}
+              aria-controls={`chat-media-panel-${tab.id}`}
+              tabIndex={i === index ? 0 : -1}
+              className={`${styles.tab} ${i === index ? styles.tabActive : ''}`}
+              onClick={() => {
+                selectTab(i);
+                focusTab(i);
+              }}
+            >
+              <span className={styles.tabPill}>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div
         ref={pagerRef}
@@ -505,6 +616,7 @@ export function ChatMediaTabs({
           if (i !== index && !mounted.includes(i)) return null;
           const slot = slide?.target === i ? slide.direction : i - index;
           const offset = peek[i] ?? 0;
+          const tabSelection = isSelectableTab(tab.id) ? selectionBindingFor(tab.id) : undefined;
           return (
             <div
               key={tab.id}
@@ -519,17 +631,60 @@ export function ChatMediaTabs({
                   : { transform: `translate3d(calc(${slot * 100}% + var(--dx)), ${offset}px, 0)` }
               }
             >
-              {tab.id === 'media' && <MediaTabGrid chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
-              {tab.id === 'file' && <FilesTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'media' && (
+                <MediaTabGrid
+                  chatId={chatId}
+                  fastScroll={slot === 0 ? fastScroll : undefined}
+                  selection={slot === 0 ? tabSelection : undefined}
+                />
+              )}
+              {tab.id === 'file' && (
+                <FilesTab
+                  chatId={chatId}
+                  fastScroll={slot === 0 ? fastScroll : undefined}
+                  selection={slot === 0 ? tabSelection : undefined}
+                />
+              )}
               {tab.id === 'link' && <LinksTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
-              {tab.id === 'voice' && <VoiceTab chatId={chatId} fastScroll={slot === 0 ? fastScroll : undefined} />}
+              {tab.id === 'voice' && (
+                <VoiceTab
+                  chatId={chatId}
+                  fastScroll={slot === 0 ? fastScroll : undefined}
+                  selection={slot === 0 ? tabSelection : undefined}
+                />
+              )}
               {tab.id === 'gif' && (
-                <MediaTabGrid chatId={chatId} category="gif" fastScroll={slot === 0 ? fastScroll : undefined} />
+                <MediaTabGrid
+                  chatId={chatId}
+                  category="gif"
+                  fastScroll={slot === 0 ? fastScroll : undefined}
+                  selection={slot === 0 ? tabSelection : undefined}
+                />
               )}
             </div>
           );
         })}
       </div>
+
+      {forwarding && selection && (
+        <ForwardSheet
+          fromChatId={chatId}
+          messageIds={selectionIds}
+          onClose={() => setForwarding(false)}
+          onForwarded={() => {
+            setForwarding(false);
+            exitSelection();
+          }}
+        />
+      )}
+
+      {confirmingDelete && (
+        <DeleteMessageModal
+          count={selectionIds.length}
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={handleDeleteSelection}
+        />
+      )}
     </div>
   );
 }

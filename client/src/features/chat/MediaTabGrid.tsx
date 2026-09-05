@@ -3,10 +3,12 @@ import { useEffect, useRef } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
+import { Icon } from '../../ui/Icon';
 import { Skeleton } from '../../ui/Skeleton';
 import { MediaTile } from '../media/MediaTile';
 import { openMediaViewerList, useMediaViewerStore, type MediaViewerItem } from '../media/mediaViewerStore';
 import type { FastScrollBinding } from './FastScroller';
+import type { AttachmentSelectionBinding } from './mediaSelection';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './MediaTabGrid.module.css';
 
@@ -16,9 +18,10 @@ interface MediaTabGridProps {
   chatId: string;
   category?: ChatAttachmentCategory;
   fastScroll?: FastScrollBinding;
+  selection?: AttachmentSelectionBinding;
 }
 
-export function MediaTabGrid({ chatId, category = 'media', fastScroll }: MediaTabGridProps) {
+export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection }: MediaTabGridProps) {
   const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, category);
 
   const myUserId = useChatStore((s) => s.myUserId);
@@ -31,6 +34,12 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll }: MediaTa
   useEffect(() => {
     fastScroll?.setItems(items);
   }, [fastScroll, items]);
+
+  useEffect(() => {
+    const removed = selection?.pendingRemoval;
+    if (!removed) return;
+    setItems((prev) => prev.filter((item) => !removed.has(item.messageId)));
+  }, [selection?.pendingRemoval, setItems]);
 
   useEffect(
     () =>
@@ -81,16 +90,34 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll }: MediaTa
   return (
     <>
       <div className={styles.grid} ref={fastScroll?.listRef}>
-        {items.map((item) => (
-          <MediaTile
-            key={item.attachment.id}
-            attachment={item.attachment}
-            chatId={chatId}
-            className={styles.tile}
-            standalone
-            onOpen={() => openMediaViewerList(chatId, viewerItems(), item.attachment.id)}
-          />
-        ))}
+        {items.map((item) => {
+          const selected = selection?.active && selection.selectedIds.has(item.messageId);
+          return (
+            <MediaTile
+              key={item.attachment.id}
+              attachment={item.attachment}
+              chatId={chatId}
+              className={`${styles.tile} ${selected ? styles.tileSelected : ''}`}
+              standalone
+              selected={selected}
+              selectionMode={selection?.active ?? false}
+              onLongPressTile={
+                selection ? () => selection.onLongPress({ messageId: item.messageId, senderId: item.senderId }) : undefined
+              }
+              onTapSelect={
+                selection ? () => selection.onTap({ messageId: item.messageId, senderId: item.senderId }) : undefined
+              }
+              checkboxSlot={
+                selection?.active && (
+                  <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+                    {selected && <Icon name="check" size={14} />}
+                  </span>
+                )
+              }
+              onOpen={() => openMediaViewerList(chatId, viewerItems(), item.attachment.id)}
+            />
+          );
+        })}
       </div>
       {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
     </>

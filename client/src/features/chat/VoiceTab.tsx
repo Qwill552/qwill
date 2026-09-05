@@ -1,14 +1,17 @@
 import type { ChatAttachmentDto } from '@messenger/shared';
-import { useEffect } from 'react';
+import { useEffect, useRef, type MouseEvent } from 'react';
 
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { Skeleton } from '../../ui/Skeleton';
+import { useLongPress } from '../../ui/gestures/useLongPress';
+import { haptic } from '../../ui/haptic';
 import { formatMediaDuration } from '../media/MediaTile';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
 import { useVoicePlayback } from '../voice/useVoicePlayback';
 import type { FastScrollBinding } from './FastScroller';
-import { useShowInChatMenu, useShowInChatTrigger } from './showInChat';
+import type { AttachmentSelectionBinding } from './mediaSelection';
+import { useShowInChatMenu } from './showInChat';
 import { useChatAttachments } from './useChatAttachments';
 import styles from './VoiceTab.module.css';
 
@@ -19,28 +22,79 @@ function VoiceRow({
   own,
   chatId,
   senderName,
+  selection,
   onMenu,
 }: {
   item: ChatAttachmentDto;
   own: boolean;
   chatId: string;
   senderName: string;
+  selection?: AttachmentSelectionBinding;
   onMenu: (messageId: number, anchor: DOMRect) => void;
 }) {
   const { src, audioRef, playing, togglePlay } = useVoicePlayback(item.attachment, own, chatId);
-  const trigger = useShowInChatTrigger(item.messageId, onMenu);
+  const selected = (selection?.active && selection.selectedIds.has(item.messageId)) ?? false;
+  const longPressFiredRef = useRef(false);
+
+  const longPress = useLongPress({
+    onLongPress: () => {
+      longPressFiredRef.current = true;
+      haptic();
+      selection?.onLongPress({ messageId: item.messageId, senderId: item.senderId });
+    },
+    disabled: () => selection?.active ?? false,
+  });
+
+  function handleClick(): void {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    if (selection?.active) {
+      selection.onTap({ messageId: item.messageId, senderId: item.senderId });
+      return;
+    }
+    togglePlay();
+  }
+
+  function handleContextMenu(event: MouseEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    if (selection?.active) return;
+    onMenu(item.messageId, event.currentTarget.getBoundingClientRect());
+  }
 
   return (
-    <div className={styles.row} {...trigger}>
+    <div
+      className={styles.row}
+      onPointerDown={longPress.onPointerDown}
+      onPointerMove={longPress.onPointerMove}
+      onPointerUp={longPress.onPointerUp}
+      onPointerCancel={longPress.onPointerCancel}
+      onContextMenu={handleContextMenu}
+    >
       <audio ref={audioRef} src={src} preload="none" />
-      <button
-        type="button"
-        className={styles.playButton}
-        onClick={togglePlay}
-        aria-label={playing ? 'Пауза' : 'Воспроизвести'}
-      >
-        <Icon name={playing ? 'pause' : 'play'} size={22} />
-      </button>
+      {selection?.active ? (
+        <button
+          type="button"
+          className={styles.checkboxButton}
+          aria-pressed={selected}
+          aria-label={`Выделить голосовое сообщение от ${own ? 'себя' : senderName}`}
+          onClick={handleClick}
+        >
+          <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+            {selected && <Icon name="check" size={12} />}
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={styles.playButton}
+          onClick={handleClick}
+          aria-label={playing ? 'Пауза' : 'Воспроизвести'}
+        >
+          <Icon name={playing ? 'pause' : 'play'} size={22} />
+        </button>
+      )}
       <span className={styles.info}>
         <span className={styles.date}>{formatAttachmentDateTime(item.createdAt)}</span>
         <span className={styles.meta}>
@@ -51,12 +105,27 @@ function VoiceRow({
   );
 }
 
-export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
-  const { items, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'voice');
+export function VoiceTab({
+  chatId,
+  fastScroll,
+  selection,
+}: {
+  chatId: string;
+  fastScroll?: FastScrollBinding;
+  selection?: AttachmentSelectionBinding;
+}) {
+  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'voice');
 
   useEffect(() => {
     fastScroll?.setItems(items);
   }, [fastScroll, items]);
+
+  useEffect(() => {
+    const removed = selection?.pendingRemoval;
+    if (!removed) return;
+    setItems((prev) => prev.filter((item) => !removed.has(item.messageId)));
+  }, [selection?.pendingRemoval, setItems]);
+
   const myUserId = useChatStore((s) => s.myUserId);
   const otherName = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.otherMember?.displayName ?? '');
   const menu = useShowInChatMenu(chatId);
@@ -97,6 +166,7 @@ export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
           own={item.senderId === myUserId}
           chatId={chatId}
           senderName={otherName}
+          selection={selection}
           onMenu={menu.open}
         />
       ))}
