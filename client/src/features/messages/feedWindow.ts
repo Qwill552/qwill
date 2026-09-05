@@ -155,3 +155,15 @@ export function shiftBounds<T extends FeedItem>(
 export function sameBounds(a: FeedBounds, b: FeedBounds): boolean {
   return a.fromId === b.fromId && a.toId === b.toId;
 }
+
+export function selectDeletedRows<Row, T extends FeedItem>(
+  rows: Row[],
+  list: T[],
+  messageIdsOf: (row: Row) => number[],
+): Row[] {
+  if (rows.length === 0) return rows;
+
+  const alive = new Set<number>();
+  for (const item of list) alive.add(item.id);
+  return rows.filter((row) => !messageIdsOf(row).some((id) => alive.has(id)));
+}

@@ -5,6 +5,7 @@ import {
   clampBounds,
   mergeFeedPage,
   sameBounds,
+  selectDeletedRows,
   shiftBounds,
   tailBounds,
   trimFeedWindow,
@@ -171,5 +172,39 @@ describe('границы среза рендера', () => {
     const withPending = [...list, ...feed(-1)];
 
     expect(clampBounds(withPending, { fromId: null, toId: null }, limit)).toEqual({ from: 5, to: 10 });
+  });
+});
+
+describe('строки, ушедшие из среза', () => {
+  const rows = [
+    { key: 'a', groupIds: [1] },
+    { key: 'b', groupIds: [2, 3] },
+    { key: 'c', groupIds: [4] },
+  ];
+
+  function keys(list: typeof rows): string[] {
+    return list.map((row) => row.key);
+  }
+
+  it('строка, чьё сообщение осталось в накопителе, удалённой не считается', () => {
+    const deleted = selectDeletedRows(rows, feed(1, 2, 3, 4), (row) => row.groupIds);
+
+    expect(deleted).toEqual([]);
+  });
+
+  it('удалённой считается только та, чьих сообщений в накопителе больше нет', () => {
+    const deleted = selectDeletedRows(rows, feed(1, 4), (row) => row.groupIds);
+
+    expect(keys(deleted)).toEqual(['b']);
+  });
+
+  it('альбом жив, пока в накопителе есть хоть один его снимок', () => {
+    const deleted = selectDeletedRows(rows, feed(3), (row) => row.groupIds);
+
+    expect(keys(deleted)).toEqual(['a', 'c']);
+  });
+
+  it('пустой список возвращается как есть, накопитель не перебирается', () => {
+    expect(selectDeletedRows([], feed(1, 2), (row: { groupIds: number[] }) => row.groupIds)).toEqual([]);
   });
 });

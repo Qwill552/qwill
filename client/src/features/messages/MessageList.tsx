@@ -25,6 +25,7 @@ import {
   FEED_SLICE_LIMIT,
   FEED_SLICE_STEP,
   sameBounds,
+  selectDeletedRows,
   shiftBounds,
   tailBounds,
   type FeedBounds,
@@ -682,9 +683,10 @@ export function MessageList({
     if (leavingRows.size > 0) setLeavingRows(new Map());
   } else if (previousRows !== renderRows || leavingRows.size > 0) {
     const liveKeys = new Set(renderRows.map((entry) => entry.key));
-    const gone = wasReconciled
+    const dropped = wasReconciled
       ? previousRows.filter((entry) => !liveKeys.has(entry.key) && !leavingRows.has(entry.key))
       : [];
+    const gone = selectDeletedRows(dropped, messages, (entry) => entry.row.groupIds);
     const revived = [...leavingRows.keys()].filter((key) => liveKeys.has(key));
 
     if (gone.length > 0 || revived.length > 0) {
