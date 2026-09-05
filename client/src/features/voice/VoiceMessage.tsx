@@ -23,16 +23,18 @@ function formatTime(ms: number): string {
 interface VoiceMessageProps {
   attachment: AttachmentDto;
   own: boolean;
+  chatId: string;
   createdAt: string;
   edited: boolean;
   status: 'sending' | 'sent' | 'failed';
   read: boolean;
 }
 
-export function VoiceMessage({ attachment, own, createdAt, edited, status, read }: VoiceMessageProps) {
+export function VoiceMessage({ attachment, own, chatId, createdAt, edited, status, read }: VoiceMessageProps) {
   const { src, audioRef, playing, progress, durationMs, unheard, togglePlay, seekTo } = useVoicePlayback(
     attachment,
     own,
+    chatId,
   );
   const waveRef = useRef<HTMLDivElement>(null);
   const [speedIndex, setSpeedIndex] = useState(0);

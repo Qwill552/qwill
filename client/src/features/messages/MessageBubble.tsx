@@ -143,6 +143,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
         <VoiceMessage
           attachment={message.attachment}
           own={own}
+          chatId={message.chatId}
           createdAt={message.createdAt}
           edited={Boolean(message.editedAt)}
           status={status}

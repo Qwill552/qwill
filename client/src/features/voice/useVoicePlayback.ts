@@ -38,8 +38,8 @@ export interface VoicePlayback {
   seekTo: (ratio: number) => void;
 }
 
-export function useVoicePlayback(attachment: AttachmentDto, own: boolean): VoicePlayback {
-  const src = useFileSrc(attachment.file.id, 'full');
+export function useVoicePlayback(attachment: AttachmentDto, own: boolean, chatId: string | null): VoicePlayback {
+  const src = useFileSrc(attachment.file.id, { tier: 'full', chatId, kind: 'voice' });
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const [playing, setPlaying] = useState(false);

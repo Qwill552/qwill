@@ -23,7 +23,7 @@ export interface FileDownload {
 }
 
 export function useFileDownload(attachment: AttachmentDto): FileDownload {
-  const src = useFileSrc(attachment.file.id, 'stream');
+  const src = useFileSrc(attachment.file.id, { tier: 'stream' });
   const native = isNativeFileDownloadAvailable();
 
   const [state, setState] = useState<FileDownloadState>(native ? 'unknown' : 'idle');

@@ -29,7 +29,7 @@ function LinkRow({ item, onMenu }: { item: ChatLinkDto; onMenu: (messageId: numb
 
   const preview = cached ?? item.preview;
   const ready = preview?.status === 'ready' ? preview : null;
-  const imageSrc = useFileSrc(ready?.imageUrl ? fileIdFromUrl(ready.imageUrl) : null, 'full');
+  const imageSrc = useFileSrc(ready?.imageUrl ? fileIdFromUrl(ready.imageUrl) : null, { tier: 'full' });
 
   const settled = item.preview !== null && item.preview.status !== 'pending';
 

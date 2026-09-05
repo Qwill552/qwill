@@ -28,7 +28,7 @@ export function LinkPreviewCard({ url, own, onLinkClick, meta }: LinkPreviewCard
   const ready = useRenderableLinkPreview(url);
   const slotRef = useRef<HTMLSpanElement>(null);
 
-  const imageSrc = useFileSrc(ready?.imageUrl ? fileIdFromUrl(ready.imageUrl) : null, 'full');
+  const imageSrc = useFileSrc(ready?.imageUrl ? fileIdFromUrl(ready.imageUrl) : null, { tier: 'full' });
 
   useEffect(() => {
     const node = slotRef.current;

@@ -48,7 +48,7 @@ export function Avatar({
   className,
 }: AvatarProps) {
   const fileId = avatarUrl ? fileIdFromUrl(avatarUrl) : null;
-  const fileSrc = useFileSrc(fileId, 'full');
+  const fileSrc = useFileSrc(fileId, { tier: 'avatar', chatId: null, kind: 'avatar' });
   const src = imageSrc ?? fileSrc;
 
   return (

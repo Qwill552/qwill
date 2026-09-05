@@ -152,7 +152,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
 
   const [openFrom] = useState<MediaRect | null>(() => (current ? findMediaRect(current.attachment.id) : null));
 
-  const streamSrc = useFileSrc(current ? current.attachment.file.id : null, 'stream');
+  const streamSrc = useFileSrc(current ? current.attachment.file.id : null, { tier: 'stream' });
 
   const startClose = useCallback(() => setClosing(true), []);
   useBackHandler(!closing, startClose);
@@ -564,9 +564,10 @@ function ViewerPage({
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const video = isVideoAttachment(item.attachment);
-  const poster = usePreviewSrc(item.attachment);
-  const imageSrc = useViewerSrc(item.attachment, wantOriginal);
-  const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, 'stream');
+  const chatId = useMediaViewerStore((s) => s.chatId);
+  const poster = usePreviewSrc(item.attachment, chatId);
+  const imageSrc = useViewerSrc(item.attachment, wantOriginal, chatId);
+  const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, { tier: 'stream' });
 
   useLayoutEffect(() => {
     if (active) registerMedia(nodeRef.current);
@@ -626,6 +627,7 @@ const StripThumb = memo(function StripThumb({
 });
 
 function StripThumbImage({ item }: { item: MediaViewerItem }) {
-  const src = usePreviewSrc(item.attachment);
+  const chatId = useMediaViewerStore((s) => s.chatId);
+  const src = usePreviewSrc(item.attachment, chatId);
   return src ? <img className={styles.thumbImage} src={src} alt="" draggable={false} /> : null;
 }

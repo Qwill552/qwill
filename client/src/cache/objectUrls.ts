@@ -1,5 +1,4 @@
-import type { MediaTier } from './db';
-import { resolveMedia } from './mediaCache';
+import { resolveMedia, type MediaDescriptor } from './mediaCache';
 
 const IDLE_LIMIT = 48;
 
@@ -39,11 +38,11 @@ export function retainObjectUrl(fileId: string): string | null {
   return entry.url;
 }
 
-export async function acquireObjectUrl(fileId: string, tier: MediaTier): Promise<string | null> {
+export async function acquireObjectUrl(fileId: string, descriptor: MediaDescriptor): Promise<string | null> {
   const ready = retainObjectUrl(fileId);
   if (ready) return ready;
 
-  const blob = await resolveMedia(fileId, tier);
+  const blob = await resolveMedia(fileId, descriptor);
   if (!blob) return null;
 
   const raced = retainObjectUrl(fileId);

@@ -47,7 +47,7 @@ function AvatarViewerStage({ url }: { url: string }) {
   });
 
   const fileId = fileIdFromUrl(url);
-  const src = useFileSrc(fileId, 'full');
+  const src = useFileSrc(fileId, { tier: 'avatar', chatId: null, kind: 'avatar' });
 
   const startClose = useCallback(() => setClosing(true), []);
   useBackHandler(!closing, startClose);

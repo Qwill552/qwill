@@ -17,15 +17,17 @@ const SKELETON_ROWS = 6;
 function VoiceRow({
   item,
   own,
+  chatId,
   senderName,
   onMenu,
 }: {
   item: ChatAttachmentDto;
   own: boolean;
+  chatId: string;
   senderName: string;
   onMenu: (messageId: number, anchor: DOMRect) => void;
 }) {
-  const { src, audioRef, playing, togglePlay } = useVoicePlayback(item.attachment, own);
+  const { src, audioRef, playing, togglePlay } = useVoicePlayback(item.attachment, own, chatId);
   const trigger = useShowInChatTrigger(item.messageId, onMenu);
 
   return (
@@ -93,6 +95,7 @@ export function VoiceTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
           key={item.attachment.id}
           item={item}
           own={item.senderId === myUserId}
+          chatId={chatId}
           senderName={otherName}
           onMenu={menu.open}
         />

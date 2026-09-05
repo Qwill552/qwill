@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
 
+import type { MediaKind, MediaTier } from '../cache/db';
 import { acquireObjectUrl, peekObjectUrl, releaseObjectUrl, retainObjectUrl } from '../cache/objectUrls';
 import { buildFileSrc, getFileToken } from './files';
 
-export type FileSrcTier = 'thumb' | 'full' | 'stream';
+export type FileSrcTier = MediaTier | 'stream';
 
-export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier = 'full'): string | undefined {
+export interface FileSrcDescriptor {
+  tier?: FileSrcTier;
+  chatId?: string | null;
+  kind?: MediaKind;
+}
+
+export function useFileSrc(fileId: string | null | undefined, descriptor: FileSrcDescriptor = {}): string | undefined {
+  const tier = descriptor.tier ?? 'full';
+  const chatId = descriptor.chatId ?? null;
+  const kind = descriptor.kind ?? 'other';
+
   const [src, setSrc] = useState<string | undefined>(() =>
     fileId && tier !== 'stream' ? peekObjectUrl(fileId) : undefined,
   );
@@ -40,7 +51,7 @@ export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier 
     setSrc(undefined);
     let held = false;
 
-    void acquireObjectUrl(fileId, tier).then((url) => {
+    void acquireObjectUrl(fileId, { tier, chatId, kind }).then((url) => {
       if (!url) return;
       if (cancelled) {
         releaseObjectUrl(fileId);
@@ -54,7 +65,7 @@ export function useFileSrc(fileId: string | null | undefined, tier: FileSrcTier 
       cancelled = true;
       if (held) releaseObjectUrl(fileId);
     };
-  }, [fileId, tier]);
+  }, [fileId, tier, chatId, kind]);
 
   return src;
 }

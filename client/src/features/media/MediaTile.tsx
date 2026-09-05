@@ -48,7 +48,7 @@ export function MediaTile({
   onOpen,
 }: MediaTileProps) {
   const ref = useRef<HTMLButtonElement>(null);
-  const src = useProgressiveSrc(attachment, ref);
+  const src = useProgressiveSrc(attachment, ref, chatId);
   const video = isVideoAttachment(attachment);
   const natural = fit === 'natural';
   const albumSelectable = onLongPressTile !== undefined;

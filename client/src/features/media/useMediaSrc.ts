@@ -1,7 +1,8 @@
-import type { AttachmentDto } from '@messenger/shared';
+import { categorizeAttachment, type AttachmentDto } from '@messenger/shared';
 import { useEffect, useState, type RefObject } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
+import type { MediaKind } from '../../cache/db';
 
 const ORIGINAL_PRELOAD_MARGIN = '300px';
 export function needsOriginalInList(attachment: AttachmentDto): boolean {
@@ -61,15 +62,28 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
   return decoded;
 }
 
-export function usePreviewSrc(attachment: AttachmentDto): string | undefined {
-  return useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, attachment.thumbnail ? 'thumb' : 'full');
+export function mediaKindOf(attachment: AttachmentDto): MediaKind {
+  const kind = categorizeAttachment(attachment.file.mimeType, attachment.peaks);
+  return kind === 'gif' ? 'photo' : kind;
 }
 
-export function useProgressiveSrc(attachment: AttachmentDto, ref: RefObject<Element | null>): string | undefined {
+export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null): string | undefined {
+  return useFileSrc(attachment.thumbnail?.id ?? attachment.file.id, {
+    tier: attachment.thumbnail ? 'thumb' : 'full',
+    chatId,
+    kind: mediaKindOf(attachment),
+  });
+}
+
+export function useProgressiveSrc(
+  attachment: AttachmentDto,
+  ref: RefObject<Element | null>,
+  chatId: string | null,
+): string | undefined {
   const reached = useReachedViewport(ref);
-  const preview = usePreviewSrc(attachment);
+  const preview = usePreviewSrc(attachment, chatId);
   const wanted = needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
-  const original = useDecodedSrc(useFileSrc(wanted, 'full'));
+  const original = useDecodedSrc(useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) }));
   return original ?? preview;
 }
 
@@ -78,9 +92,13 @@ export function mediaRatio(attachment: AttachmentDto): number | null {
   return attachment.width / attachment.height;
 }
 
-export function useViewerSrc(attachment: AttachmentDto, wantOriginal: boolean): string | undefined {
-  const preview = usePreviewSrc(attachment);
+export function useViewerSrc(
+  attachment: AttachmentDto,
+  wantOriginal: boolean,
+  chatId: string | null,
+): string | undefined {
+  const preview = usePreviewSrc(attachment, chatId);
   const wanted = wantOriginal && attachment.thumbnail ? attachment.file.id : null;
-  const original = useDecodedSrc(useFileSrc(wanted, 'full'));
+  const original = useDecodedSrc(useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) }));
   return original ?? preview;
 }
