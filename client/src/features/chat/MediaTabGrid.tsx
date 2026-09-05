@@ -89,10 +89,7 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection
 
   return (
     <>
-      <div
-        className={`${styles.grid} ${selection?.active ? styles.gridSelecting : ''}`}
-        ref={fastScroll?.listRef}
-      >
+      <div className={styles.grid} ref={fastScroll?.listRef}>
         {items.map((item) => {
           const selected = selection?.active && selection.selectedIds.has(item.messageId);
           return (
