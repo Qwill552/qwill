@@ -123,8 +123,9 @@ export function useProgressiveSrc(
   ref: RefObject<Element | null>,
   chatId: string | null,
 ): string | undefined {
+  const feed = useMediaFeed();
   const reached = useReachedViewport(ref);
-  const preview = usePreviewSrc(attachment, chatId, reached);
+  const preview = usePreviewSrc(attachment, chatId, feed === null || reached);
   const wanted = needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
   const original = useDecodedSrc(useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) }));
   return original ?? preview;
