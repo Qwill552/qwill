@@ -32,6 +32,7 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from './feedWindow';
+import { shouldFollowTail } from './feedFollow';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
@@ -352,6 +353,8 @@ export function MessageList({
     const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
     if (!el || !target) return;
     const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
+    autoScrollUntil.current = 0;
+    stuckToBottom.current = false;
     el.scrollTo({ top, behavior: 'smooth' });
   }
 
@@ -362,6 +365,7 @@ export function MessageList({
     retryUpAt.current = 0;
     retryDownAt.current = 0;
     if (focus) {
+      autoScrollUntil.current = 0;
       stuckToBottom.current = false;
       return;
     }
@@ -377,6 +381,7 @@ export function MessageList({
     const target = rowNodeFor(el, focus.messageId);
     if (!target) return;
 
+    autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     function place(): void {
       el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
@@ -414,21 +419,30 @@ export function MessageList({
       wasNewest.current = isViewportNewest;
       return;
     }
-    if (lastId !== prevLastId.current && wasNewest.current) {
-      const el = listRef.current;
-      const own = lastMessage !== null && lastMessage.sender?.id === myId;
-      const growth = el ? Math.max(0, el.scrollHeight - prevScrollHeight.current) : 0;
-      const distanceBefore = el
-        ? el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) - growth
-        : 0;
-      if (own || stuckToBottom.current || distanceBefore <= STICK_THRESHOLD) {
-        setShowJump(false);
-        scrollToBottom(true);
-      }
+    const el = listRef.current;
+    if (
+      el &&
+      shouldFollowTail({
+        lastId,
+        prevLastId: prevLastId.current,
+        liveMessageId: liveMessage,
+        isOwnLast: lastMessage !== null && lastMessage.sender?.id === myId,
+        wasNewest: wasNewest.current,
+        isAutoScrolling: performance.now() < autoScrollUntil.current,
+        scrollHeight: el.scrollHeight,
+        prevScrollHeight: prevScrollHeight.current,
+        scrollTop: el.scrollTop,
+        clientHeight: el.clientHeight,
+        bottomReserve: bottomReserve(el),
+        stickThreshold: STICK_THRESHOLD,
+      })
+    ) {
+      setShowJump(false);
+      scrollToBottom(true);
     }
     prevLastId.current = lastId;
     wasNewest.current = isViewportNewest;
-  }, [feedKey, messages, isViewportNewest, myId]);
+  }, [feedKey, messages, isViewportNewest, myId, liveMessage]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -471,9 +485,7 @@ export function MessageList({
     const anchor = pendingAnchor.current;
     if (!anchor) return;
     pendingAnchor.current = null;
-    if (stuckToBottom.current) {
-      if (performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
-    } else {
+    if (performance.now() >= autoScrollUntil.current) {
       restoreAnchor(el, anchor);
       stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
     }
