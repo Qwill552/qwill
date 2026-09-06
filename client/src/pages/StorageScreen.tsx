@@ -160,6 +160,7 @@ export function StorageScreen() {
   const navigate = useNavigate();
   const isDesktop = useLayoutMode() === 'desktop';
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
   const chats = useChatStore((s) => s.chats);
   const loadChats = useChatStore((s) => s.loadChats);
 
@@ -273,29 +274,31 @@ export function StorageScreen() {
     <div className={styles.screen}>
       {!isDesktop && <AmbientBlobs />}
       <div ref={scrollerRef} className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}>
-        <ScrollIndicator target={scrollerRef} />
+        <ScrollIndicator target={scrollerRef} mode="bounded" boundsTop={summaryRef} boundsBottom={summaryRef} />
 
-        <Card caption="Занято на устройстве">
-          {usage === null ? (
-            <div className={styles.summarySkeleton}>
-              <Skeleton width="40%" height={28} />
-              <Skeleton width="70%" height={14} />
-            </div>
-          ) : (
-            <div className={styles.summary}>
-              <span className={styles.summaryTotal}>{formatBytes(usage.total)}</span>
-              {estimate && <span className={styles.summarySub}>из {formatBytes(estimate.quota)}, доступных приложению</span>}
-              <span className={styles.summarySub}>
-                {messageCount === null ? '…' : `Сообщений в кэше: ${messageCount}`}
-              </span>
-              {persisted !== null && (
+        <div ref={summaryRef}>
+          <Card caption="Занято на устройстве">
+            {usage === null ? (
+              <div className={styles.summarySkeleton}>
+                <Skeleton width="40%" height={28} />
+                <Skeleton width="70%" height={14} />
+              </div>
+            ) : (
+              <div className={styles.summary}>
+                <span className={styles.summaryTotal}>{formatBytes(usage.total)}</span>
+                {estimate && <span className={styles.summarySub}>из {formatBytes(estimate.quota)}, доступных приложению</span>}
                 <span className={styles.summarySub}>
-                  {persisted ? 'Данные защищены от автоочистки системой' : 'Система может освободить место при нехватке диска'}
+                  {messageCount === null ? '…' : `Сообщений в кэше: ${messageCount}`}
                 </span>
-              )}
-            </div>
-          )}
-        </Card>
+                {persisted !== null && (
+                  <span className={styles.summarySub}>
+                    {persisted ? 'Данные защищены от автоочистки системой' : 'Система может освободить место при нехватке диска'}
+                  </span>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
 
         <Card caption="По типам">
           {usage === null
@@ -350,7 +353,7 @@ export function StorageScreen() {
           />
         </Card>
 
-        <Card caption="Хранить медиа — личные чаты">
+        <Card caption="Хранить медиа в личных чатах">
           <div className={styles.control}>
             <SegmentedControl
               label="Хранить медиа в личных чатах"
@@ -364,7 +367,7 @@ export function StorageScreen() {
           </div>
         </Card>
 
-        <Card caption="Хранить медиа — группы">
+        <Card caption="Хранить медиа в группах">
           <div className={styles.control}>
             <SegmentedControl
               label="Хранить медиа в группах"
@@ -466,7 +469,11 @@ export function StorageScreen() {
       )}
 
       {exceptionPickerOpen && (
-        <Sheet title="Добавить исключение" onClose={() => setExceptionPickerOpen(false)}>
+        <Sheet
+          title="Добавить исключение"
+          subtitle="Свой срок хранения медиа для этого чата"
+          onClose={() => setExceptionPickerOpen(false)}
+        >
           <Card>
             {pickableChats.map((chat) => (
               <Card.Row

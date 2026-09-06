@@ -86,7 +86,7 @@
 }
 
 .control {
-  padding: var(--space-1) var(--space-4) var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 .exception {

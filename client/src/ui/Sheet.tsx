@@ -9,6 +9,8 @@ import styles from './Sheet.module.css';
 
 interface SheetProps {
   title?: string;
+  /** Короткое пояснение под заголовком — часть шапки, не прокручивается вместе с телом. */
+  subtitle?: ReactNode;
   onClose: () => void;
   /** Кнопка справа от заголовка. */
   action?: ReactNode;
@@ -24,7 +26,7 @@ type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 
 /** Боттом-шит: перетаскивание вниз с инерцией, закрытие по Escape, скриму и броску.
  *  Один из четырёх разрешённых размывающих слоёв. */
-export function Sheet({ title, onClose, action, children }: SheetProps) {
+export function Sheet({ title, subtitle, onClose, action, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
@@ -139,6 +141,7 @@ export function Sheet({ title, onClose, action, children }: SheetProps) {
             {action}
           </div>
         )}
+        {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
         <div ref={bodyRef} className={`${styles.body} hide-native-scrollbar`}>
           <ScrollIndicator target={bodyRef} />
           {children}
