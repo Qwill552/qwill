@@ -85,6 +85,11 @@
   color: var(--primary);
 }
 
+.allCacheTitle {
+  display: inline-flex;
+  align-items: center;
+}
+
 .control {
   padding: var(--space-3) var(--space-4);
 }

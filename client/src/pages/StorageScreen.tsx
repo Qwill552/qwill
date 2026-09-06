@@ -23,6 +23,7 @@ import {
 } from '../cache/storageUsage';
 import { isServiceChat } from '../features/chat/serviceChat';
 import { isEmptyPrivateChat } from '../features/chats/visibleChats';
+import { Emoji } from '../features/emoji/Emoji';
 import { Modal } from '../features/groups/Modal';
 import { formatBytes } from '../features/messages/Attachment';
 import { useChatStore } from '../stores/chatStore';
@@ -75,6 +76,23 @@ const RETENTION_SEGMENTS: Segment<RetentionPeriod>[] = [
   { value: '1m', label: 'Месяц' },
   { value: 'forever', label: 'Всегда' },
 ];
+
+type ClearConfirmAction = 'media' | 'history' | 'all';
+
+const CONFIRM_TITLE: Record<ClearConfirmAction, string> = {
+  media: 'Очистить медиа?',
+  history: 'Очистить историю?',
+  all: 'Очистить весь кэш переписок?',
+};
+
+const CONFIRM_TEXT: Record<ClearConfirmAction, string> = {
+  media:
+    'Локальные копии фото, видео, файлов и голосовых будут удалены. Переписка на сервере останется, неотправленное из очереди не тронется — медиа загрузится заново при следующем открытии.',
+  history:
+    'Локальная копия переписки будет удалена. На сервере сообщения останутся и подгрузятся заново при открытии чата. Неотправленное из очереди не тронется.',
+  all:
+    'Локальные копии медиа и переписки будут удалены целиком. На сервере ничего не изменится и подгрузится заново при открытии чатов. Неотправленное из очереди не тронется.',
+};
 
 interface StorageEstimate {
   usage: number;
@@ -170,7 +188,7 @@ export function StorageScreen() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'media' | 'history' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ClearConfirmAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [exceptionPickerOpen, setExceptionPickerOpen] = useState(false);
 
@@ -238,7 +256,8 @@ export function StorageScreen() {
     setBusy(true);
     try {
       if (action === 'media') await clearAllMedia();
-      else await clearAllHistory();
+      else if (action === 'history') await clearAllHistory();
+      else await Promise.all([clearAllMedia(), clearAllHistory()]);
       await refresh();
     } finally {
       setBusy(false);
@@ -428,7 +447,7 @@ export function StorageScreen() {
             icon="database"
             tint="red"
             title="Очистить медиа"
-            subtitle="Локальные копии, сервер не тронется"
+            subtitle="Очистить кэш медиа"
             danger
             onClick={() => setConfirmAction('media')}
           />
@@ -436,9 +455,17 @@ export function StorageScreen() {
             icon="history"
             tint="red"
             title="Очистить историю"
-            subtitle="Локальная копия, сервер не тронется"
+            subtitle="Очистить кэш сообщений"
             danger
             onClick={() => setConfirmAction('history')}
+          />
+          <Card.Row
+            title={
+              <span className={styles.allCacheTitle}><Emoji emoji="⚡" size={16} />кэш - ВСЁ</span>
+            }
+            subtitle="Удалить весь кэш переписок."
+            danger
+            onClick={() => setConfirmAction('all')}
           />
         </Card>
       </div>
@@ -451,12 +478,8 @@ export function StorageScreen() {
       )}
 
       {confirmAction && (
-        <Modal title={confirmAction === 'media' ? 'Очистить медиа?' : 'Очистить историю?'} onClose={() => setConfirmAction(null)} opaque>
-          <p className={styles.confirmText}>
-            {confirmAction === 'media'
-              ? 'Локальные копии фото, видео, файлов и голосовых будут удалены. Переписка на сервере останется, неотправленное из очереди не тронется — медиа загрузится заново при следующем открытии.'
-              : 'Локальная копия переписки будет удалена. На сервере сообщения останутся и подгрузятся заново при открытии чата. Неотправленное из очереди не тронется.'}
-          </p>
+        <Modal title={CONFIRM_TITLE[confirmAction]} onClose={() => setConfirmAction(null)} opaque>
+          <p className={styles.confirmText}>{CONFIRM_TEXT[confirmAction]}</p>
           <div className={styles.confirmActions}>
             <button className={styles.stayButton} type="button" onClick={() => setConfirmAction(null)} disabled={busy}>
               Отмена
