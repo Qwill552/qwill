@@ -208,6 +208,7 @@ interface ChatState {
   pruneHistoryCache: () => void;
   rememberPosition: (chatId: string, position: ChatFeedPosition) => void;
   savePosition: (chatId: string) => void;
+  handOffPosition: (chatId: string) => void;
   restorePosition: (chatId: string) => Promise<void>;
   setViewportNewest: (chatId: string, value: boolean | null) => void;
   returnToTail: (chatId: string) => Promise<void>;
@@ -654,24 +655,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   savePosition(chatId) {
     const position = get().positionByChat[chatId];
-    if (get().activeChatId !== chatId) {
-      set((state) => {
-        const focusByChat = { ...state.focusByChat };
-        if (position && !position.atTail && position.anchorId !== null) {
-          focusByChat[chatId] = {
-            messageId: position.anchorId,
-            seq: (state.focusByChat[chatId]?.seq ?? 0) + 1,
-            quiet: true,
-            offset: position.anchorOffset,
-          };
-        } else {
-          delete focusByChat[chatId];
-        }
-        return { focusByChat };
-      });
-    }
     if (!position) return;
     void writeCachedPosition(chatId, position);
+  },
+
+  handOffPosition(chatId) {
+    const position = get().positionByChat[chatId];
+    set((state) => {
+      const focusByChat = { ...state.focusByChat };
+      if (position && !position.atTail && position.anchorId !== null) {
+        focusByChat[chatId] = {
+          messageId: position.anchorId,
+          seq: (state.focusByChat[chatId]?.seq ?? 0) + 1,
+          quiet: true,
+          offset: position.anchorOffset,
+        };
+      } else {
+        delete focusByChat[chatId];
+      }
+      return { focusByChat };
+    });
+    get().savePosition(chatId);
   },
 
   async restorePosition(chatId) {
@@ -788,15 +792,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   closeChat() {
     const chatId = get().activeChatId;
-    if (chatId) get().savePosition(chatId);
+    if (chatId) get().handOffPosition(chatId);
     set((state) => {
       const base = { activeChatId: null, selectionMode: false, selectedIds: new Set<number>() };
       if (!chatId) return base;
+      if (state.hasMoreAfterByChat[chatId] !== true) return base;
 
       const focusByChat = { ...state.focusByChat };
       delete focusByChat[chatId];
-      if (state.hasMoreAfterByChat[chatId] !== true) return { ...base, focusByChat };
-
       const hasMoreAfterByChat = { ...state.hasMoreAfterByChat };
       delete hasMoreAfterByChat[chatId];
       const messagesByChat = { ...state.messagesByChat };

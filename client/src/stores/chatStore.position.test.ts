@@ -42,6 +42,7 @@ const { readCachedMessages, readCachedPosition, writeCachedPosition } = await im
 const { useChatStore } = await import('./chatStore');
 
 const CHAT_ID = 'chat-position-1';
+const CHAT_B_ID = 'chat-position-2';
 const HISTORY_SIZE = 300;
 
 function message(id: number): MessageDto {
@@ -68,9 +69,9 @@ function message(id: number): MessageDto {
 
 const history = Array.from({ length: HISTORY_SIZE }, (_, index) => message(index + 1));
 
-function listItem(): ChatListItemDto {
+function listItem(id: string = CHAT_ID): ChatListItemDto {
   return {
-    id: CHAT_ID,
+    id,
     type: 'PRIVATE',
     title: 'Борис',
     avatarUrl: null,
@@ -83,8 +84,8 @@ function listItem(): ChatListItemDto {
   };
 }
 
-function detail(): ChatDto {
-  return { ...listItem(), members: [], readCursors: {}, pinnedMessage: null };
+function detail(id: string = CHAT_ID): ChatDto {
+  return { ...listItem(id), members: [], readCursors: {}, pinnedMessage: null };
 }
 
 function cachedWindow(around?: number): MessageDto[] {
@@ -96,7 +97,7 @@ function cachedWindow(around?: number): MessageDto[] {
 
 describe('chatStore: позиция в чате переживает выход (КЭШ-17)', () => {
   beforeEach(() => {
-    vi.mocked(getChatRequest).mockReset().mockResolvedValue(detail());
+    vi.mocked(getChatRequest).mockReset().mockImplementation(async (id: string) => detail(id));
     vi.mocked(getMessagesRequest)
       .mockReset()
       .mockResolvedValue({ messages: history.slice(-50), hasMore: true });
@@ -104,7 +105,7 @@ describe('chatStore: позиция в чате переживает выход 
     vi.mocked(readCachedPosition).mockReset().mockResolvedValue(null);
     vi.mocked(writeCachedPosition).mockReset();
     useChatStore.setState({
-      chats: [listItem()],
+      chats: [listItem(), listItem(CHAT_B_ID)],
       activeChatId: null,
       messagesByChat: {},
       hasMoreByChat: {},
@@ -207,7 +208,7 @@ describe('chatStore: позиция в чате переживает выход 
     });
 
     useChatStore.getState().closeChat();
-    useChatStore.getState().savePosition(CHAT_ID);
+    useChatStore.getState().handOffPosition(CHAT_ID);
 
     expect(useChatStore.getState().focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true, offset: -24 });
   });
@@ -223,7 +224,7 @@ describe('chatStore: позиция в чате переживает выход 
     });
 
     useChatStore.getState().closeChat();
-    useChatStore.getState().savePosition(CHAT_ID);
+    useChatStore.getState().handOffPosition(CHAT_ID);
 
     expect(useChatStore.getState().focusByChat[CHAT_ID]).toBeUndefined();
   });
@@ -234,6 +235,68 @@ describe('chatStore: позиция в чате переживает выход 
     useChatStore.getState().closeChat();
 
     expect(writeCachedPosition).not.toHaveBeenCalled();
+  });
+
+  it('десктопный порядок: место снимается до выхода из чата и всё равно доживает до входа (КЭШ-17a)', async () => {
+    await useChatStore.getState().openChat(CHAT_ID);
+    useChatStore.getState().rememberPosition(CHAT_ID, {
+      fromId: 100,
+      toId: 180,
+      anchorId: 140,
+      anchorOffset: -24,
+      atTail: false,
+    });
+
+    useChatStore.getState().handOffPosition(CHAT_ID);
+    useChatStore.getState().closeChat();
+
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true, offset: -24 });
+  });
+
+  it('десктопный порядок: ушли из хвоста — наводки нет (КЭШ-17a)', async () => {
+    await useChatStore.getState().openChat(CHAT_ID);
+    useChatStore.getState().rememberPosition(CHAT_ID, {
+      fromId: null,
+      toId: null,
+      anchorId: 290,
+      anchorOffset: -8,
+      atTail: true,
+    });
+
+    useChatStore.getState().handOffPosition(CHAT_ID);
+    useChatStore.getState().closeChat();
+
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toBeUndefined();
+  });
+
+  it('переход A → B → A оставляет каждому чату своё место (КЭШ-17a)', async () => {
+    const store = () => useChatStore.getState();
+
+    await store().openChat(CHAT_ID);
+    store().rememberPosition(CHAT_ID, { fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false });
+    store().handOffPosition(CHAT_ID);
+    store().closeChat();
+
+    await store().openChat(CHAT_B_ID);
+    store().rememberPosition(CHAT_B_ID, { fromId: 180, toId: 260, anchorId: 210, anchorOffset: -12, atTail: false });
+    store().handOffPosition(CHAT_B_ID);
+    store().closeChat();
+
+    await store().openChat(CHAT_ID);
+
+    expect(store().focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true, offset: -24 });
+    expect(store().focusByChat[CHAT_B_ID]).toMatchObject({ messageId: 210, quiet: true, offset: -12 });
+  });
+
+  it('сворачивание приложения в открытом чате пишет позицию, но ленту не двигает (КЭШ-17a)', async () => {
+    const position = { fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false };
+    await useChatStore.getState().openChat(CHAT_ID);
+    useChatStore.getState().rememberPosition(CHAT_ID, position);
+
+    useChatStore.getState().savePosition(CHAT_ID);
+
+    expect(writeCachedPosition).toHaveBeenCalledWith(CHAT_ID, position);
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toBeUndefined();
   });
 
   it('смена аккаунта не оставляет чужой позиции в памяти', () => {

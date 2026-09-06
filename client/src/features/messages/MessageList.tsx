@@ -221,6 +221,7 @@ export function MessageList({
   const setViewportNewest = useChatStore((s) => s.setViewportNewest);
   const rememberPosition = useChatStore((s) => s.rememberPosition);
   const savePosition = useChatStore((s) => s.savePosition);
+  const handOffPosition = useChatStore((s) => s.handOffPosition);
   const returnToTail = useChatStore((s) => s.returnToTail);
   const markRead = useChatStore((s) => s.markRead);
   const tailRequest = useChatStore((s) => s.tailRequestByChat[chatId]) ?? 0;
@@ -623,9 +624,9 @@ export function MessageList({
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      savePosition(chatId);
+      handOffPosition(chatId);
     };
-  }, [chatId, savePosition]);
+  }, [chatId, savePosition, handOffPosition]);
 
   useEffect(() => {
     setViewportNewest(chatId, isViewportNewest);
