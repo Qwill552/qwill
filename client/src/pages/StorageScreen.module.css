@@ -1,0 +1,217 @@
+.screen {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.scroller {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+  padding-top: var(--chrome-space-top);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-6));
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+@media (min-width: 900px) {
+  .screen {
+    background: transparent;
+  }
+
+  .scroller {
+    padding: var(--space-4) var(--card-inset);
+  }
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.summaryTotal {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summarySub {
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.summarySkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.rowSkeleton {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+
+.checkbox {
+  display: grid;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-on-primary);
+}
+
+.checkboxChecked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.disabledRow {
+  opacity: 0.5;
+}
+
+.freeRow {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.control {
+  padding: var(--space-1) var(--space-4) var(--space-3);
+}
+
+.exception {
+  border-bottom: 1px solid var(--border);
+}
+
+.exception:last-of-type {
+  border-bottom: none;
+}
+
+.removeException {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin: calc(var(--tap-min) * -0.5 + 10px) -10px;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .removeException:hover {
+    background: var(--danger-soft);
+  }
+}
+
+.chatRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.chatRowMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 0 13px 15px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chatRowBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.chatRowTitle {
+  overflow: hidden;
+  font-size: var(--font-name);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatRowSize {
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+.chatRowChevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.chatRowCheckboxButton {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  place-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.subRow {
+  padding-left: calc(var(--space-3) + 44px + var(--space-3));
+}
+
+.confirmText {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+  line-height: 1.4;
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.stayButton,
+.discardButton {
+  flex: 1;
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+.stayButton {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.discardButton {
+  background: var(--danger);
+  color: var(--text-on-primary);
+}
+
+.stayButton:disabled,
+.discardButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
