@@ -130,12 +130,14 @@ describe('chatStore: позиция в чате переживает выход 
     expect(getMessagesRequest).not.toHaveBeenCalled();
   });
 
-  it('позиция без якоря поднимает окно вокруг начала среза', async () => {
+  it('позиция без якоря не двигает ленту — открывается хвост', async () => {
     vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: null, anchorOffset: -24, atTail: false });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
-    expect(useChatStore.getState().focusByChat[CHAT_ID]).toMatchObject({ messageId: 100 });
+    const state = useChatStore.getState();
+    expect(state.focusByChat[CHAT_ID]).toBeUndefined();
+    expect(state.messagesByChat[CHAT_ID]!.at(-1)!.id).toBe(HISTORY_SIZE);
   });
 
   it('atTail открывает хвост, как раньше', async () => {
@@ -170,15 +172,18 @@ describe('chatStore: позиция в чате переживает выход 
     expect(state.focusByChat[CHAT_ID]).toBeUndefined();
   });
 
-  it('лента уже в памяти — позиция ставит срез на место, не подменяя ленту', async () => {
-    useChatStore.setState({ messagesByChat: { [CHAT_ID]: history.slice() } });
-    vi.mocked(readCachedPosition).mockResolvedValue({ fromId: 100, toId: 180, anchorId: 140, anchorOffset: -24, atTail: false });
+  it('лента уже в памяти — открытие чата не трогает базу и не сбивает место', async () => {
+    useChatStore.setState({
+      messagesByChat: { [CHAT_ID]: history.slice() },
+      focusByChat: { [CHAT_ID]: { messageId: 140, seq: 1, quiet: true, offset: -24 } },
+    });
 
     await useChatStore.getState().openChat(CHAT_ID);
 
     const state = useChatStore.getState();
     expect(state.messagesByChat[CHAT_ID]).toHaveLength(HISTORY_SIZE);
-    expect(state.focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true });
+    expect(state.focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true, seq: 1 });
+    expect(readCachedPosition).not.toHaveBeenCalled();
   });
 
   it('уход из чата записывает запомненную позицию', async () => {
@@ -189,6 +194,38 @@ describe('chatStore: позиция в чате переживает выход 
     useChatStore.getState().closeChat();
 
     expect(writeCachedPosition).toHaveBeenCalledWith(CHAT_ID, position);
+  });
+
+  it('уход из чата оставляет наводку на место — следующий вход не ждёт базу', async () => {
+    await useChatStore.getState().openChat(CHAT_ID);
+    useChatStore.getState().rememberPosition(CHAT_ID, {
+      fromId: 100,
+      toId: 180,
+      anchorId: 140,
+      anchorOffset: -24,
+      atTail: false,
+    });
+
+    useChatStore.getState().closeChat();
+    useChatStore.getState().savePosition(CHAT_ID);
+
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toMatchObject({ messageId: 140, quiet: true, offset: -24 });
+  });
+
+  it('ушли из хвоста — наводки нет, чат откроется внизу', async () => {
+    await useChatStore.getState().openChat(CHAT_ID);
+    useChatStore.getState().rememberPosition(CHAT_ID, {
+      fromId: null,
+      toId: null,
+      anchorId: 290,
+      anchorOffset: -8,
+      atTail: true,
+    });
+
+    useChatStore.getState().closeChat();
+    useChatStore.getState().savePosition(CHAT_ID);
+
+    expect(useChatStore.getState().focusByChat[CHAT_ID]).toBeUndefined();
   });
 
   it('без запомненной позиции уход из чата ничего не пишет', async () => {

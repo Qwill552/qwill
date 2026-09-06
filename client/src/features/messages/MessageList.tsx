@@ -374,7 +374,7 @@ export function MessageList({
     prevLastId.current = messages[messages.length - 1]?.id ?? null;
     retryUpAt.current = 0;
     retryDownAt.current = 0;
-    if (focus) {
+    if (focus && listRef.current?.querySelector(`[data-message-id="${focus.messageId}"]`)) {
       autoScrollUntil.current = 0;
       stuckToBottom.current = false;
       return;
@@ -600,11 +600,12 @@ export function MessageList({
     const el = listRef.current;
     const anchor = el ? rememberAnchor(el) : null;
     const anchorId = anchor && Number(anchor.id) > 0 ? Number(anchor.id) : null;
+    if (!el || anchor === null || anchorId === null) return;
     rememberPosition(chatId, {
       fromId: liveBounds.fromId,
       toId: liveBounds.toId,
       anchorId,
-      anchorOffset: anchor && el ? anchor.top - el.getBoundingClientRect().top : 0,
+      anchorOffset: anchor.top - el.getBoundingClientRect().top,
       atTail: isViewportNewest && stuckToBottom.current,
     });
   };

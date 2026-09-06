@@ -654,21 +654,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   savePosition(chatId) {
     const position = get().positionByChat[chatId];
+    if (get().activeChatId !== chatId) {
+      set((state) => {
+        const focusByChat = { ...state.focusByChat };
+        if (position && !position.atTail && position.anchorId !== null) {
+          focusByChat[chatId] = {
+            messageId: position.anchorId,
+            seq: (state.focusByChat[chatId]?.seq ?? 0) + 1,
+            quiet: true,
+            offset: position.anchorOffset,
+          };
+        } else {
+          delete focusByChat[chatId];
+        }
+        return { focusByChat };
+      });
+    }
     if (!position) return;
     void writeCachedPosition(chatId, position);
   },
 
   async restorePosition(chatId) {
-    const position = await readCachedPosition(chatId);
-    if (!position || position.atTail) return;
-
-    const anchorId = position.anchorId ?? position.fromId ?? position.toId;
-    if (anchorId === null) return;
-    const offset = position.anchorId === null ? 0 : position.anchorOffset;
+    const position = get().positionByChat[chatId] ?? (await readCachedPosition(chatId));
+    const anchorId = position && !position.atTail ? position.anchorId : null;
+    if (position === null || anchorId === null) return;
 
     const list = get().messagesByChat[chatId];
     if (list) {
-      if (list.some((message) => message.id === anchorId)) get().focusMessage(chatId, anchorId, true, offset);
+      if (list.some((message) => message.id === anchorId)) {
+        get().focusMessage(chatId, anchorId, true, position.anchorOffset);
+      }
       return;
     }
 
@@ -680,7 +695,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasMoreAfter: true,
       focus: anchorId,
       focusQuiet: true,
-      focusOffset: offset,
+      focusOffset: position.anchorOffset,
     });
   },
 
@@ -696,7 +711,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    if (!windowed) {
+    if (!windowed && !get().messagesByChat[chatId]) {
       await get().restorePosition(chatId);
       if (!get().messagesByChat[chatId]) await get().primeChatFromCache(chatId);
       windowed = get().hasMoreAfterByChat[chatId] === true;
