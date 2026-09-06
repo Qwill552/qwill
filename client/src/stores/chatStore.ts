@@ -266,6 +266,7 @@ interface ChatState {
   subscribeToSocket: (myUserId: string) => void;
   drainOutbox: () => Promise<void>;
   restoreOutboxMessages: () => Promise<void>;
+  preloadTopChats: () => Promise<void>;
   reset: () => void;
   /** Внутренний метод: применяет message:new и ack от message:send по одной логике реконсиляции. */
   applyIncomingMessage: (message: MessageDto) => void;
@@ -492,6 +493,78 @@ function feedEdgeId(list: LocalMessage[] | undefined, side: FeedSide): number | 
   return null;
 }
 
+export const PRELOAD_CHATS_LIMIT = 10;
+export const PRELOAD_INTERVAL_MS = 400;
+const PRELOAD_ACTIVE_CHAT_WAIT_STEP_MS = 100;
+const PRELOAD_ACTIVE_CHAT_WAIT_STEPS = 50;
+
+const preloadedChatIds = new Set<string>();
+let preloadRunToken = 0;
+let preloadStarted = false;
+let preloadResumeWaiters: (() => void)[] = [];
+
+function wakePreload(): void {
+  const waiters = preloadResumeWaiters;
+  preloadResumeWaiters = [];
+  for (const wake of waiters) wake();
+}
+
+function waitForPreloadResume(): Promise<void> {
+  return new Promise((resolve) => preloadResumeWaiters.push(resolve));
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', wakePreload);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') wakePreload();
+  });
+}
+
+function preloadDelay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPreloadConnectionAllowed(): boolean {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } })
+    .connection;
+  if (!connection) return true;
+  if (connection.saveData) return false;
+  return connection.effectiveType !== 'slow-2g' && connection.effectiveType !== '2g';
+}
+
+let outgoingSendsInFlight = 0;
+
+function beginOutgoingSend(): void {
+  outgoingSendsInFlight += 1;
+}
+
+function endOutgoingSend(): void {
+  outgoingSendsInFlight = Math.max(0, outgoingSendsInFlight - 1);
+}
+
+function isSendInProgress(): boolean {
+  return outgoingSendsInFlight > 0 || activeUploads > 0;
+}
+
+async function waitForActiveChatSettled(get: () => Pick<ChatState, 'activeChatId' | 'historyByChat'>): Promise<void> {
+  for (let step = 0; step < PRELOAD_ACTIVE_CHAT_WAIT_STEPS; step += 1) {
+    const state = get();
+    if (!state.activeChatId || state.historyByChat[state.activeChatId] !== 'loading') return;
+    await preloadDelay(PRELOAD_ACTIVE_CHAT_WAIT_STEP_MS);
+  }
+}
+
+async function preloadOneChat(chatId: string): Promise<void> {
+  const position = await readCachedPosition(chatId);
+  if (position && !position.atTail && position.anchorId !== null) {
+    const around = await getMessagesAroundRequest(chatId, position.anchorId);
+    await writeCachedMessages(around.messages);
+    return;
+  }
+  const page = await getMessagesRequest(chatId);
+  await writeCachedMessages(page.messages);
+}
+
 interface MessageRemovalResult {
   messagesByChat: Record<string, LocalMessage[]>;
   chats: ChatListItemDto[];
@@ -609,6 +682,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
     void writeCachedChats(chats);
     void get().restoreOutboxMessages();
+    if (!preloadStarted) {
+      preloadStarted = true;
+      void get().preloadTopChats();
+    }
   },
 
   replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset }) {
@@ -1135,10 +1212,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (!socket) return;
 
+    beginOutgoingSend();
     socket.emit(
       SocketEvent.MessageSend,
       { chatId, clientId, content: content || undefined, attachment, replyToId: replyTo?.id },
       (ack: MessageSendAck) => {
+        endOutgoingSend();
         if (ack.ok && ack.message) {
           clearOutboxRetry();
           void dequeueOutbox(clientId);
@@ -1433,10 +1512,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
+    beginOutgoingSend();
     socket.emit(
       SocketEvent.MessageSend,
       { chatId, clientId, content: message.content || undefined, replyToId: message.replyToId ?? undefined },
       (ack: MessageSendAck) => {
+        endOutgoingSend();
         if (ack.ok && ack.message) {
           get().applyIncomingMessage(ack.message);
           return;
@@ -1463,6 +1544,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       await bumpAttempts(entry.clientId);
 
+      beginOutgoingSend();
       socket.emit(
         SocketEvent.MessageSend,
         {
@@ -1472,6 +1554,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           replyToId: entry.replyToId ?? undefined,
         },
         (ack: MessageSendAck) => {
+          endOutgoingSend();
           if (ack.ok && ack.message) {
             clearOutboxRetry();
             void dequeueOutbox(entry.clientId);
@@ -1528,6 +1611,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [entry.chatId]: [...(state.messagesByChat[entry.chatId] ?? []), restored],
         },
       }));
+    }
+  },
+
+  async preloadTopChats() {
+    const token = ++preloadRunToken;
+    const isCurrent = (): boolean => preloadRunToken === token;
+
+    await waitForActiveChatSettled(get);
+    if (!isCurrent()) return;
+
+    const startActiveChatId = get().activeChatId;
+
+    while (isCurrent() && preloadedChatIds.size < PRELOAD_CHATS_LIMIT) {
+      const state = get();
+      if (state.activeChatId !== startActiveChatId) return;
+
+      const next = state.chats.find((c) => c.id !== state.activeChatId && !preloadedChatIds.has(c.id));
+      if (!next) return;
+
+      await preloadDelay(PRELOAD_INTERVAL_MS);
+      if (!isCurrent()) return;
+
+      if (document.hidden) {
+        await waitForPreloadResume();
+        if (!isCurrent()) return;
+        continue;
+      }
+
+      if (isSendInProgress()) continue;
+      if (!isPreloadConnectionAllowed()) return;
+      if (get().activeChatId !== startActiveChatId) return;
+
+      preloadedChatIds.add(next.id);
+
+      try {
+        await preloadOneChat(next.id);
+      } catch (error) {
+        if (!(error instanceof NetworkError)) throw error;
+        await waitForPreloadResume();
+        if (!isCurrent()) return;
+      }
     }
   },
 
@@ -1830,6 +1954,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     for (const timer of typingTimers.values()) clearTimeout(timer);
     typingTimers.clear();
     clearOutboxRetry();
+    preloadedChatIds.clear();
+    preloadStarted = false;
+    preloadRunToken += 1;
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
     unqueuedAttachments.clear();
