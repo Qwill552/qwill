@@ -42,6 +42,7 @@ describe('cache db', () => {
       'mediaMeta',
       'messages',
       'outbox',
+      'settings',
       'syncCursors',
     ]);
   });

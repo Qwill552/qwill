@@ -1,17 +1,48 @@
+import type { ChatListItemDto } from '@messenger/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { clearAllCache, openCacheDb, type MediaTier } from './db';
+import { clearAllCache, openCacheDb, writeRetentionSetting, type MediaTier } from './db';
 import {
   evictToBudget,
   MEDIA_ACCESS_THROTTLE_MS,
   removeCachedMediaByFileIds,
   resolveMedia,
   selectEvictionVictims,
+  selectExpired,
   type EvictionCandidate,
 } from './mediaCache';
 
-function candidate(fileId: string, size: number, lastUsedAt: number, tier: MediaTier): EvictionCandidate {
-  return { fileId, size, lastUsedAt, tier };
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function candidate(
+  fileId: string,
+  size: number,
+  lastUsedAt: number,
+  tier: MediaTier,
+  chatId: string | null = null,
+): EvictionCandidate {
+  return { fileId, chatId, size, lastUsedAt, tier };
+}
+
+function chatStub(id: string, type: 'PRIVATE' | 'GROUP'): ChatListItemDto {
+  return {
+    id,
+    type,
+    title: id,
+    avatarUrl: null,
+    otherMember: null,
+    lastMessage: null,
+    updatedAt: new Date(0).toISOString(),
+    unreadCount: 0,
+    muted: false,
+    isSupportRequest: false,
+  };
+}
+
+async function resetRetentionSettings(): Promise<void> {
+  await writeRetentionSetting('keepMediaPrivate', '1w');
+  await writeRetentionSetting('keepMediaGroups', '1w');
+  await writeRetentionSetting('keepMediaExceptions', {});
 }
 
 interface CallTracker {
@@ -202,6 +233,151 @@ describe('evictToBudget', () => {
 
     expect(reads.names).not.toContain('media');
     expect(reads.names).toContain('mediaMeta');
+  });
+});
+
+describe('selectExpired', () => {
+  it('протухшее выбрасывается раньше свежего', () => {
+    const now = 1_000_000;
+    const victims = selectExpired(
+      [
+        { fileId: 'stale', chatId: 'c1', lastUsedAt: now - 10_000 },
+        { fileId: 'fresh', chatId: 'c1', lastUsedAt: now - 100 },
+      ],
+      now,
+      () => 5_000,
+    );
+
+    expect(victims).toEqual(['stale']);
+  });
+
+  it('Infinity отключает возраст для записи', () => {
+    const victims = selectExpired([{ fileId: 'ancient', chatId: 'c1', lastUsedAt: 0 }], 1_000_000, () => Infinity);
+
+    expect(victims).toEqual([]);
+  });
+
+  it('chatId=null не подчиняется сроку хранения', () => {
+    const victims = selectExpired(
+      [{ fileId: 'avatar', chatId: null, lastUsedAt: 0 }],
+      1_000_000,
+      (chatId) => (chatId === null ? Infinity : 1000),
+    );
+
+    expect(victims).toEqual([]);
+  });
+});
+
+describe('evictToBudget — срок хранения', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+    await resetRetentionSettings();
+  });
+
+  it('выбрасывает протухшее по возрасту раньше бюджета', async () => {
+    const db = await openCacheDb();
+    await db!.put('chats', chatStub('private-1', 'PRIVATE'));
+    await writeRetentionSetting('keepMediaPrivate', '3d');
+    const stale = Date.now() - 4 * DAY_MS;
+    await db!.put('media', { fileId: 'stale', tier: 'full', blob: new Blob(['a']), size: 1, lastUsedAt: stale });
+    await db!.put('mediaMeta', {
+      fileId: 'stale',
+      chatId: 'private-1',
+      kind: 'photo',
+      tier: 'full',
+      size: 1,
+      lastUsedAt: stale,
+    });
+
+    await evictToBudget();
+
+    expect(await db!.get('media', 'stale')).toBeUndefined();
+    expect(await db!.get('mediaMeta', 'stale')).toBeUndefined();
+  });
+
+  it('"forever" отключает возраст, но не бюджет', async () => {
+    const db = await openCacheDb();
+    await db!.put('chats', chatStub('private-2', 'PRIVATE'));
+    await writeRetentionSetting('keepMediaPrivate', 'forever');
+    const ancient = Date.now() - 365 * DAY_MS;
+    await db!.put('media', { fileId: 'ancient', tier: 'full', blob: new Blob(['a']), size: 1, lastUsedAt: ancient });
+    await db!.put('mediaMeta', {
+      fileId: 'ancient',
+      chatId: 'private-2',
+      kind: 'photo',
+      tier: 'full',
+      size: 1,
+      lastUsedAt: ancient,
+    });
+
+    await evictToBudget();
+
+    expect(await db!.get('media', 'ancient')).toBeDefined();
+  });
+
+  it('исключение по чату перебивает общую настройку', async () => {
+    const db = await openCacheDb();
+    await db!.put('chats', chatStub('exception-chat', 'PRIVATE'));
+    await writeRetentionSetting('keepMediaPrivate', 'forever');
+    await writeRetentionSetting('keepMediaExceptions', { 'exception-chat': '3d' });
+    const stale = Date.now() - 4 * DAY_MS;
+    await db!.put('media', { fileId: 'exc', tier: 'full', blob: new Blob(['a']), size: 1, lastUsedAt: stale });
+    await db!.put('mediaMeta', {
+      fileId: 'exc',
+      chatId: 'exception-chat',
+      kind: 'photo',
+      tier: 'full',
+      size: 1,
+      lastUsedAt: stale,
+    });
+
+    await evictToBudget();
+
+    expect(await db!.get('media', 'exc')).toBeUndefined();
+  });
+
+  it('аватары не выбрасываются по возрасту', async () => {
+    const db = await openCacheDb();
+    await writeRetentionSetting('keepMediaPrivate', '3d');
+    const ancient = Date.now() - 365 * DAY_MS;
+    await db!.put('media', { fileId: 'ava', tier: 'avatar', blob: new Blob(['a']), size: 1, lastUsedAt: ancient });
+    await db!.put('mediaMeta', {
+      fileId: 'ava',
+      chatId: null,
+      kind: 'avatar',
+      tier: 'avatar',
+      size: 1,
+      lastUsedAt: ancient,
+    });
+
+    await evictToBudget();
+
+    expect(await db!.get('media', 'ava')).toBeDefined();
+  });
+
+  it('после уборки суммарный объём не выше бюджета', async () => {
+    const db = await openCacheDb();
+    await db!.put('chats', chatStub('group-1', 'GROUP'));
+    await writeRetentionSetting('keepMediaGroups', 'forever');
+    const bigSize = 300 * 1024 * 1024;
+    for (let i = 0; i < 3; i += 1) {
+      const fileId = `big-${i}`;
+      await db!.put('media', { fileId, tier: 'full', blob: new Blob([new Uint8Array(1)]), size: bigSize, lastUsedAt: i });
+      await db!.put('mediaMeta', {
+        fileId,
+        chatId: 'group-1',
+        kind: 'photo',
+        tier: 'full',
+        size: bigSize,
+        lastUsedAt: i,
+      });
+    }
+
+    await evictToBudget();
+
+    const remaining = await db!.getAll('mediaMeta');
+    const total = remaining.reduce((sum, entry) => sum + entry.size, 0);
+    expect(total).toBeLessThanOrEqual(400 * 1024 * 1024);
   });
 });
 

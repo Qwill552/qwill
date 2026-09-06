@@ -5,6 +5,25 @@ export type MediaTier = 'avatar' | 'thumb' | 'full';
 
 export type MediaKind = 'photo' | 'video' | 'file' | 'voice' | 'audio' | 'avatar' | 'other';
 
+export type RetentionPeriod = '3d' | '1w' | '1m' | 'forever';
+
+export interface RetentionSettings {
+  keepMediaPrivate: RetentionPeriod;
+  keepMediaGroups: RetentionPeriod;
+  keepMediaExceptions: Record<string, RetentionPeriod>;
+}
+
+const DEFAULT_RETENTION_SETTINGS: RetentionSettings = {
+  keepMediaPrivate: '1w',
+  keepMediaGroups: '1w',
+  keepMediaExceptions: {},
+};
+
+interface SettingEntry {
+  key: string;
+  value: RetentionPeriod | Record<string, RetentionPeriod>;
+}
+
 export interface CachedMedia {
   fileId: string;
   tier: MediaTier;
@@ -70,6 +89,7 @@ interface CacheSchema extends DBSchema {
     indexes: { byLastUsed: number; byChat: string; byKind: string };
   };
   outbox: { key: string; value: OutboxEntry; indexes: { byCreatedAt: number } };
+  settings: { key: string; value: SettingEntry };
 }
 
 export type CacheDb = IDBPDatabase<CacheSchema>;
@@ -77,7 +97,7 @@ export type CacheDb = IDBPDatabase<CacheSchema>;
 type UpgradeTransaction = IDBPTransaction<CacheSchema, StoreNames<CacheSchema>[], 'versionchange'>;
 
 const DB_NAME = 'qwill-cache';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORE_NAMES: StoreNames<CacheSchema>[] = [
   'chats',
@@ -126,6 +146,10 @@ export function openCacheDb(): Promise<CacheDb | null> {
       if (oldVersion < 3) {
         db.createObjectStore('chatPositions', { keyPath: 'chatId' }).createIndex('bySavedAt', 'savedAt');
       }
+
+      if (oldVersion < 4) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
     },
   }).catch(() => null);
 
@@ -158,4 +182,40 @@ export async function clearAllCache(): Promise<void> {
   const tx = db.transaction(STORE_NAMES, 'readwrite');
   await Promise.all(STORE_NAMES.map((name) => tx.objectStore(name).clear()));
   await tx.done;
+}
+
+export async function readRetentionSettings(): Promise<RetentionSettings> {
+  const db = await openCacheDb();
+  if (!db) return DEFAULT_RETENTION_SETTINGS;
+
+  try {
+    const [privateEntry, groupsEntry, exceptionsEntry] = await Promise.all([
+      db.get('settings', 'keepMediaPrivate'),
+      db.get('settings', 'keepMediaGroups'),
+      db.get('settings', 'keepMediaExceptions'),
+    ]);
+
+    return {
+      keepMediaPrivate: (privateEntry?.value as RetentionPeriod) ?? DEFAULT_RETENTION_SETTINGS.keepMediaPrivate,
+      keepMediaGroups: (groupsEntry?.value as RetentionPeriod) ?? DEFAULT_RETENTION_SETTINGS.keepMediaGroups,
+      keepMediaExceptions:
+        (exceptionsEntry?.value as Record<string, RetentionPeriod>) ?? DEFAULT_RETENTION_SETTINGS.keepMediaExceptions,
+    };
+  } catch {
+    return DEFAULT_RETENTION_SETTINGS;
+  }
+}
+
+export async function writeRetentionSetting<K extends keyof RetentionSettings>(
+  key: K,
+  value: RetentionSettings[K],
+): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  try {
+    await db.put('settings', { key, value });
+  } catch {
+    return;
+  }
 }

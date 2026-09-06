@@ -1,22 +1,36 @@
+import type { ChatType } from '@messenger/shared';
+
 import { buildFileSrc, getFileToken } from '../api/files';
 import {
   openCacheDb,
+  readRetentionSettings,
   requestPersistentStorage,
   type CacheDb,
   type CachedMediaMeta,
   type MediaKind,
   type MediaTier,
+  type RetentionPeriod,
 } from './db';
 
 const GIGABYTE = 1024 ** 3;
 const MEGABYTE = 1024 ** 2;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 const EVICTION_TARGET_RATIO = 0.75;
 const AVATAR_RESERVE_RATIO = 0.1;
 
 const TIER_EVICTION_ORDER: Record<MediaTier, number> = { full: 0, thumb: 1, avatar: 2 };
 
+const RETENTION_MS: Record<RetentionPeriod, number> = {
+  '3d': 3 * DAY,
+  '1w': 7 * DAY,
+  '1m': 30 * DAY,
+  forever: Infinity,
+};
+
 export const MEDIA_ACCESS_THROTTLE_MS = 24 * 60 * 60 * 1000;
 export const MEDIA_EVICT_STEP_BYTES = 32 * MEGABYTE;
+export const CLEANUP_INTERVAL_MS = 2 * HOUR;
 
 function isDesktopShell(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
@@ -32,6 +46,7 @@ export interface MediaDescriptor {
 
 export interface EvictionCandidate {
   fileId: string;
+  chatId: string | null;
   size: number;
   lastUsedAt: number;
   tier: MediaTier;
@@ -68,11 +83,43 @@ async function collectEvictionCandidates(db: CacheDb): Promise<EvictionCandidate
   let cursor = await db.transaction('mediaMeta').store.index('byLastUsed').openCursor();
 
   while (cursor) {
-    const { fileId, size, lastUsedAt, tier } = cursor.value;
-    candidates.push({ fileId, size, lastUsedAt, tier });
+    const { fileId, chatId, size, lastUsedAt, tier } = cursor.value;
+    candidates.push({ fileId, chatId, size, lastUsedAt, tier });
     cursor = await cursor.continue();
   }
   return candidates;
+}
+
+export function selectExpired(
+  entries: Pick<EvictionCandidate, 'fileId' | 'chatId' | 'lastUsedAt'>[],
+  now: number,
+  resolveTtl: (chatId: string | null) => number,
+): string[] {
+  const victims: string[] = [];
+  for (const entry of entries) {
+    const ttl = resolveTtl(entry.chatId);
+    if (ttl === Infinity) continue;
+    if (now - entry.lastUsedAt > ttl) victims.push(entry.fileId);
+  }
+  return victims;
+}
+
+async function buildTtlResolver(db: CacheDb): Promise<(chatId: string | null) => number> {
+  const settings = await readRetentionSettings();
+  const chatTypeById = new Map<string, ChatType>();
+  try {
+    for (const chat of await db.getAll('chats')) chatTypeById.set(chat.id, chat.type);
+  } catch {
+    return () => Infinity;
+  }
+
+  return (chatId: string | null): number => {
+    if (chatId === null) return Infinity;
+
+    const exception = settings.keepMediaExceptions[chatId];
+    const period = exception ?? (chatTypeById.get(chatId) === 'GROUP' ? settings.keepMediaGroups : settings.keepMediaPrivate);
+    return RETENTION_MS[period];
+  };
 }
 
 async function dropMedia(db: CacheDb, fileIds: string[]): Promise<void> {
@@ -88,7 +135,14 @@ export async function evictToBudget(): Promise<void> {
   if (!db) return;
 
   try {
-    const victims = selectEvictionVictims(await collectEvictionCandidates(db), MEDIA_BUDGET_BYTES);
+    const candidates = await collectEvictionCandidates(db);
+    const resolveTtl = await buildTtlResolver(db);
+    const expired = selectExpired(candidates, Date.now(), resolveTtl);
+    if (expired.length > 0) await dropMedia(db, expired);
+
+    const expiredIds = new Set(expired);
+    const remaining = candidates.filter((entry) => !expiredIds.has(entry.fileId));
+    const victims = selectEvictionVictims(remaining, MEDIA_BUDGET_BYTES);
     if (victims.length === 0) return;
     await dropMedia(db, victims);
   } catch {

@@ -55,7 +55,7 @@ import { NetworkError } from '../api/client';
 import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
 import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment, type OutboxEntry } from '../cache/db';
-import { removeCachedMediaByFileIds } from '../cache/mediaCache';
+import { CLEANUP_INTERVAL_MS, evictToBudget, removeCachedMediaByFileIds } from '../cache/mediaCache';
 import {
   pruneCachedHistory,
   readCachedChats,
@@ -503,6 +503,24 @@ let preloadRunToken = 0;
 let preloadStarted = false;
 let preloadResumeWaiters: (() => void)[] = [];
 
+let maintenanceScheduled = false;
+let maintenanceIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function startMaintenanceSchedule(get: () => ChatState): void {
+  if (maintenanceScheduled) return;
+  maintenanceScheduled = true;
+  maintenanceIntervalId = setInterval(() => {
+    void evictToBudget();
+    void pruneCachedHistory(get().activeChatId);
+  }, CLEANUP_INTERVAL_MS);
+}
+
+function stopMaintenanceSchedule(): void {
+  if (maintenanceIntervalId !== null) clearInterval(maintenanceIntervalId);
+  maintenanceIntervalId = null;
+  maintenanceScheduled = false;
+}
+
 function wakePreload(): void {
   const waiters = preloadResumeWaiters;
   preloadResumeWaiters = [];
@@ -686,6 +704,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       preloadStarted = true;
       void get().preloadTopChats();
     }
+    startMaintenanceSchedule(get);
   },
 
   replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset }) {
@@ -1957,6 +1976,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     preloadedChatIds.clear();
     preloadStarted = false;
     preloadRunToken += 1;
+    stopMaintenanceSchedule();
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
     unqueuedAttachments.clear();
