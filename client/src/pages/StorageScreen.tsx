@@ -161,6 +161,7 @@ export function StorageScreen() {
   const isDesktop = useLayoutMode() === 'desktop';
   const scrollerRef = useRef<HTMLDivElement>(null);
   const chats = useChatStore((s) => s.chats);
+  const loadChats = useChatStore((s) => s.loadChats);
 
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [messageCount, setMessageCount] = useState<number | null>(null);
@@ -199,6 +200,10 @@ export function StorageScreen() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    void loadChats();
+  }, [loadChats]);
 
   const chatById = useMemo(() => new Map(chats.map((chat) => [chat.id, chat])), [chats]);
 
