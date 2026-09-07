@@ -56,7 +56,7 @@ export function sniffMimeType(head: Buffer): string | null {
 }
 
 const CONTAINER_FAMILIES: Record<string, readonly string[]> = {
-  'video/webm': ['video/webm', 'audio/webm', 'video/x-matroska'],
+  'video/webm': ['video/webm', 'audio/webm', 'video/x-matroska', 'video/matroska'],
   'video/mp4': ['video/mp4', 'audio/mp4'],
 };
 
