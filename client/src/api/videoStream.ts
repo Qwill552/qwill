@@ -47,9 +47,17 @@ function sendSource(target: ServiceWorker, fileId: string, url: string): Promise
   });
 }
 
-export async function resolveStreamSrc(fileId: string, chatId: string | null, progressive: boolean): Promise<string> {
+const resolved = new Map<string, Promise<string>>();
+const disabled = new Set<string>();
+
+export function disableProgressiveStream(fileId: string): void {
+  disabled.add(fileId);
+  resolved.delete(fileId);
+}
+
+async function resolve(fileId: string, chatId: string | null, progressive: boolean): Promise<string> {
   const direct = buildFileSrc(fileId, await getFileToken(fileId));
-  if (!progressive) return direct;
+  if (!progressive || disabled.has(fileId)) return direct;
 
   const worker = controller();
   if (!worker) return direct;
@@ -57,4 +65,16 @@ export async function resolveStreamSrc(fileId: string, chatId: string | null, pr
   listenForSourceRequests();
   const delivered = await sendSource(worker, fileId, direct);
   return delivered ? streamUrl(fileId, chatId) : direct;
+}
+
+export function resolveStreamSrc(fileId: string, chatId: string | null, progressive: boolean): Promise<string> {
+  const known = resolved.get(fileId);
+  if (known) return known;
+
+  const pending = resolve(fileId, chatId, progressive).catch((error: unknown) => {
+    resolved.delete(fileId);
+    throw error;
+  });
+  resolved.set(fileId, pending);
+  return pending;
 }

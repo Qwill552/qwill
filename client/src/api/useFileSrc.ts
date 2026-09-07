@@ -10,12 +10,14 @@ export interface FileSrcDescriptor {
   tier?: FileSrcTier;
   chatId?: string | null;
   kind?: MediaKind;
+  progressive?: boolean;
 }
 
 export function useFileSrc(fileId: string | null | undefined, descriptor: FileSrcDescriptor = {}): string | undefined {
   const tier = descriptor.tier ?? 'full';
   const chatId = descriptor.chatId ?? null;
   const kind = descriptor.kind ?? 'other';
+  const progressive = descriptor.progressive ?? kind === 'video';
 
   const [src, setSrc] = useState<string | undefined>(() =>
     fileId && tier !== 'stream' ? peekObjectUrl(fileId) : undefined,
@@ -30,7 +32,7 @@ export function useFileSrc(fileId: string | null | undefined, descriptor: FileSr
     let cancelled = false;
 
     if (tier === 'stream') {
-      void resolveStreamSrc(fileId, chatId, kind === 'video')
+      void resolveStreamSrc(fileId, chatId, progressive)
         .then((url) => {
           if (!cancelled) setSrc(url);
         })
@@ -65,7 +67,7 @@ export function useFileSrc(fileId: string | null | undefined, descriptor: FileSr
       cancelled = true;
       if (held) releaseObjectUrl(fileId);
     };
-  }, [fileId, tier, chatId, kind]);
+  }, [fileId, tier, chatId, kind, progressive]);
 
   return src;
 }

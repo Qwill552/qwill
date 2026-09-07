@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from 'react-dom';
 
 import { useFileSrc } from '../../api/useFileSrc';
+import { disableProgressiveStream } from '../../api/videoStream';
 import { downloadFile } from './downloadFile';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
@@ -572,11 +573,19 @@ function ViewerPage({
   const poster = usePreviewSrc(item.attachment, chatId);
   const imageSrc = useViewerSrc(item.attachment, wantOriginal, chatId);
   const blurRef = useBlurhashCanvas(item.attachment.blurhash);
+  const [progressive, setProgressive] = useState(true);
   const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, {
     tier: 'stream',
     kind: 'video',
     chatId,
+    progressive,
   });
+
+  function handleVideoError(): void {
+    if (!progressive) return;
+    disableProgressiveStream(item.attachment.file.id);
+    setProgressive(false);
+  }
 
   useLayoutEffect(() => {
     if (active) registerMedia(nodeRef.current);
@@ -601,7 +610,15 @@ function ViewerPage({
         )}
 
         {video ? (
-          <video className={styles.video} src={videoSrc} poster={poster} controls playsInline preload="metadata" />
+          <video
+            className={styles.video}
+            src={videoSrc}
+            poster={poster}
+            controls
+            playsInline
+            preload="metadata"
+            onError={handleVideoError}
+          />
         ) : (
           <img
             className={styles.image}

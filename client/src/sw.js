@@ -75,7 +75,8 @@ function askClientForSource(client, fileId) {
 
 async function requestSource(fileId, clientId) {
   const owner = clientId ? await self.clients.get(clientId) : null;
-  const targets = owner ? [owner] : await self.clients.matchAll({ type: 'window' });
+  const windows = await self.clients.matchAll({ type: 'window' });
+  const targets = owner ? [owner, ...windows.filter((client) => client.id !== owner.id)] : windows;
 
   for (const target of targets) {
     const url = await askClientForSource(target, fileId);
@@ -149,11 +150,7 @@ async function streamFromNetwork(fileId, clientId, request) {
   return fetch(url, range ? { headers: { Range: range } } : undefined);
 }
 
-async function serveVideo(request, clientId) {
-  const url = new URL(request.url);
-  const target = parseStreamUrl(url.pathname, url.search);
-  if (!target) return fetch(request);
-
+async function serveVideo(request, clientId, target) {
   const { fileId, chatId } = target;
   const info = await ensureVideoInfo(fileId, chatId, clientId, request);
   if (!info) return streamFromNetwork(fileId, clientId, request);
@@ -199,7 +196,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith(VIDEO_STREAM_PREFIX)) return;
 
-  event.respondWith(serveVideo(event.request, event.clientId).catch(() => new Response(null, { status: 502 })));
+  const target = parseStreamUrl(url.pathname, url.search);
+  if (!target) return;
+
+  event.respondWith(
+    serveVideo(event.request, event.clientId, target)
+      .catch(() => streamFromNetwork(target.fileId, event.clientId, event.request))
+      .catch(() => new Response(null, { status: 504 })),
+  );
 });
 
 /** Пуш приходит даже когда вкладка закрыта — SW сам показывает нативное уведомление (этап 9). */
