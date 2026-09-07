@@ -50,9 +50,13 @@ function sendSource(target: ServiceWorker, fileId: string, url: string): Promise
 const resolved = new Map<string, Promise<string>>();
 const disabled = new Set<string>();
 
+function resolutionKey(fileId: string, progressive: boolean): string {
+  return `${progressive ? 'sw' : 'direct'}:${fileId}`;
+}
+
 export function disableProgressiveStream(fileId: string): void {
   disabled.add(fileId);
-  resolved.delete(fileId);
+  resolved.delete(resolutionKey(fileId, true));
 }
 
 async function resolve(fileId: string, chatId: string | null, progressive: boolean): Promise<string> {
@@ -68,13 +72,14 @@ async function resolve(fileId: string, chatId: string | null, progressive: boole
 }
 
 export function resolveStreamSrc(fileId: string, chatId: string | null, progressive: boolean): Promise<string> {
-  const known = resolved.get(fileId);
+  const key = resolutionKey(fileId, progressive);
+  const known = resolved.get(key);
   if (known) return known;
 
   const pending = resolve(fileId, chatId, progressive).catch((error: unknown) => {
-    resolved.delete(fileId);
+    resolved.delete(key);
     throw error;
   });
-  resolved.set(fileId, pending);
+  resolved.set(key, pending);
   return pending;
 }
