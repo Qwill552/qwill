@@ -28,7 +28,7 @@ import type {
   UserPresenceEvent,
   UserTypingEvent,
 } from '@messenger/shared';
-import { ErrorCode, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
+import { ErrorCode, isPlayableVideoMimeType, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
 import { getLiveCallsRequest } from '../api/calls';
@@ -402,7 +402,7 @@ function typingKey(chatId: string, userId: string): string {
 function attachmentKind(mimeType: string, hasPeaks: boolean): LocalAttachmentKind {
   if (hasPeaks) return 'voice';
   if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
+  if (isPlayableVideoMimeType(mimeType)) return 'video';
   return 'file';
 }
 
@@ -1375,7 +1375,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       controller.signal.throwIfAborted();
 
       const isImage = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
+      const isVideo = isPlayableVideoMimeType(file.type);
 
       let thumbnailFileId: string | undefined;
       let thumbnailSha256: string | undefined;

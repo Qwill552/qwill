@@ -1,11 +1,11 @@
-import type { AttachmentDto } from '@messenger/shared';
+import { isPlayableVideoMimeType, type AttachmentDto } from '@messenger/shared';
 
 export function isViewableMedia(attachment: AttachmentDto): boolean {
-  return /^(image|video)\//.test(attachment.file.mimeType);
+  return attachment.file.mimeType.startsWith('image/') || isVideoAttachment(attachment);
 }
 
 export function isVideoAttachment(attachment: AttachmentDto): boolean {
-  return attachment.file.mimeType.startsWith('video/');
+  return isPlayableVideoMimeType(attachment.file.mimeType);
 }
 
 export function isGifAttachment(attachment: AttachmentDto): boolean {

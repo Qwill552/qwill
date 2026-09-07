@@ -1,5 +1,5 @@
 import type { ChatSearchResult, SearchResultsDto, UserSearchResult } from '@messenger/shared';
-import { layoutVariants, SEARCH_PAGE_SIZE } from '@messenger/shared';
+import { isPlayableVideoMimeType, layoutVariants, SEARCH_PAGE_SIZE } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { toAvatarColor } from '../lib/avatarColor.js';
@@ -39,7 +39,7 @@ function previewOf(message: LastMessage | undefined): string | null {
   if (!attachment) return null;
   if (attachment.peaks.length > 0 || attachment.file.mimeType.startsWith('audio/')) return 'Голосовое сообщение';
   if (attachment.file.mimeType.startsWith('image/')) return 'Фото';
-  if (attachment.file.mimeType.startsWith('video/')) return 'Видео';
+  if (isPlayableVideoMimeType(attachment.file.mimeType)) return 'Видео';
   return 'Файл';
 }
 

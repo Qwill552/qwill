@@ -1,3 +1,4 @@
+import { isPlayableVideoMimeType } from '@messenger/shared';
 import { useEffect, useState } from 'react';
 
 import { Icon } from '../../ui/Icon';
@@ -17,7 +18,7 @@ function useObjectUrls(files: File[]): (string | null)[] {
 
   useEffect(() => {
     const next = files.map((file) =>
-      file.type.startsWith('image/') || file.type.startsWith('video/') ? URL.createObjectURL(file) : null,
+      file.type.startsWith('image/') || isPlayableVideoMimeType(file.type) ? URL.createObjectURL(file) : null,
     );
     setUrls(next);
     return () => {
@@ -45,7 +46,7 @@ export function MediaPickerSheet({ files, onRemove, onClose, onSend }: MediaPick
             <div key={`${file.name}-${index}`} className={styles.item}>
               {url && file.type.startsWith('image/') ? (
                 <img className={styles.thumb} src={url} alt={file.name} />
-              ) : url && file.type.startsWith('video/') ? (
+              ) : url && isPlayableVideoMimeType(file.type) ? (
                 <video className={styles.thumb} src={url} muted />
               ) : (
                 <div className={styles.fileTile}>

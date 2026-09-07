@@ -1,3 +1,5 @@
+import { isPlayableVideoMimeType } from '@messenger/shared';
+
 import type { TileTint } from '../../ui/IconTile';
 import type { IconName } from '../../ui/Icon';
 
@@ -19,7 +21,8 @@ const ARCHIVE_MIME_TYPES = new Set([
 
 export function fileKindFor(mimeType: string): FileKind {
   if (mimeType.startsWith('audio/')) return { icon: 'headphones', tint: 'teal' };
-  if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) return { icon: 'image', tint: 'blue' };
+  if (mimeType.startsWith('image/') || isPlayableVideoMimeType(mimeType)) return { icon: 'image', tint: 'blue' };
+  if (mimeType.startsWith('video/')) return { icon: 'video', tint: 'blue' };
   if (mimeType === 'application/pdf') return { icon: 'file', tint: 'red' };
   if (ARCHIVE_MIME_TYPES.has(mimeType)) return { icon: 'folder', tint: 'violet' };
   return { icon: 'file', tint: 'indigo' };

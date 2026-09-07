@@ -45,6 +45,7 @@ export const ALLOWED_MIME_TYPES = [
   'image/webp',
   'video/mp4',
   'video/webm',
+  'video/x-matroska',
   'audio/mpeg',
   'audio/ogg',
   'audio/wav',

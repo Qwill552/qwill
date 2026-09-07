@@ -14,6 +14,7 @@ import { haptic } from '../../ui/haptic';
 import { Icon } from '../../ui/Icon';
 import { Emoji } from '../emoji/Emoji';
 import { EmojiPanel } from '../emoji/EmojiPanel';
+import { isViewableMedia } from '../media/mediaKind';
 import { openMediaViewer } from '../media/mediaViewerStore';
 import { DeleteMessageModal } from './DeleteMessageModal';
 import { MessageContextMenu, type MenuOrigin, type MessageMenuItem } from './MessageContextMenu';
@@ -171,7 +172,7 @@ export function MessageRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const hasMediaBubble =
-    /^(image|video)\//.test(message.attachment?.file.mimeType ?? '') ||
+    (message.attachment ? isViewableMedia(message.attachment) : false) ||
     message.localAttachment?.kind === 'image' ||
     message.localAttachment?.kind === 'video';
 

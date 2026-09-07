@@ -55,13 +55,19 @@ export function isBlurhash(value: string | null | undefined): value is string {
   return typeof value === 'string' && blurhashSchema.safeParse(value).success;
 }
 
+export const PLAYABLE_VIDEO_MIME_TYPES: readonly string[] = ['video/mp4', 'video/webm'];
+
+export function isPlayableVideoMimeType(mimeType: string): boolean {
+  return PLAYABLE_VIDEO_MIME_TYPES.includes(mimeType);
+}
+
 export type ChatAttachmentKind = 'photo' | 'video' | 'gif' | 'voice' | 'audio' | 'file';
 
 export function categorizeAttachment(mimeType: string, peaks: number[] | null | undefined): ChatAttachmentKind {
   if (peaks && peaks.length > 0) return 'voice';
   if (mimeType === 'image/gif') return 'gif';
   if (mimeType.startsWith('image/')) return 'photo';
-  if (mimeType.startsWith('video/')) return 'video';
+  if (isPlayableVideoMimeType(mimeType)) return 'video';
   if (mimeType.startsWith('audio/')) return 'audio';
   return 'file';
 }

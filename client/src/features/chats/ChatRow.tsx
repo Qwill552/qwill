@@ -1,4 +1,4 @@
-import type { ChatListItemDto } from '@messenger/shared';
+import { isPlayableVideoMimeType, type ChatListItemDto } from '@messenger/shared';
 import { useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -40,7 +40,8 @@ function isImage(chat: ChatListItemDto): boolean {
 }
 
 function isVideo(chat: ChatListItemDto): boolean {
-  return chat.lastMessage?.attachment?.file.mimeType.startsWith('video/') ?? false;
+  const mimeType = chat.lastMessage?.attachment?.file.mimeType;
+  return mimeType !== undefined && isPlayableVideoMimeType(mimeType);
 }
 
 function attachmentIcon(chat: ChatListItemDto, own: boolean): IconName | null {

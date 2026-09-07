@@ -1,5 +1,6 @@
 import {
   extractLinks,
+  PLAYABLE_VIDEO_MIME_TYPES,
   type ChatAttachmentCategory,
   type ChatAttachmentCounts,
   type ChatAttachmentDto,
@@ -23,7 +24,7 @@ const photoWhere: Prisma.AttachmentWhereInput = {
 };
 const videoWhere: Prisma.AttachmentWhereInput = {
   peaks: { isEmpty: true },
-  file: { mimeType: { startsWith: 'video/' } },
+  file: { mimeType: { in: [...PLAYABLE_VIDEO_MIME_TYPES] } },
 };
 const gifWhere: Prisma.AttachmentWhereInput = {
   peaks: { isEmpty: true },
@@ -40,7 +41,7 @@ const fileWhere: Prisma.AttachmentWhereInput = {
   peaks: { isEmpty: true },
   NOT: [
     { file: { mimeType: { startsWith: 'image/' } } },
-    { file: { mimeType: { startsWith: 'video/' } } },
+    { file: { mimeType: { in: [...PLAYABLE_VIDEO_MIME_TYPES] } } },
     { file: { mimeType: { startsWith: 'audio/' } } },
   ],
 };
