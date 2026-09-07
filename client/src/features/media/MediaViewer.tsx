@@ -22,6 +22,7 @@ const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const TAP_SLOP = 8;
 const TAP_MS = 320;
+const NATIVE_CONTROLS_PX = 48;
 const FLING = 0.5;
 const PAGE_RATIO = 0.28;
 const DISMISS_PX = 110;
@@ -275,8 +276,17 @@ function ViewerStage({ chatId }: { chatId: string }) {
     };
   }
 
+  function videoUnderPointer(event: React.PointerEvent<HTMLDivElement>): HTMLVideoElement | null {
+    return (event.target as HTMLElement).closest('video');
+  }
+
+  function onNativeControls(event: React.PointerEvent<HTMLDivElement>, video: HTMLVideoElement): boolean {
+    return event.clientY > video.getBoundingClientRect().bottom - NATIVE_CONTROLS_PX;
+  }
+
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
-    if ((event.target as HTMLElement).closest('video')) return;
+    const video = videoUnderPointer(event);
+    if (video && onNativeControls(event, video)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     setGesturing(true);
@@ -400,6 +410,12 @@ function ViewerStage({ chatId }: { chatId: string }) {
     }
 
     if (!g.moved && event.timeStamp - g.startTime < TAP_MS && settledZoom.scale === MIN_SCALE) {
+      const video = videoUnderPointer(event);
+      if (video) {
+        if (video.paused) void video.play().catch(() => undefined);
+        else video.pause();
+        return;
+      }
       setChrome((visible) => !visible);
     }
   }
@@ -480,6 +496,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
                 wantOriginal={active && wantOriginal}
                 registerMedia={registerMedia}
                 onNaturalRatio={active ? setNaturalRatio : undefined}
+                onPlayingChange={active ? (playing) => setChrome(!playing) : undefined}
               />
             );
           })}
@@ -556,6 +573,7 @@ function ViewerPage({
   wantOriginal,
   registerMedia,
   onNaturalRatio,
+  onPlayingChange,
 }: {
   item: MediaViewerItem;
   offset: number;
@@ -566,6 +584,7 @@ function ViewerPage({
   wantOriginal: boolean;
   registerMedia: (node: HTMLElement | null) => void;
   onNaturalRatio?: (ratio: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const video = isVideoAttachment(item.attachment);
@@ -618,6 +637,8 @@ function ViewerPage({
             playsInline
             preload="metadata"
             onError={handleVideoError}
+            onPlay={() => onPlayingChange?.(true)}
+            onPause={() => onPlayingChange?.(false)}
           />
         ) : (
           <img
