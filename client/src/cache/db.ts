@@ -21,7 +21,7 @@ const DEFAULT_RETENTION_SETTINGS: RetentionSettings = {
 
 interface SettingEntry {
   key: string;
-  value: RetentionPeriod | Record<string, RetentionPeriod>;
+  value: unknown;
 }
 
 export interface CachedMedia {

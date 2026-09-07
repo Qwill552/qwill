@@ -5,6 +5,8 @@ import { currentScrollEpoch, exceedsMoveThreshold } from '../../ui/gestures/gest
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { haptic } from '../../ui/haptic';
 import { Icon } from '../../ui/Icon';
+import { Spinner } from '../../ui/Spinner';
+import { formatBytes } from '../messages/Attachment';
 import { isVideoAttachment } from './mediaKind';
 import { openMediaViewer } from './mediaViewerStore';
 import { BLURHASH_CANVAS_SIDE, useBlurhashCanvas, useDecodedSrc, useProgressiveSrc } from './useMediaSrc';
@@ -48,13 +50,26 @@ export function MediaTile({
   onOpen,
 }: MediaTileProps) {
   const ref = useRef<HTMLButtonElement>(null);
-  const src = useDecodedSrc(useProgressiveSrc(attachment, ref, chatId));
+  const media = useProgressiveSrc(attachment, ref, chatId);
+  const src = useDecodedSrc(media.src);
   const blurRef = useBlurhashCanvas(attachment.blurhash);
   const video = isVideoAttachment(attachment);
   const albumSelectable = onLongPressTile !== undefined;
   const open = onOpen ?? (() => openMediaViewer(chatId, attachment.id));
   const pointerStartRef = useRef<{ x: number; y: number; epoch: number } | null>(null);
   const longPressFiredRef = useRef(false);
+
+  function activate(): void {
+    if (media.blocked) {
+      media.requestDownload();
+      return;
+    }
+    if (media.downloading) {
+      media.cancelDownload();
+      return;
+    }
+    open();
+  }
 
   const longPress = useLongPress({
     onLongPress: () => {
@@ -93,7 +108,7 @@ export function MediaTile({
       onTapSelect?.();
       return;
     }
-    open();
+    activate();
   }
 
   function handlePointerCancel(): void {
@@ -110,7 +125,15 @@ export function MediaTile({
       data-media-id={attachment.id}
       className={`${styles.tile} ${selected ? styles.tileSelected : ''} ${className ?? ''}`}
       style={style}
-      aria-label={video ? `Видео ${attachment.originalName}` : `Фото ${attachment.originalName}`}
+      aria-label={
+        media.blocked
+          ? `Загрузить, ${formatBytes(media.sizeBytes)}`
+          : media.downloading
+            ? 'Отменить загрузку'
+            : video
+              ? `Видео ${attachment.originalName}`
+              : `Фото ${attachment.originalName}`
+      }
       aria-pressed={albumSelectable && selectionMode ? selected : undefined}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -120,10 +143,10 @@ export function MediaTile({
         if (albumSelectable) {
           if (event.detail !== 0) return;
           if (selectionMode) onTapSelect?.();
-          else open();
+          else activate();
           return;
         }
-        if (standalone || event.detail === 0) open();
+        if (standalone || event.detail === 0) activate();
       }}
     >
       {attachment.blurhash && (
@@ -146,7 +169,7 @@ export function MediaTile({
         />
       )}
 
-      {video && (
+      {video && !media.blocked && !media.downloading && (
         <span className={styles.play} aria-hidden="true">
           <Icon name="play" size={20} />
         </span>
@@ -154,6 +177,19 @@ export function MediaTile({
 
       {video && attachment.duration !== null && (
         <span className={styles.duration}>{formatMediaDuration(attachment.duration)}</span>
+      )}
+
+      {media.blocked && (
+        <span className={styles.downloadBadge} aria-hidden="true">
+          <Icon name="download" size={18} />
+          <span className={styles.downloadSize}>{formatBytes(media.sizeBytes)}</span>
+        </span>
+      )}
+
+      {media.downloading && (
+        <span className={styles.downloadBadge} aria-hidden="true">
+          <Spinner size={18} />
+        </span>
       )}
 
       {overlay && <span className={styles.overlay}>{overlay}</span>}

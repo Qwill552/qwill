@@ -7,6 +7,15 @@ import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { isStoragePersisted, readRetentionSettings, writeRetentionSetting, type MediaKind, type RetentionPeriod } from '../cache/db';
 import {
+  AUTO_DOWNLOAD_SIZE_STEPS_MB,
+  DEFAULT_AUTO_DOWNLOAD_SETTINGS,
+  readAutoDownloadSettings,
+  writeAutoDownloadSettings,
+  type AutoDownloadKind,
+  type AutoDownloadSettings,
+  type NetworkKind as AutoDownloadNetworkKind,
+} from '../cache/settings';
+import {
   areAllSelected,
   chatCellKeys,
   chatKindCellKey,
@@ -26,6 +35,7 @@ import { isEmptyPrivateChat } from '../features/chats/visibleChats';
 import { Emoji } from '../features/emoji/Emoji';
 import { Modal } from '../features/groups/Modal';
 import { formatBytes } from '../features/messages/Attachment';
+import { getSaveData } from '../net/connection';
 import { useChatStore } from '../stores/chatStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -38,6 +48,7 @@ import { ScrollIndicator } from '../ui/ScrollIndicator';
 import { SegmentedControl, type Segment } from '../ui/SegmentedControl';
 import { Sheet } from '../ui/Sheet';
 import { Skeleton } from '../ui/Skeleton';
+import { Switch } from '../ui/Switch';
 import styles from './StorageScreen.module.css';
 
 const KIND_LABEL: Record<MediaKind, string> = {
@@ -69,6 +80,22 @@ const KIND_TINT: Record<MediaKind, TileTint> = {
   avatar: 'indigo',
   other: 'teal',
 };
+
+const AUTO_DOWNLOAD_KIND_LABEL: Record<AutoDownloadKind, string> = {
+  photo: 'Фото',
+  video: 'Видео',
+  gif: 'GIF',
+  file: 'Файлы',
+};
+
+const AUTO_DOWNLOAD_NETWORK_LABEL: Record<AutoDownloadNetworkKind, string> = {
+  cellular: 'Мобильная сеть',
+  wifi: 'Wi-Fi',
+};
+
+function formatMaxBytes(maxBytes: number | null): string {
+  return maxBytes === null ? 'Без ограничения' : formatBytes(maxBytes);
+}
 
 const RETENTION_SEGMENTS: Segment<RetentionPeriod>[] = [
   { value: '3d', label: '3 дня' },
@@ -196,6 +223,10 @@ export function StorageScreen() {
   const [keepMediaGroups, setKeepMediaGroups] = useState<RetentionPeriod>('1w');
   const [keepMediaExceptions, setKeepMediaExceptions] = useState<Record<string, RetentionPeriod>>({});
 
+  const [autoDownload, setAutoDownload] = useState<AutoDownloadSettings>(DEFAULT_AUTO_DOWNLOAD_SETTINGS);
+  const [saveDataOn, setSaveDataOn] = useState(false);
+  const [sizeSheetNetwork, setSizeSheetNetwork] = useState<AutoDownloadNetworkKind | null>(null);
+
   async function refresh(): Promise<void> {
     const [nextUsage, nextCount] = await Promise.all([computeStorageUsage(), countCachedMessages()]);
     setUsage(nextUsage);
@@ -212,6 +243,9 @@ export function StorageScreen() {
       setKeepMediaGroups(settings.keepMediaGroups);
       setKeepMediaExceptions(settings.keepMediaExceptions);
     });
+
+    void readAutoDownloadSettings().then(setAutoDownload);
+    setSaveDataOn(getSaveData());
 
     if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
       void navigator.storage.estimate().then((result) => {
@@ -281,6 +315,19 @@ export function StorageScreen() {
   function addException(chatId: string): void {
     setExceptionPickerOpen(false);
     setExceptionPeriod(chatId, keepMediaPrivate);
+  }
+
+  function updateAutoDownload(network: AutoDownloadNetworkKind, patch: Partial<AutoDownloadSettings[AutoDownloadNetworkKind]>): void {
+    setAutoDownload((prev) => {
+      const next = { ...prev, [network]: { ...prev[network], ...patch } };
+      void writeAutoDownloadSettings(next);
+      return next;
+    });
+  }
+
+  function resetAutoDownload(): void {
+    setAutoDownload(DEFAULT_AUTO_DOWNLOAD_SETTINGS);
+    void writeAutoDownloadSettings(DEFAULT_AUTO_DOWNLOAD_SETTINGS);
   }
 
   const selectedBytes = usage ? selectionTotalBytes(usage, selection) : 0;
@@ -400,6 +447,44 @@ export function StorageScreen() {
           </div>
         </Card>
 
+        {(['cellular', 'wifi'] as const).map((network) => (
+          <Card key={network} caption={`Автозагрузка медиа — ${AUTO_DOWNLOAD_NETWORK_LABEL[network]}`}>
+            {(['photo', 'video', 'gif', 'file'] as const).map((kind) => (
+              <Card.Row
+                key={kind}
+                title={AUTO_DOWNLOAD_KIND_LABEL[kind]}
+                chevron={false}
+                trailing={
+                  <Switch
+                    checked={autoDownload[network][kind]}
+                    onChange={(checked) => updateAutoDownload(network, { [kind]: checked })}
+                    label={`${AUTO_DOWNLOAD_KIND_LABEL[kind]}: ${AUTO_DOWNLOAD_NETWORK_LABEL[network]}`}
+                  />
+                }
+              />
+            ))}
+            <Card.Row
+              title="Ограничение размера"
+              value={formatMaxBytes(autoDownload[network].maxBytes)}
+              onClick={() => setSizeSheetNetwork(network)}
+            />
+          </Card>
+        ))}
+
+        {saveDataOn && (
+          <Card>
+            <Card.Row
+              title="Экономия трафика включена"
+              subtitle="Автозагрузка медиа временно выключена в системе"
+              chevron={false}
+            />
+          </Card>
+        )}
+
+        <Card>
+          <Card.Row title="Сбросить автозагрузку к умолчаниям" chevron={false} onClick={resetAutoDownload} />
+        </Card>
+
         <Card caption="Исключения">
           {exceptionChatIds.map((chatId) => {
             const chat = chatById.get(chatId);
@@ -510,6 +595,37 @@ export function StorageScreen() {
               />
             ))}
             {pickableChats.length === 0 && <Card.Row title="Нет доступных чатов" chevron={false} />}
+          </Card>
+        </Sheet>
+      )}
+
+      {sizeSheetNetwork && (
+        <Sheet title="Ограничение размера" onClose={() => setSizeSheetNetwork(null)}>
+          <Card>
+            {AUTO_DOWNLOAD_SIZE_STEPS_MB.map((mb) => {
+              const bytes = mb * 1024 * 1024;
+              return (
+                <Card.Row
+                  key={mb}
+                  title={`${mb} МБ`}
+                  trailing={<RowCheckbox checked={autoDownload[sizeSheetNetwork].maxBytes === bytes} />}
+                  chevron={false}
+                  onClick={() => {
+                    updateAutoDownload(sizeSheetNetwork, { maxBytes: bytes });
+                    setSizeSheetNetwork(null);
+                  }}
+                />
+              );
+            })}
+            <Card.Row
+              title="Без ограничения"
+              trailing={<RowCheckbox checked={autoDownload[sizeSheetNetwork].maxBytes === null} />}
+              chevron={false}
+              onClick={() => {
+                updateAutoDownload(sizeSheetNetwork, { maxBytes: null });
+                setSizeSheetNetwork(null);
+              }}
+            />
           </Card>
         </Sheet>
       )}

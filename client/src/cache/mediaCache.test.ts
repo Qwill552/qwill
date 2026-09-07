@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAllCache, openCacheDb, writeRetentionSetting, type MediaTier } from './db';
 import {
   evictToBudget,
+  hasCachedMedia,
   MEDIA_ACCESS_THROTTLE_MS,
   removeCachedMediaByFileIds,
   resolveMedia,
@@ -214,6 +215,23 @@ describe('чтение из кэша', () => {
 
     expect(puts.names).toEqual(['mediaMeta']);
     expect((await db!.get('mediaMeta', 'r3'))!.lastUsedAt).toBeGreaterThan(Date.now() - MEDIA_ACCESS_THROTTLE_MS);
+  });
+});
+
+describe('hasCachedMedia', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+  });
+
+  it('false, если записи в mediaMeta нет', async () => {
+    expect(await hasCachedMedia('missing')).toBe(false);
+  });
+
+  it('true, если запись в mediaMeta есть', async () => {
+    const db = await openCacheDb();
+    await db!.put('mediaMeta', { fileId: 'hit', chatId: 'c1', kind: 'photo', tier: 'thumb', size: 1, lastUsedAt: 0 });
+
+    expect(await hasCachedMedia('hit')).toBe(true);
   });
 });
 

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useFileSrc } from '../../api/useFileSrc';
 import type { MediaKind } from '../../cache/db';
+import { cancelMediaDownload, hasCachedMedia } from '../../cache/mediaCache';
+import { readAutoDownloadSettings, shouldAutoDownload, type AutoDownloadKind } from '../../cache/settings';
+import { getNetworkKind, getSaveData } from '../../net/connection';
 import { scrollParentOf } from '../../ui/scrollParent';
 import { MEDIA_LOAD_MARGIN_PX, useMediaFeed } from './mediaFeedScope';
 
@@ -109,6 +112,73 @@ export function mediaKindOf(attachment: AttachmentDto): MediaKind {
   return kind === 'gif' ? 'photo' : kind;
 }
 
+function autoDownloadKindOf(attachment: AttachmentDto): AutoDownloadKind | null {
+  const kind = categorizeAttachment(attachment.file.mimeType, attachment.peaks);
+  return kind === 'photo' || kind === 'video' || kind === 'gif' || kind === 'file' ? kind : null;
+}
+
+interface AutoDownloadGate {
+  ready: boolean;
+  allowed: boolean;
+  manual: boolean;
+  requestDownload: () => void;
+  cancelDownload: () => void;
+}
+
+function useAutoDownloadGate(attachment: AttachmentDto, previewFileId: string): AutoDownloadGate {
+  const kind = autoDownloadKindOf(attachment);
+  const [ready, setReady] = useState(kind === null);
+  const [allowed, setAllowed] = useState(kind === null);
+  const [manual, setManual] = useState(false);
+
+  useEffect(() => {
+    if (kind === null) {
+      setReady(true);
+      setAllowed(true);
+      return;
+    }
+
+    let cancelled = false;
+    setReady(false);
+    setManual(false);
+
+    const cacheCheckId = kind === 'gif' ? attachment.file.id : previewFileId;
+
+    void Promise.all([hasCachedMedia(cacheCheckId), readAutoDownloadSettings()]).then(([cached, settings]) => {
+      if (cancelled) return;
+
+      const network = getNetworkKind();
+      setAllowed(
+        shouldAutoDownload({
+          kind,
+          network: network === 'cellular' ? 'cellular' : 'wifi',
+          sizeBytes: attachment.file.size,
+          cached,
+          saveData: getSaveData(),
+          settings,
+        }),
+      );
+      setReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [kind, previewFileId, attachment.file.id, attachment.file.size]);
+
+  return {
+    ready,
+    allowed,
+    manual,
+    requestDownload: () => setManual(true),
+    cancelDownload: () => {
+      setManual(false);
+      cancelMediaDownload(previewFileId);
+      if (kind === 'gif') cancelMediaDownload(attachment.file.id);
+    },
+  };
+}
+
 export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null, enabled = true): string | undefined {
   const fileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
   const hasDownscaled = Boolean(attachment.preview ?? attachment.thumbnail);
@@ -119,17 +189,40 @@ export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null, 
   });
 }
 
+export interface ProgressiveMedia {
+  src: string | undefined;
+  blocked: boolean;
+  downloading: boolean;
+  sizeBytes: number;
+  requestDownload: () => void;
+  cancelDownload: () => void;
+}
+
 export function useProgressiveSrc(
   attachment: AttachmentDto,
   ref: RefObject<Element | null>,
   chatId: string | null,
-): string | undefined {
+): ProgressiveMedia {
   const feed = useMediaFeed();
   const reached = useReachedViewport(ref);
-  const preview = usePreviewSrc(attachment, chatId, feed === null || reached);
-  const wanted = needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
-  const original = useDecodedSrc(useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) }));
-  return original ?? preview;
+  const previewFileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
+  const gate = useAutoDownloadGate(attachment, previewFileId);
+  const unlocked = gate.allowed || gate.manual;
+
+  const preview = usePreviewSrc(attachment, chatId, (feed === null || reached) && unlocked);
+  const wanted =
+    unlocked && needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
+  const rawOriginal = useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) });
+  const original = useDecodedSrc(rawOriginal);
+
+  return {
+    src: original ?? preview,
+    blocked: reached && gate.ready && !unlocked,
+    downloading: gate.manual && !(rawOriginal ?? preview),
+    sizeBytes: attachment.file.size,
+    requestDownload: gate.requestDownload,
+    cancelDownload: gate.cancelDownload,
+  };
 }
 
 export function mediaRatio(attachment: AttachmentDto): number | null {

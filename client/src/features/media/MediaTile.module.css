@@ -76,6 +76,29 @@
   transform: translate(-50%, -50%);
 }
 
+.downloadBadge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--viewer-chrome-bg);
+  color: var(--viewer-ink);
+  transform: translate(-50%, -50%);
+}
+
+.downloadSize {
+  font-size: var(--font-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .duration {
   position: absolute;
   top: 6px;

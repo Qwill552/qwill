@@ -208,14 +208,26 @@ async function withDownloadSlot<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
+const downloadAbortControllers = new Map<string, AbortController>();
+
+export function cancelMediaDownload(fileId: string): void {
+  downloadAbortControllers.get(fileId)?.abort();
+  downloadAbortControllers.delete(fileId);
+}
+
 async function download(fileId: string): Promise<Blob | null> {
+  const controller = new AbortController();
+  downloadAbortControllers.set(fileId, controller);
+
   try {
     const token = await getFileToken(fileId);
-    const res = await fetch(buildFileSrc(fileId, token));
+    const res = await fetch(buildFileSrc(fileId, token), { signal: controller.signal });
     if (!res.ok) return null;
     return await res.blob();
   } catch {
     return null;
+  } finally {
+    downloadAbortControllers.delete(fileId);
   }
 }
 
@@ -240,6 +252,17 @@ export function resolveMedia(fileId: string, descriptor: MediaDescriptor): Promi
   const task = loadMedia(fileId, descriptor).finally(() => inflight.delete(fileId));
   inflight.set(fileId, task);
   return task;
+}
+
+export async function hasCachedMedia(fileId: string): Promise<boolean> {
+  const db = await openCacheDb();
+  if (!db) return false;
+
+  try {
+    return (await db.get('mediaMeta', fileId)) !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 export function startCacheMaintenance(): void {
