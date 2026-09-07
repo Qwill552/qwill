@@ -64,14 +64,3 @@ export function resolveContainerMimeType(sniffed: string, declaredMimeType: stri
   const family = CONTAINER_FAMILIES[sniffed];
   return family?.includes(declaredMimeType) ? declaredMimeType : sniffed;
 }
-
-/** У текстовых файлов нет сигнатуры — эвристика: нет нулевых байт и почти всё в печатном ASCII/UTF-8 диапазоне. */
-export function looksLikeText(head: Buffer): boolean {
-  if (head.length === 0) return true;
-  let printable = 0;
-  for (const byte of head) {
-    if (byte === 0) return false;
-    if (byte === 9 || byte === 10 || byte === 13 || (byte >= 32 && byte < 127) || byte >= 128) printable++;
-  }
-  return printable / head.length > 0.95;
-}

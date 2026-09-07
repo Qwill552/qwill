@@ -4,10 +4,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  ALLOWED_MIME_TYPES,
   AVATAR_MIME_TYPES,
   AVATAR_STORED_MAX_DIMENSION,
   ErrorCode,
+  FALLBACK_MIME_TYPE,
+  isInlineSafeMimeType,
+  sanitizeMimeType,
   type FileDto,
   type InitUploadInput,
   type InitUploadResponse,
@@ -16,7 +18,7 @@ import {
 import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { AppError, notFound, tooLarge } from '../lib/errors.js';
-import { looksLikeText, resolveContainerMimeType, sniffMimeType } from '../lib/fileSignature.js';
+import { resolveContainerMimeType, sniffMimeType } from '../lib/fileSignature.js';
 import { logger } from '../lib/logger.js';
 import { isProcessableImageMimeType, processImage, type ProcessedImage } from '../lib/processImage.js';
 import type { File, UploadSession } from '../generated/prisma/client.js';
@@ -89,10 +91,11 @@ export async function initUpload(userId: string, input: InitUploadInput): Promis
     throw tooLarge(`Файл больше ${Math.floor(limitBytes / (1024 * 1024))} МБ`);
   }
 
-  const allowedTypes: readonly string[] = input.purpose === 'avatar' ? AVATAR_MIME_TYPES : ALLOWED_MIME_TYPES;
-  if (!allowedTypes.includes(input.mimeType)) {
+  const avatarTypes: readonly string[] = AVATAR_MIME_TYPES;
+  if (input.purpose === 'avatar' && !avatarTypes.includes(input.mimeType)) {
     throw new AppError(ErrorCode.UNSUPPORTED_MEDIA_TYPE, 415, 'Недопустимый тип файла');
   }
+  const declaredMimeType = input.purpose === 'avatar' ? input.mimeType : sanitizeMimeType(input.mimeType);
 
   // Тот же файл уже частично докачан этим пользователем — переиспользуем сессию, а не начинаем
   // с нуля: обрыв связи и повторный вызов initUpload иначе теряли бы уже принятые байты (секция 7).
@@ -117,7 +120,7 @@ export async function initUpload(userId: string, input: InitUploadInput): Promis
       userId,
       sha256: input.sha256,
       size: input.size,
-      mimeType: input.mimeType,
+      mimeType: declaredMimeType,
       originalName: input.originalName,
       purpose: input.purpose,
       tempPath,
@@ -166,6 +169,17 @@ export async function appendChunk(
   return { status: 'done', receivedBytes: nextReceived, file };
 }
 
+function confirmedMimeType(head: Buffer, declaredMimeType: string): string | null {
+  const sniffed = sniffMimeType(head);
+  return sniffed ? resolveContainerMimeType(sniffed, declaredMimeType) : null;
+}
+
+function pickStoredMimeType(purpose: string, declaredMimeType: string, confirmed: string | null): string {
+  if (purpose === 'avatar') return confirmed ?? declaredMimeType;
+  if (!isInlineSafeMimeType(declaredMimeType)) return declaredMimeType;
+  return confirmed === declaredMimeType ? declaredMimeType : FALLBACK_MIME_TYPE;
+}
+
 async function finalizeUpload(session: UploadSession): Promise<FileDto> {
   const sourceSha256 = await hashFile(session.tempPath);
   if (sourceSha256 !== session.sha256) {
@@ -174,21 +188,17 @@ async function finalizeUpload(session: UploadSession): Promise<FileDto> {
     throw new AppError(ErrorCode.UPLOAD_HASH_MISMATCH, 400, 'Файл повреждён при передаче, попробуйте снова');
   }
 
-  // Определяющий тип — сигнатура содержимого, а не то, что заявил клиент (секция 7).
   const head = await readHead(session.tempPath, 4096);
-  const sniffed = sniffMimeType(head);
-  const allowedTypes: readonly string[] = session.purpose === 'avatar' ? AVATAR_MIME_TYPES : ALLOWED_MIME_TYPES;
-  const finalMime = sniffed
-    ? resolveContainerMimeType(sniffed, session.mimeType)
-    : session.mimeType === 'text/plain' && looksLikeText(head)
-      ? 'text/plain'
-      : null;
+  const confirmed = confirmedMimeType(head, session.mimeType);
+  const avatarTypes: readonly string[] = AVATAR_MIME_TYPES;
 
-  if (!finalMime || !allowedTypes.includes(finalMime)) {
+  if (session.purpose === 'avatar' && (confirmed === null || !avatarTypes.includes(confirmed))) {
     await safeUnlink(session.tempPath);
     await prisma.uploadSession.delete({ where: { id: session.id } }).catch(() => undefined);
     throw new AppError(ErrorCode.UNSUPPORTED_MEDIA_TYPE, 415, 'Недопустимый тип файла');
   }
+
+  const finalMime = pickStoredMimeType(session.purpose, session.mimeType, confirmed);
 
   let processed: ProcessedImage | null = null;
   if (session.purpose === 'avatar' && isProcessableImageMimeType(finalMime)) {

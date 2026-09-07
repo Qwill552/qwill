@@ -1,4 +1,3 @@
-import { ALLOWED_MIME_TYPES } from '@messenger/shared';
 import { useEffect, useRef } from 'react';
 
 import { useLayoutMode } from '../../app/useLayoutMode';
@@ -18,7 +17,7 @@ interface Tile {
   accept: string;
 }
 
-const ALL_FILES_ACCEPT = ALLOWED_MIME_TYPES.join(',');
+const ALL_FILES_ACCEPT = '*/*';
 
 const TILES: Tile[] = [
   { id: 'gallery', icon: 'image', label: 'Галерея', accept: 'image/*,video/*' },

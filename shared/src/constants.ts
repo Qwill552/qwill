@@ -34,29 +34,24 @@ export const SEARCH_PAGE_SIZE = 20;
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;
 
-/**
- * Белый список MIME-типов для вложений (секция 7). Сервер дополнительно проверяет
- * содержимое по сигнатуре — этот список используется и там, и для accept= на клиенте.
- */
-export const ALLOWED_MIME_TYPES = [
+export const INLINE_SAFE_MIME_TYPES = [
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
   'video/mp4',
   'video/webm',
-  'video/x-matroska',
-  'video/matroska',
   'audio/mpeg',
   'audio/ogg',
   'audio/wav',
   'audio/webm',
   'audio/mp4',
-  'application/pdf',
-  'application/zip',
-  'text/plain',
 ] as const;
-export type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
+
+export function isInlineSafeMimeType(mimeType: string): boolean {
+  const safe: readonly string[] = INLINE_SAFE_MIME_TYPES;
+  return safe.includes(mimeType);
+}
 
 /** Аватар — только изображения (секция 7). GIF идёт мимо кроппера (files.ts, isGifFile) —
  *  канвас плющит анимацию до одного кадра, поэтому загружается как есть. */

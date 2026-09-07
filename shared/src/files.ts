@@ -55,6 +55,17 @@ export function isBlurhash(value: string | null | undefined): value is string {
   return typeof value === 'string' && blurhashSchema.safeParse(value).success;
 }
 
+export const FALLBACK_MIME_TYPE = 'application/octet-stream';
+
+const MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/;
+const MIME_TYPE_MAX_LENGTH = 100;
+
+export function sanitizeMimeType(value: string | null | undefined): string {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized.length === 0 || normalized.length > MIME_TYPE_MAX_LENGTH) return FALLBACK_MIME_TYPE;
+  return MIME_TYPE_PATTERN.test(normalized) ? normalized : FALLBACK_MIME_TYPE;
+}
+
 export const PLAYABLE_VIDEO_MIME_TYPES: readonly string[] = ['video/mp4', 'video/webm'];
 
 export function isPlayableVideoMimeType(mimeType: string): boolean {

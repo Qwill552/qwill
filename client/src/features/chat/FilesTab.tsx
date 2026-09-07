@@ -7,6 +7,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { haptic } from '../../ui/haptic';
 import { fileKindFor } from '../media/fileKind';
+import { RiskyFileModal } from '../media/RiskyFileModal';
 import { useFileDownload } from '../media/useFileDownload';
 import { formatBytes } from '../messages/Attachment';
 import { formatAttachmentDateTime } from '../messages/dayLabel';
@@ -29,8 +30,8 @@ function FileRow({
   onMenu: (messageId: number, anchor: DOMRect) => void;
 }) {
   const { attachment } = item;
-  const kind = fileKindFor(attachment.file.mimeType);
-  const { state, progress, activate, cancel } = useFileDownload(attachment);
+  const kind = fileKindFor(attachment.file.mimeType, attachment.originalName);
+  const { state, progress, activate, cancel, riskyPrompt, confirmRisky, cancelRisky } = useFileDownload(attachment);
   const busy = state === 'downloading';
   const selected = (selection?.active && selection.selectedIds.has(item.messageId)) ?? false;
   const longPressFiredRef = useRef(false);
@@ -64,47 +65,52 @@ function FileRow({
   }
 
   return (
-    <button
-      type="button"
-      className={styles.row}
-      onClick={handleClick}
-      onPointerDown={longPress.onPointerDown}
-      onPointerMove={longPress.onPointerMove}
-      onPointerUp={longPress.onPointerUp}
-      onPointerCancel={longPress.onPointerCancel}
-      onContextMenu={handleContextMenu}
-      aria-pressed={selection?.active ? selected : undefined}
-      aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
-    >
-      <span className={styles.lead}>
-        {selection?.active ? (
-          <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
-            {selected && <Icon name="check" size={12} />}
-          </span>
-        ) : (
-          <>
-            <IconTile icon={kind.icon} tint={kind.tint} />
-            {busy && (
-              <span className={styles.progress}>
-                <ProgressRing progress={progress} />
-                <Icon name="close" size={14} className={styles.cancelGlyph} />
-              </span>
-            )}
-            {state === 'ready' && (
-              <span className={styles.ready} aria-hidden="true">
-                <Icon name="check" size={12} />
-              </span>
-            )}
-          </>
-        )}
-      </span>
-      <span className={styles.info}>
-        <span className={styles.name}>{attachment.originalName}</span>
-        <span className={styles.meta}>
-          {formatBytes(attachment.file.size)} · {formatAttachmentDateTime(item.createdAt)}
+    <>
+      <button
+        type="button"
+        className={styles.row}
+        onClick={handleClick}
+        onPointerDown={longPress.onPointerDown}
+        onPointerMove={longPress.onPointerMove}
+        onPointerUp={longPress.onPointerUp}
+        onPointerCancel={longPress.onPointerCancel}
+        onContextMenu={handleContextMenu}
+        aria-pressed={selection?.active ? selected : undefined}
+        aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
+      >
+        <span className={styles.lead}>
+          {selection?.active ? (
+            <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+              {selected && <Icon name="check" size={12} />}
+            </span>
+          ) : (
+            <>
+              <IconTile icon={kind.icon} tint={kind.tint} />
+              {busy && (
+                <span className={styles.progress}>
+                  <ProgressRing progress={progress} />
+                  <Icon name="close" size={14} className={styles.cancelGlyph} />
+                </span>
+              )}
+              {state === 'ready' && (
+                <span className={styles.ready} aria-hidden="true">
+                  <Icon name="check" size={12} />
+                </span>
+              )}
+            </>
+          )}
         </span>
-      </span>
-    </button>
+        <span className={styles.info}>
+          <span className={styles.name}>{attachment.originalName}</span>
+          <span className={styles.meta}>
+            {formatBytes(attachment.file.size)} · {formatAttachmentDateTime(item.createdAt)}
+          </span>
+        </span>
+      </button>
+      {riskyPrompt && (
+        <RiskyFileModal fileName={attachment.originalName} onCancel={cancelRisky} onConfirm={confirmRisky} />
+      )}
+    </>
   );
 }
 

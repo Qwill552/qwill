@@ -2,6 +2,7 @@ import type { ErrorCode, FileDto, InitUploadInput, InitUploadResponse, UploadChu
 import {
   AVATAR_JPEG_QUALITY,
   AVATAR_MAX_DIMENSION,
+  sanitizeMimeType,
   THUMBNAIL_JPEG_QUALITY,
   THUMBNAIL_MAX_DIMENSION,
   UPLOAD_OFFSET_HEADER,
@@ -95,7 +96,7 @@ export async function uploadFile(
   knownSha256?: string,
 ): Promise<UploadedFile> {
   const sha256Hex = knownSha256 ?? (await hashBlob(file));
-  const mimeType = file.type || 'application/octet-stream';
+  const mimeType = sanitizeMimeType(file.type);
 
   const init = await withRateLimitRetry(
     () =>

@@ -3,7 +3,9 @@ import fs from 'node:fs/promises';
 
 import {
   ErrorCode,
+  FALLBACK_MIME_TYPE,
   initUploadSchema,
+  isInlineSafeMimeType,
   UPLOAD_OFFSET_HEADER,
   type UploadChunkResponse,
 } from '@messenger/shared';
@@ -11,6 +13,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { Router, raw } from 'express';
 
 import { env } from '../../config/env.js';
+import { attachmentContentDisposition } from '../../lib/contentDisposition.js';
 import { unauthorized } from '../../lib/errors.js';
 import { signFileToken, verifyFileToken } from '../../lib/tokens.js';
 import { canAdminReadFile } from '../../services/adminChat.js';
@@ -114,7 +117,13 @@ filesRouter.get('/:id', (req: Request, res: Response, next: NextFunction) => {
     .then(async (info) => {
       const stat = await fs.stat(info.path);
 
-      res.setHeader('Content-Type', info.mimeType);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      if (isInlineSafeMimeType(info.mimeType)) {
+        res.setHeader('Content-Type', info.mimeType);
+      } else {
+        res.setHeader('Content-Type', FALLBACK_MIME_TYPE);
+        res.setHeader('Content-Disposition', attachmentContentDisposition(req.query.name));
+      }
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
 

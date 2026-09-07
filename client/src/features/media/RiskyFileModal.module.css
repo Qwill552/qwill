@@ -1,0 +1,69 @@
+.overlay {
+  z-index: 350;
+  --modal-close-ink: var(--text-primary);
+}
+
+@media (min-width: 900px) {
+  .overlay {
+    --modal-scrim-bg: var(--menu-scrim-bg);
+    --modal-scrim-blur: none;
+  }
+}
+
+.text {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.cancelButton,
+.openButton {
+  min-width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+.cancelButton {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+@media (hover: hover) {
+  .cancelButton:hover {
+    background: var(--primary-soft);
+  }
+}
+
+.openButton {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.cancelButton:focus-visible,
+.openButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

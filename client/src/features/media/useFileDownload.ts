@@ -11,6 +11,7 @@ import {
   openNativeFile,
 } from '../../native/fileDownload';
 import { downloadFile, downloadHref } from './downloadFile';
+import { isRiskyFileName, isRiskyWarningMuted, muteRiskyWarning } from './riskyFile';
 
 export type FileDownloadState = 'unknown' | 'idle' | 'downloading' | 'ready';
 
@@ -20,6 +21,9 @@ export interface FileDownload {
   href: string | undefined;
   activate: () => void;
   cancel: () => void;
+  riskyPrompt: boolean;
+  confirmRisky: (mute: boolean) => void;
+  cancelRisky: () => void;
 }
 
 export function useFileDownload(attachment: AttachmentDto): FileDownload {
@@ -28,6 +32,7 @@ export function useFileDownload(attachment: AttachmentDto): FileDownload {
 
   const [state, setState] = useState<FileDownloadState>(native ? 'unknown' : 'idle');
   const [progress, setProgress] = useState(0);
+  const [riskyPrompt, setRiskyPrompt] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -64,7 +69,7 @@ export function useFileDownload(attachment: AttachmentDto): FileDownload {
     };
   }, [native, fileId]);
 
-  function activate(): void {
+  function open(): void {
     if (!src) return;
 
     if (!native) {
@@ -88,10 +93,29 @@ export function useFileDownload(attachment: AttachmentDto): FileDownload {
       .catch(() => setState('idle'));
   }
 
+  function activate(): void {
+    if (!src) return;
+    if (isRiskyFileName(fileName) && !isRiskyWarningMuted()) {
+      setRiskyPrompt(true);
+      return;
+    }
+    open();
+  }
+
+  function confirmRisky(mute: boolean): void {
+    if (mute) muteRiskyWarning();
+    setRiskyPrompt(false);
+    open();
+  }
+
+  function cancelRisky(): void {
+    setRiskyPrompt(false);
+  }
+
   function cancel(): void {
     if (!native || stateRef.current !== 'downloading') return;
     void cancelNativeFileDownload(fileId);
   }
 
-  return { state, progress, href: src, activate, cancel };
+  return { state, progress, href: src, activate, cancel, riskyPrompt, confirmRisky, cancelRisky };
 }

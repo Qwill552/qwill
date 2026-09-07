@@ -5,41 +5,47 @@ import { Icon } from '../../ui/Icon';
 import { formatBytes } from '../messages/Attachment';
 import { ProgressRing } from '../messages/ProgressRing';
 import { fileKindFor } from './fileKind';
+import { RiskyFileModal } from './RiskyFileModal';
 import { useFileDownload } from './useFileDownload';
 import styles from './FileBubble.module.css';
 
 export function FileBubble({ attachment, meta }: { attachment: AttachmentDto; meta?: ReactNode }) {
-  const { state, progress, activate, cancel } = useFileDownload(attachment);
+  const { state, progress, activate, cancel, riskyPrompt, confirmRisky, cancelRisky } = useFileDownload(attachment);
   const busy = state === 'downloading';
 
   return (
-    <button
-      type="button"
-      className={styles.file}
-      onClick={busy ? cancel : activate}
-      aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
-    >
-      <span className={styles.icon}>
-        <Icon name={fileKindFor(attachment.file.mimeType).icon} size={22} />
-        {busy && (
-          <span className={styles.progress}>
-            <ProgressRing progress={progress} />
-            <Icon name="close" size={14} className={styles.cancelGlyph} />
-          </span>
-        )}
-        {state === 'ready' && (
-          <span className={styles.ready} aria-hidden="true">
-            <Icon name="check" size={12} />
-          </span>
-        )}
-      </span>
-      <span className={styles.info}>
-        <span className={styles.name}>{attachment.originalName}</span>
-        <span className={styles.footer}>
-          <span className={styles.size}>{formatBytes(attachment.file.size)}</span>
-          {meta}
+    <>
+      <button
+        type="button"
+        className={styles.file}
+        onClick={busy ? cancel : activate}
+        aria-label={busy ? `Отменить загрузку ${attachment.originalName}` : attachment.originalName}
+      >
+        <span className={styles.icon}>
+          <Icon name={fileKindFor(attachment.file.mimeType, attachment.originalName).icon} size={22} />
+          {busy && (
+            <span className={styles.progress}>
+              <ProgressRing progress={progress} />
+              <Icon name="close" size={14} className={styles.cancelGlyph} />
+            </span>
+          )}
+          {state === 'ready' && (
+            <span className={styles.ready} aria-hidden="true">
+              <Icon name="check" size={12} />
+            </span>
+          )}
         </span>
-      </span>
-    </button>
+        <span className={styles.info}>
+          <span className={styles.name}>{attachment.originalName}</span>
+          <span className={styles.footer}>
+            <span className={styles.size}>{formatBytes(attachment.file.size)}</span>
+            {meta}
+          </span>
+        </span>
+      </button>
+      {riskyPrompt && (
+        <RiskyFileModal fileName={attachment.originalName} onCancel={cancelRisky} onConfirm={confirmRisky} />
+      )}
+    </>
   );
 }
