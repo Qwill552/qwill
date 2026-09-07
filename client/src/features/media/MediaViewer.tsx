@@ -572,7 +572,11 @@ function ViewerPage({
   const poster = usePreviewSrc(item.attachment, chatId);
   const imageSrc = useViewerSrc(item.attachment, wantOriginal, chatId);
   const blurRef = useBlurhashCanvas(item.attachment.blurhash);
-  const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, { tier: 'stream' });
+  const videoSrc = useFileSrc(video && active ? item.attachment.file.id : null, {
+    tier: 'stream',
+    kind: 'video',
+    chatId,
+  });
 
   useLayoutEffect(() => {
     if (active) registerMedia(nodeRef.current);

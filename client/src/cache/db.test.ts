@@ -44,6 +44,7 @@ describe('cache db', () => {
       'outbox',
       'settings',
       'syncCursors',
+      'videoChunks',
     ]);
   });
 
@@ -83,10 +84,20 @@ describe('cache db', () => {
     const db = await openCacheDb();
     await db!.put('chats', { id: 'c1' } as never);
     await db!.put('mediaMeta', { fileId: 'p1', chatId: 'c1', kind: 'photo', tier: 'thumb', size: 5, lastUsedAt: 1 });
+    await db!.put('videoChunks', {
+      key: 'k1',
+      fileId: 'f1',
+      index: 0,
+      chatId: 'c1',
+      size: 10,
+      totalSize: 10,
+      lastUsedAt: 1,
+    });
 
     await clearAllCache();
 
     expect(await db!.count('chats')).toBe(0);
     expect(await db!.count('mediaMeta')).toBe(0);
+    expect(await db!.count('videoChunks')).toBe(0);
   });
 });

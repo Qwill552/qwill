@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { MediaKind, MediaTier } from '../cache/db';
 import { acquireObjectUrl, peekObjectUrl, releaseObjectUrl, retainObjectUrl } from '../cache/objectUrls';
-import { buildFileSrc, getFileToken } from './files';
+import { resolveStreamSrc } from './videoStream';
 
 export type FileSrcTier = MediaTier | 'stream';
 
@@ -30,9 +30,9 @@ export function useFileSrc(fileId: string | null | undefined, descriptor: FileSr
     let cancelled = false;
 
     if (tier === 'stream') {
-      void getFileToken(fileId)
-        .then((token) => {
-          if (!cancelled) setSrc(buildFileSrc(fileId, token));
+      void resolveStreamSrc(fileId, chatId, kind === 'video')
+        .then((url) => {
+          if (!cancelled) setSrc(url);
         })
         .catch(() => {
           if (!cancelled) setSrc(undefined);

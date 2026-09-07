@@ -61,6 +61,7 @@ export function createApp(): Express {
     cors({
       origin: (origin, callback) => callback(null, isAllowedClientOrigin(origin)),
       credentials: true,
+      exposedHeaders: ['Content-Range', 'Accept-Ranges'],
     }),
   );
   app.use(express.json({ limit: '1mb' }));

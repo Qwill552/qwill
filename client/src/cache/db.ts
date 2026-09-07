@@ -1,4 +1,4 @@
-import type { ChatListItemDto, MessageDto } from '@messenger/shared';
+import type { ChatListItemDto, ChatType, MessageDto } from '@messenger/shared';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 
 export type MediaTier = 'avatar' | 'thumb' | 'full';
@@ -29,6 +29,16 @@ export interface CachedMedia {
   tier: MediaTier;
   blob: Blob;
   size: number;
+  lastUsedAt: number;
+}
+
+export interface CachedVideoChunk {
+  key: string;
+  fileId: string;
+  index: number;
+  chatId: string | null;
+  size: number;
+  totalSize: number;
   lastUsedAt: number;
 }
 
@@ -88,6 +98,11 @@ interface CacheSchema extends DBSchema {
     value: CachedMediaMeta;
     indexes: { byLastUsed: number; byChat: string; byKind: string };
   };
+  videoChunks: {
+    key: string;
+    value: CachedVideoChunk;
+    indexes: { byLastUsed: number; byFile: string };
+  };
   outbox: { key: string; value: OutboxEntry; indexes: { byCreatedAt: number } };
   settings: { key: string; value: SettingEntry };
 }
@@ -97,7 +112,8 @@ export type CacheDb = IDBPDatabase<CacheSchema>;
 type UpgradeTransaction = IDBPTransaction<CacheSchema, StoreNames<CacheSchema>[], 'versionchange'>;
 
 const DB_NAME = 'qwill-cache';
-const DB_VERSION = 4;
+export const VIDEO_CACHE_NAME = 'qwill-video';
+const DB_VERSION = 5;
 
 const STORE_NAMES: StoreNames<CacheSchema>[] = [
   'chats',
@@ -106,6 +122,7 @@ const STORE_NAMES: StoreNames<CacheSchema>[] = [
   'chatPositions',
   'media',
   'mediaMeta',
+  'videoChunks',
   'outbox',
 ];
 
@@ -150,6 +167,12 @@ export function openCacheDb(): Promise<CacheDb | null> {
       if (oldVersion < 4) {
         db.createObjectStore('settings', { keyPath: 'key' });
       }
+
+      if (oldVersion < 5) {
+        const chunks = db.createObjectStore('videoChunks', { keyPath: 'key' });
+        chunks.createIndex('byLastUsed', 'lastUsedAt');
+        chunks.createIndex('byFile', 'fileId');
+      }
     },
   }).catch(() => null);
 
@@ -175,7 +198,18 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
+async function deleteVideoCacheStorage(): Promise<void> {
+  try {
+    if (typeof caches === 'undefined') return;
+    await caches.delete(VIDEO_CACHE_NAME);
+  } catch {
+    return;
+  }
+}
+
 export async function clearAllCache(): Promise<void> {
+  await deleteVideoCacheStorage();
+
   const db = await openCacheDb();
   if (!db) return;
 
@@ -218,4 +252,31 @@ export async function writeRetentionSetting<K extends keyof RetentionSettings>(
   } catch {
     return;
   }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const RETENTION_MS: Record<RetentionPeriod, number> = {
+  '3d': 3 * DAY_MS,
+  '1w': 7 * DAY_MS,
+  '1m': 30 * DAY_MS,
+  forever: Infinity,
+};
+
+export async function buildRetentionResolver(db: CacheDb): Promise<(chatId: string | null) => number> {
+  const settings = await readRetentionSettings();
+  const chatTypeById = new Map<string, ChatType>();
+  try {
+    for (const chat of await db.getAll('chats')) chatTypeById.set(chat.id, chat.type);
+  } catch {
+    return () => Infinity;
+  }
+
+  return (chatId: string | null): number => {
+    if (chatId === null) return Infinity;
+
+    const exception = settings.keepMediaExceptions[chatId];
+    const period = exception ?? (chatTypeById.get(chatId) === 'GROUP' ? settings.keepMediaGroups : settings.keepMediaPrivate);
+    return RETENTION_MS[period];
+  };
 }

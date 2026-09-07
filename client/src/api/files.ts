@@ -354,3 +354,8 @@ export function getFileToken(fileId: string): Promise<string> {
   tokenRequests.set(fileId, request);
   return request;
 }
+
+export function refreshFileToken(fileId: string): Promise<string> {
+  fileTokens.delete(fileId);
+  return getFileToken(fileId);
+}
