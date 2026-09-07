@@ -22,11 +22,12 @@ import { validateBody } from '../middleware/validate.js';
 
 export const authRouter: Router = Router();
 
-function requireCsrfToken(req: Request, _res: Response, next: NextFunction): void {
+function requireCsrfToken(req: Request, res: Response, next: NextFunction): void {
   if (isCsrfTokenValid(req)) {
     next();
     return;
   }
+  clearSessionCookies(res);
   next(forbidden('Проверка запроса не пройдена, войдите заново'));
 }
 

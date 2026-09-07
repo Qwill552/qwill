@@ -44,6 +44,10 @@ export function setCsrfToken(token: string | null): void {
   else localStorage.removeItem(CSRF_TOKEN_STORAGE_KEY);
 }
 
+export function hasSessionCredentials(): boolean {
+  return csrfToken !== null;
+}
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
   if (!token) {

@@ -1,6 +1,7 @@
 import type { FontSize, ThemePreference, UserSettingsDTO } from '@messenger/shared';
 import { create } from 'zustand';
 
+import { hasSessionCredentials } from '../api/client';
 import { updateSettingsRequest } from '../api/users';
 import { setCallBackgroundStyle, type CallBackgroundStyle } from '../calls/nativeCall';
 import { setDesktopTitleTheme } from '../native/desktop';
@@ -100,6 +101,7 @@ interface UiState {
  *  состояния и сохранение предпочтений на сервере, чтобы они не терялись при входе с другого устройства (этап 8). */
 export const useUiStore = create<UiState>((set, get) => {
   function persist(patch: { theme?: ThemePreference; fontSize?: FontSize }): void {
+    if (!hasSessionCredentials()) return;
     updateSettingsRequest(patch).catch(() => undefined);
   }
 

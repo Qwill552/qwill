@@ -377,6 +377,16 @@ describe('security.test.ts — обязательный набор отказо�
       expect(res.status).toBe(403);
     });
 
+    it('refresh без заголовка гасит куки сессии — вкладка не остаётся в вечном 403', async () => {
+      const session = await openSession('healcsrf');
+      const res = await request.post('/api/auth/refresh').set('Cookie', session.cookieHeader).send({});
+
+      expect(res.status).toBe(403);
+      const cleared = setCookiesOf(res);
+      expect(findSetCookie(cleared, REFRESH_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+      expect(findSetCookie(cleared, CSRF_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+    });
+
     it('refresh с чужим CSRF-токеном → 403', async () => {
       const session = await openSession('badcsrf');
       const res = await request
