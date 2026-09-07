@@ -111,6 +111,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLElement | null>(null);
+  const pressedVideo = useRef<HTMLVideoElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const pointers = useRef(new Map<number, Vector>());
   const live = useRef<LiveGesture>(idleGesture());
@@ -287,6 +288,8 @@ function ViewerStage({ chatId }: { chatId: string }) {
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
     const video = videoUnderPointer(event);
     if (video && onNativeControls(event, video)) return;
+
+    pressedVideo.current = video;
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     setGesturing(true);
@@ -384,6 +387,9 @@ function ViewerStage({ chatId }: { chatId: string }) {
     }
     if (active.size > 0) return;
 
+    const tappedVideo = pressedVideo.current;
+    pressedVideo.current = null;
+
     const g = gesture.current;
     g.axis = null;
 
@@ -410,7 +416,7 @@ function ViewerStage({ chatId }: { chatId: string }) {
     }
 
     if (!g.moved && event.timeStamp - g.startTime < TAP_MS && settledZoom.scale === MIN_SCALE) {
-      const video = videoUnderPointer(event);
+      const video = tappedVideo;
       if (video) {
         if (video.paused) void video.play().catch(() => undefined);
         else video.pause();
