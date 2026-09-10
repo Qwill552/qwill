@@ -208,7 +208,7 @@ export function attachFlingTakeover(el: HTMLElement): FlingTakeover {
   }
 
   function onTakeover(event: TouchEvent): void {
-    if (event.touches.length !== 1 || reducedMotion()) return;
+    if (event.touches.length !== 1 || !event.cancelable || reducedMotion()) return;
     cancelInertia();
     driving = true;
     axis = 'none';
