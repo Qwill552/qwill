@@ -157,3 +157,58 @@ test('быстрый бросок вверх не упирается в неви
   const expected = (FLING_FRAMES * FLING_STEP_PX) / before.averageRow;
   expect(travelled, 'лента проехала заметно меньше, чем её просили').toBeGreaterThan(expected * 0.7);
 });
+
+test('переход по закрепу к далёкому сообщению телепортирует и подсвечивает (КЭШ-24a)', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  const me = uniqueUser('feedpin');
+  const other = uniqueUser('feedpinother');
+  await registerUser(page, me);
+
+  const mine = await prisma.user.findUniqueOrThrow({ where: { username: me.username } });
+  const chatId = await seedChatWithHistory(mine.id, other.username, other.displayName);
+
+  const oldest = await prisma.message.findFirstOrThrow({
+    where: { chatId },
+    orderBy: { id: 'asc' },
+  });
+  await prisma.chat.update({ where: { id: chatId }, data: { pinnedMessageId: oldest.id } });
+
+  await page.goto(`/chats/${chatId}`);
+  await expect(page.locator('.message-wrap').last()).toBeVisible();
+  await page.waitForTimeout(2000);
+
+  await expect(page.locator(`[data-message-id="${oldest.id}"]`)).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Закреплённое сообщение/ }).click();
+
+  await expect(page.locator(`[data-message-id="${oldest.id}"][data-flash="1"]`)).toBeVisible({ timeout: 15_000 });
+});
+
+test('переход по закрепу к загруженному сообщению подсвечивает его (КЭШ-24a)', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  const me = uniqueUser('feedpinnear');
+  const other = uniqueUser('feedpinnearother');
+  await registerUser(page, me);
+
+  const mine = await prisma.user.findUniqueOrThrow({ where: { username: me.username } });
+  const chatId = await seedChatWithHistory(mine.id, other.username, other.displayName);
+
+  const newest = await prisma.message.findFirstOrThrow({
+    where: { chatId },
+    orderBy: { id: 'desc' },
+    skip: 3,
+  });
+  await prisma.chat.update({ where: { id: chatId }, data: { pinnedMessageId: newest.id } });
+
+  await page.goto(`/chats/${chatId}`);
+  await expect(page.locator('.message-wrap').last()).toBeVisible();
+  await page.waitForTimeout(2000);
+  await scrollFeedBy(page, -1200);
+  await page.waitForTimeout(600);
+
+  await page.getByRole('button', { name: /Закреплённое сообщение/ }).click();
+
+  await expect(page.locator(`[data-message-id="${newest.id}"][data-flash="1"]`)).toBeVisible({ timeout: 15_000 });
+});

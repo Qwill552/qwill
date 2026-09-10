@@ -229,6 +229,8 @@ export function MessageList({
   const savePosition = useChatStore((s) => s.savePosition);
   const handOffPosition = useChatStore((s) => s.handOffPosition);
   const returnToTail = useChatStore((s) => s.returnToTail);
+  const focusMessage = useChatStore((s) => s.focusMessage);
+  const openChatAt = useChatStore((s) => s.openChatAt);
   const markRead = useChatStore((s) => s.markRead);
   const tailRequest = useChatStore((s) => s.tailRequestByChat[chatId]) ?? 0;
   const liveMessage = useChatStore((s) => s.liveMessageByChat[chatId]) ?? 0;
@@ -278,6 +280,9 @@ export function MessageList({
   const fling = useRef<FlingTakeover | null>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
+  const [flashId, setFlashId] = useState<number | null>(null);
+  const flashTimer = useRef(0);
+  const flashMessageRef = useRef<(messageId: number) => void>(() => undefined);
 
   if (liveSeen.current !== liveMessage) {
     liveSeen.current = liveMessage;
@@ -478,6 +483,7 @@ export function MessageList({
   const winTailRef = useRef(tailRequest);
 
   let liveWin = win;
+  let pinnedByFocus = false;
   if (winFeedRef.current !== feedKey) {
     winFeedRef.current = feedKey;
     winFocusRef.current = focus?.seq ?? 0;
@@ -487,6 +493,7 @@ export function MessageList({
     winFocusRef.current = focus.seq;
     liveWin = windowAroundMessage(focus.messageId);
     setWin(liveWin);
+    pinnedByFocus = true;
   }
 
   if (winTailRef.current !== tailRequest) {
@@ -495,7 +502,8 @@ export function MessageList({
     setWin(liveWin);
   }
 
-  const stickToTail = settledFeedKey.current === feedKey && stuckToBottom.current && !hasMoreAfter;
+  const stickToTail =
+    !pinnedByFocus && settledFeedKey.current === feedKey && stuckToBottom.current && !hasMoreAfter;
   const view: FeedSlice =
     displayEntries.length === 0
       ? { from: 0, to: -1 }
@@ -559,15 +567,29 @@ export function MessageList({
     return candidate;
   }
 
+  function flashMessage(messageId: number): void {
+    window.clearTimeout(flashTimer.current);
+    setFlashId(messageId);
+    flashTimer.current = window.setTimeout(() => setFlashId(null), cssDurationMs('--dur-flash'));
+  }
+
+  flashMessageRef.current = flashMessage;
+
   function scrollToMessage(messageId: number): void {
     const el = listRef.current;
-    const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-    if (!el || !target) return;
+    const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`) ?? null;
+    if (!el || !target) {
+      if (entryIndexByMessage.has(messageId)) focusMessage(chatId, messageId);
+      else void openChatAt(chatId, messageId);
+      return;
+    }
+
     fling.current?.stop();
     const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     el.scrollTo({ top, behavior: 'smooth' });
+    flashMessage(messageId);
   }
 
   useLayoutEffect(() => {
@@ -609,10 +631,7 @@ export function MessageList({
       el!.scrollTop = Math.max(0, node.offsetTop - offset);
     }
     place();
-    if (!quiet) target.dataset.flash = '1';
-    const flashTimer = quiet
-      ? 0
-      : window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
+    if (!quiet) flashMessageRef.current(focus.messageId);
 
     const observer = new ResizeObserver(place);
     for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) observer.observe(node);
@@ -630,7 +649,6 @@ export function MessageList({
     const holdTimer = window.setTimeout(release, quiet ? RESTORE_HOLD_MS : FOCUS_HOLD_MS);
 
     return () => {
-      window.clearTimeout(flashTimer);
       window.clearTimeout(holdTimer);
       release();
     };
@@ -680,7 +698,10 @@ export function MessageList({
 
     const held = feedAnchor.current;
     const heldIndex = held === null ? undefined : entryIndexByKey.get(held.key);
-    if (held !== null && heldIndex !== undefined && !stuckToBottom.current) {
+    if (stuckToBottom.current) {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distance > 1 && performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+    } else if (held !== null && heldIndex !== undefined) {
       const shift = rowTop(table, heldIndex) - held.top;
       if (Math.abs(shift) > 0.5 && performance.now() >= autoScrollUntil.current) el.scrollTop += shift;
     }
@@ -968,6 +989,8 @@ export function MessageList({
 
   useEffect(() => () => window.clearTimeout(floatingDateIdle.current), [chatId]);
 
+  useEffect(() => () => window.clearTimeout(flashTimer.current), [chatId]);
+
   function handleScroll(): void {
     const el = listRef.current;
     if (!el) return;
@@ -1075,6 +1098,7 @@ export function MessageList({
             onForwardRequest={onForwardRequest}
             onToggleReaction={toggleReaction}
             onLeaveDone={handleLeaveDone}
+            flash={flashId !== null && entry.row.groupIds.includes(flashId)}
             listRef={listRef}
             stuckToBottomRef={stuckToBottom}
           />
@@ -1136,6 +1160,7 @@ const MessageListRow = memo(function MessageListRow({
   onForwardRequest,
   onToggleReaction,
   onLeaveDone,
+  flash,
   listRef,
   stuckToBottomRef,
 }: {
@@ -1151,6 +1176,7 @@ const MessageListRow = memo(function MessageListRow({
   onForwardRequest: (messageIds: number[]) => void;
   onToggleReaction: (chatId: string, messageId: number, emoji: string) => void;
   onLeaveDone: (key: RowKey) => void;
+  flash: boolean;
   listRef: React.RefObject<HTMLDivElement | null>;
   stuckToBottomRef: React.RefObject<boolean>;
 }) {
@@ -1241,6 +1267,7 @@ const MessageListRow = memo(function MessageListRow({
           canReply={canReply}
           canReact={canReact}
           isPinned={isPinned}
+          flash={flash}
           onReply={onReply}
           onEdit={onEdit}
           onForwardRequest={onForwardRequest}

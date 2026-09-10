@@ -48,6 +48,7 @@ interface MessageRowProps {
   /** Там же незачем реакции: панель в контекстном меню и двойной тап выключаются вместе. */
   canReact: boolean;
   isPinned: boolean;
+  flash: boolean;
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
   onForwardRequest: (messageIds: number[]) => void;
@@ -130,6 +131,7 @@ export function MessageRow({
   canReply,
   canReact,
   isPinned,
+  flash,
   onReply,
   onEdit,
   onForwardRequest,
@@ -496,6 +498,7 @@ export function MessageRow({
     <div
       className={`message-wrap ${styles.row} ${own ? styles.own : ''} ${selected ? styles.selected : ''}`}
       data-message-id={message.id}
+      data-flash={flash ? '1' : undefined}
       ref={swipe.ref}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

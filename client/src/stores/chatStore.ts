@@ -941,12 +941,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const key = `${chatId}:older`;
     if (feedLoadsInFlight.has(key)) return;
     feedLoadsInFlight.add(key);
+    const epoch = get().feedEpochByChat[chatId] ?? 0;
     let page: MessagesPage;
     try {
       page = await getMessagesRequest(chatId, oldest.id);
     } finally {
       feedLoadsInFlight.delete(key);
     }
+    if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
@@ -967,12 +969,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const key = `${chatId}:newer`;
     if (feedLoadsInFlight.has(key)) return;
     feedLoadsInFlight.add(key);
+    const epoch = get().feedEpochByChat[chatId] ?? 0;
     let page: MessagesPage;
     try {
       page = await getMessagesAfterRequest(chatId, newest.id);
     } finally {
       feedLoadsInFlight.delete(key);
     }
+    if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
       const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
