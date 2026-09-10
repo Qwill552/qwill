@@ -1,16 +1,28 @@
-/* Разделитель даты — липкая пилюля по центру над лентой. Это оверлейная поверхность:
+/* Разделитель даты — пилюля по центру над лентой. Это оверлейная поверхность:
    под ней проезжают сообщения, и она обязана их размывать. */
 
 .dayWrap {
-  position: sticky;
-  z-index: 2;
-  /* Ноль, а не --chrome-space-top: прямоугольник липкости уже уменьшен на padding
-     скроллера, и запас под хрому здесь посчитался бы второй раз. */
-  top: 0;
   display: flex;
   justify-content: center;
   padding: var(--space-3) 0 var(--space-1);
   pointer-events: none;
+}
+
+.floating {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px) + var(--space-3));
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--dur-close) var(--ease-screen);
+}
+
+.floatingHidden {
+  opacity: 0;
 }
 
 /* Буквально строка 328 референса. */

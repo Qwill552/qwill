@@ -13,26 +13,34 @@ import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { isServiceChat } from '../chat/serviceChat';
 import { groupAlbums, mergeReactions } from '../media/albums';
 import { MediaFeedContext, useMediaFeedScope } from '../media/mediaFeedScope';
-import { DateDivider, UnreadDivider } from './Dividers';
+import { DateDivider, FloatingDate, UnreadDivider } from './Dividers';
 import { MessageBubble } from './MessageBubble';
 import { MessageReactions } from './MessageReactions';
 import { isDeletableMessage } from './messageDeleting';
 import {
-  boundsAround,
-  clampBounds,
-  FEED_PAGE_SIZE,
   FEED_PREFETCH_MARGIN,
   FEED_RETRY_MS,
+  FEED_SENSITIVE_AREA_PX,
   FEED_SLICE_LIMIT,
-  FEED_SLICE_STEP,
-  sameBounds,
   selectDeletedRows,
-  shiftBounds,
-  tailBounds,
-  type FeedBounds,
   type FeedKeepRange,
   type FeedSide,
+  type FeedSlice,
 } from './feedWindow';
+import {
+  buildHeightTable,
+  heightsOf,
+  indexAtOffset,
+  rowHeight,
+  rowTop,
+  sameWindow,
+  skeletonsAbove,
+  skeletonsBelow,
+  totalHeight,
+  windowAtEnd,
+  windowAtOffset,
+  windowAround,
+} from './feedHeights';
 import { shouldFollowTail } from './feedFollow';
 import { attachFlingTakeover, type FlingTakeover } from './flingTakeover';
 import { isEditableMessage } from './messageEditing';
@@ -55,7 +63,8 @@ const FOCUS_HOLD_MS = 500;
 /** Восстановленное место держим дольше: строки выше якоря дорастают до своей высоты по мере
  *  загрузки картинок, а `overflow-anchor` у ленты выключен — без этого лента уползает вверх. */
 const RESTORE_HOLD_MS = 1200;
-const FEED_LOAD_AHEAD_PX = 600;
+const FLOATING_DATE_HIDE_MS = 1000;
+const DAY_DIVIDER_ESTIMATE = 38;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
 const TYPING_BUBBLE_IN_FEED: boolean = false;
@@ -124,6 +133,8 @@ interface MessageRowData {
   sameAuthorAsPrev: boolean;
   sameAuthorAsNext: boolean;
   showDay: boolean;
+  firstIndex: number;
+  lastIndex: number;
 }
 
 type RowKey = string | number;
@@ -146,12 +157,6 @@ interface RenderRow {
 interface LeavingRow {
   entry: RenderRow;
   index: number;
-}
-
-interface DaySection {
-  key: RowKey;
-  iso: string;
-  entries: RenderRow[];
 }
 
 /** Ключ строки держится за `albumId`, а не за id первого сообщения: удаление первого снимка
@@ -259,8 +264,12 @@ export function MessageList({
   const wasNewest = useRef(true);
   const settledFeedKey = useRef<string | null>(null);
   const pendingAnchor = useRef<RowAnchor | null>(null);
-  const topTriggerRef = useRef<HTMLDivElement>(null);
-  const bottomTriggerRef = useRef<HTMLDivElement>(null);
+  const feedAnchor = useRef<{ key: RowKey; top: number } | null>(null);
+  const topSpacerRef = useRef<HTMLDivElement>(null);
+  const geometry = useRef({ contentTop: 0, padTop: 0 });
+  const dayDividerHeight = useRef(DAY_DIVIDER_ESTIMATE);
+  const floatingDateIdle = useRef(0);
+  const [floatingDate, setFloatingDate] = useState<{ iso: string; offset: number } | null>(null);
   const loadingUp = useRef(false);
   const loadingDown = useRef(false);
   const retryUpAt = useRef(0);
@@ -273,50 +282,6 @@ export function MessageList({
   if (liveSeen.current !== liveMessage) {
     liveSeen.current = liveMessage;
     if (liveMessage !== 0) liveIds.current.add(liveMessage);
-  }
-
-  const [bounds, setBounds] = useState<FeedBounds>(() =>
-    focus ? boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT) : { fromId: null, toId: null },
-  );
-  const boundsFeedRef = useRef(feedKey);
-  const boundsFocusRef = useRef(focus?.seq ?? 0);
-  const boundsTailRef = useRef(tailRequest);
-
-  let liveBounds = bounds;
-  if (boundsFeedRef.current !== feedKey) {
-    boundsFeedRef.current = feedKey;
-    boundsFocusRef.current = focus?.seq ?? 0;
-    liveBounds = focus
-      ? boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT)
-      : tailBounds(messages, FEED_SLICE_LIMIT);
-    setBounds(liveBounds);
-  } else if (focus && boundsFocusRef.current !== focus.seq) {
-    boundsFocusRef.current = focus.seq;
-    liveBounds = boundsAround(messages, focus.messageId, FEED_SLICE_LIMIT);
-    setBounds(liveBounds);
-  }
-
-  if (boundsTailRef.current !== tailRequest) {
-    boundsTailRef.current = tailRequest;
-    liveBounds = tailBounds(messages, FEED_SLICE_LIMIT);
-    setBounds(liveBounds);
-  }
-
-  const view = useMemo(() => clampBounds(messages, liveBounds, FEED_SLICE_LIMIT), [messages, liveBounds]);
-  const sliceRef = useRef<LocalMessage[]>([]);
-  const nextSlice = messages.slice(view.from, view.to + 1);
-  if (!sameRows(sliceRef.current, nextSlice)) sliceRef.current = nextSlice;
-  const slice = sliceRef.current;
-  const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
-  const isViewportNewest = view.to >= messages.length - 1 && !hasMoreAfter;
-
-  const lastSliceSignature = useRef(sliceSignature);
-  if (lastSliceSignature.current !== sliceSignature) {
-    lastSliceSignature.current = sliceSignature;
-    const el = listRef.current;
-    if (el && settledFeedKey.current === feedKey && pendingAnchor.current === null && !stuckToBottom.current) {
-      pendingAnchor.current = rememberAnchor(el);
-    }
   }
 
   const myRole = members?.find((m) => m.userId === myId)?.role;
@@ -335,410 +300,13 @@ export function MessageList({
     unreadAnchor.current = null;
   }, [feedKey]);
 
-  /** Скроллим сам контейнер, а не через scrollIntoView: тот тянет за собой все скроллящиеся
-   *  предки, и однажды уже утащил вниз всю оболочку вместе с плавающей хромой. */
-  function scrollToBottom(smooth: boolean): void {
-    const el = listRef.current;
-    if (!el) return;
-    fling.current?.stop();
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
-    autoScrollUntil.current = performance.now() + AUTO_SCROLL_GUARD_MS;
-    stuckToBottom.current = true;
-    el.scrollTo({ top: el.scrollHeight, behavior });
-  }
-
-  /** Баннер закрепа — та же логика: не scrollIntoView (см. журнал ux-ui.md, этап 2), а свой
-   *  scrollTo по измеренному offsetTop. Молча ничего не делает, если сообщение не догружено
-   *  в текущую страницу истории — догрузки по id пока нет (вне объёма этого этапа). */
-  function rowNodeFor(el: HTMLDivElement, messageId: number): HTMLElement | null {
-    const exact = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-    if (exact) return exact;
-    let candidate: HTMLElement | null = null;
-    for (const node of el.querySelectorAll<HTMLElement>('[data-message-id]')) {
-      const id = Number(node.dataset.messageId);
-      if (id > 0 && id <= messageId) candidate = node;
-    }
-    return candidate;
-  }
-
-  function scrollToMessage(messageId: number): void {
-    const el = listRef.current;
-    const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-    if (!el || !target) return;
-    fling.current?.stop();
-    const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
-    autoScrollUntil.current = 0;
-    stuckToBottom.current = false;
-    el.scrollTo({ top, behavior: 'smooth' });
-  }
-
-  useLayoutEffect(() => {
-    if (settledFeedKey.current === feedKey || messages.length === 0) return;
-    settledFeedKey.current = feedKey;
-    prevLastId.current = messages[messages.length - 1]?.id ?? null;
-    retryUpAt.current = 0;
-    retryDownAt.current = 0;
-    if (focus && listRef.current?.querySelector(`[data-message-id="${focus.messageId}"]`)) {
-      autoScrollUntil.current = 0;
-      stuckToBottom.current = false;
-      return;
-    }
-    stuckToBottom.current = true;
-    setShowJump(false);
-    scrollToBottom(false);
-  }, [feedKey, chatId, messages.length, focus]);
-
-  useLayoutEffect(() => {
-    if (!focus) return;
-    const el = listRef.current;
-    if (!el) return;
-    const target = rowNodeFor(el, focus.messageId);
-    if (!target) return;
-
-    autoScrollUntil.current = 0;
-    stuckToBottom.current = false;
-    fling.current?.stop();
-    const quiet = focus.quiet === true;
-    const offset = focus.offset ?? 0;
-    if (quiet) pendingAnchor.current = null;
-    function place(): void {
-      if (!quiet) {
-        el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
-        return;
-      }
-      const node = el!.querySelector<HTMLElement>(`[data-message-id="${focus!.messageId}"]`);
-      if (!node || el!.clientHeight === 0) return;
-      el!.scrollTop = Math.max(0, node.offsetTop - offset);
-    }
-    place();
-    if (!quiet) target.dataset.flash = '1';
-    const flashTimer = quiet
-      ? 0
-      : window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
-
-    const observer = new ResizeObserver(place);
-    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) observer.observe(node);
-
-    function release(): void {
-      observer.disconnect();
-      el!.removeEventListener('pointerdown', release);
-      el!.removeEventListener('wheel', release);
-      el!.removeEventListener('touchstart', release);
-    }
-    el.addEventListener('pointerdown', release);
-    el.addEventListener('wheel', release, { passive: true });
-    el.addEventListener('touchstart', release, { passive: true });
-    const holdTimer = window.setTimeout(release, quiet ? RESTORE_HOLD_MS : FOCUS_HOLD_MS);
-
-    return () => {
-      window.clearTimeout(flashTimer);
-      window.clearTimeout(holdTimer);
-      release();
-    };
-  }, [focus]);
-
-  useLayoutEffect(() => {
-    const lastMessage = messages[messages.length - 1] ?? null;
-    const lastId = lastMessage?.id ?? null;
-    if (settledFeedKey.current !== feedKey) {
-      prevLastId.current = lastId;
-      wasNewest.current = isViewportNewest;
-      return;
-    }
-    const el = listRef.current;
-    if (
-      el &&
-      shouldFollowTail({
-        lastId,
-        prevLastId: prevLastId.current,
-        liveMessageId: liveMessage,
-        isOwnLast: lastMessage !== null && lastMessage.sender?.id === myId,
-        wasNewest: wasNewest.current,
-        isAutoScrolling: performance.now() < autoScrollUntil.current,
-        scrollHeight: el.scrollHeight,
-        prevScrollHeight: prevScrollHeight.current,
-        scrollTop: el.scrollTop,
-        clientHeight: el.clientHeight,
-        bottomReserve: bottomReserve(el),
-        stickThreshold: STICK_THRESHOLD,
-      })
-    ) {
-      setShowJump(false);
-      scrollToBottom(true);
-    }
-    prevLastId.current = lastId;
-    wasNewest.current = isViewportNewest;
-  }, [feedKey, messages, isViewportNewest, myId, liveMessage]);
-
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (el) prevScrollHeight.current = el.scrollHeight;
-  });
-
-  useEffect(() => {
-    if (TYPING_BUBBLE_IN_FEED && typing && stuckToBottom.current) scrollToBottom(true);
-  }, [typing]);
-
-  // Резерв места под композер едет CSS-переходом (--dur-menu), а прокрутка за ним сама не
-  // идёт: плавный scrollTo тут не годится — у него своя, неуправляемая длительность, и лента
-  // догоняла бы уже уехавший композер. Вместо этого низ ленты прижимается каждый кадр, пока
-  // идёт переход, — последний пузырь остаётся приклеен к композеру всё время движения.
-  useEffect(() => {
-    const node = listRef.current;
-    if (!node || !stuckToBottom.current) return;
-    const ms = cssDurationMs('--dur-menu');
-    const until = performance.now() + ms;
-    let frame = 0;
-    function pinToBottom(): void {
-      node!.scrollTop = node!.scrollHeight;
-      if (performance.now() < until) frame = requestAnimationFrame(pinToBottom);
-    }
-    pinToBottom();
-    return () => cancelAnimationFrame(frame);
-  }, [emojiPanelOpen]);
-
-  useLayoutEffect(() => {
-    if (tailRequest === 0) return;
-    pendingAnchor.current = null;
-    stuckToBottom.current = true;
-    setShowJump(false);
-    scrollToBottom(false);
-  }, [tailRequest]);
-
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const anchor = pendingAnchor.current;
-    if (!anchor) return;
-    pendingAnchor.current = null;
-    if (performance.now() >= autoScrollUntil.current) {
-      restoreAnchor(el, anchor);
-      stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
-    }
-    if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
-  }, [sliceSignature]);
-
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const seen = appearSeen.current;
-    const live = liveIds.current;
-    liveIds.current = new Set();
-    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
-      if (seen.has(node)) continue;
-      seen.add(node);
-      if (live.has(Number(node.dataset.messageId))) node.dataset.appear = '1';
-    }
-  });
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      if (!stuckToBottom.current) return;
-      fling.current?.stop();
-      el.scrollTop = el.scrollHeight;
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [chatId]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const takeover = attachFlingTakeover(el);
-    fling.current = takeover;
-    return () => {
-      fling.current = null;
-      takeover.destroy();
-    };
-  }, [chatId]);
-
-  function requestUp(): void {
-    const el = listRef.current;
-    if (!el || !hasMore || view.from > 0 || loadingUp.current || performance.now() < retryUpAt.current) return;
-    loadingUp.current = true;
-    pendingAnchor.current = rememberAnchor(el);
-    if (liveBounds.toId === null && messages.length + FEED_PAGE_SIZE > FEED_SLICE_LIMIT) {
-      const tail = lastSettledId(messages);
-      if (tail !== null) setBounds({ fromId: null, toId: tail });
-    }
-    loadMore(chatId)
-      .catch(() => {
-        pendingAnchor.current = null;
-        retryUpAt.current = performance.now() + FEED_RETRY_MS;
-      })
-      .finally(() => {
-        loadingUp.current = false;
-      });
-  }
-
-  function requestDown(): void {
-    const el = listRef.current;
-    if (!el || !hasMoreAfter || view.to < messages.length - 1) return;
-    if (loadingDown.current || performance.now() < retryDownAt.current) return;
-    loadingDown.current = true;
-    pendingAnchor.current = rememberAnchor(el);
-    if (liveBounds.toId !== null) setBounds({ fromId: liveBounds.fromId, toId: null });
-    loadMoreAfter(chatId)
-      .catch(() => {
-        pendingAnchor.current = null;
-        retryDownAt.current = performance.now() + FEED_RETRY_MS;
-      })
-      .finally(() => {
-        loadingDown.current = false;
-      });
-  }
-
-  function growSlice(side: FeedSide): boolean {
-    const el = listRef.current;
-    if (!el) return false;
-    const next = shiftBounds(messages, liveBounds, side, FEED_SLICE_STEP, FEED_SLICE_LIMIT);
-    if (sameBounds(next, liveBounds)) return false;
-    pendingAnchor.current = rememberAnchor(el);
-    setBounds(next);
-    return true;
-  }
-
-  function nearEdge(side: FeedSide): void {
-    prefetchSide.current = side;
-    if (growSlice(side)) return;
-    if (side === 'older') requestUp();
-    else requestDown();
-  }
-
-  const nearEdgeRef = useRef(nearEdge);
-  nearEdgeRef.current = nearEdge;
-
-  useEffect(() => () => window.clearTimeout(scrollIdle.current), [chatId]);
-
-  const capturePosition = useRef<() => void>(() => undefined);
-  capturePosition.current = () => {
-    if (messages.length === 0) return;
-    const el = listRef.current;
-    const anchor = el ? rememberAnchor(el) : null;
-    const anchorId = anchor && Number(anchor.id) > 0 ? Number(anchor.id) : null;
-    if (!el || anchor === null || anchorId === null) return;
-    rememberPosition(chatId, {
-      fromId: liveBounds.fromId,
-      toId: liveBounds.toId,
-      anchorId,
-      anchorOffset: anchor.top - el.getBoundingClientRect().top,
-      atTail: isViewportNewest && stuckToBottom.current,
-    });
-  };
-
-  useEffect(() => {
-    capturePosition.current();
-  }, [sliceSignature]);
-
-  useEffect(() => {
-    function onVisibilityChange(): void {
-      if (document.visibilityState !== 'hidden') return;
-      capturePosition.current();
-      savePosition(chatId);
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      handOffPosition(chatId);
-    };
-  }, [chatId, savePosition, handOffPosition]);
-
-  useEffect(() => {
-    setViewportNewest(chatId, isViewportNewest);
-  }, [chatId, isViewportNewest, setViewportNewest]);
-
-  useEffect(() => () => setViewportNewest(chatId, null), [chatId, setViewportNewest]);
-
-  const markedUpTo = useRef(0);
-  useEffect(() => {
-    markedUpTo.current = 0;
-  }, [chatId]);
-
-  useEffect(() => {
-    if (!isViewportNewest) return;
-    const last = lastSettledId(messages);
-    if (last === null || last <= markedUpTo.current) return;
-    markedUpTo.current = last;
-    markRead(chatId, last);
-  }, [chatId, messages, isViewportNewest, markRead]);
-
-  useEffect(() => {
-    const side = prefetchSide.current;
-    const unseen = side === 'older' ? view.from : messages.length - 1 - view.to;
-    prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen);
-  }, [chatId, messages, view, slice, prefetchFeed]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    const top = topTriggerRef.current;
-    const bottom = bottomTriggerRef.current;
-    if (!el || !top || !bottom) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          nearEdgeRef.current(entry.target === top ? 'older' : 'newer');
-        }
-      },
-      { root: el, rootMargin: `${FEED_LOAD_AHEAD_PX}px 0px ${FEED_LOAD_AHEAD_PX}px 0px` },
-    );
-    observer.observe(top);
-    observer.observe(bottom);
-    return () => observer.disconnect();
-  }, [chatId]);
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el || el.scrollHeight >= el.clientHeight * 2) return;
-    nearEdgeRef.current('older');
-    nearEdgeRef.current('newer');
-  }, [sliceSignature]);
-
-  function handleScroll(): void {
-    const el = listRef.current;
-    if (!el) return;
-    // Скролл отменяет любой висящий жест сообщения — long-press/окно двойного тапа
-    // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
-    bumpScrollEpoch();
-    const raw = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const distance = raw - bottomReserve(el);
-    prevScrollHeight.current = el.scrollHeight;
-    if (performance.now() < autoScrollUntil.current) {
-      if (raw <= 1) autoScrollUntil.current = 0;
-      stuckToBottom.current = true;
-    } else {
-      stuckToBottom.current = distance < STICK_THRESHOLD;
-      if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
-      else if (distance < STICK_THRESHOLD) setShowJump(false);
-    }
-
-    const ahead = Math.max(FEED_LOAD_AHEAD_PX, el.clientHeight);
-    if (el.scrollTop < ahead) nearEdge('older');
-    if (distance < ahead) nearEdge('newer');
-
-    window.clearTimeout(scrollIdle.current);
-    scrollIdle.current = window.setTimeout(() => {
-      capturePosition.current();
-      trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current));
-      pruneHistoryCache();
-    }, SCROLL_IDLE_MS);
-  }
-
-  function handleJump(): void {
-    if (!hasMoreAfter && view.to >= messages.length - 1) {
-      scrollToBottom(true);
-      return;
-    }
-    void returnToTail(chatId);
-  }
-
   const rows = useMemo(() => {
-    const albums = groupAlbums(slice);
+    const albums = groupAlbums(messages);
+    let cursor = 0;
 
     return albums.flatMap((album, index) => {
+      const firstIndex = cursor;
+      cursor += album.length;
       const message = album[0];
       const last = album[album.length - 1];
       if (!message || !last) return [];
@@ -769,10 +337,12 @@ export function MessageList({
           sameAuthorAsPrev,
           sameAuthorAsNext,
           showDay: !prev || !isSameDay(prev.createdAt, message.createdAt),
+          firstIndex,
+          lastIndex: firstIndex + album.length - 1,
         },
       ];
     });
-  }, [slice]);
+  }, [messages]);
 
   const renderRows = useMemo<RenderRow[]>(() => {
     const albumSeen = new Map<string, number>();
@@ -868,18 +438,574 @@ export function MessageList({
     return result;
   }, [renderRows, leavingRows]);
 
-  const daySections = useMemo<DaySection[]>(() => {
-    const sections: DaySection[] = [];
-    for (const entry of displayEntries) {
-      const current = sections[sections.length - 1];
-      if (!current || entry.row.showDay) {
-        sections.push({ key: `day-${entry.key}`, iso: entry.row.message.createdAt, entries: [entry] });
-      } else {
-        current.entries.push(entry);
-      }
-    }
-    return sections;
+  const displayEntriesRef = useRef(displayEntries);
+  displayEntriesRef.current = displayEntries;
+
+  const entryIndexByMessage = useMemo(() => {
+    const index = new Map<number, number>();
+    displayEntries.forEach((entry, position) => {
+      for (const id of entry.row.groupIds) index.set(id, position);
+    });
+    return index;
   }, [displayEntries]);
+
+  const entryIndexByKey = useMemo(() => {
+    const index = new Map<RowKey, number>();
+    displayEntries.forEach((entry, position) => index.set(entry.key, position));
+    return index;
+  }, [displayEntries]);
+
+  const measuredHeights = heightsOf(chatId);
+  const [heightsVersion, setHeightsVersion] = useState(0);
+  const rowKeys = useMemo(() => displayEntries.map((entry) => entry.key), [displayEntries]);
+  const table = useMemo(
+    () => buildHeightTable(rowKeys, measuredHeights),
+    [rowKeys, measuredHeights, heightsVersion],
+  );
+  const tableRef = useRef(table);
+  tableRef.current = table;
+
+  function windowAroundMessage(messageId: number): FeedSlice {
+    const index = entryIndexByMessage.get(messageId);
+    return index === undefined ? windowAtEnd(table, FEED_SLICE_LIMIT) : windowAround(table, index, FEED_SLICE_LIMIT);
+  }
+
+  const [win, setWin] = useState<FeedSlice>(() =>
+    focus ? windowAround(table, entryIndexByMessage.get(focus.messageId) ?? table.count, FEED_SLICE_LIMIT) : windowAtEnd(table, FEED_SLICE_LIMIT),
+  );
+  const winFeedRef = useRef(feedKey);
+  const winFocusRef = useRef(focus?.seq ?? 0);
+  const winTailRef = useRef(tailRequest);
+
+  let liveWin = win;
+  if (winFeedRef.current !== feedKey) {
+    winFeedRef.current = feedKey;
+    winFocusRef.current = focus?.seq ?? 0;
+    liveWin = focus ? windowAroundMessage(focus.messageId) : windowAtEnd(table, FEED_SLICE_LIMIT);
+    setWin(liveWin);
+  } else if (focus && winFocusRef.current !== focus.seq) {
+    winFocusRef.current = focus.seq;
+    liveWin = windowAroundMessage(focus.messageId);
+    setWin(liveWin);
+  }
+
+  if (winTailRef.current !== tailRequest) {
+    winTailRef.current = tailRequest;
+    liveWin = windowAtEnd(table, FEED_SLICE_LIMIT);
+    setWin(liveWin);
+  }
+
+  const stickToTail = settledFeedKey.current === feedKey && stuckToBottom.current && !hasMoreAfter;
+  const view: FeedSlice =
+    displayEntries.length === 0
+      ? { from: 0, to: -1 }
+      : stickToTail || liveWin.to < 0 || liveWin.to >= displayEntries.length || liveWin.from > liveWin.to
+        ? windowAtEnd(table, FEED_SLICE_LIMIT)
+        : liveWin;
+
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  const firstEntry = displayEntries[view.from];
+  const lastEntry = displayEntries[view.to];
+  const sliceFrom = firstEntry ? Math.min(firstEntry.row.firstIndex, messages.length) : 0;
+  const sliceTo = lastEntry ? Math.min(lastEntry.row.lastIndex, messages.length - 1) : -1;
+  const sliceRef = useRef<LocalMessage[]>([]);
+  const nextSlice = messages.slice(sliceFrom, sliceTo + 1);
+  if (!sameRows(sliceRef.current, nextSlice)) sliceRef.current = nextSlice;
+  const slice = sliceRef.current;
+  const sliceSignature = `${feedKey}:${slice[0]?.id ?? 0}:${slice[slice.length - 1]?.id ?? 0}:${slice.length}`;
+  const geometrySignature = `${sliceSignature}:${heightsVersion}`;
+  const isViewportNewest = view.to >= displayEntries.length - 1 && !hasMoreAfter;
+
+  const lastGeometrySignature = useRef(geometrySignature);
+  if (lastGeometrySignature.current !== geometrySignature) {
+    lastGeometrySignature.current = geometrySignature;
+    const el = listRef.current;
+    if (el && settledFeedKey.current === feedKey && pendingAnchor.current === null && !stuckToBottom.current) {
+      pendingAnchor.current = rememberAnchor(el);
+    }
+  }
+
+  const skeletonTop = skeletonsAbove(view);
+  const skeletonBottom = skeletonsBelow(table, view);
+  const spacerTopHeight = rowTop(table, skeletonTop.from);
+  const spacerBottomHeight = Math.max(0, totalHeight(table) - rowTop(table, skeletonBottom.to + 1));
+
+  /** Скроллим сам контейнер, а не через scrollIntoView: тот тянет за собой все скроллящиеся
+   *  предки, и однажды уже утащил вниз всю оболочку вместе с плавающей хромой. */
+  function scrollToBottom(smooth: boolean): void {
+    const el = listRef.current;
+    if (!el) return;
+    fling.current?.stop();
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
+    autoScrollUntil.current = performance.now() + AUTO_SCROLL_GUARD_MS;
+    stuckToBottom.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }
+
+  /** Баннер закрепа — та же логика: не scrollIntoView (см. журнал ux-ui.md, этап 2), а свой
+   *  scrollTo по измеренному offsetTop. Молча ничего не делает, если сообщение не догружено
+   *  в текущую страницу истории — догрузки по id пока нет (вне объёма этого этапа). */
+  function rowNodeFor(el: HTMLDivElement, messageId: number): HTMLElement | null {
+    const exact = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    if (exact) return exact;
+    let candidate: HTMLElement | null = null;
+    for (const node of el.querySelectorAll<HTMLElement>('[data-message-id]')) {
+      const id = Number(node.dataset.messageId);
+      if (id > 0 && id <= messageId) candidate = node;
+    }
+    return candidate;
+  }
+
+  function scrollToMessage(messageId: number): void {
+    const el = listRef.current;
+    const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    if (!el || !target) return;
+    fling.current?.stop();
+    const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
+    autoScrollUntil.current = 0;
+    stuckToBottom.current = false;
+    el.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  useLayoutEffect(() => {
+    if (settledFeedKey.current === feedKey || messages.length === 0) return;
+    settledFeedKey.current = feedKey;
+    prevLastId.current = messages[messages.length - 1]?.id ?? null;
+    retryUpAt.current = 0;
+    retryDownAt.current = 0;
+    if (focus && listRef.current?.querySelector(`[data-message-id="${focus.messageId}"]`)) {
+      autoScrollUntil.current = 0;
+      stuckToBottom.current = false;
+      return;
+    }
+    stuckToBottom.current = true;
+    setShowJump(false);
+    scrollToBottom(false);
+  }, [feedKey, chatId, messages.length, focus]);
+
+  useLayoutEffect(() => {
+    if (!focus) return;
+    const el = listRef.current;
+    if (!el) return;
+    const target = rowNodeFor(el, focus.messageId);
+    if (!target) return;
+
+    autoScrollUntil.current = 0;
+    stuckToBottom.current = false;
+    fling.current?.stop();
+    const quiet = focus.quiet === true;
+    const offset = focus.offset ?? 0;
+    if (quiet) pendingAnchor.current = null;
+    function place(): void {
+      if (!quiet) {
+        el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
+        return;
+      }
+      const node = el!.querySelector<HTMLElement>(`[data-message-id="${focus!.messageId}"]`);
+      if (!node || el!.clientHeight === 0) return;
+      el!.scrollTop = Math.max(0, node.offsetTop - offset);
+    }
+    place();
+    if (!quiet) target.dataset.flash = '1';
+    const flashTimer = quiet
+      ? 0
+      : window.setTimeout(() => delete target.dataset.flash, cssDurationMs('--dur-flash'));
+
+    const observer = new ResizeObserver(place);
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) observer.observe(node);
+    if (topSpacerRef.current) observer.observe(topSpacerRef.current);
+
+    function release(): void {
+      observer.disconnect();
+      el!.removeEventListener('pointerdown', release);
+      el!.removeEventListener('wheel', release);
+      el!.removeEventListener('touchstart', release);
+    }
+    el.addEventListener('pointerdown', release);
+    el.addEventListener('wheel', release, { passive: true });
+    el.addEventListener('touchstart', release, { passive: true });
+    const holdTimer = window.setTimeout(release, quiet ? RESTORE_HOLD_MS : FOCUS_HOLD_MS);
+
+    return () => {
+      window.clearTimeout(flashTimer);
+      window.clearTimeout(holdTimer);
+      release();
+    };
+  }, [focus]);
+
+  useLayoutEffect(() => {
+    const lastMessage = messages[messages.length - 1] ?? null;
+    const lastId = lastMessage?.id ?? null;
+    if (settledFeedKey.current !== feedKey) {
+      prevLastId.current = lastId;
+      wasNewest.current = isViewportNewest;
+      return;
+    }
+    const el = listRef.current;
+    if (
+      el &&
+      shouldFollowTail({
+        lastId,
+        prevLastId: prevLastId.current,
+        liveMessageId: liveMessage,
+        isOwnLast: lastMessage !== null && lastMessage.sender?.id === myId,
+        wasNewest: wasNewest.current,
+        isAutoScrolling: performance.now() < autoScrollUntil.current,
+        scrollHeight: el.scrollHeight,
+        prevScrollHeight: prevScrollHeight.current,
+        scrollTop: el.scrollTop,
+        clientHeight: el.clientHeight,
+        bottomReserve: bottomReserve(el),
+        stickThreshold: STICK_THRESHOLD,
+      })
+    ) {
+      setShowJump(false);
+      scrollToBottom(true);
+    }
+    prevLastId.current = lastId;
+    wasNewest.current = isViewportNewest;
+  }, [feedKey, messages, isViewportNewest, myId, liveMessage]);
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el) prevScrollHeight.current = el.scrollHeight;
+  });
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+
+    const held = feedAnchor.current;
+    const heldIndex = held === null ? undefined : entryIndexByKey.get(held.key);
+    if (held !== null && heldIndex !== undefined && !stuckToBottom.current) {
+      const shift = rowTop(table, heldIndex) - held.top;
+      if (Math.abs(shift) > 0.5 && performance.now() >= autoScrollUntil.current) el.scrollTop += shift;
+    }
+    const first = displayEntries[view.from];
+    feedAnchor.current = first ? { key: first.key, top: rowTop(table, view.from) } : null;
+
+    const anchor = pendingAnchor.current;
+    if (!anchor) return;
+    pendingAnchor.current = null;
+    if (performance.now() >= autoScrollUntil.current) {
+      restoreAnchor(el, anchor);
+      stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
+    }
+    if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
+  }, [geometrySignature, displayEntries, entryIndexByKey, table, view.from]);
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+
+    const spacer = topSpacerRef.current;
+    if (spacer) geometry.current.contentTop = spacer.offsetTop;
+
+    const divider = el.querySelector<HTMLElement>('[data-day-divider]');
+    if (divider && divider.offsetHeight > 0) dayDividerHeight.current = divider.offsetHeight;
+
+    let changed = false;
+    for (const node of el.querySelectorAll<HTMLElement>('[data-row-index]')) {
+      const entry = displayEntriesRef.current[Number(node.dataset.rowIndex)];
+      if (!entry) continue;
+      const height = node.offsetHeight;
+      if (height <= 0 || measuredHeights.get(entry.key) === height) continue;
+      measuredHeights.set(entry.key, height);
+      changed = true;
+    }
+
+    if (changed) {
+      if (!stuckToBottom.current && pendingAnchor.current === null) pendingAnchor.current = rememberAnchor(el);
+      setHeightsVersion((version) => version + 1);
+      return;
+    }
+    syncWindow();
+  });
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    geometry.current.padTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
+  }, [chatId, pinnedMessage]);
+
+  useEffect(() => {
+    if (TYPING_BUBBLE_IN_FEED && typing && stuckToBottom.current) scrollToBottom(true);
+  }, [typing]);
+
+  // Резерв места под композер едет CSS-переходом (--dur-menu), а прокрутка за ним сама не
+  // идёт: плавный scrollTo тут не годится — у него своя, неуправляемая длительность, и лента
+  // догоняла бы уже уехавший композер. Вместо этого низ ленты прижимается каждый кадр, пока
+  // идёт переход, — последний пузырь остаётся приклеен к композеру всё время движения.
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node || !stuckToBottom.current) return;
+    const ms = cssDurationMs('--dur-menu');
+    const until = performance.now() + ms;
+    let frame = 0;
+    function pinToBottom(): void {
+      node!.scrollTop = node!.scrollHeight;
+      if (performance.now() < until) frame = requestAnimationFrame(pinToBottom);
+    }
+    pinToBottom();
+    return () => cancelAnimationFrame(frame);
+  }, [emojiPanelOpen]);
+
+  useLayoutEffect(() => {
+    if (tailRequest === 0) return;
+    pendingAnchor.current = null;
+    stuckToBottom.current = true;
+    setShowJump(false);
+    scrollToBottom(false);
+  }, [tailRequest]);
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const seen = appearSeen.current;
+    const live = liveIds.current;
+    liveIds.current = new Set();
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+      if (seen.has(node)) continue;
+      seen.add(node);
+      if (live.has(Number(node.dataset.messageId))) node.dataset.appear = '1';
+    }
+  });
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (!stuckToBottom.current) return;
+      fling.current?.stop();
+      el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [chatId]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const takeover = attachFlingTakeover(el);
+    fling.current = takeover;
+    return () => {
+      fling.current = null;
+      takeover.destroy();
+    };
+  }, [chatId]);
+
+  function requestUp(): void {
+    const el = listRef.current;
+    if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current) return;
+    loadingUp.current = true;
+    pendingAnchor.current = rememberAnchor(el);
+    loadMore(chatId)
+      .catch(() => {
+        pendingAnchor.current = null;
+        retryUpAt.current = performance.now() + FEED_RETRY_MS;
+      })
+      .finally(() => {
+        loadingUp.current = false;
+      });
+  }
+
+  function requestDown(): void {
+    const el = listRef.current;
+    if (!el || !hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
+    loadingDown.current = true;
+    pendingAnchor.current = rememberAnchor(el);
+    loadMoreAfter(chatId)
+      .catch(() => {
+        pendingAnchor.current = null;
+        retryDownAt.current = performance.now() + FEED_RETRY_MS;
+      })
+      .finally(() => {
+        loadingDown.current = false;
+      });
+  }
+
+  function syncWindow(): void {
+    const el = listRef.current;
+    if (!el || tableRef.current.count === 0) return;
+    const height = el.clientHeight;
+    if (height === 0) return;
+    const next = windowAtOffset(
+      tableRef.current,
+      el.scrollTop - geometry.current.contentTop,
+      height,
+      FEED_SLICE_LIMIT,
+    );
+    setWin((current) => (sameWindow(current, next) ? current : next));
+  }
+
+  function checkEdges(): void {
+    const el = listRef.current;
+    if (!el) return;
+    const ahead = Math.max(FEED_SENSITIVE_AREA_PX, el.clientHeight);
+    const above = el.scrollTop - geometry.current.contentTop;
+    const below = totalHeight(tableRef.current) - above - el.clientHeight;
+    if (above < ahead) {
+      prefetchSide.current = 'older';
+      requestUp();
+    }
+    if (below < ahead) {
+      prefetchSide.current = 'newer';
+      requestDown();
+    }
+  }
+
+  const checkEdgesRef = useRef(checkEdges);
+  checkEdgesRef.current = checkEdges;
+
+  useEffect(() => () => window.clearTimeout(scrollIdle.current), [chatId]);
+
+  const capturePosition = useRef<() => void>(() => undefined);
+  capturePosition.current = () => {
+    if (messages.length === 0) return;
+    const el = listRef.current;
+    const anchor = el ? rememberAnchor(el) : null;
+    const anchorId = anchor && Number(anchor.id) > 0 ? Number(anchor.id) : null;
+    if (!el || anchor === null || anchorId === null) return;
+    rememberPosition(chatId, {
+      fromId: view.from <= 0 ? null : (slice[0]?.id ?? null),
+      toId: view.to >= displayEntries.length - 1 ? null : (slice[slice.length - 1]?.id ?? null),
+      anchorId,
+      anchorOffset: anchor.top - el.getBoundingClientRect().top,
+      atTail: isViewportNewest && stuckToBottom.current,
+    });
+  };
+
+  useEffect(() => {
+    capturePosition.current();
+  }, [geometrySignature]);
+
+  useEffect(() => {
+    function onVisibilityChange(): void {
+      if (document.visibilityState !== 'hidden') return;
+      capturePosition.current();
+      savePosition(chatId);
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      handOffPosition(chatId);
+    };
+  }, [chatId, savePosition, handOffPosition]);
+
+  useEffect(() => {
+    setViewportNewest(chatId, isViewportNewest);
+  }, [chatId, isViewportNewest, setViewportNewest]);
+
+  useEffect(() => () => setViewportNewest(chatId, null), [chatId, setViewportNewest]);
+
+  const markedUpTo = useRef(0);
+  useEffect(() => {
+    markedUpTo.current = 0;
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!isViewportNewest) return;
+    const last = lastSettledId(messages);
+    if (last === null || last <= markedUpTo.current) return;
+    markedUpTo.current = last;
+    markRead(chatId, last);
+  }, [chatId, messages, isViewportNewest, markRead]);
+
+  useEffect(() => {
+    const side = prefetchSide.current;
+    const unseen = side === 'older' ? sliceFrom : messages.length - 1 - sliceTo;
+    prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen);
+  }, [chatId, messages, sliceFrom, sliceTo, prefetchFeed]);
+
+  useEffect(() => {
+    checkEdgesRef.current();
+  }, [geometrySignature, hasMore, hasMoreAfter]);
+
+  function updateFloatingDate(): void {
+    const el = listRef.current;
+    const entries = displayEntriesRef.current;
+    const heights = tableRef.current;
+    if (!el || entries.length === 0 || heights.count === 0) {
+      setFloatingDate(null);
+      return;
+    }
+
+    const clip = el.scrollTop + geometry.current.padTop - geometry.current.contentTop;
+    const topIndex = indexAtOffset(heights, clip);
+    const entry = entries[topIndex];
+    if (!entry) {
+      setFloatingDate(null);
+      return;
+    }
+
+    let dayIndex = topIndex;
+    while (dayIndex > 0 && !entries[dayIndex]!.row.showDay) dayIndex -= 1;
+    if (rowTop(heights, dayIndex) + dayDividerHeight.current > clip) {
+      setFloatingDate(null);
+      return;
+    }
+
+    let offset = 0;
+    for (let next = topIndex + 1; next < entries.length; next += 1) {
+      if (!entries[next]!.row.showDay) continue;
+      const edge = rowTop(heights, next) + dayDividerHeight.current - clip;
+      if (edge > dayDividerHeight.current && edge < dayDividerHeight.current * 2) {
+        offset = edge - dayDividerHeight.current * 2;
+      }
+      break;
+    }
+
+    const iso = entry.row.message.createdAt;
+    setFloatingDate((current) =>
+      current !== null && current.iso === iso && current.offset === offset ? current : { iso, offset },
+    );
+    window.clearTimeout(floatingDateIdle.current);
+    floatingDateIdle.current = window.setTimeout(() => setFloatingDate(null), FLOATING_DATE_HIDE_MS);
+  }
+
+  useEffect(() => () => window.clearTimeout(floatingDateIdle.current), [chatId]);
+
+  function handleScroll(): void {
+    const el = listRef.current;
+    if (!el) return;
+    // Скролл отменяет любой висящий жест сообщения — long-press/окно двойного тапа
+    // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
+    bumpScrollEpoch();
+    const raw = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const distance = raw - bottomReserve(el);
+    prevScrollHeight.current = el.scrollHeight;
+    if (performance.now() < autoScrollUntil.current) {
+      if (raw <= 1) autoScrollUntil.current = 0;
+      stuckToBottom.current = true;
+    } else {
+      stuckToBottom.current = distance < STICK_THRESHOLD;
+      if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
+      else if (distance < STICK_THRESHOLD) setShowJump(false);
+    }
+
+    syncWindow();
+    checkEdges();
+    updateFloatingDate();
+
+    window.clearTimeout(scrollIdle.current);
+    scrollIdle.current = window.setTimeout(() => {
+      capturePosition.current();
+      trimFeed(chatId, prefetchSide.current, keepRange(sliceRef.current));
+      pruneHistoryCache();
+    }, SCROLL_IDLE_MS);
+  }
+
+  function handleJump(): void {
+    if (isViewportNewest) {
+      scrollToBottom(true);
+      return;
+    }
+    void returnToTail(chatId);
+  }
+
 
   return (
     <MediaFeedContext.Provider value={mediaFeed}>
@@ -920,8 +1046,6 @@ export function MessageList({
 
         <div className={styles.filler} />
 
-        <div className={styles.trigger} ref={topTriggerRef} aria-hidden="true" />
-
         {displayEntries.length === 0 && !hasMore && historyState === 'ready' && (
           <p className={styles.empty}>Сообщений пока нет. Напишите первым.</p>
         )}
@@ -930,31 +1054,41 @@ export function MessageList({
           <p className={styles.empty}>Нет связи. История не загружена.</p>
         )}
 
-        {daySections.map((section) => (
-          <div key={section.key} className={styles.daySection}>
-            <DateDivider iso={section.iso} />
-            {section.entries.map((entry) => (
-              <MessageListRow
-                key={entry.key}
-                entry={entry}
-                leaving={leavingRows.has(entry.key)}
-                chatId={chatId}
-                myId={myId}
-                isGroup={isGroup}
-                unreadCount={unreadCount}
-                onReply={onReply}
-                onEdit={onEdit}
-                onForwardRequest={onForwardRequest}
-                onToggleReaction={toggleReaction}
-                onLeaveDone={handleLeaveDone}
-                listRef={listRef}
-                stuckToBottomRef={stuckToBottom}
-              />
-            ))}
-          </div>
+        <div className={styles.spacer} style={{ height: spacerTopHeight }} ref={topSpacerRef} aria-hidden="true" />
+
+        {displayEntries.slice(skeletonTop.from, skeletonTop.to + 1).map((entry, offset) => (
+          <RowShape key={`shape-${entry.key}`} own={entry.own} height={rowHeight(table, skeletonTop.from + offset)} />
         ))}
 
-        <div className={styles.trigger} ref={bottomTriggerRef} aria-hidden="true" />
+        {displayEntries.slice(view.from, view.to + 1).map((entry, offset) => (
+          <MessageListRow
+            key={entry.key}
+            index={view.from + offset}
+            entry={entry}
+            leaving={leavingRows.has(entry.key)}
+            chatId={chatId}
+            myId={myId}
+            isGroup={isGroup}
+            unreadCount={unreadCount}
+            onReply={onReply}
+            onEdit={onEdit}
+            onForwardRequest={onForwardRequest}
+            onToggleReaction={toggleReaction}
+            onLeaveDone={handleLeaveDone}
+            listRef={listRef}
+            stuckToBottomRef={stuckToBottom}
+          />
+        ))}
+
+        {displayEntries.slice(skeletonBottom.from, skeletonBottom.to + 1).map((entry, offset) => (
+          <RowShape
+            key={`shape-${entry.key}`}
+            own={entry.own}
+            height={rowHeight(table, skeletonBottom.from + offset)}
+          />
+        ))}
+
+        <div className={styles.spacer} style={{ height: spacerBottomHeight }} aria-hidden="true" />
 
         {TYPING_BUBBLE_IN_FEED && typing && (
           <div className={styles.typingRow}>
@@ -966,8 +1100,9 @@ export function MessageList({
           </div>
         )}
 
-        <div className={styles.spacer} />
       </div>
+
+      <FloatingDate iso={floatingDate?.iso ?? null} offset={floatingDate?.offset ?? 0} />
 
       <button
         type="button"
@@ -990,6 +1125,7 @@ export function MessageList({
  *  пересоздала бы узел строки со всеми последствиями (см. `leavingRows` выше). */
 const MessageListRow = memo(function MessageListRow({
   entry,
+  index,
   leaving,
   chatId,
   myId,
@@ -1004,6 +1140,7 @@ const MessageListRow = memo(function MessageListRow({
   stuckToBottomRef,
 }: {
   entry: RenderRow;
+  index: number;
   leaving: boolean;
   chatId: string;
   myId: string | null;
@@ -1079,7 +1216,8 @@ const MessageListRow = memo(function MessageListRow({
   }, [collapsing]);
 
   return (
-    <>
+    <div className={`${styles.row} ${collapsing ? styles.rowCollapsing : ''}`} data-row-index={index}>
+      {row.showDay && <DateDivider iso={message.createdAt} />}
       {showUnread && <UnreadDivider count={unreadCount} />}
 
       <div
@@ -1125,6 +1263,14 @@ const MessageListRow = memo(function MessageListRow({
           </MessageBubble>
         </MessageRow>
       </div>
-    </>
+    </div>
+  );
+});
+
+const RowShape = memo(function RowShape({ own, height }: { own: boolean; height: number }) {
+  return (
+    <div className={`${styles.shape} ${own ? styles.shapeOwn : ''}`} style={{ height }} aria-hidden="true">
+      <span className={styles.shapeBubble} />
+    </div>
   );
 });

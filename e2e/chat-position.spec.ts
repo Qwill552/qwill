@@ -42,15 +42,27 @@ async function scrollFeedUp(page: Page, pixels: number): Promise<void> {
   await page.evaluate(`(() => { const el = ${SCROLLER}; if (el) el.scrollBy({ top: ${-pixels} }); })()`);
 }
 
+async function settleFeed(page: Page): Promise<void> {
+  let previous = '';
+  for (let step = 0; step < 24; step += 1) {
+    const shape = (await page.evaluate(
+      `(() => { const el = ${SCROLLER}; return el ? Math.round(el.scrollTop) + '/' + Math.round(el.scrollHeight) : ''; })()`,
+    )) as string;
+    if (shape !== '' && shape === previous) return;
+    previous = shape;
+    await page.waitForTimeout(250);
+  }
+}
+
 async function watchEntry(page: Page): Promise<{ view: FeedView; closestToBottom: number }> {
   let closestToBottom = Number.POSITIVE_INFINITY;
-  let view = await feedView(page);
   for (let step = 0; step < 20; step += 1) {
-    view = await feedView(page);
-    if (view.anchorId !== null) closestToBottom = Math.min(closestToBottom, view.distanceToBottom);
+    const sample = await feedView(page);
+    if (sample.anchorId !== null) closestToBottom = Math.min(closestToBottom, sample.distanceToBottom);
     await page.waitForTimeout(120);
   }
-  return { view, closestToBottom };
+  await settleFeed(page);
+  return { view: await feedView(page), closestToBottom };
 }
 
 async function seedPeer(username: string, displayName: string): Promise<string> {
@@ -98,7 +110,7 @@ test('чат открывается там же, где его оставили,
 
   for (let cycle = 1; cycle <= 3; cycle += 1) {
     await scrollFeedUp(page, SCROLL_UP_PX);
-    await page.waitForTimeout(900);
+    await settleFeed(page);
     const before = await feedView(page);
     expect(before.anchorId, `цикл ${cycle}: подъём вверх не сработал`).not.toBeNull();
     expect(before.distanceToBottom).toBeGreaterThan(600);
@@ -142,7 +154,7 @@ test.describe('десктопная раскладка', () => {
       await expect(page.locator('.message-wrap').last()).toBeVisible({ timeout: 30_000 });
       await page.waitForTimeout(2000);
       await scrollFeedUp(page, SCROLL_UP_PX);
-      await page.waitForTimeout(900);
+      await settleFeed(page);
       const view = await feedView(page);
       expect(view.anchorId, `${label}: подъём вверх не сработал`).not.toBeNull();
       expect(view.distanceToBottom, `${label}: подъём вверх не сработал`).toBeGreaterThan(600);

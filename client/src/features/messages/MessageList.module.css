@@ -11,7 +11,6 @@
   display: flex;
   height: 100%;
   flex-direction: column;
-  gap: var(--message-gap);
   overflow-x: clip;
   overflow-y: auto;
   overflow-anchor: none;
@@ -34,19 +33,36 @@
   flex-shrink: 0;
 }
 
-.daySection {
+.row {
+  padding-bottom: var(--message-gap);
+}
+
+.rowCollapsing {
+  padding-bottom: 0;
+  transition: padding-bottom var(--dur-menu) var(--ease-screen);
+}
+
+.shape {
   display: flex;
-  flex-direction: column;
-  gap: var(--message-gap);
-}
-
-.daySection > * {
-  flex-shrink: 0;
-}
-
-.trigger {
-  height: 0;
+  justify-content: flex-start;
+  padding-bottom: var(--message-gap);
   pointer-events: none;
+}
+
+.shapeOwn {
+  justify-content: flex-end;
+}
+
+.shapeBubble {
+  width: 62%;
+  height: 100%;
+  border-radius: 20px 20px 20px 7px;
+  background: var(--pulse-bub);
+  opacity: 0.5;
+}
+
+.shapeOwn .shapeBubble {
+  border-radius: 20px 20px 7px 20px;
 }
 
 /* Короткая переписка прижимается к низу, а не висит под шапкой. Отдельная распорка,
@@ -59,7 +75,6 @@
 
 .spacer {
   flex-shrink: 0;
-  height: 1px;
 }
 
 /* Точки «печатает…» — буквально строки 344-352 референса. */
@@ -171,13 +186,8 @@
   pointer-events: none;
 }
 
-/* Отрицательный отступ гасит зазор ленты у схлопнувшейся строки: без него на месте
-   удалённого сообщения оставалось бы 8px вместо 4px, и соседи в конце дёргались бы. */
 .shellCollapsing {
-  margin-top: calc(var(--message-gap) * -1);
-  transition:
-    height var(--dur-menu) var(--ease-screen),
-    margin-top var(--dur-menu) var(--ease-screen);
+  transition: height var(--dur-menu) var(--ease-screen);
 }
 
 .empty {
