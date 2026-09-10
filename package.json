@@ -27,6 +27,7 @@
     "perf:bench": "node scripts/perf/bench.mjs",
     "perf:experiment": "node scripts/perf/experiment.mjs",
     "perf:shot": "node scripts/perf/shot.mjs",
+    "perf:fling": "node scripts/perf/fling.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",
