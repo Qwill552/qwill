@@ -34,6 +34,7 @@ import {
   type FeedSide,
 } from './feedWindow';
 import { shouldFollowTail } from './feedFollow';
+import { attachFlingTakeover, type FlingTakeover } from './flingTakeover';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
@@ -265,6 +266,7 @@ export function MessageList({
   const retryUpAt = useRef(0);
   const retryDownAt = useRef(0);
   const prefetchSide = useRef<FeedSide>('older');
+  const fling = useRef<FlingTakeover | null>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
 
@@ -338,6 +340,7 @@ export function MessageList({
   function scrollToBottom(smooth: boolean): void {
     const el = listRef.current;
     if (!el) return;
+    fling.current?.stop();
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
     const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
     autoScrollUntil.current = performance.now() + AUTO_SCROLL_GUARD_MS;
@@ -363,6 +366,7 @@ export function MessageList({
     const el = listRef.current;
     const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
     if (!el || !target) return;
+    fling.current?.stop();
     const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
@@ -394,6 +398,7 @@ export function MessageList({
 
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
+    fling.current?.stop();
     const quiet = focus.quiet === true;
     const offset = focus.offset ?? 0;
     if (quiet) pendingAnchor.current = null;
@@ -531,10 +536,23 @@ export function MessageList({
     const el = listRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      if (stuckToBottom.current) el.scrollTop = el.scrollHeight;
+      if (!stuckToBottom.current) return;
+      fling.current?.stop();
+      el.scrollTop = el.scrollHeight;
     });
     observer.observe(el);
     return () => observer.disconnect();
+  }, [chatId]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const takeover = attachFlingTakeover(el);
+    fling.current = takeover;
+    return () => {
+      fling.current = null;
+      takeover.destroy();
+    };
   }, [chatId]);
 
   function requestUp(): void {
