@@ -144,7 +144,7 @@ export function expectKeyboard(): void {
   keyboardExpected = true;
   expectTimer = window.setTimeout(() => {
     keyboardExpected = false;
-    settle();
+    move(targetLift(keyboardHeight), cssDuration('--dur-close'), cssValue('--ease-close') || FALLBACK_EASING);
   }, KEYBOARD_WAIT_MS);
 }
 
