@@ -6,13 +6,12 @@ function keyboardHeight(viewport: VisualViewport): number {
   return Math.max(0, window.innerHeight - viewport.height * viewport.scale);
 }
 
-function occludedEditable(height: number): HTMLElement | null {
+function focusedEditable(): HTMLElement | null {
   const active = document.activeElement;
   if (!(active instanceof HTMLElement)) return null;
   const editable =
     active.isContentEditable || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
-  if (!editable) return null;
-  return active.getBoundingClientRect().bottom > window.innerHeight - height ? active : null;
+  return editable ? active : null;
 }
 
 export function initVirtualKeyboard(): void {
@@ -29,8 +28,13 @@ export function initVirtualKeyboard(): void {
     published = height;
     document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
     if (height === 0) return;
+
+    const field = focusedEditable();
+    if (field && field.getBoundingClientRect().bottom > window.innerHeight - height) {
+      field.scrollIntoView({ block: 'center' });
+      return;
+    }
     window.scrollTo(0, 0);
-    occludedEditable(height)?.scrollIntoView({ block: 'center' });
   };
 
   viewport.addEventListener('resize', publish);
