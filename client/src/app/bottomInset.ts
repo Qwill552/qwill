@@ -495,7 +495,9 @@ function watchPanelGesture(): void {
     taken = false;
     if (event.phase === 'cancel') {
       move(panelLift, cssDuration('--dur-menu'), cssValue('--ease-screen') || FALLBACK_EASING);
+      return;
     }
+    move(0, cssDuration('--dur-close'), cssValue('--ease-close') || FALLBACK_EASING);
   });
 }
 
