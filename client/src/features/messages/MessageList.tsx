@@ -53,7 +53,6 @@ import styles from './MessageList.module.css';
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 /** Насколько далеко надо уйти вверх, чтобы появилась кнопка «вниз» — в экранах. */
 const JUMP_AFTER_SCREENS = 0.5;
-/** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
 const BOTTOM_SNAP = 8;
 const FOLLOW_THRESHOLD = 50;

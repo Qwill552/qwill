@@ -41,6 +41,7 @@ const RESTING_LIFT = 0;
 const SAFE_SETTLE_MS = 600;
 const FALLBACK_DURATION_MS = 250;
 const FALLBACK_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
+const SETTLE_MARGIN_MS = 80;
 const PANEL_LIFT_KEY = 'qwill.panel-lift';
 
 const listeners = new Set<(state: BottomInsetState) => void>();
@@ -159,10 +160,11 @@ function stopMoving(): void {
 
 /** Одна анимация на элемент, на всё движение. Значения задаются абсолютные, заливки нет:
  *  по окончании элемент остаётся на том, что уже написано в CSS. */
-function startMoving(fromLift: number, toLift: number, duration: number, easing: string): void {
+function startMoving(fromLift: number, toLift: number, duration: number, easing: string): Animation | null {
   stopMoving();
-  if (duration <= 0 || fromLift === toLift) return;
+  if (duration <= 0 || fromLift === toLift) return null;
 
+  let first: Animation | null = null;
   for (const [el, mode] of movers) {
     const from = offsetOf(mode, fromLift);
     const to = offsetOf(mode, toLift);
@@ -173,7 +175,9 @@ function startMoving(fromLift: number, toLift: number, duration: number, easing:
     );
     running.add(animation);
     animation.finished.catch(() => undefined).finally(() => running.delete(animation));
+    first = first ?? animation;
   }
+  return first;
 }
 
 function writeVariables(nextLayoutLift: number, nextLiveLift: number, occupied: boolean): void {
@@ -219,8 +223,9 @@ function move(toLift: number, duration: number, easing: string): void {
   const laidOut = layoutLift;
   writeVariables(RESTING_LIFT, toLift, true);
   notify('start', layoutLift - laidOut);
-  startMoving(fromLift, toLift, duration, easing);
-  settleTimer = window.setTimeout(settle, duration);
+  const animation = startMoving(fromLift, toLift, duration, easing);
+  animation?.finished.then(settle, () => undefined);
+  settleTimer = window.setTimeout(settle, duration + (animation ? SETTLE_MARGIN_MS : 0));
 }
 
 function cssValue(name: string): string {
