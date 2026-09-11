@@ -12,10 +12,7 @@ type NavigatorWithVirtualKeyboard = Navigator & {
 export type KeyboardPhase = 'start' | 'end';
 
 export interface KeyboardState {
-  /** Подъём, на который пересчитана раскладка: отступ ленты и её прокрутка. */
-  liftLayout: number;
-  /** Подъём в конце начавшегося движения. Совпадает с `liftLayout` при появлении. */
-  liftTo: number;
+  layoutShift: number;
   phase: KeyboardPhase;
 }
 
@@ -40,6 +37,7 @@ function virtualKeyboard(): VirtualKeyboard | undefined {
   return (navigator as NavigatorWithVirtualKeyboard).virtualKeyboard;
 }
 
+const RESTING_LIFT = 0;
 const SAFE_SETTLE_MS = 600;
 const FALLBACK_DURATION_MS = 250;
 const FALLBACK_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
@@ -58,6 +56,10 @@ let keyboardHeight = 0;
 let heldSafeBottom = -1;
 let safeProbe: HTMLElement | null = null;
 let safeTimer: number | undefined;
+
+export function keyboardLift(): number {
+  return liveLift;
+}
 
 export function onKeyboardState(listener: (state: KeyboardState) => void): () => void {
   listeners.add(listener);
@@ -154,8 +156,8 @@ function writeVariables(nextLayoutLift: number, nextLiveLift: number, height: nu
   }
 }
 
-function notify(phase: KeyboardPhase, liftTo: number): void {
-  const state: KeyboardState = { liftLayout: layoutLift, liftTo, phase };
+function notify(phase: KeyboardPhase, layoutShift: number): void {
+  const state: KeyboardState = { layoutShift, phase };
   for (const listener of listeners) listener(state);
 }
 
@@ -189,8 +191,9 @@ function watchWebSources(): void {
     if (hasNativeInsets) return;
     const height = Math.round(webKeyboardHeight());
     if (height === keyboardHeight) return;
+    const laidOut = layoutLift;
     writeVariables(lift(height), lift(height), height);
-    notify('end', lift(height));
+    notify('end', layoutLift - laidOut);
     if (height > 0) revealFocused(height);
   };
 
@@ -209,18 +212,18 @@ async function watchNativeInsets(): Promise<void> {
       const target = Math.round(event.target ?? 0);
       const fromLift = liveLift;
       const toLift = lift(target);
-      // Пока клавиатура едет, раскладка стоит на большем из двух концов: на убирании
-      // отнятый отступ было бы нечем компенсировать — прокрутка упёрлась бы в конец.
-      writeVariables(Math.max(layoutLift, toLift), toLift, Math.max(keyboardHeight, target));
-      notify('start', toLift);
+      const laidOut = layoutLift;
+      writeVariables(RESTING_LIFT, toLift, Math.max(keyboardHeight, target));
+      notify('start', layoutLift - laidOut);
       startMoving(fromLift, toLift, event.duration ?? FALLBACK_DURATION_MS, event.easing || FALLBACK_EASING);
       return;
     }
 
     stopMoving();
     const height = Math.round(event.height);
+    const laidOut = layoutLift;
     writeVariables(lift(height), lift(height), height);
-    notify('end', lift(height));
+    notify('end', layoutLift - laidOut);
     scheduleSafeBottomHold();
     if (height > 0) revealFocused(height);
   });

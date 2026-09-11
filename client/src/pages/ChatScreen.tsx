@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createReportRequest } from '../api/admin';
 import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
-import { registerKeyboardMover } from '../app/virtualKeyboard';
+import { keyboardLift, registerKeyboardMover } from '../app/virtualKeyboard';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
@@ -96,6 +96,7 @@ export function ChatScreen() {
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerBarRef = useRef<HTMLDivElement>(null);
   const composerFadeRef = useRef<HTMLDivElement>(null);
@@ -189,6 +190,24 @@ export function ChatScreen() {
       .filter((el): el is HTMLDivElement => el !== null)
       .map((el) => registerKeyboardMover(el, 'chrome'));
     return () => off.forEach((stop) => stop());
+  }, [chatId]);
+
+  useEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+
+    function dismissKeyboard(event: PointerEvent): void {
+      if (keyboardLift() <= 0) return;
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('[data-message-scroller]')) return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    screen.addEventListener('pointerdown', dismissKeyboard, true);
+    return () => screen.removeEventListener('pointerdown', dismissKeyboard, true);
   }, [chatId]);
 
   useLayoutEffect(() => {
@@ -362,6 +381,7 @@ export function ChatScreen() {
   return (
     <div
       className={styles.screen}
+      ref={screenRef}
       style={{
         ...(composerHeight ? { ['--composer-h' as string]: `${composerHeight}px` } : undefined),
         ['--composer-inset-bottom' as string]:

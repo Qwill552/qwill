@@ -825,9 +825,9 @@ export function MessageList({
     return () => observer.disconnect();
   }, [chatId]);
 
-  // Раскладка под клавиатуру встаёт сразу на конечное значение, а картинку на время
-  // движения отводит назад преобразование (--keyboard-catchup): за кадр не выполняется ни
-  // строчки скрипта, движение проигрывает композитор по кривой самой клавиатуры.
+  // Раскладка под клавиатуру меняется один раз за движение, а картинку всё движение ведёт
+  // преобразование: за кадр не выполняется ни строчки скрипта, движение проигрывает
+  // композитор по кривой самой клавиатуры.
   useEffect(() => {
     const list = listRef.current;
     const jump = jumpRef.current;
@@ -840,24 +840,20 @@ export function MessageList({
 
   useEffect(
     () =>
-      onKeyboardState(({ phase }) => {
+      onKeyboardState(({ phase, layoutShift }) => {
         const el = listRef.current;
         if (!el) return;
 
-        if (phase === 'start') {
-          const stuck = stuckToBottom.current;
-          keyboardAnchor.current = { stuck };
-          if (stuck) {
-            fling.current?.stop();
-            el.scrollTop = el.scrollHeight;
-          }
+        if (phase === 'start') keyboardAnchor.current = { stuck: stuckToBottom.current };
+        const stuck = keyboardAnchor.current?.stuck ?? stuckToBottom.current;
+        if (phase === 'end') keyboardAnchor.current = null;
+        if (layoutShift === 0) return;
+
+        fling.current?.stop();
+        if (!stuck) {
+          el.scrollTop += layoutShift;
           return;
         }
-
-        const stuck = keyboardAnchor.current?.stuck ?? stuckToBottom.current;
-        keyboardAnchor.current = null;
-        if (!stuck) return;
-        fling.current?.stop();
         el.scrollTop = el.scrollHeight;
         stuckToBottom.current = true;
       }),
