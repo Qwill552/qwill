@@ -202,8 +202,7 @@ function rememberPanelLift(value: number): void {
 function offsetOf(mode: InsetMoverMode, atLift: number): number {
   if (mode === 'chrome') return -atLift;
   if (mode === 'feed') return layoutLift - atLift;
-  const height = panelLift + Math.max(heldSafeBottom, 0);
-  return (height * (panelLift - atLift)) / Math.max(panelLift, 1);
+  return panelLift - atLift;
 }
 
 function stopMoving(): void {
