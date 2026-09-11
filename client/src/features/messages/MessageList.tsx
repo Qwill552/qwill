@@ -287,6 +287,7 @@ export function MessageList({
   const scrollSample = useRef<{ t: number; top: number } | null>(null);
   const fling = useRef<FlingTakeover | null>(null);
   const keyboardAnchor = useRef(false);
+  const bottomGap = useRef(0);
   const jumpRef = useRef<HTMLButtonElement>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
@@ -838,12 +839,16 @@ export function MessageList({
         const el = listRef.current;
         if (!el) return;
 
+        if (phase === 'measure') {
+          bottomGap.current = el.scrollHeight - el.scrollTop - el.clientHeight;
+          return;
+        }
         if (phase === 'start') keyboardAnchor.current = true;
         if (phase === 'end') keyboardAnchor.current = false;
         if (layoutShift === 0) return;
 
         fling.current?.stop();
-        el.scrollTop += layoutShift;
+        el.scrollTop = el.scrollHeight - el.clientHeight - bottomGap.current;
       }),
     [],
   );

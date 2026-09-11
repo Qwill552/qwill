@@ -9,7 +9,7 @@ type NavigatorWithVirtualKeyboard = Navigator & {
   virtualKeyboard?: VirtualKeyboard;
 };
 
-export type BottomInsetPhase = 'start' | 'end';
+export type BottomInsetPhase = 'measure' | 'start' | 'end';
 
 export interface BottomInsetState {
   layoutShift: number;
@@ -24,7 +24,7 @@ interface KeyboardInsetsPlugin {
   addListener(
     eventName: 'keyboardInset',
     listener: (event: {
-      phase: BottomInsetPhase;
+      phase: 'start' | 'end';
       height: number;
       target?: number;
       duration?: number;
@@ -208,6 +208,7 @@ function settle(): void {
   stopMoving();
   const lift = targetLift(keyboardHeight);
   const laidOut = layoutLift;
+  if (lift !== laidOut) notify('measure', lift - laidOut);
   writeVariables(lift, lift, lift > 0);
   notify('end', layoutLift - laidOut);
 }
@@ -221,6 +222,7 @@ function move(toLift: number, duration: number, easing: string): void {
 
   const fromLift = liveLift;
   const laidOut = layoutLift;
+  if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
   writeVariables(RESTING_LIFT, toLift, true);
   notify('start', layoutLift - laidOut);
   const animation = startMoving(fromLift, toLift, duration, easing);
