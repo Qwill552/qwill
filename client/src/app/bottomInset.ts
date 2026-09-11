@@ -79,6 +79,7 @@ let followed: Map<HTMLElement, string> | null = null;
 let lastSample: { at: number; lift: number } | null = null;
 let followSpeed: number | null = null;
 let panelNode: HTMLElement | null = null;
+let panelTransition: string | null = null;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
   listeners.add(listener);
@@ -324,7 +325,11 @@ function beginFollow(): void {
   stopMoving();
   lastSample = null;
   followSpeed = null;
-  if (panelNode && panelOpen && keyboardHeight <= 0) movers.set(panelNode, 'panel');
+  if (panelNode && panelOpen && keyboardHeight <= 0) {
+    movers.set(panelNode, 'panel');
+    if (panelTransition === null) panelTransition = panelNode.style.transition;
+    panelNode.style.transition = 'none';
+  }
   followed = new Map([...movers.keys()].map((el) => [el, el.style.transform]));
   const laidOut = layoutLift;
   if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
@@ -341,7 +346,11 @@ function follow(toLift: number): void {
 function clearFollow(): void {
   if (!followed) return;
   for (const [el, before] of followed) el.style.transform = before;
-  if (panelNode) movers.delete(panelNode);
+  if (panelNode) {
+    movers.delete(panelNode);
+    if (panelTransition !== null) panelNode.style.transition = panelTransition;
+  }
+  panelTransition = null;
   followed = null;
   lastSample = null;
   followSpeed = null;
