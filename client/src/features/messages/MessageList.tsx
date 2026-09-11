@@ -812,6 +812,9 @@ export function MessageList({
     if (!el) return;
     const observer = new ResizeObserver(() => {
       if (!stuckToBottom.current) return;
+      // Пока едет клавиатура, прокрутку правит onKeyboardHeight — синхронно и тем же
+      // числом. Второй проход здесь только заставил бы пересчитать раскладку ещё раз.
+      if (document.documentElement.dataset.keyboard === 'up') return;
       fling.current?.stop();
       el.scrollTop = el.scrollHeight;
     });
