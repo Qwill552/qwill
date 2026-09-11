@@ -112,6 +112,7 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
   const [activeCategory, setActiveCategory] = useState(0);
   const [closing, setClosing] = useState(false);
   const [instant, setInstant] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   const [dragging, setDragging] = useState(false);
   const [categoryHiddenPx, setCategoryHiddenPx] = useState(0);
@@ -177,6 +178,12 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
   useLayoutEffect(() => {
     if (!kept) return;
     setInstant(shown ? bottomLift() > 0 : isKeyboardExpected());
+    if (!shown) {
+      setEntered(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(frame);
   }, [kept, shown]);
 
   useBackHandler(kept ? shown : !closing, startClose);
@@ -303,7 +310,7 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
           popover ? styles.popover : '',
           closing ? styles.panelClosing : '',
           kept ? styles.kept : '',
-          kept && shown ? styles.keptOpen : '',
+          kept && entered ? styles.keptOpen : '',
           kept && instant ? styles.keptInstant : '',
         ]
           .filter(Boolean)
