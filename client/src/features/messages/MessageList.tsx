@@ -1164,7 +1164,7 @@ export function MessageList({
             onLeaveDone={handleLeaveDone}
             flash={flashId !== null && entry.row.groupIds.includes(flashId)}
             listRef={listRef}
-            stuckToBottomRef={stuckToBottom}
+            atBottomRef={atVeryBottom}
           />
         ))}
 
@@ -1227,7 +1227,7 @@ const MessageListRow = memo(function MessageListRow({
   onLeaveDone,
   flash,
   listRef,
-  stuckToBottomRef,
+  atBottomRef,
 }: {
   entry: RenderRow;
   index: number;
@@ -1243,7 +1243,7 @@ const MessageListRow = memo(function MessageListRow({
   onLeaveDone: (key: RowKey) => void;
   flash: boolean;
   listRef: React.RefObject<HTMLDivElement | null>;
-  stuckToBottomRef: React.RefObject<boolean>;
+  atBottomRef: React.RefObject<boolean>;
 }) {
   const { row, own, read, isReal, canEdit, canDelete, canPin, canReply, canReact, isPinned, showUnread } = entry;
   const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext } = row;
@@ -1273,7 +1273,7 @@ const MessageListRow = memo(function MessageListRow({
     // видимой области: возвращаем прокрутке ровно то, что теряет строка, каждый кадр.
     const list = listRef.current;
     let observer: ResizeObserver | null = null;
-    if (list && !stuckToBottomRef.current && node.offsetTop < list.scrollTop) {
+    if (list && !atBottomRef.current && node.offsetTop < list.scrollTop) {
       let lastHeight = node.offsetHeight;
       observer = new ResizeObserver((entries) => {
         const height = entries[0]?.contentRect.height;
@@ -1298,7 +1298,7 @@ const MessageListRow = memo(function MessageListRow({
       node.style.height = '';
       node.style.opacity = '';
     };
-  }, [leaving, entry.key, onLeaveDone, listRef, stuckToBottomRef]);
+  }, [leaving, entry.key, onLeaveDone, listRef, atBottomRef]);
 
   useLayoutEffect(() => {
     if (!collapsing) return;
