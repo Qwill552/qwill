@@ -2,7 +2,7 @@ import { layoutVariants } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
-import { bottomLift, isKeyboardExpected, onBottomInset } from '../../app/bottomInset';
+import { bottomLift, isKeyboardExpected, onBottomInset, registerEmojiPanel } from '../../app/bottomInset';
 import { desktopColumnRect, desktopOverlayBounds } from '../../app/desktopOverlay';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
@@ -204,6 +204,12 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
       window.clearTimeout(timer);
     };
   }, [handover]);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || popover) return;
+    return registerEmojiPanel(panel);
+  }, [popover]);
 
   useBackHandler(kept ? shown : !closing, startClose);
   useEscapeKey(kept ? shown : !closing, startClose);

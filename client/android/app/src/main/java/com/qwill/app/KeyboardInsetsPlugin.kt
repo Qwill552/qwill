@@ -59,6 +59,7 @@ class KeyboardInsetsPlugin : Plugin() {
                             JSObject()
                                 .put("phase", "move")
                                 .put("height", insets.getInsets(WindowInsetsCompat.Type.ime()).bottom / density)
+                                .put("at", System.currentTimeMillis().toDouble())
                         )
                     }
                     return insets

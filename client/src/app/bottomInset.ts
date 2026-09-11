@@ -1,5 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
+import { onBackGesture } from './backGesture';
+
 interface VirtualKeyboard extends EventTarget {
   overlaysContent: boolean;
   boundingRect: DOMRectReadOnly;
@@ -18,7 +20,7 @@ export interface BottomInsetState {
 
 /** `chrome` едет вверх вместе с клавиатурой, `feed` — отстаёт от уже пересчитанной
  *  раскладки ровно на то, что клавиатуре осталось пройти. */
-export type InsetMoverMode = 'chrome' | 'feed';
+export type InsetMoverMode = 'chrome' | 'feed' | 'panel';
 
 interface KeyboardInsetsPlugin {
   addListener(
@@ -29,6 +31,7 @@ interface KeyboardInsetsPlugin {
       target?: number;
       duration?: number;
       easing?: string;
+      at?: number;
     }) => void,
   ): Promise<{ remove: () => Promise<void> }>;
 }
@@ -45,6 +48,8 @@ const SETTLE_MARGIN_MS = 80;
 const KEYBOARD_WAIT_MS = 700;
 const SETTLE_DEBOUNCE_MS = 70;
 const PANEL_LIFT_KEY = 'qwill.panel-lift';
+const FOLLOW_LEAD_LIMIT_MS = 24;
+const PANEL_GESTURE_START = 0.015;
 
 const listeners = new Set<(state: BottomInsetState) => void>();
 const movers = new Map<HTMLElement, InsetMoverMode>();
@@ -70,6 +75,8 @@ let settledTimer: number | undefined;
 let keyboardExpected = false;
 let moveId = 0;
 let followed: Map<HTMLElement, string> | null = null;
+let lastSample: { at: number; lift: number } | null = null;
+let panelNode: HTMLElement | null = null;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
   listeners.add(listener);
@@ -88,6 +95,15 @@ export function registerInsetMover(el: HTMLElement, mode: InsetMoverMode): () =>
   movers.set(el, mode);
   return () => {
     movers.delete(el);
+  };
+}
+
+export function registerEmojiPanel(el: HTMLElement): () => void {
+  panelNode = el;
+  return () => {
+    if (panelNode !== el) return;
+    movers.delete(el);
+    panelNode = null;
   };
 }
 
@@ -182,7 +198,10 @@ function rememberPanelLift(value: number): void {
 }
 
 function offsetOf(mode: InsetMoverMode, atLift: number): number {
-  return mode === 'chrome' ? -atLift : layoutLift - atLift;
+  if (mode === 'chrome') return -atLift;
+  if (mode === 'feed') return layoutLift - atLift;
+  const height = panelLift + Math.max(heldSafeBottom, 0);
+  return (height * (panelLift - atLift)) / Math.max(panelLift, 1);
 }
 
 function stopMoving(): void {
@@ -281,11 +300,25 @@ function settle(): void {
   notify('end', layoutLift - laidOut);
 }
 
+function leadingLift(lift: number, at: number | undefined, ceiling: number): number {
+  const previous = lastSample;
+  if (at === undefined) return lift;
+  lastSample = { at, lift };
+  if (!previous || at <= previous.at) return lift;
+
+  const gap = at - previous.at;
+  const lead = Math.min(FOLLOW_LEAD_LIMIT_MS, Math.max(0, Date.now() - at) + gap);
+  const ahead = lift + ((lift - previous.lift) / gap) * lead;
+  return Math.min(Math.max(ahead, 0), ceiling);
+}
+
 function beginFollow(): void {
   window.clearTimeout(settleTimer);
   const from = movingLift() ?? liveLift;
   moveId += 1;
   stopMoving();
+  lastSample = null;
+  if (panelNode && panelOpen && keyboardHeight <= 0) movers.set(panelNode, 'panel');
   followed = new Map([...movers.keys()].map((el) => [el, el.style.transform]));
   const laidOut = layoutLift;
   if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
@@ -302,7 +335,9 @@ function follow(toLift: number): void {
 function clearFollow(): void {
   if (!followed) return;
   for (const [el, before] of followed) el.style.transform = before;
+  if (panelNode) movers.delete(panelNode);
   followed = null;
+  lastSample = null;
 }
 
 function move(toLift: number, duration: number, easing: string): void {
@@ -395,7 +430,8 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     if (event.phase === 'move') {
-      follow(liftOf(Math.round(event.height)));
+      const measured = liftOf(event.height);
+      follow(leadingLift(measured, event.at, Math.max(knownKeyboardLift, measured)));
       return;
     }
 
@@ -419,6 +455,34 @@ async function watchNativeInsets(): Promise<void> {
   });
 }
 
+function watchPanelGesture(): void {
+  let taken = false;
+
+  onBackGesture((event) => {
+    if (event.phase === 'start') {
+      taken = false;
+      return;
+    }
+
+    if (event.phase === 'progress') {
+      if (!panelOpen || keyboardHeight > 0 || panelLift <= 0) return;
+      if (event.progress <= PANEL_GESTURE_START) return;
+      if (!taken) {
+        beginFollow();
+        taken = true;
+      }
+      follow(panelLift * (1 - Math.min(1, event.progress)));
+      return;
+    }
+
+    if (!taken) return;
+    taken = false;
+    if (event.phase === 'cancel') {
+      move(panelLift, cssDuration('--dur-menu'), cssValue('--ease-screen') || FALLBACK_EASING);
+    }
+  });
+}
+
 export function initBottomInset(): void {
   const keyboard = virtualKeyboard();
   if (keyboard) keyboard.overlaysContent = true;
@@ -432,5 +496,6 @@ export function initBottomInset(): void {
   rememberPanelLift(stored > 0 ? stored : measure(panelProbe));
 
   watchWebSources();
+  watchPanelGesture();
   void watchNativeInsets();
 }
