@@ -49,6 +49,7 @@ const KEYBOARD_WAIT_MS = 700;
 const SETTLE_DEBOUNCE_MS = 70;
 const PANEL_LIFT_KEY = 'qwill.panel-lift';
 const FOLLOW_LEAD_LIMIT_MS = 24;
+const FOLLOW_SPEED_KEEP = 0.6;
 const PANEL_GESTURE_START = 0.015;
 
 const listeners = new Set<(state: BottomInsetState) => void>();
@@ -76,6 +77,7 @@ let keyboardExpected = false;
 let moveId = 0;
 let followed: Map<HTMLElement, string> | null = null;
 let lastSample: { at: number; lift: number } | null = null;
+let followSpeed: number | null = null;
 let panelNode: HTMLElement | null = null;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
@@ -307,9 +309,13 @@ function leadingLift(lift: number, at: number | undefined, ceiling: number): num
   if (!previous || at <= previous.at) return lift;
 
   const gap = at - previous.at;
+  const instant = (lift - previous.lift) / gap;
+  followSpeed = followSpeed === null ? instant : followSpeed * FOLLOW_SPEED_KEEP + instant * (1 - FOLLOW_SPEED_KEEP);
   const lead = Math.min(FOLLOW_LEAD_LIMIT_MS, Math.max(0, Date.now() - at) + gap);
-  const ahead = lift + ((lift - previous.lift) / gap) * lead;
-  return Math.min(Math.max(ahead, 0), ceiling);
+  const ahead = lift + followSpeed * lead;
+  const forward = Math.sign(instant);
+  const held = forward !== 0 && Math.sign(ahead - liveLift) === -forward ? liveLift : ahead;
+  return Math.min(Math.max(held, 0), ceiling);
 }
 
 function beginFollow(): void {
@@ -318,6 +324,7 @@ function beginFollow(): void {
   moveId += 1;
   stopMoving();
   lastSample = null;
+  followSpeed = null;
   if (panelNode && panelOpen && keyboardHeight <= 0) movers.set(panelNode, 'panel');
   followed = new Map([...movers.keys()].map((el) => [el, el.style.transform]));
   const laidOut = layoutLift;
@@ -338,6 +345,7 @@ function clearFollow(): void {
   if (panelNode) movers.delete(panelNode);
   followed = null;
   lastSample = null;
+  followSpeed = null;
 }
 
 function move(toLift: number, duration: number, easing: string): void {
