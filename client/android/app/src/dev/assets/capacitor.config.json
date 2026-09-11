@@ -6,6 +6,11 @@
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": true
   },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "disable"
+    }
+  },
   "server": {
     "androidScheme": "https",
     "url": "https://dev.qwill.mooo.com"
