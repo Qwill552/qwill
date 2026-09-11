@@ -414,7 +414,6 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
             <div
               ref={fieldRef}
               className={styles.input}
-              data-composer-field="true"
               contentEditable
               role="textbox"
               aria-multiline="true"
