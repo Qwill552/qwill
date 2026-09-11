@@ -2,7 +2,7 @@ import { layoutVariants } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
-import { bottomLift, isKeyboardExpected } from '../../app/bottomInset';
+import { bottomLift, isKeyboardExpected, onBottomInset } from '../../app/bottomInset';
 import { desktopColumnRect, desktopOverlayBounds } from '../../app/desktopOverlay';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
@@ -97,6 +97,7 @@ interface DragState {
 }
 
 const SETTLE_DUR_MS = 500;
+const HANDOVER_LIMIT_MS = 900;
 const POPOVER_GAP = 8;
 const POPOVER_EDGE = 12;
 
@@ -113,6 +114,7 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
   const [closing, setClosing] = useState(false);
   const [instant, setInstant] = useState(false);
   const [entered, setEntered] = useState(false);
+  const [handover, setHandover] = useState(false);
 
   const [dragging, setDragging] = useState(false);
   const [categoryHiddenPx, setCategoryHiddenPx] = useState(0);
@@ -177,14 +179,31 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
 
   useLayoutEffect(() => {
     if (!kept) return;
-    setInstant(shown ? bottomLift() > 0 : isKeyboardExpected());
+    const toKeyboard = !shown && isKeyboardExpected();
+    setInstant(shown ? bottomLift() > 0 : toKeyboard);
     if (!shown) {
       setEntered(false);
+      setHandover(toKeyboard);
       return;
     }
+    setHandover(false);
     const frame = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(frame);
   }, [kept, shown]);
+
+  /** Подмена панели клавиатурой: содержимое гаснет сразу, а сама карточка держится, пока
+   *  клавиатура не встанет на её место — иначе на время её подъёма зияет дыра. */
+  useEffect(() => {
+    if (!handover) return;
+    const off = onBottomInset(({ phase }) => {
+      if (phase === 'end' && !isKeyboardExpected()) setHandover(false);
+    });
+    const timer = window.setTimeout(() => setHandover(false), HANDOVER_LIMIT_MS);
+    return () => {
+      off();
+      window.clearTimeout(timer);
+    };
+  }, [handover]);
 
   useBackHandler(kept ? shown : !closing, startClose);
   useEscapeKey(kept ? shown : !closing, startClose);
@@ -312,6 +331,7 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
           kept ? styles.kept : '',
           kept && entered ? styles.keptOpen : '',
           kept && instant ? styles.keptInstant : '',
+          kept && handover ? styles.keptHandover : '',
         ]
           .filter(Boolean)
           .join(' ')}

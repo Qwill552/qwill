@@ -114,6 +114,18 @@
   transition: color var(--transition);
 }
 
+.swap {
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  transition: transform var(--dur-icon) linear, opacity var(--dur-icon) linear;
+}
+
+.swapHidden {
+  transform: scale(0);
+  opacity: 0;
+}
+
 .round:disabled {
   cursor: default;
   opacity: 0.4;

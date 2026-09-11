@@ -65,6 +65,7 @@ let safeTimer: number | undefined;
 let settleTimer: number | undefined;
 let expectTimer: number | undefined;
 let keyboardExpected = false;
+let moveId = 0;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
   listeners.add(listener);
@@ -180,6 +181,16 @@ function stopMoving(): void {
   running.clear();
 }
 
+function movingLift(): number | null {
+  if (running.size === 0) return null;
+  for (const [el, mode] of movers) {
+    if (mode !== 'chrome') continue;
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    return -matrix.m42;
+  }
+  return null;
+}
+
 /** Одна анимация на элемент, на всё движение. Значения задаются абсолютные, заливки нет:
  *  по окончании элемент остаётся на том, что уже написано в CSS. */
 function startMoving(fromLift: number, toLift: number, duration: number, easing: string): Animation | null {
@@ -227,6 +238,7 @@ function notify(phase: BottomInsetPhase, layoutShift: number): void {
 
 function settle(): void {
   window.clearTimeout(settleTimer);
+  moveId += 1;
   stopMoving();
   const lift = targetLift(keyboardHeight);
   const laidOut = layoutLift;
@@ -242,14 +254,18 @@ function move(toLift: number, duration: number, easing: string): void {
     return;
   }
 
-  const fromLift = liveLift;
+  const fromLift = movingLift() ?? liveLift;
   const laidOut = layoutLift;
+  const id = (moveId += 1);
+  const mine = (): void => {
+    if (id === moveId) settle();
+  };
   if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
   writeVariables(RESTING_LIFT, toLift, true);
   notify('start', layoutLift - laidOut);
   const animation = startMoving(fromLift, toLift, duration, easing);
-  animation?.finished.then(settle, () => undefined);
-  settleTimer = window.setTimeout(settle, duration + (animation ? SETTLE_MARGIN_MS : 0));
+  animation?.finished.then(mine, () => undefined);
+  settleTimer = window.setTimeout(mine, duration + (animation ? SETTLE_MARGIN_MS : 0));
 }
 
 function cssValue(name: string): string {

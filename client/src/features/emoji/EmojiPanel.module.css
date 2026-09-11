@@ -61,6 +61,18 @@
   transition: none;
 }
 
+/* Клавиатура забирает место панели: содержимое гаснет, карточка остаётся, пока та едет. */
+.keptHandover {
+  transform: none;
+  visibility: visible;
+  content-visibility: visible;
+  transition: none;
+}
+
+.keptHandover > * {
+  opacity: 0;
+}
+
 @keyframes rise {
   from {
     transform: translateY(100%);

@@ -395,7 +395,12 @@ export function MessageComposer({
               title={emojiPanelOpen ? 'Клавиатура' : 'Эмодзи'}
               aria-pressed={emojiPanelOpen}
             >
-              <Icon name={emojiPanelOpen ? 'keyboard' : 'emoji'} size={22} />
+              <span className={`${styles.swap} ${emojiPanelOpen ? styles.swapHidden : ''}`}>
+                <Icon name="emoji" size={22} />
+              </span>
+              <span className={`${styles.swap} ${emojiPanelOpen ? '' : styles.swapHidden}`}>
+                <Icon name="keyboard" size={22} />
+              </span>
             </button>
             <div
               ref={fieldRef}
