@@ -8,7 +8,7 @@ const DECELERATION_RATE = Math.log(0.78) / Math.log(0.9);
 const FLING_FRICTION = 0.015;
 const TUNING_COEFF = 9.80665 * 39.37 * 160 * 0.84;
 const FLING_SCALE = FLING_FRICTION * TUNING_COEFF;
-const MAX_FLING_VELOCITY = 8000;
+export const MAX_FLING_VELOCITY = 8000;
 const MIN_FLING_VELOCITY = 50;
 const VELOCITY_HORIZON_MS = 100;
 const VELOCITY_SAMPLES = 20;
@@ -127,7 +127,7 @@ export interface FlingTakeover {
   destroy(): void;
 }
 
-export function attachFlingTakeover(el: HTMLElement): FlingTakeover {
+export function attachFlingTakeover(el: HTMLElement, onRelease?: (beltVelocity: number) => void): FlingTakeover {
   const points: TrackPoint[] = [];
   let armed = false;
   let touchActive = false;
@@ -258,6 +258,7 @@ export function attachFlingTakeover(el: HTMLElement): FlingTakeover {
     touchActive = false;
     const velocity = fingerVelocity(points, event.timeStamp);
     points.length = 0;
+    onRelease?.(-velocity);
     if (driving) {
       driving = false;
       if (axis === 'vertical') startInertia(-velocity);

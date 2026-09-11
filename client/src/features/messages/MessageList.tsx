@@ -42,7 +42,7 @@ import {
   windowAround,
 } from './feedHeights';
 import { shouldFollowTail } from './feedFollow';
-import { attachFlingTakeover, type FlingTakeover } from './flingTakeover';
+import { attachFlingTakeover, flingDistance, MAX_FLING_VELOCITY, type FlingTakeover } from './flingTakeover';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
@@ -95,6 +95,12 @@ function restoreAnchor(el: HTMLElement, anchor: RowAnchor): void {
 
 function bottomReserve(el: HTMLElement): number {
   return parseFloat(getComputedStyle(el).paddingBottom) || 0;
+}
+
+function predictedPrefetchRows(beltVelocity: number, averageRowHeight: number): number {
+  const speed = Math.min(MAX_FLING_VELOCITY, Math.abs(beltVelocity));
+  if (speed === 0) return 0;
+  return Math.ceil(flingDistance(speed) / averageRowHeight);
 }
 
 function keepRange(slice: LocalMessage[]): FeedKeepRange | null {
@@ -277,6 +283,7 @@ export function MessageList({
   const retryUpAt = useRef(0);
   const retryDownAt = useRef(0);
   const prefetchSide = useRef<FeedSide>('older');
+  const scrollSample = useRef<{ t: number; top: number } | null>(null);
   const fling = useRef<FlingTakeover | null>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
@@ -303,6 +310,10 @@ export function MessageList({
   }
   useEffect(() => {
     unreadAnchor.current = null;
+  }, [feedKey]);
+
+  useEffect(() => {
+    scrollSample.current = null;
   }, [feedKey]);
 
   const rows = useMemo(() => {
@@ -810,13 +821,18 @@ export function MessageList({
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    const takeover = attachFlingTakeover(el);
+    const takeover = attachFlingTakeover(el, (beltVelocity) => {
+      if (beltVelocity === 0) return;
+      const rows = predictedPrefetchRows(beltVelocity, tableRef.current.average);
+      const side: FeedSide = beltVelocity > 0 ? 'newer' : 'older';
+      prefetchFeed(chatId, side, Math.max(rows, FEED_PREFETCH_MARGIN));
+    });
     fling.current = takeover;
     return () => {
       fling.current = null;
       takeover.destroy();
     };
-  }, [chatId]);
+  }, [chatId, prefetchFeed]);
 
   function requestUp(): void {
     const el = listRef.current;
@@ -1012,6 +1028,19 @@ export function MessageList({
     syncWindow();
     checkEdges();
     updateFloatingDate();
+
+    const now = performance.now();
+    const sample = scrollSample.current;
+    scrollSample.current = { t: now, top: el.scrollTop };
+    const dt = sample ? now - sample.t : 0;
+    if (sample && dt > 0) {
+      const instVelocity = ((el.scrollTop - sample.top) / dt) * 1000;
+      if (instVelocity !== 0) {
+        const rows = predictedPrefetchRows(instVelocity, table.average);
+        const side: FeedSide = instVelocity > 0 ? 'newer' : 'older';
+        prefetchFeed(chatId, side, Math.max(rows, FEED_PREFETCH_MARGIN));
+      }
+    }
 
     window.clearTimeout(scrollIdle.current);
     scrollIdle.current = window.setTimeout(() => {
