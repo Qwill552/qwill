@@ -363,7 +363,12 @@ async function watchNativeInsets(): Promise<void> {
     keyboardTarget = keyboardHeight;
     if (keyboardHeight > 0) forgetExpectedKeyboard();
     rememberPanelLift(liftOf(keyboardHeight));
-    settle();
+    const settled = targetLift(keyboardHeight);
+    if (running.size === 0 && settled !== liveLift) {
+      move(settled, cssDuration('--dur-close'), cssValue('--ease-close') || FALLBACK_EASING);
+    } else {
+      settle();
+    }
     scheduleSafeBottomHold();
     if (keyboardHeight > 0) revealFocused(keyboardHeight);
   });
