@@ -824,13 +824,15 @@ export function MessageList({
 
   // Клавиатура меняет нижний отступ ленты покадрово. ResizeObserver выше узнаёт об этом
   // на кадр позже, и содержимое каждый раз сначала стоит, а потом догоняет рывком.
+  // Положение задаётся абсолютное: приращения теряются на упоре в предел прокрутки, и
+  // разница между подъёмом и спуском копится в промах на полтораста пикселей.
   useEffect(
     () =>
-      onKeyboardHeight((height, previous) => {
+      onKeyboardHeight(() => {
         const el = listRef.current;
         if (!el || !stuckToBottom.current) return;
         fling.current?.stop();
-        el.scrollTop += height - previous;
+        el.scrollTop = el.scrollHeight;
       }),
     [],
   );
