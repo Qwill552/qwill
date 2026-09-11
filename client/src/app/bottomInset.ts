@@ -127,7 +127,9 @@ function liftOf(height: number): number {
 }
 
 function targetLift(keyboardAt: number): number {
-  return Math.max(liftOf(keyboardAt), panelOpen || keyboardExpected ? panelLift : 0);
+  const fromKeyboard = liftOf(keyboardAt);
+  if (fromKeyboard > 0) return fromKeyboard;
+  return panelOpen || keyboardExpected ? panelLift : 0;
 }
 
 function forgetExpectedKeyboard(): void {
@@ -286,6 +288,7 @@ function cssDuration(name: string): number {
 
 export function setEmojiPanelLift(open: boolean): void {
   if (open === panelOpen) return;
+  if (open) rememberPanelLift(liftOf(keyboardHeight));
   panelOpen = open;
   scheduleSafeBottomHold();
   move(
