@@ -5,6 +5,15 @@
   background: transparent;
 }
 
+/* Тап по композеру обязан доходить до композера: по кнопке — вернуть клавиатуру, по полю —
+   открыть её. Поэтому ловушка закрытия кончается там, где начинается капсула. */
+.catcherAbove {
+  bottom: calc(
+    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
+      var(--bottom-lift-live, 0px)
+  );
+}
+
 .panel {
   position: fixed;
   right: 0;
@@ -26,6 +35,30 @@
 
 .panelClosing {
   animation: rise var(--dur-close) var(--ease-close) reverse forwards;
+}
+
+/* Панель монтируется один раз и дальше только прячется — как emojiView у Telegram, где
+   закрытие это setVisibility(GONE), а не уничтожение вьюхи. Поэтому ни появления
+   содержимого, ни его пересборки при каждом открытии больше нет. */
+.kept {
+  animation: none;
+  transform: translateY(100%);
+  visibility: hidden;
+  content-visibility: hidden;
+  transition: transform var(--dur-close) var(--ease-close), visibility 0s linear var(--dur-close);
+}
+
+.keptOpen {
+  transform: none;
+  visibility: visible;
+  content-visibility: visible;
+  transition: transform var(--dur-menu) var(--ease-screen), visibility 0s;
+}
+
+/* Низ уже занят клавиатурой (или она на подходе) — подъезжать неоткуда и некуда:
+   панель просто оказывается на её месте, как showPopup у Telegram. */
+.keptInstant {
+  transition: none;
 }
 
 @keyframes rise {

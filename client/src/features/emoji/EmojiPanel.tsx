@@ -2,6 +2,7 @@ import { layoutVariants } from '@messenger/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
+import { bottomLift, isKeyboardExpected } from '../../app/bottomInset';
 import { desktopColumnRect, desktopOverlayBounds } from '../../app/desktopOverlay';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
@@ -22,6 +23,9 @@ type PanelTab = 'emoji' | 'stickers' | 'gif';
 interface EmojiPanelProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  /** Задан — панель живёт смонтированной и только прячется, как emojiView у Telegram.
+   *  Не задан — старое поведение: пока отрисована, значит открыта (поповер реакций). */
+  open?: boolean;
   /** Якорь поповера на десктопе — кнопка эмодзи композера или пузырь сообщения. На мобильной
    *  ветке не используется: там панель по-прежнему выезжает снизу во всю ширину. */
   anchor?: DOMRect | null;
@@ -96,7 +100,9 @@ const SETTLE_DUR_MS = 500;
 const POPOVER_GAP = 8;
 const POPOVER_EDGE = 12;
 
-export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
+export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps) {
+  const kept = open !== undefined;
+  const shown = open ?? true;
   const index = useEmojiIndex();
   const recent = useEmojiUsageStore((s) => s.recent);
   const recordUsage = useEmojiUsageStore((s) => s.recordUsage);
@@ -105,6 +111,7 @@ export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [instant, setInstant] = useState(false);
 
   const [dragging, setDragging] = useState(false);
   const [categoryHiddenPx, setCategoryHiddenPx] = useState(0);
@@ -153,18 +160,27 @@ export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
   }, [popover, anchor]);
 
   function startClose(): void {
+    if (kept) {
+      onClose();
+      return;
+    }
     setClosing((current) => current || true);
   }
 
   useEffect(() => {
-    if (!closing) return;
+    if (kept || !closing) return;
     const ms = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-close')) || 0;
     const timer = window.setTimeout(onClose, ms);
     return () => window.clearTimeout(timer);
-  }, [closing, onClose]);
+  }, [kept, closing, onClose]);
 
-  useBackHandler(!closing, startClose);
-  useEscapeKey(!closing, startClose);
+  useLayoutEffect(() => {
+    if (!kept) return;
+    setInstant(shown ? bottomLift() > 0 : isKeyboardExpected());
+  }, [kept, shown]);
+
+  useBackHandler(kept ? shown : !closing, startClose);
+  useEscapeKey(kept ? shown : !closing, startClose);
 
 
   useEffect(() => {
@@ -269,11 +285,25 @@ export function EmojiPanel({ onSelect, onClose, anchor }: EmojiPanelProps) {
       onPointerUp={stopPointerBubble}
       onPointerCancel={stopPointerBubble}
     >
-      <div className={styles.catcher} onClick={startClose} aria-hidden="true" />
+      <div
+        className={`${styles.catcher} ${kept ? styles.catcherAbove : ''}`}
+        onClick={startClose}
+        aria-hidden="true"
+        hidden={kept && !shown}
+      />
 
       <div
         ref={panelRef}
-        className={`${styles.panel} ${popover ? styles.popover : ''} ${closing ? styles.panelClosing : ''}`}
+        className={[
+          styles.panel,
+          popover ? styles.popover : '',
+          closing ? styles.panelClosing : '',
+          kept ? styles.kept : '',
+          kept && shown ? styles.keptOpen : '',
+          kept && instant ? styles.keptInstant : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         style={popover ? popoverStyle : undefined}
         role="dialog"
         aria-modal="true"

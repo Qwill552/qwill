@@ -15,6 +15,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { useEmojiIndex, type EmojiIndex } from '../emoji/emojiIndex';
+import { expectKeyboard } from '../../app/bottomInset';
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice/VoiceRecorder';
 import { AttachSheet } from './AttachSheet';
@@ -54,6 +56,8 @@ export function MessageComposer({
   const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
   const [error, setError] = useState<string | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
+  const [emojiPanelKept, setEmojiPanelKept] = useState(false);
+  const desktop = useLayoutMode() === 'desktop';
   const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [pickedFiles, setPickedFiles] = useState<File[] | null>(null);
@@ -90,8 +94,15 @@ export function MessageComposer({
   const recordOriginRef = useRef({ x: 0, y: 0 });
 
   function setEmojiPanelOpen(open: boolean): void {
+    if (open) setEmojiPanelKept(true);
     setEmojiPanelOpenState(open);
     onEmojiPanelToggle?.(open);
+  }
+
+  function returnToKeyboard(): void {
+    expectKeyboard();
+    setEmojiPanelOpen(false);
+    fieldRef.current?.focus();
   }
 
   useEffect(() => {
@@ -373,14 +384,18 @@ export function MessageComposer({
               className={styles.round}
               type="button"
               onClick={(event) => {
+                if (emojiPanelOpen) {
+                  returnToKeyboard();
+                  return;
+                }
                 setEmojiAnchor(event.currentTarget.getBoundingClientRect());
-                setEmojiPanelOpen(!emojiPanelOpen);
+                setEmojiPanelOpen(true);
               }}
-              aria-label="Эмодзи"
-              title="Эмодзи"
+              aria-label={emojiPanelOpen ? 'Клавиатура' : 'Эмодзи'}
+              title={emojiPanelOpen ? 'Клавиатура' : 'Эмодзи'}
               aria-pressed={emojiPanelOpen}
             >
-              <Icon name="emoji" size={22} />
+              <Icon name={emojiPanelOpen ? 'keyboard' : 'emoji'} size={22} />
             </button>
             <div
               ref={fieldRef}
@@ -394,6 +409,12 @@ export function MessageComposer({
               onInput={handleFieldInput}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
+              onFocus={() => {
+                if (emojiPanelOpen) {
+                  expectKeyboard();
+                  setEmojiPanelOpen(false);
+                }
+              }}
               onBlur={handleFieldBlur}
               onPaste={handleFieldPaste}
               onDrop={handleFieldDrop}
@@ -431,9 +452,18 @@ export function MessageComposer({
         </button>
       </form>
 
-      {emojiPanelOpen && (
-        <EmojiPanel anchor={emojiAnchor} onSelect={insertEmoji} onClose={() => setEmojiPanelOpen(false)} />
-      )}
+      {desktop
+        ? emojiPanelOpen && (
+            <EmojiPanel anchor={emojiAnchor} onSelect={insertEmoji} onClose={() => setEmojiPanelOpen(false)} />
+          )
+        : emojiPanelKept && (
+            <EmojiPanel
+              anchor={emojiAnchor}
+              open={emojiPanelOpen}
+              onSelect={insertEmoji}
+              onClose={() => setEmojiPanelOpen(false)}
+            />
+          )}
 
       {attachSheetOpen && <AttachSheet onClose={() => setAttachSheetOpen(false)} onFilesSelected={handleFilesFromSheet} />}
 

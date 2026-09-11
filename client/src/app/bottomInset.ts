@@ -42,6 +42,7 @@ const SAFE_SETTLE_MS = 600;
 const FALLBACK_DURATION_MS = 250;
 const FALLBACK_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 const SETTLE_MARGIN_MS = 80;
+const KEYBOARD_WAIT_MS = 700;
 const PANEL_LIFT_KEY = 'qwill.panel-lift';
 
 const listeners = new Set<(state: BottomInsetState) => void>();
@@ -62,6 +63,8 @@ let safeProbe: HTMLElement | null = null;
 let panelProbe: HTMLElement | null = null;
 let safeTimer: number | undefined;
 let settleTimer: number | undefined;
+let expectTimer: number | undefined;
+let keyboardExpected = false;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
   listeners.add(listener);
@@ -123,7 +126,26 @@ function liftOf(height: number): number {
 }
 
 function targetLift(keyboardAt: number): number {
-  return Math.max(liftOf(keyboardAt), panelOpen ? panelLift : 0);
+  return Math.max(liftOf(keyboardAt), panelOpen || keyboardExpected ? panelLift : 0);
+}
+
+function forgetExpectedKeyboard(): void {
+  window.clearTimeout(expectTimer);
+  keyboardExpected = false;
+}
+
+export function isKeyboardExpected(): boolean {
+  return keyboardExpected;
+}
+
+export function expectKeyboard(): void {
+  if (panelLift <= 0) return;
+  window.clearTimeout(expectTimer);
+  keyboardExpected = true;
+  expectTimer = window.setTimeout(() => {
+    keyboardExpected = false;
+    settle();
+  }, KEYBOARD_WAIT_MS);
 }
 
 function panelStorageKey(): string {
@@ -283,6 +305,7 @@ function watchWebSources(): void {
     const height = Math.round(webKeyboardHeight());
     if (height === keyboardHeight) return;
     keyboardHeight = height;
+    if (height > 0) forgetExpectedKeyboard();
     rememberPanelLift(liftOf(height));
     settle();
     if (height > 0) revealFocused(height);
@@ -300,6 +323,7 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     if (event.phase === 'start') {
+      if (Math.round(event.target ?? 0) > 0) forgetExpectedKeyboard();
       keyboardHeight = Math.round(event.target ?? 0);
       move(
         targetLift(keyboardHeight),
@@ -310,6 +334,7 @@ async function watchNativeInsets(): Promise<void> {
     }
 
     keyboardHeight = Math.round(event.height);
+    if (keyboardHeight > 0) forgetExpectedKeyboard();
     rememberPanelLift(liftOf(keyboardHeight));
     settle();
     scheduleSafeBottomHold();
