@@ -9,64 +9,51 @@ type NavigatorWithVirtualKeyboard = Navigator & {
   virtualKeyboard?: VirtualKeyboard;
 };
 
-function virtualKeyboard(): VirtualKeyboard | undefined {
-  return (navigator as NavigatorWithVirtualKeyboard).virtualKeyboard;
+export type KeyboardPhase = 'start' | 'move' | 'end';
+
+export interface KeyboardState {
+  /** Подъём, на который уже пересчитана раскладка: отступ ленты, высота фейда, кнопка «вниз». */
+  liftLayout: number;
+  /** Подъём, на котором клавиатура находится прямо сейчас. По нему едет картинка. */
+  liftLive: number;
+  phase: KeyboardPhase;
 }
 
 interface KeyboardInsetsPlugin {
   addListener(
     eventName: 'keyboardInset',
-    listener: (event: { height: number; settled: boolean }) => void,
+    listener: (event: { height: number; target: number; phase: KeyboardPhase }) => void,
   ): Promise<{ remove: () => Promise<void> }>;
 }
 
-let published = -1;
-let nativeDriven = false;
-
-function focusedEditable(): HTMLElement | null {
-  const active = document.activeElement;
-  if (!(active instanceof HTMLElement)) return null;
-  const editable =
-    active.isContentEditable || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
-  return editable ? active : null;
+function virtualKeyboard(): VirtualKeyboard | undefined {
+  return (navigator as NavigatorWithVirtualKeyboard).virtualKeyboard;
 }
 
-type HeightListener = (height: number, previous: number) => void;
+const SAFE_SETTLE_MS = 600;
 
-const listeners = new Set<HeightListener>();
+const listeners = new Set<(state: KeyboardState) => void>();
 
-/** Подписка на высоту клавиатуры. Вызывается **синхронно**, в том же кадре, где меняется
- *  `--keyboard-h`: тому, кто подстраивает прокрутку под новый отступ, нельзя узнать об
- *  этом кадром позже — иначе содержимое сначала стоит, а потом догоняет рывком. */
-export function onKeyboardHeight(listener: HeightListener): () => void {
+let nativeDriven = false;
+let layoutHeight_ = 0;
+let liveHeight = 0;
+let heldSafeBottom = -1;
+let safeProbe: HTMLElement | null = null;
+let safeTimer: number | undefined;
+
+/** Подписка на клавиатуру. Вызывается **синхронно**: тому, кто подстраивает прокрутку,
+ *  нельзя узнать о новой высоте кадром позже — иначе содержимое сначала стоит, а потом
+ *  догоняет рывком. */
+export function onKeyboardState(listener: (state: KeyboardState) => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 }
 
-function apply(height: number): void {
-  if (height === published) return;
-  const previous = published;
-  published = height;
-
-  const root = document.documentElement;
-  if (height > 0) root.dataset.keyboard = 'up';
-  root.style.setProperty('--keyboard-h', `${height}px`);
-  if (height === 0) delete root.dataset.keyboard;
-
-  for (const listener of listeners) listener(height, Math.max(previous, 0));
-}
-
-function layoutHeight(): number {
+function viewportHeight(): number {
   return Math.max(window.innerHeight, document.documentElement.clientHeight);
 }
-
-const SAFE_SETTLE_MS = 600;
-
-let heldSafeBottom = -1;
-let safeProbe: HTMLElement | null = null;
-let safeTimer: number | undefined;
 
 function readSafeBottom(): number {
   if (!safeProbe) {
@@ -84,7 +71,7 @@ function readSafeBottom(): number {
 function scheduleSafeBottomHold(): void {
   window.clearTimeout(safeTimer);
   safeTimer = window.setTimeout(() => {
-    if (published > 0) return;
+    if (liveHeight > 0) return;
     const value = readSafeBottom();
     if (value === heldSafeBottom) return;
     heldSafeBottom = value;
@@ -92,14 +79,40 @@ function scheduleSafeBottomHold(): void {
   }, SAFE_SETTLE_MS);
 }
 
-function settle(height: number): void {
-  apply(height);
-  scheduleSafeBottomHold();
-  if (height === 0) return;
+function lift(height: number): number {
+  return Math.max(0, height - Math.max(heldSafeBottom, 0));
+}
 
-  const field = focusedEditable();
-  if (field && field.getBoundingClientRect().bottom > layoutHeight() - height) {
-    field.scrollIntoView({ block: 'center' });
+/** Раскладка пересчитывается дважды за движение, картинка едет каждый кадр. Менять отступ
+ *  ленты покадрово нельзя: чтение её высоты после этого стоит целый кадр на длинной
+ *  переписке, и клавиатура уезжает вперёд, пока мы считаем. */
+function publish(nextLayout: number, nextLive: number, phase: KeyboardPhase): void {
+  const root = document.documentElement;
+  const layoutChanged = nextLayout !== layoutHeight_;
+  const liveChanged = nextLive !== liveHeight;
+  if (!layoutChanged && !liveChanged && phase === 'move') return;
+
+  layoutHeight_ = nextLayout;
+  liveHeight = nextLive;
+
+  if (nextLive > 0 || nextLayout > 0) root.dataset.keyboard = 'up';
+  if (layoutChanged) root.style.setProperty('--keyboard-h', `${nextLayout}px`);
+  root.style.setProperty('--keyboard-live', `${nextLive}px`);
+  if (nextLive === 0 && nextLayout === 0) delete root.dataset.keyboard;
+
+  const state: KeyboardState = { liftLayout: lift(nextLayout), liftLive: lift(nextLive), phase };
+  for (const listener of listeners) listener(state);
+}
+
+function revealFocused(height: number): void {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return;
+  const editable =
+    active.isContentEditable || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+  if (!editable) return;
+
+  if (active.getBoundingClientRect().bottom > viewportHeight() - height) {
+    active.scrollIntoView({ block: 'center' });
     return;
   }
   window.scrollTo(0, 0);
@@ -108,17 +121,20 @@ function settle(height: number): void {
 /** Оболочка и браузер сообщают о клавиатуре по-разному, и ровно одним способом каждый.
  *  В WebView сжимается визуальный вьюпорт, а `boundingRect` пуст; в Chrome вьюпорт не
  *  шевелится вовсе, зато честен `boundingRect`. Берём наибольшее из двух. */
-function keyboardHeight(): number {
+function webKeyboardHeight(): number {
   const viewport = window.visualViewport;
-  const fromViewport = viewport ? layoutHeight() - viewport.height * viewport.scale : 0;
+  const fromViewport = viewport ? viewportHeight() - viewport.height * viewport.scale : 0;
   const fromApi = virtualKeyboard()?.boundingRect.height ?? 0;
   return Math.max(0, fromViewport, fromApi);
 }
 
 function watchWebSources(): void {
   const onChange = (): void => {
+    scheduleSafeBottomHold();
     if (nativeDriven) return;
-    settle(Math.round(keyboardHeight()));
+    const height = Math.round(webKeyboardHeight());
+    publish(height, height, 'end');
+    if (height > 0) revealFocused(height);
   };
 
   window.visualViewport?.addEventListener('resize', onChange);
@@ -133,15 +149,31 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     nativeDriven = true;
+    const target = Math.round(event.target);
     const height = Math.round(event.height);
-    if (event.settled) settle(height);
-    else apply(height);
+
+    if (event.phase === 'start') {
+      // Пока клавиатура едет, раскладка стоит на большем из двух концов: на убирании
+      // отнятый отступ было бы нечем компенсировать — прокрутка упёрлась бы в конец.
+      publish(Math.max(layoutHeight_, target), liveHeight, 'start');
+      return;
+    }
+    if (event.phase === 'end') {
+      publish(height, height, 'end');
+      scheduleSafeBottomHold();
+      if (height > 0) revealFocused(height);
+      return;
+    }
+    publish(layoutHeight_, height, 'move');
   });
 }
 
 export function initVirtualKeyboard(): void {
   const keyboard = virtualKeyboard();
   if (keyboard) keyboard.overlaysContent = true;
+
+  heldSafeBottom = readSafeBottom();
+  document.documentElement.style.setProperty('--safe-bottom-hold', `${heldSafeBottom}px`);
 
   watchWebSources();
   void watchNativeInsets();

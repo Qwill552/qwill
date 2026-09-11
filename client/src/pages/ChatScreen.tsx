@@ -47,7 +47,7 @@ const COMPOSER_STYLE = {
   bottom: 'var(--composer-inset-bottom, calc(20px + var(--safe-bottom)))',
   padding: 0,
   gap: '10px',
-  transform: 'translateY(calc(-1 * var(--keyboard-lift)))',
+  transform: 'translateY(calc(-1 * var(--keyboard-lift-live)))',
   transition: 'bottom var(--dur-menu) var(--ease-screen)',
 };
 

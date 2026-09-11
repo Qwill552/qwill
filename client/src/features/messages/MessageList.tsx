@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
-import { onKeyboardHeight } from '../../app/virtualKeyboard';
+import { onKeyboardState } from '../../app/virtualKeyboard';
 import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
@@ -286,6 +286,9 @@ export function MessageList({
   const prefetchSide = useRef<FeedSide>('older');
   const scrollSample = useRef<{ t: number; top: number } | null>(null);
   const fling = useRef<FlingTakeover | null>(null);
+  /** Низ уже пересчитанной под клавиатуру раскладки и то, держалась ли лента конца, когда
+   *  клавиатура тронулась. Непустой — значит прокруткой сейчас распоряжается клавиатура. */
+  const keyboardAnchor = useRef<{ maxTop: number; stuck: boolean } | null>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -822,17 +825,39 @@ export function MessageList({
     return () => observer.disconnect();
   }, [chatId]);
 
-  // Клавиатура меняет нижний отступ ленты покадрово. ResizeObserver выше узнаёт об этом
-  // на кадр позже, и содержимое каждый раз сначала стоит, а потом догоняет рывком.
-  // Положение задаётся абсолютное: приращения теряются на упоре в предел прокрутки, и
-  // разница между подъёмом и спуском копится в промах на полтораста пикселей.
+  // Отступ под клавиатуру меняется дважды за движение, а содержимое едет за ней каждый
+  // кадр прокруткой: читать высоту ленты после смены отступа стоит целый кадр, и на этом
+  // клавиатура уезжает вперёд. `maxTop` — низ уже пересчитанной раскладки, от него
+  // содержимое отводится на то, что клавиатуре осталось пройти.
   useEffect(
     () =>
-      onKeyboardHeight(() => {
+      onKeyboardState(({ liftLayout, liftLive, phase }) => {
         const el = listRef.current;
-        if (!el || !stuckToBottom.current) return;
-        fling.current?.stop();
-        el.scrollTop = el.scrollHeight;
+        if (!el) return;
+
+        if (phase === 'start') {
+          const stuck = stuckToBottom.current;
+          if (stuck) {
+            fling.current?.stop();
+            el.scrollTop = el.scrollHeight;
+          }
+          keyboardAnchor.current = { maxTop: el.scrollTop, stuck };
+          if (stuck) el.scrollTop = el.scrollTop - (liftLayout - liftLive);
+          return;
+        }
+
+        const anchor = keyboardAnchor.current;
+        if (phase === 'end') {
+          keyboardAnchor.current = null;
+          if (!anchor?.stuck && !stuckToBottom.current) return;
+          fling.current?.stop();
+          el.scrollTop = el.scrollHeight;
+          stuckToBottom.current = true;
+          return;
+        }
+
+        if (!anchor?.stuck) return;
+        el.scrollTop = anchor.maxTop - (liftLayout - liftLive);
       }),
     [],
   );
@@ -1029,6 +1054,9 @@ export function MessageList({
   function handleScroll(): void {
     const el = listRef.current;
     if (!el) return;
+    // Пока едет клавиатура, прокрутку ведём мы сами и уводим её от конца намеренно —
+    // иначе лента решит, что человек ушёл вверх, и перестанет держаться низа.
+    if (keyboardAnchor.current) return;
     // Скролл отменяет любой висящий жест сообщения — long-press/окно двойного тапа
     // (ux-ui/gestures.md, «Общие правила», п.2; см. ui/gestures/gestureReducer.ts).
     bumpScrollEpoch();
