@@ -25,7 +25,15 @@ function focusedEditable(): HTMLElement | null {
 function apply(height: number): void {
   if (height === published) return;
   published = height;
-  document.documentElement.style.setProperty('--keyboard-h', `${height}px`);
+
+  const root = document.documentElement;
+  if (height > 0) root.dataset.keyboard = 'up';
+  root.style.setProperty('--keyboard-h', `${height}px`);
+  if (height === 0) delete root.dataset.keyboard;
+}
+
+function layoutHeight(): number {
+  return Math.max(window.innerHeight, document.documentElement.clientHeight);
 }
 
 function settle(height: number): void {
@@ -33,7 +41,7 @@ function settle(height: number): void {
   if (height === 0) return;
 
   const field = focusedEditable();
-  if (field && field.getBoundingClientRect().bottom > window.innerHeight - height) {
+  if (field && field.getBoundingClientRect().bottom > layoutHeight() - height) {
     field.scrollIntoView({ block: 'center' });
     return;
   }
@@ -41,7 +49,7 @@ function settle(height: number): void {
 }
 
 function keyboardHeight(viewport: VisualViewport): number {
-  return Math.max(0, window.innerHeight - viewport.height * viewport.scale);
+  return Math.max(0, layoutHeight() - viewport.height * viewport.scale);
 }
 
 function watchViewport(): void {

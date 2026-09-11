@@ -28,6 +28,13 @@
   user-select: none;
 }
 
+/* Пока высоту ведёт клавиатура, она меняется каждый кадр, и переход выше превращается в
+   хвост, который догоняет её с задержкой: композер едет преобразованием сразу, а лента
+   тянется за ним. Переход нужен только панели эмодзи, где значение меняется один раз. */
+:global(html[data-keyboard='up']) .list {
+  transition: none;
+}
+
 /* Скроллящаяся флекс-колонка сжимает детей, когда их суммарная высота превышает
    контент-бокс: строка становится ниже своего пузыря, пузырь вылезает за неё и
    накладывается на следующий. Видно тем сильнее, чем больше padding-bottom, поэтому
@@ -161,6 +168,10 @@
   color: rgb(var(--pulse-ink));
   cursor: pointer;
   transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
+}
+
+:global(html[data-keyboard='up']) .jump {
+  transition: opacity var(--transition), transform var(--transition), background 0.2s;
 }
 
 @media (hover: hover) {
