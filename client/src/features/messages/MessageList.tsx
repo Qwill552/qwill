@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
+import { onKeyboardHeight } from '../../app/virtualKeyboard';
 import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
@@ -817,6 +818,19 @@ export function MessageList({
     observer.observe(el);
     return () => observer.disconnect();
   }, [chatId]);
+
+  // Клавиатура меняет нижний отступ ленты покадрово. ResizeObserver выше узнаёт об этом
+  // на кадр позже, и содержимое каждый раз сначала стоит, а потом догоняет рывком.
+  useEffect(
+    () =>
+      onKeyboardHeight((height, previous) => {
+        const el = listRef.current;
+        if (!el || !stuckToBottom.current) return;
+        fling.current?.stop();
+        el.scrollTop += height - previous;
+      }),
+    [],
+  );
 
   useEffect(() => {
     const el = listRef.current;
