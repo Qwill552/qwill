@@ -69,6 +69,7 @@ let expectTimer: number | undefined;
 let settledTimer: number | undefined;
 let keyboardExpected = false;
 let moveId = 0;
+let followed: Map<HTMLElement, string> | null = null;
 
 export function onBottomInset(listener: (state: BottomInsetState) => void): () => void {
   listeners.add(listener);
@@ -285,6 +286,7 @@ function beginFollow(): void {
   const from = movingLift() ?? liveLift;
   moveId += 1;
   stopMoving();
+  followed = new Map([...movers.keys()].map((el) => [el, el.style.transform]));
   const laidOut = layoutLift;
   if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
   writeVariables(RESTING_LIFT, from, true);
@@ -292,13 +294,15 @@ function beginFollow(): void {
 }
 
 function follow(toLift: number): void {
-  if (toLift === liveLift) return;
+  if (!followed || toLift === liveLift) return;
   liveLift = toLift;
   for (const [el, mode] of movers) el.style.transform = `translateY(${offsetOf(mode, toLift)}px)`;
 }
 
 function clearFollow(): void {
-  for (const [el] of movers) el.style.removeProperty('transform');
+  if (!followed) return;
+  for (const [el, before] of followed) el.style.transform = before;
+  followed = null;
 }
 
 function move(toLift: number, duration: number, easing: string): void {
