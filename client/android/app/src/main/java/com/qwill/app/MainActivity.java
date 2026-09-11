@@ -15,7 +15,9 @@ import android.webkit.WebView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.BackEventCompat;
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -40,6 +42,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ApkUpdatePlugin.class);
         registerPlugin(FileDownloadPlugin.class);
         registerPlugin(KeyboardInsetsPlugin.class);
+        registerPlugin(BackGesturePlugin.class);
         super.onCreate(savedInstanceState);
 
         current = new WeakReference<>(this);
@@ -48,7 +51,28 @@ public class MainActivity extends BridgeActivity {
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
+            public void handleOnBackStarted(@NonNull BackEventCompat event) {
+                BackGestureRegistry.INSTANCE.release();
+                BackGestureRegistry.INSTANCE.publish("start", event);
+            }
+
+            @Override
+            public void handleOnBackProgressed(@NonNull BackEventCompat event) {
+                BackGestureRegistry.INSTANCE.publish("progress", event);
+            }
+
+            @Override
+            public void handleOnBackCancelled() {
+                BackGestureRegistry.INSTANCE.release();
+                BackGestureRegistry.INSTANCE.publish("cancel");
+            }
+
+            @Override
             public void handleOnBackPressed() {
+                BackGestureRegistry.INSTANCE.publish("invoke");
+                if (BackGestureRegistry.INSTANCE.release()) {
+                    return;
+                }
                 Bridge bridge = getBridge();
                 WebView webView = bridge == null ? null : bridge.getWebView();
                 if (webView != null && webView.canGoBack()) {

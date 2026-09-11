@@ -49,6 +49,7 @@ import { ChatInfoCard } from '../features/chat/ChatInfoCard';
 import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
+import { onBackGesture, takeBackGesture } from './backGesture';
 import { hasOpenOverlay } from './useBackHandler';
 import { useLayoutMode } from './useLayoutMode';
 import { isTabRoot, parentPathOf, tabOf, transitionKind, type TransitionKind } from './routing';
@@ -79,6 +80,9 @@ const POP_EASE = 'cubic-bezier(.32,0,.22,1)';
 /** Жест отпущен, но не пересёк порог — settle(): пружинный возврат. */
 const SETTLE_MS = 420;
 const SETTLE_EASE = 'cubic-bezier(.18,1.1,.32,1)';
+
+const SYSTEM_BACK_NUDGE_PX = 56;
+const SYSTEM_BACK_LAZY_START = 0.015;
 
 function emptyLocation(pathname: string): Location {
   return { pathname, search: '', hash: '', state: null, key: 'preview' };
@@ -282,6 +286,7 @@ export function ScreenStack() {
     startTime: number;
     taken: boolean;
   } | null>(null);
+  const systemBackRef = useRef<{ taken: boolean } | null>(null);
   /** Дозор на случай, если `transitionend` не придёт вовсе (см. armFallback ниже). */
   const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackToken = useRef(0);
@@ -367,7 +372,7 @@ export function ScreenStack() {
     clearFallback();
     fallbackTimer.current = setTimeout(() => {
       if (fallbackToken.current !== token) return;
-      if (backSwipeRef.current?.taken) {
+      if (backSwipeRef.current?.taken || systemBackRef.current?.taken) {
         armDragWatchdog();
         return;
       }
@@ -505,7 +510,7 @@ export function ScreenStack() {
     scheduleDragFrame();
   }
 
-  function endDrag(): void {
+  function endDrag(decision?: 'commit'): void {
     const d = dragRef.current;
     if (!d?.active) {
       abandonStuckDrag();
@@ -525,14 +530,15 @@ export function ScreenStack() {
     // решающей скорости нет вовсе, решает финальная позиция — как в референсе.
     const flingForward = d.velocity > POP_VELOCITY;
     const flingBackward = -d.velocity > POP_VELOCITY;
-    const commit = flingForward || (!flingBackward && d.progress > POP_THRESHOLD);
+    const commit = decision === 'commit' || flingForward || (!flingBackward && d.progress > POP_THRESHOLD);
 
     if (commit) {
       // Инерция: чем резче был бросок, тем быстрее долетает остаток пути — не фиксированные
       // 340мс всегда, а время, пропорциональное скорости самого жеста.
       const remainingPx = d.width * (1 - d.progress);
       const pxPerSecond = Math.max(700, Math.abs(d.velocity) * 960);
-      const durationMs = Math.min(400, Math.max(120, (remainingPx / pxPerSecond) * 1000));
+      const durationMs =
+        decision === 'commit' ? POP_MS : Math.min(400, Math.max(120, (remainingPx / pxPerSecond) * 1000));
       paintDrag(1, { durationMs, easing: POP_EASE });
       setAnim((a) => (a && a.mode === 'drag' ? { ...a, progress: 1, transition: true, durationMs, easing: POP_EASE } : a));
       setDisplayLocation(emptyLocation(d.parentPath));
@@ -567,6 +573,45 @@ export function ScreenStack() {
 
   const liveDrag = useRef({ begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag });
   liveDrag.current = { begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag };
+
+  useEffect(() => {
+    if (layout === 'desktop') return;
+
+    return onBackGesture((event) => {
+      const gesture = systemBackRef.current;
+
+      if (event.phase === 'start') {
+        systemBackRef.current = { taken: false };
+        return;
+      }
+
+      if (event.phase === 'progress') {
+        if (!gesture) return;
+        const pulled = (event.progress - SYSTEM_BACK_LAZY_START) / (1 - SYSTEM_BACK_LAZY_START);
+        if (pulled <= 0) return;
+        if (!gesture.taken) {
+          if (!liveDrag.current.begin({ x: 0, y: event.touchY, timeStamp: performance.now() })) {
+            systemBackRef.current = null;
+            return;
+          }
+          gesture.taken = true;
+          takeBackGesture();
+        }
+        const eased = 1 - (1 - Math.min(1, pulled)) ** 3;
+        liveDrag.current.update({
+          x: SYSTEM_BACK_NUDGE_PX * eased,
+          y: event.touchY,
+          timeStamp: performance.now(),
+        });
+        return;
+      }
+
+      systemBackRef.current = null;
+      if (!gesture?.taken) return;
+      if (event.phase === 'cancel') liveDrag.current.cancel();
+      else liveDrag.current.end('commit');
+    });
+  }, [layout]);
 
   useEffect(() => {
     function handleMove(event: globalThis.PointerEvent): void {
