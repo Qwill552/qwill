@@ -188,7 +188,9 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) setCategoryNaturalH((entry.target as HTMLElement).offsetHeight);
+      if (!entry) return;
+      const height = (entry.target as HTMLElement).offsetHeight;
+      if (height > 0) setCategoryNaturalH(height);
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -199,7 +201,9 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) setTabsNaturalH((entry.target as HTMLElement).offsetHeight);
+      if (!entry) return;
+      const height = (entry.target as HTMLElement).offsetHeight;
+      if (height > 0) setTabsNaturalH(height);
     });
     observer.observe(el);
     return () => observer.disconnect();
