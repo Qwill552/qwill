@@ -24,7 +24,7 @@ interface KeyboardInsetsPlugin {
   addListener(
     eventName: 'keyboardInset',
     listener: (event: {
-      phase: 'start' | 'end';
+      phase: 'start' | 'move' | 'end';
       height: number;
       target?: number;
       duration?: number;
@@ -279,6 +279,22 @@ function settle(): void {
   notify('end', layoutLift - laidOut);
 }
 
+function beginFollow(): void {
+  window.clearTimeout(settleTimer);
+  const from = movingLift() ?? liveLift;
+  moveId += 1;
+  stopMoving();
+  const laidOut = layoutLift;
+  if (RESTING_LIFT !== laidOut) notify('measure', RESTING_LIFT - laidOut);
+  writeVariables(RESTING_LIFT, from, true);
+  notify('start', layoutLift - laidOut);
+}
+
+function follow(toLift: number): void {
+  if (toLift === liveLift) return;
+  writeVariables(RESTING_LIFT, toLift, true);
+}
+
 function move(toLift: number, duration: number, easing: string): void {
   window.clearTimeout(settleTimer);
   if (toLift === liveLift || duration <= 0) {
@@ -367,8 +383,17 @@ async function watchNativeInsets(): Promise<void> {
 
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
+    if (event.phase === 'move') {
+      follow(liftOf(Math.round(event.height)));
+      return;
+    }
+
     if (event.phase === 'start') {
-      if ((event.duration ?? 0) < 0) return;
+      if ((event.duration ?? 0) < 0) {
+        window.clearTimeout(settledTimer);
+        beginFollow();
+        return;
+      }
       window.clearTimeout(settledTimer);
       const target = Math.round(event.target ?? 0);
       if (target > 0) forgetExpectedKeyboard();

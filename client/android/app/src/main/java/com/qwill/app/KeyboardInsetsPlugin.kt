@@ -17,6 +17,7 @@ class KeyboardInsetsPlugin : Plugin() {
 
     private var running = 0
     private var lastImeInset = -1
+    private var userDriven = false
 
     override fun load() {
         val view = bridge.webView ?: return
@@ -35,6 +36,7 @@ class KeyboardInsetsPlugin : Plugin() {
                 ): WindowInsetsAnimationCompat.BoundsCompat {
                     val appearing = ViewCompat.getRootWindowInsets(view)
                         ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                    userDriven = animation.durationMillis < 0
                     notifyListeners(
                         "keyboardInset",
                         JSObject()
@@ -50,9 +52,20 @@ class KeyboardInsetsPlugin : Plugin() {
                 override fun onProgress(
                     insets: WindowInsetsCompat,
                     animations: MutableList<WindowInsetsAnimationCompat>
-                ): WindowInsetsCompat = insets
+                ): WindowInsetsCompat {
+                    if (userDriven) {
+                        notifyListeners(
+                            "keyboardInset",
+                            JSObject()
+                                .put("phase", "move")
+                                .put("height", insets.getInsets(WindowInsetsCompat.Type.ime()).bottom / density)
+                        )
+                    }
+                    return insets
+                }
 
                 override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    userDriven = false
                     running = (running - 1).coerceAtLeast(0)
                     lastImeInset = imeInset(view)
                     notifyListeners(
