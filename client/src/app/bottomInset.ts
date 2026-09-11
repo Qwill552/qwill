@@ -43,6 +43,7 @@ const FALLBACK_DURATION_MS = 250;
 const FALLBACK_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 const SETTLE_MARGIN_MS = 80;
 const KEYBOARD_WAIT_MS = 700;
+const SETTLE_DEBOUNCE_MS = 70;
 const PANEL_LIFT_KEY = 'qwill.panel-lift';
 
 const listeners = new Set<(state: BottomInsetState) => void>();
@@ -56,6 +57,7 @@ const hasNativeInsets = Capacitor.isNativePlatform() && Capacitor.isPluginAvaila
 let layoutLift = 0;
 let liveLift = 0;
 let keyboardHeight = 0;
+let knownKeyboardLift = 0;
 let panelOpen = false;
 let panelLift = 0;
 let heldSafeBottom = -1;
@@ -64,6 +66,7 @@ let panelProbe: HTMLElement | null = null;
 let safeTimer: number | undefined;
 let settleTimer: number | undefined;
 let expectTimer: number | undefined;
+let settledTimer: number | undefined;
 let keyboardExpected = false;
 let moveId = 0;
 
@@ -246,6 +249,25 @@ function notify(phase: BottomInsetPhase, layoutShift: number): void {
   for (const listener of listeners) listener(state);
 }
 
+function applySettledHeight(height: number): void {
+  window.clearTimeout(settledTimer);
+  settledTimer = window.setTimeout(() => {
+    keyboardHeight = height;
+    if (height > 0) {
+      knownKeyboardLift = liftOf(height);
+      forgetExpectedKeyboard();
+    }
+    rememberPanelLift(liftOf(height));
+    const next = targetLift(height);
+    if (running.size === 0 && next !== liveLift) {
+      move(next, cssDuration('--dur-close'), cssValue('--ease-close') || FALLBACK_EASING);
+    } else {
+      settle();
+    }
+    if (height > 0) revealFocused(height);
+  }, SETTLE_DEBOUNCE_MS);
+}
+
 function settle(): void {
   window.clearTimeout(settleTimer);
   moveId += 1;
@@ -331,11 +353,7 @@ function watchWebSources(): void {
     if (hasNativeInsets) return;
     const height = Math.round(webKeyboardHeight());
     if (height === keyboardHeight) return;
-    keyboardHeight = height;
-    if (height > 0) forgetExpectedKeyboard();
-    rememberPanelLift(liftOf(height));
-    settle();
-    if (height > 0) revealFocused(height);
+    applySettledHeight(height);
   };
 
   window.visualViewport?.addEventListener('resize', onChange);
@@ -350,23 +368,17 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     if (event.phase === 'start') {
-      keyboardHeight = Math.round(event.target ?? 0);
-      if (keyboardHeight > 0) forgetExpectedKeyboard();
+      window.clearTimeout(settledTimer);
+      const target = Math.round(event.target ?? 0);
+      if (target > 0) forgetExpectedKeyboard();
+      keyboardHeight =
+        target > 0 && knownKeyboardLift > 0 ? knownKeyboardLift + Math.max(heldSafeBottom, 0) : target;
       move(targetLift(keyboardHeight), event.duration ?? FALLBACK_DURATION_MS, event.easing || FALLBACK_EASING);
       return;
     }
 
-    keyboardHeight = Math.round(event.height);
-    if (keyboardHeight > 0) forgetExpectedKeyboard();
-    rememberPanelLift(liftOf(keyboardHeight));
-    const settled = targetLift(keyboardHeight);
-    if (running.size === 0 && settled !== liveLift) {
-      move(settled, cssDuration('--dur-close'), cssValue('--ease-close') || FALLBACK_EASING);
-    } else {
-      settle();
-    }
+    applySettledHeight(Math.round(event.height));
     scheduleSafeBottomHold();
-    if (keyboardHeight > 0) revealFocused(keyboardHeight);
   });
 }
 
@@ -378,6 +390,7 @@ export function initBottomInset(): void {
   document.documentElement.style.setProperty('--safe-bottom-hold', `${heldSafeBottom}px`);
 
   const stored = storedPanelLift();
+  if (stored > 0) knownKeyboardLift = stored;
   panelProbe = probe(panelProbe, 'var(--emoji-panel-h)');
   rememberPanelLift(stored > 0 ? stored : measure(panelProbe));
 
