@@ -87,7 +87,10 @@
   bottom: 0;
   left: 0;
   z-index: 4;
-  height: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))));
+  height: calc(
+    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
+      var(--keyboard-h)
+  );
   background: rgba(var(--pulse-dock), 0.5);
   backdrop-filter: blur(6px) saturate(150%);
   mask-image: linear-gradient(to top, black 0%, black 20%, transparent 100%);

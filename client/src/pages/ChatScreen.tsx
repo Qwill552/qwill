@@ -47,7 +47,8 @@ const COMPOSER_STYLE = {
   bottom: 'var(--composer-inset-bottom, calc(20px + var(--safe-bottom)))',
   padding: 0,
   gap: '10px',
-  transition: 'bottom var(--dur-menu) var(--ease-screen)',
+  transform: 'translateY(calc(-1 * var(--keyboard-h)))',
+  transition: 'bottom var(--dur-menu) var(--ease-screen), transform var(--dur-menu) var(--ease-screen)',
 };
 
 /** Десктоп (ux-ui/14-desktop/03-chat-column-chrome.md): шапка — сплошная полоса 60px

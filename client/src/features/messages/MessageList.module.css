@@ -15,7 +15,10 @@
   overflow-y: auto;
   overflow-anchor: none;
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
-    calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 40px);
+    calc(
+      var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
+        var(--keyboard-h) + 40px
+    );
   overscroll-behavior: contain;
   touch-action: pan-y;
   transition: padding-bottom var(--dur-menu) var(--ease-screen);
@@ -142,7 +145,10 @@
   position: absolute;
   z-index: 5;
   right: calc(var(--safe-right) + 14px);
-  bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
+  bottom: calc(
+    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
+      var(--keyboard-h) + 12px
+  );
   display: grid;
   overflow: hidden;
   place-items: center;
