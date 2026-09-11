@@ -5,15 +5,6 @@
   background: transparent;
 }
 
-/* Тап по композеру обязан доходить до композера: по кнопке — вернуть клавиатуру, по полю —
-   открыть её. Поэтому ловушка закрытия кончается там, где начинается капсула. */
-.catcherAbove {
-  bottom: calc(
-    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
-      var(--bottom-lift-live, 0px)
-  );
-}
-
 .panel {
   position: fixed;
   right: 0;

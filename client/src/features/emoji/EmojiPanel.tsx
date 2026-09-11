@@ -315,12 +315,7 @@ export function EmojiPanel({ onSelect, onClose, anchor, open }: EmojiPanelProps)
       onPointerUp={stopPointerBubble}
       onPointerCancel={stopPointerBubble}
     >
-      <div
-        className={`${styles.catcher} ${kept ? styles.catcherAbove : ''}`}
-        onClick={startClose}
-        aria-hidden="true"
-        hidden={kept && !shown}
-      />
+      {!kept && <div className={styles.catcher} onClick={startClose} aria-hidden="true" />}
 
       <div
         ref={panelRef}

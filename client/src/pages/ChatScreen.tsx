@@ -105,6 +105,7 @@ export function ChatScreen() {
   const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerApiRef = useRef<MessageComposerHandle>(null);
+  const headerBarRef = useRef<HTMLDivElement>(null);
   const composerBarRef = useRef<HTMLDivElement>(null);
   const composerFadeRef = useRef<HTMLDivElement>(null);
 
@@ -253,17 +254,28 @@ export function ChatScreen() {
       event.stopPropagation();
     }
 
+    function handleChromeTouchMove(event: TouchEvent): void {
+      if (bottomLift() <= 0 || !event.cancelable) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('[data-composer-field]')) return;
+      event.preventDefault();
+    }
+
+    const bars = [headerBarRef.current, composerBarRef.current].filter((el): el is HTMLDivElement => el !== null);
+
     screen.addEventListener('pointerdown', handleDown, true);
     screen.addEventListener('pointermove', handleMove, true);
     screen.addEventListener('pointerup', handleUp, true);
     screen.addEventListener('pointercancel', handleUp, true);
     screen.addEventListener('click', handleClick, true);
+    bars.forEach((bar) => bar.addEventListener('touchmove', handleChromeTouchMove, { passive: false }));
     return () => {
       screen.removeEventListener('pointerdown', handleDown, true);
       screen.removeEventListener('pointermove', handleMove, true);
       screen.removeEventListener('pointerup', handleUp, true);
       screen.removeEventListener('pointercancel', handleUp, true);
       screen.removeEventListener('click', handleClick, true);
+      bars.forEach((bar) => bar.removeEventListener('touchmove', handleChromeTouchMove));
     };
   }, [chatId]);
 
@@ -477,7 +489,11 @@ export function ChatScreen() {
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
-      <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
+      <ChromeBar
+        variant={isDesktop ? 'solid' : 'chrome'}
+        ref={headerBarRef}
+        style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}
+      >
         {selectionMode ? (
           <SelectionHeader
             count={selectedIds.size}
