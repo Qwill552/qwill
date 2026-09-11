@@ -17,7 +17,7 @@
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
     calc(
       var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
-        var(--keyboard-h) + 40px
+        var(--keyboard-lift) + 40px
     );
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -154,7 +154,7 @@
   right: calc(var(--safe-right) + 14px);
   bottom: calc(
     var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
-      var(--keyboard-h) + 12px
+      var(--keyboard-lift) + 12px
   );
   display: grid;
   overflow: hidden;

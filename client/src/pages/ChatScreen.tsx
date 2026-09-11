@@ -47,7 +47,7 @@ const COMPOSER_STYLE = {
   bottom: 'var(--composer-inset-bottom, calc(20px + var(--safe-bottom)))',
   padding: 0,
   gap: '10px',
-  transform: 'translateY(calc(-1 * var(--keyboard-h)))',
+  transform: 'translateY(calc(-1 * var(--keyboard-lift)))',
   transition: 'bottom var(--dur-menu) var(--ease-screen)',
 };
 
@@ -356,8 +356,8 @@ export function ChatScreen() {
         ...(composerHeight ? { ['--composer-h' as string]: `${composerHeight}px` } : undefined),
         ['--composer-inset-bottom' as string]:
           emojiPanelOpen && !isDesktop
-            ? 'calc(var(--emoji-panel-h) + var(--safe-bottom) + var(--chrome-gap))'
-            : 'calc(20px + var(--safe-bottom))',
+            ? 'calc(var(--emoji-panel-h) + var(--safe-bottom-hold) + var(--chrome-gap))'
+            : 'calc(20px + var(--safe-bottom-hold))',
         ['--call-banner-h' as string]: showCallBanner
           ? isDesktop
             ? `${CALL_BANNER_H}px`

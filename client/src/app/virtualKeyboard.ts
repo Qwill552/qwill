@@ -62,8 +62,39 @@ function layoutHeight(): number {
   return Math.max(window.innerHeight, document.documentElement.clientHeight);
 }
 
+const SAFE_SETTLE_MS = 600;
+
+let heldSafeBottom = -1;
+let safeProbe: HTMLElement | null = null;
+let safeTimer: number | undefined;
+
+function readSafeBottom(): number {
+  if (!safeProbe) {
+    safeProbe = document.createElement('div');
+    safeProbe.style.cssText =
+      'position:fixed;left:-9999px;top:0;width:1px;pointer-events:none;height:env(safe-area-inset-bottom,0px)';
+    document.body.append(safeProbe);
+  }
+  return Math.round(parseFloat(getComputedStyle(safeProbe).height)) || 0;
+}
+
+/** Полоска жестов гаснет раньше, чем поедет клавиатура, и возвращается раньше, чем та
+ *  опустится. Перечитываем её только когда всё успокоилось: иначе композер шатнётся на
+ *  её высоту в начале и в конце движения. */
+function scheduleSafeBottomHold(): void {
+  window.clearTimeout(safeTimer);
+  safeTimer = window.setTimeout(() => {
+    if (published > 0) return;
+    const value = readSafeBottom();
+    if (value === heldSafeBottom) return;
+    heldSafeBottom = value;
+    document.documentElement.style.setProperty('--safe-bottom-hold', `${value}px`);
+  }, SAFE_SETTLE_MS);
+}
+
 function settle(height: number): void {
   apply(height);
+  scheduleSafeBottomHold();
   if (height === 0) return;
 
   const field = focusedEditable();
