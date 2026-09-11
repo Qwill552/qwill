@@ -185,8 +185,13 @@ function movingLift(): number | null {
   if (running.size === 0) return null;
   for (const [el, mode] of movers) {
     if (mode !== 'chrome') continue;
-    const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-    return -matrix.m42;
+    const raw = getComputedStyle(el).transform;
+    if (!raw || raw === 'none') return null;
+    try {
+      return -new DOMMatrixReadOnly(raw).m42;
+    } catch {
+      return null;
+    }
   }
   return null;
 }
