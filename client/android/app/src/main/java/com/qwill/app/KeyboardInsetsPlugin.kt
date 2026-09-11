@@ -1,12 +1,16 @@
 package com.qwill.app
 
 import android.view.View
+import android.view.animation.Interpolator
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.annotation.CapacitorPlugin
+import java.util.Locale
+
+private const val EASING_SAMPLES = 20
 
 @CapacitorPlugin(name = "QwillKeyboard")
 class KeyboardInsetsPlugin : Plugin() {
@@ -24,22 +28,30 @@ class KeyboardInsetsPlugin : Plugin() {
                 ): WindowInsetsAnimationCompat.BoundsCompat {
                     val appearing = ViewCompat.getRootWindowInsets(view)
                         ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-                    emit(imeInset(view), if (appearing) bounds.upperBound.bottom else 0, density, "start")
+                    notifyListeners(
+                        "keyboardInset",
+                        JSObject()
+                            .put("phase", "start")
+                            .put("height", imeInset(view) / density)
+                            .put("target", (if (appearing) bounds.upperBound.bottom else 0) / density)
+                            .put("duration", animation.durationMillis)
+                            .put("easing", easingOf(animation.interpolator))
+                    )
                     return bounds
                 }
 
                 override fun onProgress(
                     insets: WindowInsetsCompat,
                     animations: MutableList<WindowInsetsAnimationCompat>
-                ): WindowInsetsCompat {
-                    val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-                    emit(ime, ime, density, "move")
-                    return insets
-                }
+                ): WindowInsetsCompat = insets
 
                 override fun onEnd(animation: WindowInsetsAnimationCompat) {
-                    val ime = imeInset(view)
-                    emit(ime, ime, density, "end")
+                    notifyListeners(
+                        "keyboardInset",
+                        JSObject()
+                            .put("phase", "end")
+                            .put("height", imeInset(view) / density)
+                    )
                 }
             }
         )
@@ -48,13 +60,13 @@ class KeyboardInsetsPlugin : Plugin() {
     private fun imeInset(view: View): Int =
         ViewCompat.getRootWindowInsets(view)?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
 
-    private fun emit(height: Int, target: Int, density: Float, phase: String) {
-        notifyListeners(
-            "keyboardInset",
-            JSObject()
-                .put("height", height / density)
-                .put("target", target / density)
-                .put("phase", phase)
-        )
+    /** Кривую системы не угадываем, а снимаем: значения интерполятора в точках уходят в CSS
+     *  как `linear(...)`, и веб едет по той же кривой, что и сама клавиатура. */
+    private fun easingOf(interpolator: Interpolator?): String {
+        if (interpolator == null) return ""
+        val points = (0..EASING_SAMPLES).joinToString(", ") { step ->
+            String.format(Locale.US, "%.4f", interpolator.getInterpolation(step.toFloat() / EASING_SAMPLES))
+        }
+        return "linear($points)"
     }
 }

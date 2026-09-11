@@ -28,11 +28,13 @@
   user-select: none;
 }
 
-/* Пока высоту ведёт клавиатура, она меняется каждый кадр, и переход выше превращается в
-   хвост, который догоняет её с задержкой: композер едет преобразованием сразу, а лента
-   тянется за ним. Переход нужен только панели эмодзи, где значение меняется один раз. */
+/* Пока едет клавиатура, отступ ленты стоит на конечном значении, а картинка отстаёт от
+   него на то, что клавиатуре осталось пройти. Сдвиг вверх ничего не оголяет: снизу
+   освобождается ровно та полоса, которую уже закрыла клавиатура. Переход не нужен —
+   движение проигрывает композитор по кривой самой клавиатуры. */
 :global(html[data-keyboard='up']) .list {
   transition: none;
+  transform: translateY(var(--keyboard-catchup));
 }
 
 /* Скроллящаяся флекс-колонка сжимает детей, когда их суммарная высота превышает
@@ -152,10 +154,7 @@
   position: absolute;
   z-index: 5;
   right: calc(var(--safe-right) + 14px);
-  bottom: calc(
-    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
-      var(--keyboard-lift) + 12px
-  );
+  bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
   display: grid;
   overflow: hidden;
   place-items: center;
@@ -170,8 +169,9 @@
   transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
 }
 
-:global(html[data-keyboard='up']) .jump {
-  transition: opacity var(--transition), transform var(--transition), background 0.2s;
+:global(html[data-keyboard='up']) .jump:not(.jumpHidden) {
+  transform: translateY(calc(-1 * var(--keyboard-lift-live)));
+  transition: opacity var(--transition), background 0.2s;
 }
 
 @media (hover: hover) {

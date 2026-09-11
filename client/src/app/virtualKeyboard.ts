@@ -9,20 +9,30 @@ type NavigatorWithVirtualKeyboard = Navigator & {
   virtualKeyboard?: VirtualKeyboard;
 };
 
-export type KeyboardPhase = 'start' | 'move' | 'end';
+export type KeyboardPhase = 'start' | 'end';
 
 export interface KeyboardState {
-  /** Подъём, на который уже пересчитана раскладка: отступ ленты, высота фейда, кнопка «вниз». */
+  /** Подъём, на который пересчитана раскладка: отступ ленты и её прокрутка. */
   liftLayout: number;
-  /** Подъём, на котором клавиатура находится прямо сейчас. По нему едет картинка. */
-  liftLive: number;
+  /** Подъём в конце начавшегося движения. Совпадает с `liftLayout` при появлении. */
+  liftTo: number;
   phase: KeyboardPhase;
 }
+
+/** `chrome` едет вверх вместе с клавиатурой, `feed` — отстаёт от уже пересчитанной
+ *  раскладки ровно на то, что клавиатуре осталось пройти. */
+export type KeyboardMoverMode = 'chrome' | 'feed';
 
 interface KeyboardInsetsPlugin {
   addListener(
     eventName: 'keyboardInset',
-    listener: (event: { height: number; target: number; phase: KeyboardPhase }) => void,
+    listener: (event: {
+      phase: KeyboardPhase;
+      height: number;
+      target?: number;
+      duration?: number;
+      easing?: string;
+    }) => void,
   ): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -31,25 +41,37 @@ function virtualKeyboard(): VirtualKeyboard | undefined {
 }
 
 const SAFE_SETTLE_MS = 600;
+const FALLBACK_DURATION_MS = 250;
+const FALLBACK_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
 const listeners = new Set<(state: KeyboardState) => void>();
+const movers = new Map<HTMLElement, KeyboardMoverMode>();
+const running = new Set<Animation>();
 
 /** Считается сразу, а не по факту первого события: иначе visualViewport успевает
  *  опередить нативный мост и опубликовать конечную высоту до начала движения. */
 const hasNativeInsets = Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('QwillKeyboard');
-let layoutHeight_ = 0;
-let liveHeight = 0;
+
+let layoutLift = 0;
+let liveLift = 0;
+let keyboardHeight = 0;
 let heldSafeBottom = -1;
 let safeProbe: HTMLElement | null = null;
 let safeTimer: number | undefined;
 
-/** Подписка на клавиатуру. Вызывается **синхронно**: тому, кто подстраивает прокрутку,
- *  нельзя узнать о новой высоте кадром позже — иначе содержимое сначала стоит, а потом
- *  догоняет рывком. */
 export function onKeyboardState(listener: (state: KeyboardState) => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+
+/** Элемент, который должен ехать вместе с клавиатурой. Движение проигрывает композитор по
+ *  длительности и кривой самой клавиатуры — за кадр не выполняется ни строчки скрипта. */
+export function registerKeyboardMover(el: HTMLElement, mode: KeyboardMoverMode): () => void {
+  movers.set(el, mode);
+  return () => {
+    movers.delete(el);
   };
 }
 
@@ -73,7 +95,7 @@ function readSafeBottom(): number {
 function scheduleSafeBottomHold(): void {
   window.clearTimeout(safeTimer);
   safeTimer = window.setTimeout(() => {
-    if (liveHeight > 0) return;
+    if (keyboardHeight > 0) return;
     const value = readSafeBottom();
     if (value === heldSafeBottom) return;
     heldSafeBottom = value;
@@ -85,31 +107,55 @@ function lift(height: number): number {
   return Math.max(0, height - Math.max(heldSafeBottom, 0));
 }
 
-/** Раскладка пересчитывается дважды за движение, картинка едет каждый кадр. Менять отступ
- *  ленты покадрово нельзя: чтение её высоты после этого стоит целый кадр на длинной
- *  переписке, и клавиатура уезжает вперёд, пока мы считаем. */
-function publish(nextLayout: number, nextLive: number, phase: KeyboardPhase): void {
+function offsetOf(mode: KeyboardMoverMode, atLift: number): number {
+  return mode === 'chrome' ? -atLift : layoutLift - atLift;
+}
+
+function stopMoving(): void {
+  for (const animation of running) animation.cancel();
+  running.clear();
+}
+
+/** Одна анимация на элемент, на всё движение. Значения задаются абсолютные, заливки нет:
+ *  по окончании элемент остаётся на том, что уже написано в CSS. */
+function startMoving(fromLift: number, toLift: number, duration: number, easing: string): void {
+  stopMoving();
+  if (duration <= 0 || fromLift === toLift) return;
+
+  for (const [el, mode] of movers) {
+    const from = offsetOf(mode, fromLift);
+    const to = offsetOf(mode, toLift);
+    if (from === to) continue;
+    const animation = el.animate(
+      [{ transform: `translateY(${from}px)` }, { transform: `translateY(${to}px)` }],
+      { duration, easing, fill: 'none' },
+    );
+    running.add(animation);
+    animation.finished.catch(() => undefined).finally(() => running.delete(animation));
+  }
+}
+
+function writeVariables(nextLayoutLift: number, nextLiveLift: number, height: number): void {
   const root = document.documentElement;
-  const layoutChanged = nextLayout !== layoutHeight_;
-  const liveChanged = nextLive !== liveHeight;
-  if (!layoutChanged && !liveChanged && phase === 'move') return;
+  layoutLift = nextLayoutLift;
+  liveLift = nextLiveLift;
+  keyboardHeight = height;
 
-  layoutHeight_ = nextLayout;
-  liveHeight = nextLive;
-
-  if (nextLive > 0 || nextLayout > 0) root.dataset.keyboard = 'up';
-  if (layoutChanged) root.style.setProperty('--keyboard-h', `${nextLayout}px`);
-  root.style.setProperty('--keyboard-live', `${nextLive}px`);
-  // Снять признак в этом же кадре нельзя: раскладка считается один раз, в конце задачи, и
-  // увидит уже снятый признак — а значит включит переход на отступ ленты ровно на то
+  if (height > 0 || nextLayoutLift > 0) root.dataset.keyboard = 'up';
+  root.style.setProperty('--keyboard-lift', `${nextLayoutLift}px`);
+  root.style.setProperty('--keyboard-lift-live', `${nextLiveLift}px`);
+  // Снять признак в этом же кадре нельзя: стиль считается один раз, в конце задачи, и
+  // увидит уже снятый признак — а значит вернёт переход на отступ ленты ровно на то
   // изменение, ради которого он и выключался.
-  if (nextLive === 0 && nextLayout === 0) {
+  if (height === 0 && nextLayoutLift === 0) {
     requestAnimationFrame(() => {
-      if (liveHeight === 0 && layoutHeight_ === 0) delete root.dataset.keyboard;
+      if (keyboardHeight === 0 && layoutLift === 0) delete root.dataset.keyboard;
     });
   }
+}
 
-  const state: KeyboardState = { liftLayout: lift(nextLayout), liftLive: lift(nextLive), phase };
+function notify(phase: KeyboardPhase, liftTo: number): void {
+  const state: KeyboardState = { liftLayout: layoutLift, liftTo, phase };
   for (const listener of listeners) listener(state);
 }
 
@@ -142,7 +188,9 @@ function watchWebSources(): void {
     scheduleSafeBottomHold();
     if (hasNativeInsets) return;
     const height = Math.round(webKeyboardHeight());
-    publish(height, height, 'end');
+    if (height === keyboardHeight) return;
+    writeVariables(lift(height), lift(height), height);
+    notify('end', lift(height));
     if (height > 0) revealFocused(height);
   };
 
@@ -157,22 +205,24 @@ async function watchNativeInsets(): Promise<void> {
 
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
-    const target = Math.round(event.target);
-    const height = Math.round(event.height);
-
     if (event.phase === 'start') {
+      const target = Math.round(event.target ?? 0);
+      const fromLift = liveLift;
+      const toLift = lift(target);
       // Пока клавиатура едет, раскладка стоит на большем из двух концов: на убирании
       // отнятый отступ было бы нечем компенсировать — прокрутка упёрлась бы в конец.
-      publish(Math.max(layoutHeight_, target), liveHeight, 'start');
+      writeVariables(Math.max(layoutLift, toLift), toLift, Math.max(keyboardHeight, target));
+      notify('start', toLift);
+      startMoving(fromLift, toLift, event.duration ?? FALLBACK_DURATION_MS, event.easing || FALLBACK_EASING);
       return;
     }
-    if (event.phase === 'end') {
-      publish(height, height, 'end');
-      scheduleSafeBottomHold();
-      if (height > 0) revealFocused(height);
-      return;
-    }
-    publish(layoutHeight_, height, 'move');
+
+    stopMoving();
+    const height = Math.round(event.height);
+    writeVariables(lift(height), lift(height), height);
+    notify('end', lift(height));
+    scheduleSafeBottomHold();
+    if (height > 0) revealFocused(height);
   });
 }
 

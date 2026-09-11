@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
-import { onKeyboardState } from '../../app/virtualKeyboard';
+import { onKeyboardState, registerKeyboardMover } from '../../app/virtualKeyboard';
 import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
@@ -286,9 +286,9 @@ export function MessageList({
   const prefetchSide = useRef<FeedSide>('older');
   const scrollSample = useRef<{ t: number; top: number } | null>(null);
   const fling = useRef<FlingTakeover | null>(null);
-  /** Низ уже пересчитанной под клавиатуру раскладки и то, держалась ли лента конца, когда
-   *  клавиатура тронулась. Непустой — значит прокруткой сейчас распоряжается клавиатура. */
-  const keyboardAnchor = useRef<{ maxTop: number; stuck: boolean } | null>(null);
+  /** Непустой — значит прокруткой сейчас распоряжается клавиатура. */
+  const keyboardAnchor = useRef<{ stuck: boolean } | null>(null);
+  const jumpRef = useRef<HTMLButtonElement>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -825,39 +825,41 @@ export function MessageList({
     return () => observer.disconnect();
   }, [chatId]);
 
-  // Отступ под клавиатуру меняется дважды за движение, а содержимое едет за ней каждый
-  // кадр прокруткой: читать высоту ленты после смены отступа стоит целый кадр, и на этом
-  // клавиатура уезжает вперёд. `maxTop` — низ уже пересчитанной раскладки, от него
-  // содержимое отводится на то, что клавиатуре осталось пройти.
+  // Раскладка под клавиатуру встаёт сразу на конечное значение, а картинку на время
+  // движения отводит назад преобразование (--keyboard-catchup): за кадр не выполняется ни
+  // строчки скрипта, движение проигрывает композитор по кривой самой клавиатуры.
+  useEffect(() => {
+    const list = listRef.current;
+    const jump = jumpRef.current;
+    const off = [
+      list ? registerKeyboardMover(list, 'feed') : null,
+      jump ? registerKeyboardMover(jump, 'chrome') : null,
+    ];
+    return () => off.forEach((stop) => stop?.());
+  }, [chatId]);
+
   useEffect(
     () =>
-      onKeyboardState(({ liftLayout, liftLive, phase }) => {
+      onKeyboardState(({ phase }) => {
         const el = listRef.current;
         if (!el) return;
 
         if (phase === 'start') {
           const stuck = stuckToBottom.current;
+          keyboardAnchor.current = { stuck };
           if (stuck) {
             fling.current?.stop();
             el.scrollTop = el.scrollHeight;
           }
-          keyboardAnchor.current = { maxTop: el.scrollTop, stuck };
-          if (stuck) el.scrollTop = el.scrollTop - (liftLayout - liftLive);
           return;
         }
 
-        const anchor = keyboardAnchor.current;
-        if (phase === 'end') {
-          keyboardAnchor.current = null;
-          if (!anchor?.stuck && !stuckToBottom.current) return;
-          fling.current?.stop();
-          el.scrollTop = el.scrollHeight;
-          stuckToBottom.current = true;
-          return;
-        }
-
-        if (!anchor?.stuck) return;
-        el.scrollTop = anchor.maxTop - (liftLayout - liftLive);
+        const stuck = keyboardAnchor.current?.stuck ?? stuckToBottom.current;
+        keyboardAnchor.current = null;
+        if (!stuck) return;
+        fling.current?.stop();
+        el.scrollTop = el.scrollHeight;
+        stuckToBottom.current = true;
       }),
     [],
   );
@@ -1206,6 +1208,7 @@ export function MessageList({
 
       <button
         type="button"
+        ref={jumpRef}
         className={`${styles.jump} ${showJump || !isViewportNewest ? '' : styles.jumpHidden}`}
         aria-label="К последним сообщениям"
         tabIndex={showJump || !isViewportNewest ? 0 : -1}

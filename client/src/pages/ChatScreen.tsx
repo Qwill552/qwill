@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createReportRequest } from '../api/admin';
 import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
+import { registerKeyboardMover } from '../app/virtualKeyboard';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
@@ -96,6 +97,8 @@ export function ChatScreen() {
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const composerRef = useRef<HTMLDivElement>(null);
+  const composerBarRef = useRef<HTMLDivElement>(null);
+  const composerFadeRef = useRef<HTMLDivElement>(null);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -180,6 +183,13 @@ export function ChatScreen() {
     if (kickedChatId === chatId) navigate('/chats', { replace: true });
     clearKicked();
   }, [kickedChatId, chatId, navigate, clearKicked]);
+
+  useEffect(() => {
+    const off = [composerBarRef.current, composerFadeRef.current]
+      .filter((el): el is HTMLDivElement => el !== null)
+      .map((el) => registerKeyboardMover(el, 'chrome'));
+    return () => off.forEach((stop) => stop());
+  }, [chatId]);
 
   useLayoutEffect(() => {
     const el = composerRef.current;
@@ -481,9 +491,9 @@ export function ChatScreen() {
         />
       )}
 
-      <div className={styles.composerFade} />
+      <div className={styles.composerFade} ref={composerFadeRef} />
 
-      <ChromeBar side="bottom" style={isDesktop ? DESKTOP_COMPOSER_STYLE : COMPOSER_STYLE}>
+      <ChromeBar side="bottom" ref={composerBarRef} style={isDesktop ? DESKTOP_COMPOSER_STYLE : COMPOSER_STYLE}>
         <div ref={composerRef} className={styles.composerSlot}>
           {selectionMode ? (
             <SelectionBar

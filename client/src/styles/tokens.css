@@ -507,12 +507,14 @@
      в обратную сторону в начале и в конце движения. --safe-bottom-hold держит последнее
      спокойное значение, --keyboard-lift на него опирается. */
   --safe-bottom-hold: env(safe-area-inset-bottom, 0px);
-  --keyboard-live: 0px;
 
-  /* Раскладка идёт по --keyboard-lift и пересчитывается дважды за движение; картинка
-     (только преобразование композера) идёт по --keyboard-lift-live и едет каждый кадр. */
-  --keyboard-lift: max(0px, var(--keyboard-h) - var(--safe-bottom-hold));
-  --keyboard-lift-live: max(0px, var(--keyboard-live) - var(--safe-bottom-hold));
+  /* Обе величины пишет JS уже с вычтенной полоской жестов. --keyboard-lift — подъём, на
+     который пересчитана раскладка (отступ ленты); --keyboard-lift-live — подъём в конце
+     начавшегося движения. Само движение проигрывает композитор по длительности и кривой
+     самой клавиатуры, ни одна из величин за кадр не меняется. */
+  --keyboard-lift: 0px;
+  --keyboard-lift-live: 0px;
+  --keyboard-catchup: max(0px, var(--keyboard-lift) - var(--keyboard-lift-live));
 
   --titlebar-h: 0px;
 }
