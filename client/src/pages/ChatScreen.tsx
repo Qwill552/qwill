@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createReportRequest } from '../api/admin';
 import { useEscapeKey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
-import { keyboardLift, registerKeyboardMover } from '../app/virtualKeyboard';
+import { bottomLift, registerInsetMover, setEmojiPanelLift } from '../app/bottomInset';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
@@ -48,8 +48,7 @@ const COMPOSER_STYLE = {
   bottom: 'var(--composer-inset-bottom, calc(20px + var(--safe-bottom)))',
   padding: 0,
   gap: '10px',
-  transform: 'translateY(calc(-1 * var(--keyboard-lift-live)))',
-  transition: 'bottom var(--dur-menu) var(--ease-screen)',
+  transform: 'translateY(calc(-1 * var(--bottom-lift-live)))',
 };
 
 /** Десктоп (ux-ui/14-desktop/03-chat-column-chrome.md): шапка — сплошная полоса 60px
@@ -190,9 +189,15 @@ export function ChatScreen() {
   useEffect(() => {
     const off = [composerBarRef.current, composerFadeRef.current]
       .filter((el): el is HTMLDivElement => el !== null)
-      .map((el) => registerKeyboardMover(el, 'chrome'));
+      .map((el) => registerInsetMover(el, 'chrome'));
     return () => off.forEach((stop) => stop());
   }, [chatId]);
+
+  useEffect(() => {
+    setEmojiPanelLift(emojiPanelOpen && !isDesktop);
+  }, [emojiPanelOpen, isDesktop]);
+
+  useEffect(() => () => setEmojiPanelLift(false), []);
 
   useEffect(() => {
     const screen = screenRef.current;
@@ -213,7 +218,7 @@ export function ChatScreen() {
 
     function handleDown(event: PointerEvent): void {
       dismissingPointer = null;
-      if (keyboardLift() <= 0 || !inFeed(event)) return;
+      if (bottomLift() <= 0 || !inFeed(event)) return;
       const focused = document.activeElement;
       if (focused instanceof HTMLElement) focused.blur();
       dismissingPointer = event.pointerId;
@@ -419,10 +424,7 @@ export function ChatScreen() {
       ref={screenRef}
       style={{
         ...(composerHeight ? { ['--composer-h' as string]: `${composerHeight}px` } : undefined),
-        ['--composer-inset-bottom' as string]:
-          emojiPanelOpen && !isDesktop
-            ? 'calc(var(--emoji-panel-h) + var(--safe-bottom-hold) + var(--chrome-gap))'
-            : 'calc(20px + var(--safe-bottom-hold))',
+        ['--composer-inset-bottom' as string]: 'calc(20px + var(--safe-bottom-hold))',
         ['--call-banner-h' as string]: showCallBanner
           ? isDesktop
             ? `${CALL_BANNER_H}px`
@@ -442,7 +444,6 @@ export function ChatScreen() {
         chatId={chatId}
         isGroup={isGroup}
         typing={isTyping}
-        emojiPanelOpen={emojiPanelOpen}
         onReply={handleReply}
         onEdit={handleEdit}
         onForwardRequest={setForwardRequest}

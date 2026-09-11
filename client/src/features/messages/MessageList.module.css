@@ -17,7 +17,7 @@
   padding: calc(var(--chat-header-h, 56px) + var(--pinned-h, 0px)) 12px
     calc(
       var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) +
-        var(--keyboard-lift) + 40px
+        var(--bottom-lift) + 40px
     );
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -32,9 +32,9 @@
    на то, что клавиатуре осталось пройти. Сдвиг вверх ничего не оголяет: снизу
    освобождается ровно та полоса, которую уже закрыла клавиатура. Переход не нужен —
    движение проигрывает композитор по кривой самой клавиатуры. */
-:global(html[data-keyboard='up']) .list {
+:global(html[data-bottom-lift]) .list {
   transition: none;
-  transform: translateY(calc(var(--keyboard-lift) - var(--keyboard-lift-live)));
+  transform: translateY(calc(var(--bottom-lift) - var(--bottom-lift-live)));
 }
 
 /* Скроллящаяся флекс-колонка сжимает детей, когда их суммарная высота превышает
@@ -169,8 +169,8 @@
   transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
 }
 
-:global(html[data-keyboard='up']) .jump:not(.jumpHidden) {
-  transform: translateY(calc(-1 * var(--keyboard-lift-live)));
+:global(html[data-bottom-lift]) .jump:not(.jumpHidden) {
+  transform: translateY(calc(-1 * var(--bottom-lift-live)));
   transition: opacity var(--transition), background 0.2s;
 }
 

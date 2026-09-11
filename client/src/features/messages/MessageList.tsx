@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
-import { onKeyboardState, registerKeyboardMover } from '../../app/virtualKeyboard';
+import { onBottomInset, registerInsetMover } from '../../app/bottomInset';
 import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
@@ -42,7 +42,7 @@ import {
   windowAtOffset,
   windowAround,
 } from './feedHeights';
-import { shouldFollowTail } from './feedFollow';
+import { isTailArrival, shouldFollowTail } from './feedFollow';
 import { attachFlingTakeover, flingDistance, MAX_FLING_VELOCITY, type FlingTakeover } from './flingTakeover';
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
@@ -55,6 +55,8 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const JUMP_AFTER_SCREENS = 0.5;
 /** Ближе этого к низу лента считается «прилипшей» и сама едет за новыми сообщениями. */
 const STICK_THRESHOLD = 120;
+const BOTTOM_SNAP = 8;
+const FOLLOW_THRESHOLD = 50;
 const SCROLL_ANIMATE_SCREENS = 2;
 /** Доля распада, после которой строка начинает схлопывать высоту: соседи съезжают, пока пыль ещё летит. */
 const COLLAPSE_AT = 0.55;
@@ -198,7 +200,6 @@ export function MessageList({
   chatId,
   isGroup,
   typing,
-  emojiPanelOpen,
   onReply,
   onEdit,
   onForwardRequest,
@@ -209,7 +210,6 @@ export function MessageList({
   /** Буквально `sc-if value="{{ typing }}"` из референса (строка 344) — три скачущие точки
    *  внизу ленты, отдельно от статуса «печатает…» в капсуле шапки. */
   typing: boolean;
-  emojiPanelOpen: boolean;
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
   /** Открывает шит выбора чата-получателя (ux-ui/06) — владеет им ChatScreen, чтобы им же
@@ -267,6 +267,7 @@ export function MessageList({
   const liveIds = useRef<Set<number>>(new Set());
   const scrollIdle = useRef(0);
   const stuckToBottom = useRef(true);
+  const atVeryBottom = useRef(true);
   const prevScrollHeight = useRef(0);
   const autoScrollUntil = useRef(0);
   const prevLastId = useRef<number | null>(null);
@@ -286,8 +287,7 @@ export function MessageList({
   const prefetchSide = useRef<FeedSide>('older');
   const scrollSample = useRef<{ t: number; top: number } | null>(null);
   const fling = useRef<FlingTakeover | null>(null);
-  /** Непустой — значит прокруткой сейчас распоряжается клавиатура. */
-  const keyboardAnchor = useRef<{ stuck: boolean } | null>(null);
+  const keyboardAnchor = useRef(false);
   const jumpRef = useRef<HTMLButtonElement>(null);
   const liveSeen = useRef(0);
   const [showJump, setShowJump] = useState(false);
@@ -565,6 +565,7 @@ export function MessageList({
     const behavior: ScrollBehavior = smooth && distance <= el.clientHeight * SCROLL_ANIMATE_SCREENS ? 'smooth' : 'auto';
     autoScrollUntil.current = performance.now() + AUTO_SCROLL_GUARD_MS;
     stuckToBottom.current = true;
+    atVeryBottom.current = true;
     el.scrollTo({ top: el.scrollHeight, behavior });
   }
 
@@ -603,6 +604,7 @@ export function MessageList({
     const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
+    atVeryBottom.current = false;
     el.scrollTo({ top, behavior: 'smooth' });
     flashMessage(messageId);
   }
@@ -616,6 +618,7 @@ export function MessageList({
     if (focus && listRef.current?.querySelector(`[data-message-id="${focus.messageId}"]`)) {
       autoScrollUntil.current = 0;
       stuckToBottom.current = false;
+      atVeryBottom.current = false;
       return;
     }
     stuckToBottom.current = true;
@@ -632,6 +635,7 @@ export function MessageList({
 
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
+    atVeryBottom.current = false;
     fling.current?.stop();
     const quiet = focus.quiet === true;
     const offset = focus.offset ?? 0;
@@ -691,12 +695,19 @@ export function MessageList({
         prevScrollHeight: prevScrollHeight.current,
         scrollTop: el.scrollTop,
         clientHeight: el.clientHeight,
-        bottomReserve: bottomReserve(el),
-        stickThreshold: STICK_THRESHOLD,
+        bottomReserve: 0,
+        stickThreshold: FOLLOW_THRESHOLD,
       })
     ) {
       setShowJump(false);
       scrollToBottom(true);
+    } else if (
+      el &&
+      lastId !== prevLastId.current &&
+      isTailArrival(lastId, liveMessage) &&
+      el.scrollHeight - el.scrollTop - el.clientHeight > FOLLOW_THRESHOLD
+    ) {
+      setShowJump(true);
     }
     prevLastId.current = lastId;
     wasNewest.current = isViewportNewest;
@@ -713,7 +724,7 @@ export function MessageList({
 
     const held = feedAnchor.current;
     const heldIndex = held === null ? undefined : entryIndexByKey.get(held.key);
-    if (stuckToBottom.current) {
+    if (atVeryBottom.current) {
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (distance > 1 && performance.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
     } else if (held !== null && heldIndex !== undefined) {
@@ -728,7 +739,9 @@ export function MessageList({
     pendingAnchor.current = null;
     if (performance.now() >= autoScrollUntil.current) {
       restoreAnchor(el, anchor);
-      stuckToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight - bottomReserve(el) < STICK_THRESHOLD;
+      const raw = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stuckToBottom.current = raw - bottomReserve(el) < STICK_THRESHOLD;
+      atVeryBottom.current = raw <= BOTTOM_SNAP;
     }
     if (loadingUp.current || loadingDown.current) pendingAnchor.current = rememberAnchor(el);
   }, [geometrySignature, displayEntries, entryIndexByKey, table, view.from]);
@@ -771,24 +784,6 @@ export function MessageList({
     if (TYPING_BUBBLE_IN_FEED && typing && stuckToBottom.current) scrollToBottom(true);
   }, [typing]);
 
-  // Резерв места под композер едет CSS-переходом (--dur-menu), а прокрутка за ним сама не
-  // идёт: плавный scrollTo тут не годится — у него своя, неуправляемая длительность, и лента
-  // догоняла бы уже уехавший композер. Вместо этого низ ленты прижимается каждый кадр, пока
-  // идёт переход, — последний пузырь остаётся приклеен к композеру всё время движения.
-  useEffect(() => {
-    const node = listRef.current;
-    if (!node || !stuckToBottom.current) return;
-    const ms = cssDurationMs('--dur-menu');
-    const until = performance.now() + ms;
-    let frame = 0;
-    function pinToBottom(): void {
-      node!.scrollTop = node!.scrollHeight;
-      if (performance.now() < until) frame = requestAnimationFrame(pinToBottom);
-    }
-    pinToBottom();
-    return () => cancelAnimationFrame(frame);
-  }, [emojiPanelOpen]);
-
   useLayoutEffect(() => {
     if (tailRequest === 0) return;
     pendingAnchor.current = null;
@@ -814,10 +809,10 @@ export function MessageList({
     const el = listRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      if (!stuckToBottom.current) return;
+      if (!atVeryBottom.current) return;
       // Пока едет клавиатура, прокрутку правит onKeyboardHeight — синхронно и тем же
       // числом. Второй проход здесь только заставил бы пересчитать раскладку ещё раз.
-      if (document.documentElement.dataset.keyboard === 'up') return;
+      if (document.documentElement.dataset.bottomLift !== undefined) return;
       fling.current?.stop();
       el.scrollTop = el.scrollHeight;
     });
@@ -832,30 +827,24 @@ export function MessageList({
     const list = listRef.current;
     const jump = jumpRef.current;
     const off = [
-      list ? registerKeyboardMover(list, 'feed') : null,
-      jump ? registerKeyboardMover(jump, 'chrome') : null,
+      list ? registerInsetMover(list, 'feed') : null,
+      jump ? registerInsetMover(jump, 'chrome') : null,
     ];
     return () => off.forEach((stop) => stop?.());
   }, [chatId]);
 
   useEffect(
     () =>
-      onKeyboardState(({ phase, layoutShift }) => {
+      onBottomInset(({ phase, layoutShift }) => {
         const el = listRef.current;
         if (!el) return;
 
-        if (phase === 'start') keyboardAnchor.current = { stuck: stuckToBottom.current };
-        const stuck = keyboardAnchor.current?.stuck ?? stuckToBottom.current;
-        if (phase === 'end') keyboardAnchor.current = null;
+        if (phase === 'start') keyboardAnchor.current = true;
+        if (phase === 'end') keyboardAnchor.current = false;
         if (layoutShift === 0) return;
 
         fling.current?.stop();
-        if (!stuck) {
-          el.scrollTop += layoutShift;
-          return;
-        }
-        el.scrollTop = el.scrollHeight;
-        stuckToBottom.current = true;
+        el.scrollTop += layoutShift;
       }),
     [],
   );
@@ -1061,9 +1050,11 @@ export function MessageList({
     const raw = el.scrollHeight - el.scrollTop - el.clientHeight;
     const distance = raw - bottomReserve(el);
     prevScrollHeight.current = el.scrollHeight;
+    atVeryBottom.current = raw <= BOTTOM_SNAP;
     if (performance.now() < autoScrollUntil.current) {
       if (raw <= 1) autoScrollUntil.current = 0;
       stuckToBottom.current = true;
+      atVeryBottom.current = true;
     } else {
       stuckToBottom.current = distance < STICK_THRESHOLD;
       if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);

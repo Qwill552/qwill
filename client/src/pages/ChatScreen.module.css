@@ -98,8 +98,8 @@
 /* Едет вместе с композером: своя высота остаётся прежней, а освобождённую снизу полосу
    всё равно закрывает клавиатура. Иначе размытая полоса выросла бы до конечной высоты
    сразу и висела бы над ещё не уехавшим композером. */
-:global(html[data-keyboard='up']) .composerFade {
-  transform: translateY(calc(-1 * var(--keyboard-lift-live)));
+:global(html[data-bottom-lift]) .composerFade {
+  transform: translateY(calc(-1 * var(--bottom-lift-live)));
 }
 
 /* Обёртка, которую меряет ResizeObserver: её высота уходит в --composer-h и оттуда
