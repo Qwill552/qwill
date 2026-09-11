@@ -1,7 +1,9 @@
 import { MESSAGES_PAGE_SIZE, type ChatListItemDto, type MessageDto } from '@messenger/shared';
 
-import { openCacheDb } from './db';
-import { FEED_ACCUMULATOR_LIMIT } from '../features/messages/feedWindow';
+import { openCacheDb, type CacheDb, type MessageRange } from './db';
+import { FEED_ACCUMULATOR_LIMIT, type FeedSide } from '../features/messages/feedWindow';
+
+export type { MessageRange } from './db';
 
 export const CACHED_HISTORY_LIMIT = Math.max(FEED_ACCUMULATOR_LIMIT, MESSAGES_PAGE_SIZE);
 
@@ -81,6 +83,92 @@ export async function removeCachedMessages(chatId: string, ids: number[]): Promi
   await tx.done;
 }
 
+async function readRanges(db: CacheDb, chatId: string): Promise<MessageRange[]> {
+  try {
+    const stored = await db.get('messageRanges', chatId);
+    return stored?.ranges ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function mergeCachedRange(ranges: MessageRange[], next: MessageRange): MessageRange[] {
+  const sorted = [...ranges, next].sort((a, b) => a.fromId - b.fromId);
+  const merged: MessageRange[] = [];
+  for (const range of sorted) {
+    const last = merged.at(-1);
+    if (last && range.fromId <= last.toId + 1) {
+      last.toId = Math.max(last.toId, range.toId);
+    } else {
+      merged.push({ ...range });
+    }
+  }
+  return merged;
+}
+
+export async function readCachedRanges(chatId: string): Promise<MessageRange[]> {
+  const db = await openCacheDb();
+  if (!db) return [];
+
+  return readRanges(db, chatId);
+}
+
+export async function recordCachedRange(chatId: string, fromId: number, toId: number): Promise<void> {
+  if (fromId > toId) return;
+
+  const db = await openCacheDb();
+  if (!db) return;
+
+  try {
+    const existing = await readRanges(db, chatId);
+    await db.put('messageRanges', { chatId, ranges: mergeCachedRange(existing, { fromId, toId }) });
+  } catch {
+    return;
+  }
+}
+
+export async function readCachedPage(
+  chatId: string,
+  side: FeedSide,
+  edgeId: number,
+  limit: number,
+): Promise<MessageDto[]> {
+  const db = await openCacheDb();
+  if (!db) return [];
+
+  try {
+    const ranges = await readRanges(db, chatId);
+    const range = ranges.find((r) => r.fromId <= edgeId && edgeId <= r.toId);
+    if (!range) return [];
+
+    const result: MessageDto[] = [];
+    const store = db.transaction('messages').store;
+
+    if (side === 'older') {
+      if (edgeId - 1 < range.fromId) return [];
+      const bound = IDBKeyRange.bound([chatId, range.fromId], [chatId, edgeId - 1]);
+      let cursor = await store.openCursor(bound, 'prev');
+      while (cursor && result.length < limit) {
+        if (!cursor.value.deletedAt) result.push(cursor.value);
+        cursor = await cursor.continue();
+      }
+      result.reverse();
+    } else {
+      if (edgeId + 1 > range.toId) return [];
+      const bound = IDBKeyRange.bound([chatId, edgeId + 1], [chatId, range.toId]);
+      let cursor = await store.openCursor(bound, 'next');
+      while (cursor && result.length < limit) {
+        if (!cursor.value.deletedAt) result.push(cursor.value);
+        cursor = await cursor.continue();
+      }
+    }
+
+    return result;
+  } catch {
+    return [];
+  }
+}
+
 export async function readCachedPosition(chatId: string): Promise<ChatFeedPosition | null> {
   const db = await openCacheDb();
   if (!db) return null;
@@ -141,6 +229,7 @@ export async function removeCachedChat(chatId: string): Promise<void> {
   await db.delete('chats', chatId);
   await db.delete('syncCursors', chatId);
   await db.delete('chatPositions', chatId);
+  await db.delete('messageRanges', chatId);
 
   const keys = await db.getAllKeysFromIndex('messages', 'byChat', chatId);
   const tx = db.transaction('messages', 'readwrite');

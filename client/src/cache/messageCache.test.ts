@@ -5,11 +5,15 @@ import { clearAllCache, openCacheDb, type CachedChatPosition } from './db';
 import {
   CACHED_HISTORY_LIMIT,
   CACHED_POSITION_TTL_MS,
+  mergeCachedRange,
   pruneCachedHistory,
   pruneCachedPositions,
   readCachedChats,
   readCachedMessages,
+  readCachedPage,
   readCachedPosition,
+  readCachedRanges,
+  recordCachedRange,
   removeCachedChat,
   removeCachedMessages,
   selectHistoryPruneVictims,
@@ -307,5 +311,112 @@ describe('позиция в чате', () => {
     await pruneCachedPositions();
 
     expect((await db!.getAll('chatPositions')).map((entry) => entry.chatId)).toEqual(['свежий']);
+  });
+});
+
+describe('mergeCachedRange', () => {
+  it('сливает пересекающиеся диапазоны', () => {
+    expect(mergeCachedRange([{ fromId: 1, toId: 10 }], { fromId: 5, toId: 15 })).toEqual([{ fromId: 1, toId: 15 }]);
+  });
+
+  it('сливает соприкасающиеся диапазоны', () => {
+    expect(mergeCachedRange([{ fromId: 1, toId: 10 }], { fromId: 11, toId: 20 })).toEqual([{ fromId: 1, toId: 20 }]);
+  });
+
+  it('не сливает несмежные диапазоны', () => {
+    expect(mergeCachedRange([{ fromId: 1, toId: 10 }], { fromId: 20, toId: 30 })).toEqual([
+      { fromId: 1, toId: 10 },
+      { fromId: 20, toId: 30 },
+    ]);
+  });
+
+  it('поглощённый диапазон не меняет границ', () => {
+    expect(mergeCachedRange([{ fromId: 1, toId: 100 }], { fromId: 10, toId: 20 })).toEqual([{ fromId: 1, toId: 100 }]);
+  });
+});
+
+describe('диапазоны истории чата', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+  });
+
+  it('записанный диапазон читается обратно', async () => {
+    await recordCachedRange('c1', 10, 20);
+
+    expect(await readCachedRanges('c1')).toEqual([{ fromId: 10, toId: 20 }]);
+  });
+
+  it('второй смежный диапазон сливается с первым', async () => {
+    await recordCachedRange('c1', 10, 20);
+    await recordCachedRange('c1', 1, 9);
+
+    expect(await readCachedRanges('c1')).toEqual([{ fromId: 1, toId: 20 }]);
+  });
+
+  it('чужой чат не задет', async () => {
+    await recordCachedRange('c1', 10, 20);
+
+    expect(await readCachedRanges('c2')).toEqual([]);
+  });
+
+  it('removeCachedChat убирает диапазоны чата', async () => {
+    await recordCachedRange('c1', 10, 20);
+
+    await removeCachedChat('c1');
+
+    expect(await readCachedRanges('c1')).toEqual([]);
+  });
+});
+
+describe('readCachedPage', () => {
+  beforeEach(async () => {
+    await clearAllCache();
+  });
+
+  it('отдаёт страницу старее края внутри известного диапазона', async () => {
+    await writeCachedMessages(Array.from({ length: 20 }, (_, i) => message(i + 1)));
+    await recordCachedRange('c1', 1, 20);
+
+    const page = await readCachedPage('c1', 'older', 15, 5);
+
+    expect(page.map((m) => m.id)).toEqual([10, 11, 12, 13, 14]);
+  });
+
+  it('отдаёт страницу новее края внутри известного диапазона', async () => {
+    await writeCachedMessages(Array.from({ length: 20 }, (_, i) => message(i + 1)));
+    await recordCachedRange('c1', 1, 20);
+
+    const page = await readCachedPage('c1', 'newer', 5, 5);
+
+    expect(page.map((m) => m.id)).toEqual([6, 7, 8, 9, 10]);
+  });
+
+  it('обрезает страницу лимитом', async () => {
+    await writeCachedMessages(Array.from({ length: 20 }, (_, i) => message(i + 1)));
+    await recordCachedRange('c1', 1, 20);
+
+    expect(await readCachedPage('c1', 'older', 20, 3)).toHaveLength(3);
+  });
+
+  it('пусто, если край не принадлежит ни одному диапазону — это и есть дыра', async () => {
+    await writeCachedMessages([message(50), message(60)]);
+    await recordCachedRange('c1', 55, 65);
+
+    expect(await readCachedPage('c1', 'older', 50, 10)).toEqual([]);
+  });
+
+  it('пусто, когда диапазон известен, но у края ничего не осталось', async () => {
+    await writeCachedMessages([message(10), message(11)]);
+    await recordCachedRange('c1', 10, 11);
+
+    expect(await readCachedPage('c1', 'older', 10, 10)).toEqual([]);
+    expect(await readCachedPage('c1', 'newer', 11, 10)).toEqual([]);
+  });
+
+  it('не отдаёт сообщения из чужого чата', async () => {
+    await writeCachedMessages([message(5, 'c2')]);
+    await recordCachedRange('c1', 1, 20);
+
+    expect(await readCachedPage('c1', 'older', 15, 10)).toEqual([]);
   });
 });

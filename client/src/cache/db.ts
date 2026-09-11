@@ -62,6 +62,16 @@ export interface CachedChatPosition {
   savedAt: number;
 }
 
+export interface MessageRange {
+  fromId: number;
+  toId: number;
+}
+
+export interface CachedMessageRanges {
+  chatId: string;
+  ranges: MessageRange[];
+}
+
 export interface SyncCursor {
   chatId: string;
   maxId: number;
@@ -92,6 +102,7 @@ interface CacheSchema extends DBSchema {
   messages: { key: [string, number]; value: MessageDto; indexes: { byChat: string } };
   syncCursors: { key: string; value: SyncCursor };
   chatPositions: { key: string; value: CachedChatPosition; indexes: { bySavedAt: number } };
+  messageRanges: { key: string; value: CachedMessageRanges };
   media: { key: string; value: CachedMedia; indexes: { byLastUsed: number } };
   mediaMeta: {
     key: string;
@@ -113,13 +124,14 @@ type UpgradeTransaction = IDBPTransaction<CacheSchema, StoreNames<CacheSchema>[]
 
 const DB_NAME = 'qwill-cache';
 export const VIDEO_CACHE_NAME = 'qwill-video';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 const STORE_NAMES: StoreNames<CacheSchema>[] = [
   'chats',
   'messages',
   'syncCursors',
   'chatPositions',
+  'messageRanges',
   'media',
   'mediaMeta',
   'videoChunks',
@@ -172,6 +184,10 @@ export function openCacheDb(): Promise<CacheDb | null> {
         const chunks = db.createObjectStore('videoChunks', { keyPath: 'key' });
         chunks.createIndex('byLastUsed', 'lastUsedAt');
         chunks.createIndex('byFile', 'fileId');
+      }
+
+      if (oldVersion < 6) {
+        db.createObjectStore('messageRanges', { keyPath: 'chatId' });
       }
     },
   }).catch(() => null);

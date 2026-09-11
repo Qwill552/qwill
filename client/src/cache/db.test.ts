@@ -40,6 +40,7 @@ describe('cache db', () => {
       'chats',
       'media',
       'mediaMeta',
+      'messageRanges',
       'messages',
       'outbox',
       'settings',

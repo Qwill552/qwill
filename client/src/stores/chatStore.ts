@@ -60,7 +60,9 @@ import {
   pruneCachedHistory,
   readCachedChats,
   readCachedMessages,
+  readCachedPage,
   readCachedPosition,
+  recordCachedRange,
   removeCachedChat,
   removeCachedMessages,
   writeCachedChats,
@@ -942,6 +944,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (feedLoadsInFlight.has(key)) return;
     feedLoadsInFlight.add(key);
     const epoch = get().feedEpochByChat[chatId] ?? 0;
+
+    const cached = await readCachedPage(chatId, 'older', oldest.id, FEED_PAGE_SIZE).catch(() => []);
+    if (cached.length > 0) {
+      feedLoadsInFlight.delete(key);
+      if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
+      set((state) => ({
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: mergeFeedPage(state.messagesByChat[chatId] ?? [], cached as LocalMessage[], 'older'),
+        },
+      }));
+      return;
+    }
+
     let page: MessagesPage;
     try {
       page = await getMessagesRequest(chatId, oldest.id);
@@ -949,15 +965,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       feedLoadsInFlight.delete(key);
     }
     if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
+    const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
-      const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: mergeFeedPage(list, fresh, 'older') },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.hasMore },
       };
     });
     void writeCachedMessages(page.messages);
+    if (fresh.length > 0) {
+      void recordCachedRange(chatId, Math.min(...fresh.map((m) => m.id)), oldest.id - 1);
+    }
   },
 
   async loadMoreAfter(chatId) {
@@ -970,6 +989,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (feedLoadsInFlight.has(key)) return;
     feedLoadsInFlight.add(key);
     const epoch = get().feedEpochByChat[chatId] ?? 0;
+
+    const cached = await readCachedPage(chatId, 'newer', newest.id, FEED_PAGE_SIZE).catch(() => []);
+    if (cached.length > 0) {
+      feedLoadsInFlight.delete(key);
+      if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
+      set((state) => ({
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: mergeFeedPage(state.messagesByChat[chatId] ?? [], cached as LocalMessage[], 'newer'),
+        },
+      }));
+      return;
+    }
+
     let page: MessagesPage;
     try {
       page = await getMessagesAfterRequest(chatId, newest.id);
@@ -977,15 +1010,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       feedLoadsInFlight.delete(key);
     }
     if ((get().feedEpochByChat[chatId] ?? 0) !== epoch) return;
+    const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
     set((state) => {
       const list = state.messagesByChat[chatId] ?? [];
-      const fresh = page.messages.filter((m) => !m.deletedAt) as LocalMessage[];
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: mergeFeedPage(list, fresh, 'newer') },
         hasMoreAfterByChat: { ...state.hasMoreAfterByChat, [chatId]: page.hasMore },
       };
     });
     void writeCachedMessages(page.messages);
+    if (fresh.length > 0) {
+      void recordCachedRange(chatId, newest.id + 1, Math.max(...fresh.map((m) => m.id)));
+    }
   },
 
   setViewportNewest(chatId, value) {
