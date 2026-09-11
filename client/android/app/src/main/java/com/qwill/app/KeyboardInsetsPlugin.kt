@@ -15,9 +15,6 @@ private const val EASING_SAMPLES = 20
 @CapacitorPlugin(name = "QwillKeyboard")
 class KeyboardInsetsPlugin : Plugin() {
 
-    private var running = 0
-    private var lastImeInset = -1
-
     override fun load() {
         val view = bridge.webView ?: return
         val density = view.resources.displayMetrics.density
@@ -25,10 +22,6 @@ class KeyboardInsetsPlugin : Plugin() {
         ViewCompat.setWindowInsetsAnimationCallback(
             view,
             object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
-                override fun onPrepare(animation: WindowInsetsAnimationCompat) {
-                    running += 1
-                }
-
                 override fun onStart(
                     animation: WindowInsetsAnimationCompat,
                     bounds: WindowInsetsAnimationCompat.BoundsCompat
@@ -53,31 +46,15 @@ class KeyboardInsetsPlugin : Plugin() {
                 ): WindowInsetsCompat = insets
 
                 override fun onEnd(animation: WindowInsetsAnimationCompat) {
-                    running = (running - 1).coerceAtLeast(0)
-                    lastImeInset = imeInset(view)
                     notifyListeners(
                         "keyboardInset",
                         JSObject()
                             .put("phase", "end")
-                            .put("height", lastImeInset / density)
+                            .put("height", imeInset(view) / density)
                     )
                 }
             }
         )
-
-        ViewCompat.setOnApplyWindowInsetsListener(view) { _, insets ->
-            val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            if (running == 0 && ime != lastImeInset) {
-                lastImeInset = ime
-                notifyListeners(
-                    "keyboardInset",
-                    JSObject()
-                        .put("phase", "end")
-                        .put("height", ime / density)
-                )
-            }
-            insets
-        }
     }
 
     private fun imeInset(view: View): Int =
