@@ -56,6 +56,7 @@ const hasNativeInsets = Capacitor.isNativePlatform() && Capacitor.isPluginAvaila
 let layoutLift = 0;
 let liveLift = 0;
 let keyboardHeight = 0;
+let keyboardTarget = 0;
 let panelOpen = false;
 let panelLift = 0;
 let heldSafeBottom = -1;
@@ -114,7 +115,10 @@ function readSafeBottom(): number {
 function scheduleSafeBottomHold(): void {
   window.clearTimeout(safeTimer);
   safeTimer = window.setTimeout(() => {
-    if (keyboardHeight > 0 || panelOpen) return;
+    if (keyboardHeight > 0 || panelOpen || keyboardExpected || running.size > 0) {
+      scheduleSafeBottomHold();
+      return;
+    }
     const value = readSafeBottom();
     if (value === heldSafeBottom) return;
     heldSafeBottom = value;
@@ -143,6 +147,7 @@ export function isKeyboardExpected(): boolean {
 
 export function expectKeyboard(): void {
   if (panelLift <= 0) return;
+  keyboardTarget = keyboardHeight;
   window.clearTimeout(expectTimer);
   keyboardExpected = true;
   expectTimer = window.setTimeout(() => {
@@ -329,6 +334,7 @@ function watchWebSources(): void {
     const height = Math.round(webKeyboardHeight());
     if (height === keyboardHeight) return;
     keyboardHeight = height;
+    keyboardTarget = height;
     if (height > 0) forgetExpectedKeyboard();
     rememberPanelLift(liftOf(height));
     settle();
@@ -347,17 +353,14 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     if (event.phase === 'start') {
-      if (Math.round(event.target ?? 0) > 0) forgetExpectedKeyboard();
-      keyboardHeight = Math.round(event.target ?? 0);
-      move(
-        targetLift(keyboardHeight),
-        event.duration ?? FALLBACK_DURATION_MS,
-        event.easing || FALLBACK_EASING,
-      );
+      keyboardTarget = Math.round(event.target ?? 0);
+      if (keyboardTarget > 0) forgetExpectedKeyboard();
+      move(targetLift(keyboardTarget), event.duration ?? FALLBACK_DURATION_MS, event.easing || FALLBACK_EASING);
       return;
     }
 
     keyboardHeight = Math.round(event.height);
+    keyboardTarget = keyboardHeight;
     if (keyboardHeight > 0) forgetExpectedKeyboard();
     rememberPanelLift(liftOf(keyboardHeight));
     settle();
