@@ -272,6 +272,7 @@ function settle(): void {
   window.clearTimeout(settleTimer);
   moveId += 1;
   stopMoving();
+  clearFollow();
   const lift = targetLift(keyboardHeight);
   const laidOut = layoutLift;
   if (lift !== laidOut) notify('measure', lift - laidOut);
@@ -292,7 +293,12 @@ function beginFollow(): void {
 
 function follow(toLift: number): void {
   if (toLift === liveLift) return;
-  writeVariables(RESTING_LIFT, toLift, true);
+  liveLift = toLift;
+  for (const [el, mode] of movers) el.style.transform = `translateY(${offsetOf(mode, toLift)}px)`;
+}
+
+function clearFollow(): void {
+  for (const [el] of movers) el.style.removeProperty('transform');
 }
 
 function move(toLift: number, duration: number, easing: string): void {
@@ -303,6 +309,7 @@ function move(toLift: number, duration: number, easing: string): void {
   }
 
   const fromLift = movingLift() ?? liveLift;
+  clearFollow();
   const laidOut = layoutLift;
   const id = (moveId += 1);
   const mine = (): void => {
