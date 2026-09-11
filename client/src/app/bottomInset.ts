@@ -368,6 +368,7 @@ async function watchNativeInsets(): Promise<void> {
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
     if (event.phase === 'start') {
+      if ((event.duration ?? 0) < 0) return;
       window.clearTimeout(settledTimer);
       const target = Math.round(event.target ?? 0);
       if (target > 0) forgetExpectedKeyboard();
