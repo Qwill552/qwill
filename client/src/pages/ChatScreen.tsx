@@ -73,6 +73,8 @@ const DESKTOP_COMPOSER_STYLE = {
 
 const CALL_BANNER_H = 52;
 
+const DISMISS_CLICK_WINDOW_MS = 700;
+
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
  *  Буквальный перенос из «Пульс» (design-archive/reference), хрома — этап 2 CLAUDE.md. */
 export function ChatScreen() {
@@ -196,18 +198,51 @@ export function ChatScreen() {
     const screen = screenRef.current;
     if (!screen) return;
 
-    function dismissKeyboard(event: PointerEvent): void {
-      if (keyboardLift() <= 0) return;
+    let dismissingPointer: number | null = null;
+    let dismissedAt = 0;
+
+    function inFeed(event: Event): boolean {
       const target = event.target;
-      if (!(target instanceof Element) || !target.closest('[data-message-scroller]')) return;
-      const focused = document.activeElement;
-      if (focused instanceof HTMLElement) focused.blur();
+      return target instanceof Element && target.closest('[data-message-scroller]') !== null;
+    }
+
+    function swallow(event: Event): void {
       event.preventDefault();
       event.stopPropagation();
     }
 
-    screen.addEventListener('pointerdown', dismissKeyboard, true);
-    return () => screen.removeEventListener('pointerdown', dismissKeyboard, true);
+    function handleDown(event: PointerEvent): void {
+      dismissingPointer = null;
+      if (keyboardLift() <= 0 || !inFeed(event)) return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+      dismissingPointer = event.pointerId;
+      dismissedAt = event.timeStamp;
+      swallow(event);
+    }
+
+    function handleUp(event: PointerEvent): void {
+      if (event.pointerId !== dismissingPointer) return;
+      dismissingPointer = null;
+      swallow(event);
+    }
+
+    function handleClick(event: MouseEvent): void {
+      if (event.timeStamp - dismissedAt > DISMISS_CLICK_WINDOW_MS || !inFeed(event)) return;
+      dismissedAt = 0;
+      swallow(event);
+    }
+
+    screen.addEventListener('pointerdown', handleDown, true);
+    screen.addEventListener('pointerup', handleUp, true);
+    screen.addEventListener('pointercancel', handleUp, true);
+    screen.addEventListener('click', handleClick, true);
+    return () => {
+      screen.removeEventListener('pointerdown', handleDown, true);
+      screen.removeEventListener('pointerup', handleUp, true);
+      screen.removeEventListener('pointercancel', handleUp, true);
+      screen.removeEventListener('click', handleClick, true);
+    };
   }, [chatId]);
 
   useLayoutEffect(() => {
