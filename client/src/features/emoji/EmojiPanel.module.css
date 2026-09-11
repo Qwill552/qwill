@@ -21,10 +21,10 @@
   left: 0;
   z-index: 221;
   display: flex;
-  height: calc(var(--emoji-panel-h) + var(--safe-bottom));
+  height: calc(var(--emoji-panel-h) + var(--safe-bottom-hold, var(--safe-bottom)));
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: var(--safe-bottom-hold, var(--safe-bottom));
   border-top: 1px solid var(--sheet-border);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: var(--sheet-bg);
