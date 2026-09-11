@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
   },
+  plugins: {
+    SystemBars: {
+      insetsHandling: 'disable',
+    },
+  },
   server: {
     androidScheme: 'https',
     url: 'https://qwill.mooo.com',
