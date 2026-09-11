@@ -21,7 +21,11 @@ import { GroupCallBanner } from '../features/calls/GroupCallBanner';
 import { ForwardSheet } from '../features/messages/ForwardSheet';
 import { GroupPanel } from '../features/groups/GroupPanel';
 import { DeleteMessageModal } from '../features/messages/DeleteMessageModal';
-import { MessageComposer, type ComposerContext } from '../features/messages/MessageComposer';
+import {
+  MessageComposer,
+  type ComposerContext,
+  type MessageComposerHandle,
+} from '../features/messages/MessageComposer';
 import { isDeletableSelection } from '../features/messages/messageDeleting';
 import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
@@ -73,6 +77,7 @@ const DESKTOP_COMPOSER_STYLE = {
 const CALL_BANNER_H = 52;
 
 const DISMISS_CLICK_WINDOW_MS = 700;
+const DISMISS_TAP_SLOP_PX = 10;
 
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
  *  Буквальный перенос из «Пульс» (design-archive/reference), хрома — этап 2 CLAUDE.md. */
@@ -99,6 +104,7 @@ export function ChatScreen() {
   const [reporting, setReporting] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const composerApiRef = useRef<MessageComposerHandle>(null);
   const composerBarRef = useRef<HTMLDivElement>(null);
   const composerFadeRef = useRef<HTMLDivElement>(null);
 
@@ -205,45 +211,56 @@ export function ChatScreen() {
 
     let dismissingPointer: number | null = null;
     let dismissedAt = 0;
+    let startX = 0;
+    let startY = 0;
+    let dragged = false;
 
     function inFeed(event: Event): boolean {
       const target = event.target;
       return target instanceof Element && target.closest('[data-message-scroller]') !== null;
     }
 
-    function swallow(event: Event): void {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
     function handleDown(event: PointerEvent): void {
       dismissingPointer = null;
       if (bottomLift() <= 0 || !inFeed(event)) return;
-      const focused = document.activeElement;
-      if (focused instanceof HTMLElement) focused.blur();
       dismissingPointer = event.pointerId;
-      dismissedAt = event.timeStamp;
-      swallow(event);
+      startX = event.clientX;
+      startY = event.clientY;
+      dragged = false;
+      event.stopPropagation();
+    }
+
+    function handleMove(event: PointerEvent): void {
+      if (event.pointerId !== dismissingPointer || dragged) return;
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > DISMISS_TAP_SLOP_PX) dragged = true;
     }
 
     function handleUp(event: PointerEvent): void {
       if (event.pointerId !== dismissingPointer) return;
       dismissingPointer = null;
-      swallow(event);
+      event.stopPropagation();
+      if (dragged || event.type !== 'pointerup') return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+      composerApiRef.current?.closeEmojiPanel();
+      dismissedAt = event.timeStamp;
     }
 
     function handleClick(event: MouseEvent): void {
       if (event.timeStamp - dismissedAt > DISMISS_CLICK_WINDOW_MS || !inFeed(event)) return;
       dismissedAt = 0;
-      swallow(event);
+      event.preventDefault();
+      event.stopPropagation();
     }
 
     screen.addEventListener('pointerdown', handleDown, true);
+    screen.addEventListener('pointermove', handleMove, true);
     screen.addEventListener('pointerup', handleUp, true);
     screen.addEventListener('pointercancel', handleUp, true);
     screen.addEventListener('click', handleClick, true);
     return () => {
       screen.removeEventListener('pointerdown', handleDown, true);
+      screen.removeEventListener('pointermove', handleMove, true);
       screen.removeEventListener('pointerup', handleUp, true);
       screen.removeEventListener('pointercancel', handleUp, true);
       screen.removeEventListener('click', handleClick, true);
@@ -561,6 +578,7 @@ export function ChatScreen() {
             <ServiceChatBar chatId={chatId} muted={muted} />
           ) : (
             <MessageComposer
+              ref={composerApiRef}
               chatId={chatId}
               context={composerContext}
               onClearContext={() => setComposerContext(null)}

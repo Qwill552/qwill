@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_FILE_SIZE_BYTES } from '@messenger/shared';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ClipboardEvent,
   CompositionEvent,
@@ -40,19 +40,22 @@ const COMPOSER_EMOJI_SIZE = 20;
 
 export type ComposerContext = ComposerContextValue;
 
-export function MessageComposer({
-  chatId,
-  context,
-  onClearContext,
-  onEmojiPanelToggle,
-  onEditLast,
-}: {
+export interface MessageComposerHandle {
+  closeEmojiPanel: () => void;
+}
+
+interface MessageComposerProps {
   chatId: string;
   context: ComposerContext | null;
   onClearContext: () => void;
   onEmojiPanelToggle?: (open: boolean) => void;
   onEditLast?: () => void;
-}) {
+}
+
+export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposerProps>(function MessageComposer(
+  { chatId, context, onClearContext, onEmojiPanelToggle, onEditLast },
+  ref,
+) {
   const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
   const [error, setError] = useState<string | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
@@ -104,6 +107,12 @@ export function MessageComposer({
     setEmojiPanelOpen(false);
     fieldRef.current?.focus();
   }
+
+  useImperativeHandle(ref, () => ({
+    closeEmojiPanel() {
+      if (emojiPanelOpen) setEmojiPanelOpen(false);
+    },
+  }));
 
   useEffect(() => {
     return () => onEmojiPanelToggle?.(false);
@@ -482,4 +491,4 @@ export function MessageComposer({
       )}
     </div>
   );
-}
+});
