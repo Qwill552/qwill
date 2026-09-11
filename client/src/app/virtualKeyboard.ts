@@ -34,7 +34,9 @@ const SAFE_SETTLE_MS = 600;
 
 const listeners = new Set<(state: KeyboardState) => void>();
 
-let nativeDriven = false;
+/** Считается сразу, а не по факту первого события: иначе visualViewport успевает
+ *  опередить нативный мост и опубликовать конечную высоту до начала движения. */
+const hasNativeInsets = Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('QwillKeyboard');
 let layoutHeight_ = 0;
 let liveHeight = 0;
 let heldSafeBottom = -1;
@@ -98,7 +100,14 @@ function publish(nextLayout: number, nextLive: number, phase: KeyboardPhase): vo
   if (nextLive > 0 || nextLayout > 0) root.dataset.keyboard = 'up';
   if (layoutChanged) root.style.setProperty('--keyboard-h', `${nextLayout}px`);
   root.style.setProperty('--keyboard-live', `${nextLive}px`);
-  if (nextLive === 0 && nextLayout === 0) delete root.dataset.keyboard;
+  // Снять признак в этом же кадре нельзя: раскладка считается один раз, в конце задачи, и
+  // увидит уже снятый признак — а значит включит переход на отступ ленты ровно на то
+  // изменение, ради которого он и выключался.
+  if (nextLive === 0 && nextLayout === 0) {
+    requestAnimationFrame(() => {
+      if (liveHeight === 0 && layoutHeight_ === 0) delete root.dataset.keyboard;
+    });
+  }
 
   const state: KeyboardState = { liftLayout: lift(nextLayout), liftLive: lift(nextLive), phase };
   for (const listener of listeners) listener(state);
@@ -131,7 +140,7 @@ function webKeyboardHeight(): number {
 function watchWebSources(): void {
   const onChange = (): void => {
     scheduleSafeBottomHold();
-    if (nativeDriven) return;
+    if (hasNativeInsets) return;
     const height = Math.round(webKeyboardHeight());
     publish(height, height, 'end');
     if (height > 0) revealFocused(height);
@@ -144,11 +153,10 @@ function watchWebSources(): void {
 }
 
 async function watchNativeInsets(): Promise<void> {
-  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('QwillKeyboard')) return;
+  if (!hasNativeInsets) return;
 
   const plugin = registerPlugin<KeyboardInsetsPlugin>('QwillKeyboard');
   await plugin.addListener('keyboardInset', (event) => {
-    nativeDriven = true;
     const target = Math.round(event.target);
     const height = Math.round(event.height);
 
