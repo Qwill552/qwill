@@ -30,7 +30,7 @@ export function BlockUserModal({ chatId, userId, username, onClose }: BlockUserM
   }
 
   return (
-    <Modal title="Заблокировать?" onClose={onClose}>
+    <Modal title="Заблокировать?" onClose={onClose} className={styles.overlay}>
       <p className={styles.text}>
         Писать и звонить друг другу не сможет никто из вас: ни @{username} вам, ни вы ему. Переписка остаётся на
         месте, и блокировку можно снять.

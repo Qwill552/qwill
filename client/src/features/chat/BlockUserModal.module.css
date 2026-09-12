@@ -1,3 +1,7 @@
+.overlay {
+  z-index: 350;
+}
+
 .text {
   margin: 0 0 var(--space-4);
   color: var(--text-secondary);

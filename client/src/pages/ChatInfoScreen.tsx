@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { createReportRequest } from '../api/admin';
 import { getUserProfileRequest } from '../api/users';
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import { BlockUserModal } from '../features/chat/BlockUserModal';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
 import { ChatMediaTabs } from '../features/chat/ChatMediaTabs';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
@@ -32,18 +33,21 @@ export function ChatInfoScreen() {
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [usernameCopied, setUsernameCopied] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [attachmentSummary, setAttachmentSummary] = useState<string | null>(null);
   const [fastScrollActive, setFastScrollActive] = useState(false);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
   const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const setUserBlocked = useChatStore((s) => s.setUserBlocked);
   const startCall = useCallStore((s) => s.startCall);
 
   const other = chat?.otherMember ?? null;
   const presence = other ? presenceByUser[other.id] : undefined;
   const online = presence?.online ?? false;
   const muted = chat?.muted ?? false;
+  const iBlocked = chat?.iBlocked ?? false;
 
   useEffect(() => {
     const otherId = chat?.otherMember?.id;
@@ -83,7 +87,16 @@ export function ChatInfoScreen() {
     { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
     { id: 'edit', label: 'Изменить контакт', icon: 'edit', onSelect: () => {} },
     { id: 'report', label: 'Пожаловаться на профиль', icon: 'report', onSelect: () => setReporting(true) },
-    { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} },
+    {
+      id: 'block',
+      label: iBlocked ? 'Разблокировать' : 'Заблокировать',
+      icon: 'lock',
+      onSelect: () => {
+        if (!chatId) return;
+        if (iBlocked) void setUserBlocked(chatId, other.id, false).catch(() => undefined);
+        else setBlockModalOpen(true);
+      },
+    },
     { id: 'delete', label: 'Удалить контакт', icon: 'trash', danger: true, onSelect: () => {} },
   ];
 
@@ -197,6 +210,15 @@ export function ChatInfoScreen() {
 
       {menuAnchor && (
         <Menu anchor={menuAnchor} onClose={() => setMenuAnchor(null)} items={menuItems} desktopWidth={246} />
+      )}
+
+      {blockModalOpen && chatId && (
+        <BlockUserModal
+          chatId={chatId}
+          userId={other.id}
+          username={other.username}
+          onClose={() => setBlockModalOpen(false)}
+        />
       )}
 
       {reporting && (

@@ -460,7 +460,13 @@ export function ChatScreen() {
         : [profileItem, muteItem, ...(canReport ? [reportItem] : [])]
       : isDesktop
         ? [editItem, muteItem, ...(canReport ? [reportItem] : []), ...(otherMemberId ? [blockItem] : []), deleteItem]
-        : [profileItem, muteItem, ...(canReport ? [reportItem] : []), deleteItem];
+        : [
+            profileItem,
+            muteItem,
+            ...(canReport ? [reportItem] : []),
+            ...(otherMemberId ? [blockItem] : []),
+            deleteItem,
+          ];
 
   if (!chatId) return null;
 
