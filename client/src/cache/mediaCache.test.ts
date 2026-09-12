@@ -37,6 +37,8 @@ function chatStub(id: string, type: 'PRIVATE' | 'GROUP'): ChatListItemDto {
     unreadCount: 0,
     muted: false,
     isSupportRequest: false,
+    iBlocked: false,
+    blockedMe: false,
   };
 }
 

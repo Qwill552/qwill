@@ -1,9 +1,11 @@
 import { ErrorCode } from '@messenger/shared';
 import type {
   ApiErrorBody,
+  BlockStateDto,
   CardFontDto,
   CardImageDto,
   CardImageListDto,
+  ChatMemberSummary,
   ProfileCardPreviewDto,
   PublicUser,
   UpdateProfileInput,
@@ -103,4 +105,16 @@ export function getSettingsRequest(): Promise<UserSettingsDTO> {
 
 export function updateSettingsRequest(input: UpdateSettingsInput): Promise<UserSettingsDTO> {
   return apiRequest<UserSettingsDTO>('/api/users/me/settings', { method: 'PATCH', body: input });
+}
+
+export function blockUserRequest(userId: string): Promise<BlockStateDto> {
+  return apiRequest<BlockStateDto>(`/api/users/${userId}/block`, { method: 'POST' });
+}
+
+export function unblockUserRequest(userId: string): Promise<BlockStateDto> {
+  return apiRequest<BlockStateDto>(`/api/users/${userId}/block`, { method: 'DELETE' });
+}
+
+export function listBlockedRequest(): Promise<ChatMemberSummary[]> {
+  return apiRequest<ChatMemberSummary[]>('/api/users/me/blocked');
 }

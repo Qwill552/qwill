@@ -59,6 +59,8 @@ function listItem(overrides: Partial<ChatListItemDto> = {}): ChatListItemDto {
     unreadCount: 0,
     muted: false,
     isSupportRequest: false,
+    iBlocked: false,
+    blockedMe: false,
     ...overrides,
   };
 }

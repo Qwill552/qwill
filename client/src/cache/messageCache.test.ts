@@ -56,6 +56,8 @@ function chat(id: string): ChatListItemDto {
     unreadCount: 0,
     muted: false,
     isSupportRequest: false,
+    iBlocked: false,
+    blockedMe: false,
   };
 }
 

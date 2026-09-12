@@ -1,9 +1,11 @@
 import {
   CARD_IMAGE_MAX_BYTES,
   PROFILE_CARD_MAX_BYTES,
+  SocketEvent,
   setAvatarSchema,
   updateProfileSchema,
   updateSettingsSchema,
+  type ChatBlockEvent,
 } from '@messenger/shared';
 import express, { Router } from 'express';
 
@@ -13,6 +15,8 @@ import {
   deleteCardImage,
   listCardImages,
 } from '../../services/cardImages.js';
+import { blockUser, invertBlockState, listBlocked, unblockUser, type BlockState } from '../../services/block.js';
+import { privateChatIdBetween } from '../../services/chat.js';
 import {
   deleteCard,
   findVisibleCard,
@@ -30,6 +34,7 @@ import {
   updateSettings,
 } from '../../services/user.js';
 import { tooLarge } from '../../lib/errors.js';
+import { emitToUser } from '../../realtime/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { cardImageUploadLimiter, cardSaveLimiter } from '../middleware/rateLimit.js';
 import { validateBody } from '../middleware/validate.js';
@@ -159,6 +164,46 @@ usersRouter.get('/me/settings', (req, res, next) => {
 usersRouter.patch('/me/settings', validateBody(updateSettingsSchema), (req, res, next) => {
   updateSettings(req.userId!, req.body)
     .then((settings) => res.json(settings))
+    .catch(next);
+});
+
+async function broadcastBlockState(userId: string, otherId: string, state: BlockState): Promise<void> {
+  const chatId = await privateChatIdBetween(userId, otherId);
+  if (!chatId) return;
+
+  const mine: ChatBlockEvent = { chatId, userId: otherId, ...state };
+  const theirs: ChatBlockEvent = { chatId, userId, ...invertBlockState(state) };
+  emitToUser(userId, SocketEvent.ChatBlock, mine);
+  emitToUser(otherId, SocketEvent.ChatBlock, theirs);
+}
+
+usersRouter.get('/me/blocked', (req, res, next) => {
+  listBlocked(req.userId!)
+    .then((users) => res.json(users))
+    .catch(next);
+});
+
+usersRouter.post('/:id/block', (req, res, next) => {
+  const userId = req.userId!;
+  const otherId = String(req.params.id);
+
+  blockUser(userId, otherId)
+    .then(async (state) => {
+      await broadcastBlockState(userId, otherId, state);
+      res.json(state);
+    })
+    .catch(next);
+});
+
+usersRouter.delete('/:id/block', (req, res, next) => {
+  const userId = req.userId!;
+  const otherId = String(req.params.id);
+
+  unblockUser(userId, otherId)
+    .then(async (state) => {
+      await broadcastBlockState(userId, otherId, state);
+      res.json(state);
+    })
     .catch(next);
 });
 

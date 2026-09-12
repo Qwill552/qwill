@@ -11,6 +11,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { formatBirthday, formatLastSeen } from '../../utils/presence';
 import { openAvatarViewer } from '../media/avatarViewerStore';
 import { ProfileCardFrame } from '../profile/ProfileCardFrame';
+import { BlockUserModal } from './BlockUserModal';
 import card from '../../app/desktopCard.module.css';
 import { Avatar } from '../../ui/Avatar';
 import { Card } from '../../ui/Card';
@@ -86,10 +87,12 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
   const [usernameCopied, setUsernameCopied] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
 
   const chat = useChatStore((s) => s.chats.find((c) => c.id === chatId));
   const presenceByUser = useChatStore((s) => s.presenceByUser);
   const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const setUserBlocked = useChatStore((s) => s.setUserBlocked);
   const startCall = useCallStore((s) => s.startCall);
   const [profile, setProfile] = useState<UserProfileDto | null>(null);
   const [counts, setCounts] = useState<ChatAttachmentCounts | null>(null);
@@ -101,6 +104,7 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
   const presence = other ? presenceByUser[other.id] : undefined;
   const online = presence?.online ?? false;
   const muted = chat?.muted ?? false;
+  const iBlocked = chat?.iBlocked ?? false;
 
   useEffect(() => {
     if (!other?.id) return;
@@ -159,7 +163,15 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
     { id: 'share', label: 'Поделиться контактом', icon: 'forward', onSelect: () => {} },
     { id: 'edit', label: 'Изменить контакт', icon: 'edit', onSelect: () => {} },
     { id: 'report', label: 'Пожаловаться на профиль', icon: 'report', onSelect: () => setReporting(true) },
-    { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} },
+    {
+      id: 'block',
+      label: iBlocked ? 'Разблокировать' : 'Заблокировать',
+      icon: 'lock',
+      onSelect: () => {
+        if (iBlocked) void setUserBlocked(chatId, other.id, false).catch(() => undefined);
+        else setBlockModalOpen(true);
+      },
+    },
     { id: 'delete', label: 'Удалить контакт', icon: 'trash', danger: true, onSelect: () => {} },
   ];
 
@@ -304,6 +316,15 @@ export function ChatInfoCard({ chatId }: ChatInfoCardProps) {
           onSend={(comment) =>
             createReportRequest({ targetUserId: other.id, kind: 'profile', comment }).then(() => undefined)
           }
+        />
+      )}
+
+      {blockModalOpen && (
+        <BlockUserModal
+          chatId={chatId}
+          userId={other.id}
+          username={other.username}
+          onClose={() => setBlockModalOpen(false)}
         />
       )}
     </div>

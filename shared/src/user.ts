@@ -201,3 +201,8 @@ export interface CardFontDto {
   weights: number[];
   hasItalic: boolean;
 }
+
+export interface BlockStateDto {
+  iBlocked: boolean;
+  blockedMe: boolean;
+}

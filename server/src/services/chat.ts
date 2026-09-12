@@ -1,7 +1,6 @@
 import type {
   ChatDto,
   ChatListItemDto,
-  ChatMemberSummary,
   MessageDto,
   MessagesAround,
   MessagesPage,
@@ -11,10 +10,11 @@ import { ErrorCode } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
-import { toAvatarColor } from '../lib/avatarColor.js';
 import { fileUrl } from '../lib/fileUrl.js';
+import { blockStateBetween, blockStatesFor, NO_BLOCK, type BlockState } from './block.js';
 import { assertAvatarEligible } from './file.js';
 import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
+import { toMemberSummary } from './userSummary.js';
 import type { Chat, ChatMember, User } from '../generated/prisma/client.js';
 
 type ChatWithRelations = Chat & {
@@ -22,21 +22,12 @@ type ChatWithRelations = Chat & {
   messages: MessageWithRelations[];
 };
 
-export function toMemberSummary(
-  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarFileId' | 'avatarColor' | 'lastSeenAt' | 'isService'>,
-): ChatMemberSummary {
-  return {
-    id: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    avatarUrl: fileUrl(user.avatarFileId),
-    avatarColor: toAvatarColor(user.avatarColor),
-    lastSeenAt: user.lastSeenAt.toISOString(),
-    isService: user.isService,
-  };
-}
-
-function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: number): ChatListItemDto {
+function toChatListItem(
+  chat: ChatWithRelations,
+  userId: string,
+  unreadCount: number,
+  block: BlockState,
+): ChatListItemDto {
   const other = chat.type === 'PRIVATE' ? chat.members.find((m) => m.userId !== userId) : undefined;
   const otherSummary = other ? toMemberSummary(other.user) : null;
   const lastMessageRow = chat.messages[0];
@@ -53,6 +44,8 @@ function toChatListItem(chat: ChatWithRelations, userId: string, unreadCount: nu
     unreadCount,
     muted: own?.mutedAt != null,
     isSupportRequest: chat.isSupportRequest,
+    iBlocked: chat.type === 'PRIVATE' && block.iBlocked,
+    blockedMe: chat.type === 'PRIVATE' && block.blockedMe,
   };
 }
 
@@ -98,9 +91,39 @@ export async function assertChatWritable(chatId: string, userId: string): Promis
     where: { chatId, user: { isService: true } },
     select: { userId: true },
   });
-  if (!serviceMember || serviceMember.userId === userId) return;
+  if (serviceMember) {
+    if (serviceMember.userId === userId) return;
+    throw forbidden('В этот чат нельзя писать');
+  }
 
-  throw forbidden('В этот чат нельзя писать');
+  await assertNotBlockedInChat(chatId, userId);
+}
+
+export async function privateCounterpartId(chatId: string, userId: string): Promise<string | null> {
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    select: { type: true, members: { select: { userId: true } } },
+  });
+  if (!chat || chat.type !== 'PRIVATE') return null;
+  return chat.members.find((member) => member.userId !== userId)?.userId ?? null;
+}
+
+export async function assertNotBlockedInChat(chatId: string, userId: string): Promise<void> {
+  const otherId = await privateCounterpartId(chatId, userId);
+  if (!otherId) return;
+
+  const state = await blockStateBetween(userId, otherId);
+  if (!state.iBlocked && !state.blockedMe) return;
+
+  throw forbidden('Переписка заблокирована', ErrorCode.BLOCKED);
+}
+
+export async function privateChatIdBetween(userId: string, otherId: string): Promise<string | null> {
+  const chat = await prisma.chat.findUnique({
+    where: { pairKey: pairKeyFor(userId, otherId) },
+    select: { id: true },
+  });
+  return chat?.id ?? null;
 }
 
 export function pairKeyFor(a: string, b: string): string {
@@ -197,6 +220,8 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
     return lastMessageId > (membership.clearedUpToMessageId ?? 0);
   });
 
+  const blockStates = await blockStatesFor(userId);
+
   const items = await Promise.all(
     visible.map(async (membership) => {
       const unreadCount = await countUnread(
@@ -205,7 +230,9 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
         membership.lastReadMessageId,
         membership.clearedUpToMessageId,
       );
-      return toChatListItem(membership.chat, userId, unreadCount);
+      const otherId = membership.chat.members.find((m) => m.userId !== userId)?.userId;
+      const block = (otherId ? blockStates.get(otherId) : undefined) ?? NO_BLOCK;
+      return toChatListItem(membership.chat, userId, unreadCount, block);
     }),
   );
 
@@ -233,8 +260,11 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
     ? await prisma.message.findUnique({ where: { id: chat.pinnedMessageId }, include: messageInclude })
     : null;
 
+  const otherId = chat.members.find((m) => m.userId !== userId)?.userId;
+  const block = chat.type === 'PRIVATE' && otherId ? await blockStateBetween(userId, otherId) : NO_BLOCK;
+
   return {
-    ...toChatListItem(chat, userId, unreadCount),
+    ...toChatListItem(chat, userId, unreadCount, block),
     members: chat.members.map((m) => toMemberSummary(m.user)),
     readCursors,
     pinnedMessage: pinned ? toMessageDto(pinned) : null,

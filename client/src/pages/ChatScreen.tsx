@@ -9,6 +9,8 @@ import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
 import { OfficialMark } from '../features/chat/OfficialMark';
+import { BlockedBar } from '../features/chat/BlockedBar';
+import { BlockUserModal } from '../features/chat/BlockUserModal';
 import { ServiceChatBar } from '../features/chat/ServiceChatBar';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
 import { DeleteChatModal } from '../features/chats/DeleteChatModal';
@@ -102,6 +104,7 @@ export function ChatScreen() {
   const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerApiRef = useRef<MessageComposerHandle>(null);
@@ -122,6 +125,7 @@ export function ChatScreen() {
   const exitSelection = useChatStore((s) => s.exitSelection);
   const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
   const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const setUserBlocked = useChatStore((s) => s.setUserBlocked);
   /** Только чтобы знать, резервировать ли под баннер место в ленте (--pinned-h) — сам
    *  баннер рисует и владеет им `MessageList` (там же живут права на закреп/снятие),
    *  сюда он лишь порталится, чтобы не оказаться под блюром шапки (см. ниже, pinnedSlot). */
@@ -323,6 +327,10 @@ export function ChatScreen() {
   const isService = isServiceChat(activeChat);
   const isSupportChat = activeChat?.isSupportRequest === true;
   const muted = activeChat?.muted ?? false;
+  const iBlocked = activeChat?.iBlocked ?? false;
+  const blockedMe = activeChat?.blockedMe ?? false;
+  const blocked = iBlocked || blockedMe;
+  const otherMemberId = activeChat?.otherMember?.id ?? null;
   const isTyping = typingUsers.length > 0;
   const headerAvatarUrl = !isGroup && !isService ? activeChat?.avatarUrl : undefined;
 
@@ -424,7 +432,16 @@ export function ChatScreen() {
   };
 
   const editItem: MenuItem = { id: 'edit', label: 'Изменить', icon: 'edit', onSelect: () => {} };
-  const blockItem: MenuItem = { id: 'block', label: 'Заблокировать', icon: 'lock', onSelect: () => {} };
+  const blockItem: MenuItem = {
+    id: 'block',
+    label: iBlocked ? 'Разблокировать' : 'Заблокировать',
+    icon: 'lock',
+    onSelect: () => {
+      if (!chatId || !otherMemberId) return;
+      if (iBlocked) void setUserBlocked(chatId, otherMemberId, false).catch(() => undefined);
+      else setBlockModalOpen(true);
+    },
+  };
   const deleteItem: MenuItem = {
     id: 'delete',
     label: 'Удалить чат',
@@ -439,10 +456,10 @@ export function ChatScreen() {
     ? [muteItem]
     : isGroup
       ? isDesktop
-        ? [editItem, muteItem, ...(canReport ? [reportItem] : []), blockItem]
+        ? [editItem, muteItem, ...(canReport ? [reportItem] : [])]
         : [profileItem, muteItem, ...(canReport ? [reportItem] : [])]
       : isDesktop
-        ? [editItem, muteItem, ...(canReport ? [reportItem] : []), blockItem, deleteItem]
+        ? [editItem, muteItem, ...(canReport ? [reportItem] : []), ...(otherMemberId ? [blockItem] : []), deleteItem]
         : [profileItem, muteItem, ...(canReport ? [reportItem] : []), deleteItem];
 
   if (!chatId) return null;
@@ -580,6 +597,15 @@ export function ChatScreen() {
 
       {deleteModalOpen && activeChat && <DeleteChatModal chat={activeChat} onClose={() => setDeleteModalOpen(false)} />}
 
+      {blockModalOpen && chatId && activeChat?.otherMember && (
+        <BlockUserModal
+          chatId={chatId}
+          userId={activeChat.otherMember.id}
+          username={activeChat.otherMember.username}
+          onClose={() => setBlockModalOpen(false)}
+        />
+      )}
+
       {selectionDeleteConfirm && (
         <DeleteMessageModal
           count={selectedIds.size}
@@ -600,6 +626,8 @@ export function ChatScreen() {
             />
           ) : isService ? (
             <ServiceChatBar chatId={chatId} muted={muted} />
+          ) : blocked ? (
+            <BlockedBar chatId={chatId} userId={otherMemberId} iBlocked={iBlocked} />
           ) : (
             <MessageComposer
               ref={composerApiRef}

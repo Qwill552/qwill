@@ -6,7 +6,8 @@ import { env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { notFound } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { assertMember, toMemberSummary } from './chat.js';
+import { assertMember, assertNotBlockedInChat } from './chat.js';
+import { toMemberSummary } from './userSummary.js';
 import { messageInclude } from './message.js';
 import * as pushService from './push.js';
 import type { Call, CallParticipant, User } from '../generated/prisma/client.js';
@@ -68,6 +69,7 @@ async function getCallOrThrow(callId: string): Promise<CallWithRelations> {
 
 export async function startCall(input: { chatId: string; userId: string; kind: CallKind }): Promise<CallAccessDto> {
   await assertMember(input.chatId, input.userId);
+  await assertNotBlockedInChat(input.chatId, input.userId);
 
   const existing = await prisma.call.findFirst({
     where: { chatId: input.chatId, status: { in: ACTIVE_STATUSES } },
@@ -101,6 +103,7 @@ export async function startCall(input: { chatId: string; userId: string; kind: C
 export async function joinCall(input: { callId: string; userId: string }): Promise<CallAccessDto> {
   const call = await getCallOrThrow(input.callId);
   await assertMember(call.chatId, input.userId);
+  await assertNotBlockedInChat(call.chatId, input.userId);
 
   const now = new Date();
   await prisma.callParticipant.upsert({

@@ -4,6 +4,7 @@ import type {
   CallInviteEvent,
   CallLiveEvent,
   CallParticipantChangedEvent,
+  ChatBlockEvent,
   ChatDeletedEvent,
   ChatDto,
   ChatListItemDto,
@@ -52,6 +53,7 @@ import {
   updateMemberRoleRequest,
 } from '../api/chats';
 import { NetworkError } from '../api/client';
+import { blockUserRequest, unblockUserRequest } from '../api/users';
 import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
 import { buildImageAssets } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment, type OutboxEntry } from '../cache/db';
@@ -230,6 +232,8 @@ interface ChatState {
   /** Уведомления по чату — оптимистично: тумблер и вид пункта меню переключаются сразу,
    *  а при отказе сервера возвращаются обратно. */
   setChatMuted: (chatId: string, muted: boolean) => Promise<void>;
+  setUserBlocked: (chatId: string, userId: string, blocked: boolean) => Promise<void>;
+  reloadChatState: (chatId: string) => Promise<void>;
   deleteChat: (chatId: string, forEveryone: boolean) => Promise<void>;
   clearKicked: () => void;
   sendMessage: (
@@ -287,6 +291,7 @@ interface ChatState {
   applyMemberChanged: (event: MemberChangedEvent) => void;
   /** Внутренний метод: применяет chat:updated — смена названия/аватара группы (этап 7). */
   applyChatUpdated: (event: ChatUpdatedEvent) => void;
+  applyChatBlock: (event: ChatBlockEvent) => void;
   /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
   setTyping: (event: UserTypingEvent) => void;
   /** Внутренний метод: гоняет хэш/превью/загрузку/emit одного вложения, вызывается и при
@@ -454,6 +459,10 @@ function dropPacketQueuedForReconnect(clientId: string): void {
 
 function isRetriableSendError(ack: MessageSendAck): boolean {
   return ack.error?.code === ErrorCode.RATE_LIMITED;
+}
+
+function isBlockedSendError(ack: MessageSendAck): boolean {
+  return ack.error?.code === ErrorCode.BLOCKED;
 }
 
 const OUTBOX_RETRY_LIMIT = 12;
@@ -1198,6 +1207,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  async reloadChatState(chatId) {
+    const chat = await getChatRequest(chatId).catch(() => null);
+    if (chat) get().applyChatDetail(chat);
+  },
+
+  async setUserBlocked(chatId, userId, blocked) {
+    const state = blocked ? await blockUserRequest(userId) : await unblockUserRequest(userId);
+    get().applyChatBlock({ chatId, userId, ...state });
+  },
+
   async deleteChat(chatId, forEveryone) {
     const previousChats = get().chats;
     set((state) => ({ chats: state.chats.filter((c) => c.id !== chatId) }));
@@ -1286,6 +1305,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (isRetriableSendError(ack)) {
           scheduleOutboxRetry(() => void get().drainOutbox());
+          return;
+        }
+
+        if (isBlockedSendError(ack)) {
+          void get().reloadChatState(chatId);
+          void dequeueOutbox(clientId);
+          get().setMessageFailed(chatId, clientId);
           return;
         }
 
@@ -1505,6 +1531,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             get().applyIncomingMessage(ack.message);
             return;
           }
+          if (isBlockedSendError(ack)) void get().reloadChatState(chatId);
           get().updateLocalAttachment(chatId, clientId, { error: ack.error?.message ?? 'Не удалось отправить' });
           get().setMessageFailed(chatId, clientId);
         },
@@ -1625,6 +1652,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             scheduleOutboxRetry(() => void get().drainOutbox());
             return;
           }
+
+          if (isBlockedSendError(ack)) void get().reloadChatState(entry.chatId);
 
           void dequeueOutbox(entry.clientId);
           get().setMessageFailed(entry.chatId, entry.clientId);
@@ -1918,6 +1947,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off(SocketEvent.ChatUpdated).on(SocketEvent.ChatUpdated, (event: ChatUpdatedEvent) => {
       get().applyChatUpdated(event);
+    });
+
+    socket.off(SocketEvent.ChatBlock).on(SocketEvent.ChatBlock, (event: ChatBlockEvent) => {
+      get().applyChatBlock(event);
     });
 
     socket.off(SocketEvent.ChatRead).on(SocketEvent.ChatRead, (event: ChatReadEvent) => {
@@ -2283,6 +2316,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         c.id === event.chatId ? { ...c, title: event.title, avatarUrl: event.avatarUrl } : c,
       ),
     }));
+  },
+
+  applyChatBlock(event: ChatBlockEvent) {
+    let changed = false;
+    set((state) => ({
+      chats: state.chats.map((c) => {
+        if (c.id !== event.chatId || (c.iBlocked === event.iBlocked && c.blockedMe === event.blockedMe)) return c;
+        changed = true;
+        return { ...c, iBlocked: event.iBlocked, blockedMe: event.blockedMe };
+      }),
+    }));
+    if (changed) void writeCachedChats(get().chats);
   },
 
   setTyping(event: UserTypingEvent) {

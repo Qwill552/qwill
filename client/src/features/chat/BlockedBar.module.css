@@ -1,0 +1,39 @@
+.bar {
+  flex: 1;
+  min-height: 48px;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.action {
+  flex-shrink: 0;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-meta);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .action:hover {
+    background: var(--primary-soft);
+  }
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

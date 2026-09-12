@@ -81,6 +81,8 @@ function listItem(id: string = CHAT_ID): ChatListItemDto {
     unreadCount: 0,
     muted: false,
     isSupportRequest: false,
+    iBlocked: false,
+    blockedMe: false,
   };
 }
 

@@ -315,6 +315,8 @@ export interface ChatListItemDto {
    *  На звонки не влияет. */
   muted: boolean;
   isSupportRequest: boolean;
+  iBlocked: boolean;
+  blockedMe: boolean;
 }
 
 export interface ChatDto extends ChatListItemDto {

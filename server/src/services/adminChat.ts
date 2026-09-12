@@ -11,7 +11,7 @@ import { forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { assertAdmin, getAdminChatAccessEnabled } from './admin.js';
 import { recordAdminAction, type AdminActor } from './adminLog.js';
-import { toMemberSummary } from './chat.js';
+import { toMemberSummary } from './userSummary.js';
 import { messageInclude, toMessageDto } from './message.js';
 
 interface ReportedChatAccess {

@@ -23,6 +23,7 @@ export const SocketEvent = {
   UserTyping: 'user:typing',
   UserPresence: 'user:presence',
   ChatUpdated: 'chat:updated',
+  ChatBlock: 'chat:block',
   MemberChanged: 'member:changed',
   VisibilityChange: 'visibility:change',
   CallStart: 'call:start',
@@ -79,6 +80,13 @@ export interface ChatPinnedEvent {
 
 export interface ChatDeletedEvent {
   chatId: string;
+}
+
+export interface ChatBlockEvent {
+  chatId: string;
+  userId: string;
+  iBlocked: boolean;
+  blockedMe: boolean;
 }
 
 /** Клиент → сервер: «прочитано всё вплоть до этого сообщения» (секция 3). */
