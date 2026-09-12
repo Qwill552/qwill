@@ -58,7 +58,9 @@ export function CalendarMonth({
             <button
               key={key}
               type="button"
-              className={`${styles.cell} ${selected === key ? styles.cellSelected : ''}`}
+              className={`${styles.cell} ${selected === key ? styles.cellSelected : ''} ${
+                day?.preview ? styles.cellWithPhoto : ''
+              }`}
               disabled={!day}
               aria-label={day ? `${dayTitle(key)}, сообщений: ${day.count}` : dayTitle(key)}
               onClick={day ? () => onPick(day) : undefined}

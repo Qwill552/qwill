@@ -381,24 +381,24 @@ export async function assertFileAccess(fileId: string, userId: string): Promise<
   const isLinkPreviewImage = await prisma.linkPreview.findFirst({ where: { imageFileId: fileId }, select: { url: true } });
   if (isLinkPreviewImage) return;
 
-  const chatAvatarOf = await prisma.chat.findFirst({ where: { avatarFileId: fileId }, select: { id: true } });
-  if (chatAvatarOf) {
-    const member = await prisma.chatMember.findUnique({
-      where: { chatId_userId: { chatId: chatAvatarOf.id, userId } },
-    });
-    if (member) return;
-  }
-
-  const attachment = await prisma.attachment.findFirst({
-    where: { OR: [{ fileId }, { thumbnailFileId: fileId }, { previewFileId: fileId }] },
-    select: { message: { select: { chatId: true } } },
+  const chatAvatarOf = await prisma.chat.findFirst({
+    where: { avatarFileId: fileId, members: { some: { userId } } },
+    select: { id: true },
   });
-  if (attachment) {
-    const member = await prisma.chatMember.findUnique({
-      where: { chatId_userId: { chatId: attachment.message.chatId, userId } },
-    });
-    if (member) return;
-  }
+  if (chatAvatarOf) return;
+
+  // Файлы дедуплицируются по содержимому: один и тот же снимок в двух разных чатах — одна
+  // строка File. Поэтому спрашивать надо «есть ли хоть одно вложение этого файла в чате,
+  // где я состою», а не проверять чат первого попавшегося вложения: иначе участник второго
+  // чата получал 404 на картинку, которую видит (найдено тестом календаря, R-33A).
+  const visible = await prisma.attachment.findFirst({
+    where: {
+      OR: [{ fileId }, { thumbnailFileId: fileId }, { previewFileId: fileId }],
+      message: { chat: { members: { some: { userId } } } },
+    },
+    select: { id: true },
+  });
+  if (visible) return;
 
   throw notFound(ErrorCode.FILE_NOT_FOUND, 'Файл не найден');
 }

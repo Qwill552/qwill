@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
 import { getChatCalendar } from '../src/services/chatCalendar.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
+import { assertFileAccess } from '../src/services/file.js';
 import { listChatAttachments } from '../src/services/chatMedia.js';
 import { sendMessage } from '../src/services/message.js';
 
@@ -257,5 +258,62 @@ describe('двусторонняя страница вложений (R-33A)', (
     expect(top.items.map((item) => item.messageId)).toEqual([ids[4]]);
     expect(top.hasMoreAfter).toBe(false);
     expect(top.hasMoreBefore).toBe(true);
+  });
+});
+
+describe('доступ к дедуплицированному файлу (R-33A)', () => {
+  it('участник второго чата видит файл, впервые отправленный в первом', async () => {
+    const alice = await registerUser('dedup_alice');
+    const bob = await registerUser('dedup_bob');
+    const carol = await registerUser('dedup_carol');
+
+    const firstChat = await createPrivateChat(alice.userId, bob.username);
+    const secondChat = await createPrivateChat(alice.userId, carol.username);
+
+    clientSeq += 1;
+    const sha256 = fakeSha256();
+    const file = await prisma.file.create({
+      data: { sha256, storedName: `cal-${RUN_ID}-${sha256}.bin`, mimeType: 'image/png', size: 10 },
+    });
+    createdFileIds.push(file.id);
+
+    const inFirst = await sendMessage({
+      chatId: firstChat,
+      senderId: alice.userId,
+      clientId: `cal_${RUN_ID}_dedup_1`,
+      attachment: { fileId: file.id, sha256, originalName: 'a' },
+    });
+    expect(inFirst.id).toBeGreaterThan(0);
+
+    await sendMessage({
+      chatId: secondChat,
+      senderId: alice.userId,
+      clientId: `cal_${RUN_ID}_dedup_2`,
+      attachment: { fileId: file.id, sha256, originalName: 'a' },
+    });
+
+    await expect(assertFileAccess(file.id, carol.userId)).resolves.toBeUndefined();
+    await expect(assertFileAccess(file.id, bob.userId)).resolves.toBeUndefined();
+  });
+
+  it('посторонний файл по-прежнему не отдаётся', async () => {
+    const alice = await registerUser('dedup_out_alice');
+    const bob = await registerUser('dedup_out_bob');
+    const eve = await registerUser('dedup_out_eve');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    const sha256 = fakeSha256();
+    const file = await prisma.file.create({
+      data: { sha256, storedName: `cal-${RUN_ID}-${sha256}.bin`, mimeType: 'image/png', size: 10 },
+    });
+    createdFileIds.push(file.id);
+    await sendMessage({
+      chatId,
+      senderId: alice.userId,
+      clientId: `cal_${RUN_ID}_dedup_3`,
+      attachment: { fileId: file.id, sha256, originalName: 'a' },
+    });
+
+    await expect(assertFileAccess(file.id, eve.userId)).rejects.toThrow();
   });
 });

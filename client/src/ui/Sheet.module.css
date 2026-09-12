@@ -38,8 +38,15 @@
   animation: rise var(--dur-close) var(--ease-close) reverse forwards;
 }
 
-/* Во время перетаскивания позицией управляет указатель, анимации нет. */
+/* Во время перетаскивания позицией управляет указатель, анимации нет. Заодно на время
+   движения шит перестаёт размывать подложку и становится непрозрачным — тем же рецептом,
+   каким токены переводят всё оформление в Строгий режим. Причина: backdrop-filter на
+   едущем слое пересчитывается каждый кадр по всей площади экрана, и это ровно тот фриз,
+   который видно пальцем (ux-ui/motion-cost.md; R-33A, замечание пользователя). */
 .dragging {
+  --sheet-bg: var(--surface-2);
+  --sheet-blur: none;
+
   animation: none;
   transition: none;
 }
@@ -50,12 +57,17 @@
   transition: transform var(--dur-menu) var(--ease-screen);
 }
 
+/* Шапка целиком — рукоять перетаскивания: ручка, заголовок и подзаголовок. */
+.header {
+  flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
 .grip {
   display: grid;
-  flex-shrink: 0;
   place-items: center;
   height: 28px;
-  cursor: grab;
 }
 
 .gripBar {
@@ -150,6 +162,11 @@
 
   .dialogClosing {
     animation: dialogOut var(--dur-close) ease-in both;
+  }
+
+  .header {
+    cursor: default;
+    touch-action: auto;
   }
 }
 

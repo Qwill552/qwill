@@ -4,16 +4,21 @@
   gap: var(--space-4);
 }
 
+/* Капсула с днями недели: она держится сверху и обязана читаться на фоне пустых клеток
+   месяца, а не сливаться с ними (R-33A, решение пользователя). */
 .weekdays {
   position: sticky;
   top: 0;
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: var(--space-1) 0;
-  background: var(--sheet-bg);
-  color: var(--text-tertiary);
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-secondary);
   font-size: var(--font-caption);
+  font-weight: 700;
   text-align: center;
 }
 
@@ -45,7 +50,7 @@
 /* Месяц, чьи дни ещё едут: пустая клетка в нём не должна читаться как «в этот день
    не писали» (R-33A). */
 .gridLoading {
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .outside {
@@ -54,9 +59,10 @@
   place-items: center;
   color: var(--text-tertiary);
   font-size: var(--font-meta);
-  opacity: 0.45;
 }
 
+/* День с сообщениями — заметная пилюля, день без них — просто число. Разница держится на
+   цвете и насыщенности, а не на прозрачности: выцветание читается как поломка. */
 .cell {
   position: relative;
   display: grid;
@@ -66,8 +72,9 @@
   padding: 0;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--surface-3);
-  color: var(--text-primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
   cursor: pointer;
   place-items: center;
 }
@@ -75,8 +82,8 @@
 .cell:disabled {
   background: transparent;
   color: var(--text-tertiary);
+  font-weight: 500;
   cursor: default;
-  opacity: 0.55;
 }
 
 .cell:focus-visible {
@@ -95,22 +102,36 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.5;
+}
+
+/* Число поверх снимка: сам снимок остаётся в полную силу, читаемость даёт вуаль из
+   токена поверхности, а не приглушение картинки. */
+.cellWithPhoto::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
+}
+
+.cellWithPhoto .cellNumber,
+.cellWithPhoto .cellCount {
+  z-index: 1;
+  color: var(--text-on-primary);
 }
 
 .cellNumber {
   position: relative;
   font-size: var(--font-meta);
-  font-weight: 600;
 }
 
 .cellCount {
   position: absolute;
   right: 0;
-  bottom: 2px;
+  bottom: 3px;
   left: 0;
-  color: var(--text-secondary);
+  color: var(--primary);
   font-size: 9px;
+  font-weight: 600;
   line-height: 1;
   text-align: center;
 }
@@ -155,7 +176,6 @@
 .arrow:disabled {
   color: var(--text-tertiary);
   cursor: default;
-  opacity: 0.5;
 }
 
 .arrow:focus-visible {

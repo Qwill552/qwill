@@ -299,6 +299,7 @@ export function MessageList({
   const [flashId, setFlashId] = useState<number | null>(null);
   const flashTimer = useRef(0);
   const flashMessageRef = useRef<(messageId: number) => void>(() => undefined);
+  const placedFocus = useRef(0);
 
   if (liveSeen.current !== liveMessage) {
     liveSeen.current = liveMessage;
@@ -522,8 +523,14 @@ export function MessageList({
     setWin(liveWin);
   }
 
+  // Запрошенный прыжок держит окно рендера за собой, пока не поставлен: иначе следующий же
+  // проход (setWin во время рендера — это второй проход) снова прилипал к хвосту, строка
+  // цели не оказывалась в DOM, эффект фокуса выходил ни с чем — и из самого низа ленты
+  // переход к дню не срабатывал вовсе (R-33A, найдено пользователем).
+  const focusIndex = focus ? entryIndexByMessage.get(focus.messageId) : undefined;
+  const focusPending = focus !== null && focus !== undefined && focus.seq !== placedFocus.current && focusIndex !== undefined;
   const stickToTail =
-    !pinnedByFocus && settledFeedKey.current === feedKey && stuckToBottom.current && !hasMoreAfter;
+    !pinnedByFocus && !focusPending && settledFeedKey.current === feedKey && stuckToBottom.current && !hasMoreAfter;
   const view: FeedSlice =
     displayEntries.length === 0
       ? { from: 0, to: -1 }
@@ -659,12 +666,16 @@ export function MessageList({
     if (!focus) return;
     const el = listRef.current;
     if (!el) return;
-    const target = rowNodeFor(el, focus.messageId);
-    if (!target) return;
 
+    // Прыжок отменяет прилипание к низу до всякой проверки: даже если строка ещё не в DOM,
+    // эффект «держать хвост» ниже не должен утягивать ленту обратно.
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     atVeryBottom.current = false;
+
+    const target = rowNodeFor(el, focus.messageId);
+    if (!target) return;
+    placedFocus.current = focus.seq;
     fling.current?.stop();
     const quiet = focus.quiet === true;
     const offset = focus.offset ?? 0;

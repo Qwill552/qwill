@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 
 import { useEscapeKey } from '../app/hotkeys';
-import { useBackHandler } from '../app/useBackHandler';
+import { registerOverlayBackGesture, useBackHandler } from '../app/useBackHandler';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { ScrollIndicator } from './ScrollIndicator';
 import styles from './Sheet.module.css';
@@ -21,6 +21,8 @@ interface SheetProps {
 const CLOSE_RATIO = 0.4;
 /** Скорость броска (px/мс), при которой шит закрывается независимо от пройденного пути. */
 const FLING_VELOCITY = 0.6;
+/** Доля высоты шита, на которую он уезжает за полным прогрессом системного жеста «назад». */
+const SYSTEM_BACK_TRAVEL = 0.35;
 
 type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 
@@ -99,6 +101,28 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
     offsetTo(0);
   }
 
+  // Системный жест «назад» ведёт шит так же, как палец: за прогрессом жеста едет transform,
+  // на `invoke` шит уходит. Ничего не пересчитывается — только смещение (ux-ui/motion-cost.md).
+  useEffect(() => {
+    if (desktop) return;
+    return registerOverlayBackGesture({
+      progress: (ratio) => {
+        const height = sheetRef.current?.offsetHeight ?? 0;
+        setPhase((current) => (current === 'closing' ? current : 'dragging'));
+        offsetTo(height * ratio * SYSTEM_BACK_TRAVEL);
+      },
+      settle: (committed) => {
+        if (committed) {
+          offsetTo(sheetRef.current?.offsetHeight ?? 0);
+          startClose();
+          return;
+        }
+        setPhase('settling');
+        offsetTo(0);
+      },
+    });
+  }, [desktop, startClose]);
+
   const sheetClass = [
     styles.sheet,
     desktop ? styles.dialog : '',
@@ -124,24 +148,28 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
         aria-label={title}
         onTransitionEnd={() => setPhase((current) => (current === 'settling' ? 'open' : current))}
       >
-        {!desktop && (
-          <div
-            className={styles.grip}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          >
-            <span className={styles.gripBar} />
-          </div>
-        )}
-        {(title || action) && (
-          <div className={styles.titleRow}>
-            {title && <h2 className={styles.title}>{title}</h2>}
-            {action}
-          </div>
-        )}
-        {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+        {/* Тянется вся шапка, а не только пилюля: за 28 px ручки попасть пальцем трудно
+            (R-33A, замечание пользователя). */}
+        <div
+          className={styles.header}
+          onPointerDown={desktop ? undefined : handlePointerDown}
+          onPointerMove={desktop ? undefined : handlePointerMove}
+          onPointerUp={desktop ? undefined : handlePointerUp}
+          onPointerCancel={desktop ? undefined : handlePointerUp}
+        >
+          {!desktop && (
+            <div className={styles.grip}>
+              <span className={styles.gripBar} />
+            </div>
+          )}
+          {(title || action) && (
+            <div className={styles.titleRow}>
+              {title && <h2 className={styles.title}>{title}</h2>}
+              {action}
+            </div>
+          )}
+          {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+        </div>
         <div ref={bodyRef} className={`${styles.body} hide-native-scrollbar`}>
           <ScrollIndicator target={bodyRef} />
           {children}

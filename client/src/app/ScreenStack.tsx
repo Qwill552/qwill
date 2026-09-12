@@ -51,7 +51,7 @@ import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
 import { onBackGesture, takeBackGesture } from './backGesture';
-import { hasOpenOverlay } from './useBackHandler';
+import { hasOpenOverlay, topOverlayBackGesture } from './useBackHandler';
 import { useLayoutMode } from './useLayoutMode';
 import { isTabRoot, parentPathOf, tabOf, transitionKind, type TransitionKind } from './routing';
 import { lastPathForTab, rememberTabPath } from './tabNav';
@@ -574,6 +574,7 @@ export function ScreenStack() {
     armFallback(SETTLE_MS);
   }
 
+  const overlayGestureRef = useRef<ReturnType<typeof topOverlayBackGesture>>(null);
   const liveDrag = useRef({ begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag });
   liveDrag.current = { begin: beginDrag, update: updateDrag, end: endDrag, cancel: cancelDrag };
 
@@ -585,6 +586,24 @@ export function ScreenStack() {
 
       if (event.phase === 'start') {
         systemBackRef.current = { taken: false };
+        overlayGestureRef.current = hasOpenOverlay() ? topOverlayBackGesture() : null;
+        return;
+      }
+
+      const overlay = overlayGestureRef.current;
+      if (overlay) {
+        if (event.phase === 'progress') {
+          if (!gesture) return;
+          if (!gesture.taken) {
+            gesture.taken = true;
+            takeBackGesture();
+          }
+          overlay.progress(Math.min(1, Math.max(0, event.progress)));
+          return;
+        }
+        systemBackRef.current = null;
+        overlayGestureRef.current = null;
+        if (gesture?.taken) overlay.settle(event.phase !== 'cancel');
         return;
       }
 

@@ -48,7 +48,12 @@ function labelOf(offsetDays: number): RegExp {
   return new RegExp(`^${text}`);
 }
 
-async function seedChat(mineId: string, username: string, displayName: string): Promise<string> {
+async function seedChat(
+  mineId: string,
+  username: string,
+  displayName: string,
+  days: { offsetDays: number; firstText: string; count?: number }[] = DAYS,
+): Promise<string> {
   const peer = await prisma.user.create({
     data: { username, displayName, passwordHash: 'e2e-not-a-real-hash' },
   });
@@ -60,14 +65,15 @@ async function seedChat(mineId: string, username: string, displayName: string): 
     },
   });
 
-  for (const day of DAYS) {
+  for (const day of days) {
     const base = Date.now() - day.offsetDays * DAY_MS;
+    const count = day.count ?? PER_DAY;
     await prisma.message.createMany({
-      data: Array.from({ length: PER_DAY }, (_, index) => ({
+      data: Array.from({ length: count }, (_, index) => ({
         chatId: chat.id,
         senderId: index % 2 === 0 ? peer.id : mineId,
         content: index === 0 ? day.firstText : `${day.firstText.split(' ')[0]} строка ${index + 1}`,
-        createdAt: new Date(base - (PER_DAY - index) * 60_000),
+        createdAt: new Date(base - (count - index) * 60_000),
       })),
     });
   }
@@ -190,4 +196,61 @@ test('миниатюра дня в календаре действительно
   await expect(image).toBeVisible({ timeout: 15_000 });
   const loaded = await image.evaluate((node) => (node as HTMLImageElement).naturalWidth > 0);
   expect(loaded, 'миниатюра дня должна прийти с токеном, а не получить 401').toBe(true);
+});
+
+const FEED_SCROLLER = `(() => {
+  const row = document.querySelector('.message-wrap');
+  let el = row ? row.parentElement : null;
+  while (el && !(el.scrollHeight > el.clientHeight + 8 && getComputedStyle(el).overflowY === 'auto')) el = el.parentElement;
+  return el;
+})()`;
+
+async function distanceFromBottom(page: Page): Promise<number> {
+  return page.evaluate(`(() => {
+    const el = ${FEED_SCROLLER};
+    return el ? Math.round(el.scrollHeight - el.scrollTop - el.clientHeight) : -1;
+  })()`) as Promise<number>;
+}
+
+test('из самого низа ленты выбор дня тоже переносит — даже если день уже загружен', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const me = uniqueUser('calbottom');
+  const other = uniqueUser('calbottomother');
+  await registerUser(page, me);
+
+  const mine = await prisma.user.findUniqueOrThrow({ where: { username: me.username } });
+  const chatId = await seedChat(mine.id, other.username, other.displayName, [
+    { offsetDays: 11, firstText: 'далёкий день строка 1', count: 120 },
+    { offsetDays: 5, firstText: 'средний день строка 1', count: 120 },
+    { offsetDays: 0, firstText: 'сегодняшний день строка 1', count: 25 },
+  ]);
+
+  await page.goto(`/chats/${chatId}`);
+  await expect(page.locator('.message-wrap').last()).toBeVisible();
+  await page.waitForTimeout(2000);
+
+  for (let step = 0; step < 5; step += 1) {
+    await page.evaluate(`(() => { const el = ${FEED_SCROLLER}; if (el) el.scrollBy({ top: -2500 }); })()`);
+    await page.waitForTimeout(500);
+  }
+  await page.evaluate(`(() => { const el = ${FEED_SCROLLER}; if (el) el.scrollTop = el.scrollHeight; })()`);
+  await page.waitForTimeout(900);
+  expect(await distanceFromBottom(page), 'тест начинается ровно внизу ленты').toBeLessThan(10);
+
+  const around: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/messages/around/')) around.push(request.url());
+  });
+
+  await openCalendarFromFeed(page);
+
+  const target = page.getByRole('dialog', { name: 'Календарь' }).getByRole('button', { name: labelOf(5) });
+  await expect(target).toBeEnabled();
+  await target.click();
+  await expect(page.getByRole('dialog', { name: 'Календарь' })).toBeHidden();
+  await page.waitForTimeout(1500);
+
+  expect(around, 'этот сценарий должен идти без запроса окрестности — день уже загружен').toEqual([]);
+  expect(await distanceFromBottom(page), 'лента должна уехать к началу дня, а не остаться внизу').toBeGreaterThan(200);
 });

@@ -3,6 +3,29 @@ import { useEffect, useRef } from 'react';
 let openOverlays = 0;
 let nextEntryId = 0;
 
+/** Системный жест «назад» при открытом оверлее ведёт сам оверлей: шторка едет за пальцем
+ *  ровно так же, как при перетаскивании вниз, и уезжает на `invoke`. Раньше ScreenStack
+ *  просто отказывался вести жест (`hasOpenOverlay`), и палец у края не делал ничего
+ *  видимого до самого отпускания (R-33A, замечание пользователя). */
+export interface OverlayBackGesture {
+  progress: (ratio: number) => void;
+  settle: (committed: boolean) => void;
+}
+
+const overlayGestures: OverlayBackGesture[] = [];
+
+export function registerOverlayBackGesture(handler: OverlayBackGesture): () => void {
+  overlayGestures.push(handler);
+  return () => {
+    const at = overlayGestures.indexOf(handler);
+    if (at >= 0) overlayGestures.splice(at, 1);
+  };
+}
+
+export function topOverlayBackGesture(): OverlayBackGesture | null {
+  return overlayGestures[overlayGestures.length - 1] ?? null;
+}
+
 /** Пока открыт хотя бы один оверлей, у него уже есть собственный полноэкранный скрим —
  *  зона свайпа «назад» у левого края физически под ним, так что ScreenStack просто
  *  не должен запускать свой жест поверх. */
