@@ -1,5 +1,5 @@
 import type { AdminUserCardDto, ReportGroupDto, ReportGroupView } from '@messenger/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -12,6 +12,7 @@ import {
 import { getUserProfileRequest } from '../../api/users';
 import { Card } from '../../ui/Card';
 import { IconButton } from '../../ui/IconButton';
+import { Menu } from '../../ui/Menu';
 import { Sheet } from '../../ui/Sheet';
 import { Switch } from '../../ui/Switch';
 import { ProfileCardFrame } from '../profile/ProfileCardFrame';
@@ -47,6 +48,9 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
   const [error, setError] = useState<string | null>(null);
   const [workedNow, setWorkedNow] = useState(false);
   const [closedNow, setClosedNow] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<{ reportId: string; anchor: DOMRect } | null>(null);
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const loadCard = useCallback(() => {
     getUserProfileRequest(group.targetUserId)
@@ -61,6 +65,18 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
       .then(setTarget)
       .catch(() => setTarget(null));
   }, [group.kind, group.targetUserId, loadCard]);
+
+  function openReportMenu(reportId: string): void {
+    const node = rowRefs.current.get(reportId);
+    if (!node) return;
+    setMenuFor({ reportId, anchor: node.getBoundingClientRect() });
+  }
+
+  function toggleReportText(reportId: string): void {
+    setExpanded((prev) =>
+      prev.includes(reportId) ? prev.filter((id) => id !== reportId) : [...prev, reportId],
+    );
+  }
 
   function openProfile(userId: string): void {
     onClose();
@@ -205,17 +221,34 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
 
         <Card caption={`Жалобы (${group.reports.length})`}>
           {group.reports.map((report) => (
-            <Card.Row
+            <div
               key={report.id}
-              title={`@${report.reporterUsername}`}
-              subtitle={
-                report.targetMessageId != null
-                  ? `«${report.comment}» · сообщение #${report.targetMessageId}`
-                  : `«${report.comment}»`
-              }
-              value={formatDateTime(report.createdAt)}
-              onClick={() => openProfile(report.reporterId)}
-            />
+              ref={(node) => {
+                if (node) rowRefs.current.set(report.id, node);
+                else rowRefs.current.delete(report.id);
+              }}
+            >
+              <Card.Row
+                title={`@${report.reporterUsername}`}
+                subtitle={
+                  report.targetMessageId != null
+                    ? `«${report.comment}» · сообщение #${report.targetMessageId}`
+                    : `«${report.comment}»`
+                }
+                value={formatDateTime(report.createdAt)}
+                onClick={() => openReportMenu(report.id)}
+                chevron={false}
+              />
+              {expanded.includes(report.id) && (
+                <div className={styles.reportText}>
+                  <p className={styles.reportComment}>{report.comment}</p>
+                  <p className={styles.reportMeta}>
+                    {`@${report.reporterUsername} · ${formatDateTime(report.createdAt)}`}
+                    {report.targetMessageId != null ? ` · сообщение #${report.targetMessageId}` : ''}
+                  </p>
+                </div>
+              )}
+            </div>
           ))}
         </Card>
 
@@ -258,6 +291,30 @@ export function ReportDetail({ group, view, onClose, onChanged }: ReportDetailPr
           </Card>
         )}
       </div>
+
+      {menuFor && (
+        <Menu
+          anchor={menuFor.anchor}
+          onClose={() => setMenuFor(null)}
+          items={[
+            {
+              id: 'profile',
+              label: 'Профиль жалобщика',
+              icon: 'user',
+              onSelect: () => {
+                const report = group.reports.find((item) => item.id === menuFor.reportId);
+                if (report) openProfile(report.reporterId);
+              },
+            },
+            {
+              id: 'text',
+              label: expanded.includes(menuFor.reportId) ? 'Скрыть текст жалобы' : 'Текст жалобы',
+              icon: 'report',
+              onSelect: () => toggleReportText(menuFor.reportId),
+            },
+          ]}
+        />
+      )}
     </Sheet>
   );
 }

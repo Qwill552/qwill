@@ -109,3 +109,61 @@
 .lifted {
   opacity: 0.55;
 }
+
+.banRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 13px 15px;
+}
+
+.banRow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--space-3);
+  height: 1px;
+  background: rgba(var(--pulse-glass), 0.06);
+}
+
+.banRow:first-child::before {
+  content: none;
+}
+
+.banInfo {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgb(var(--pulse-ink));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.banInfo:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.banCidr {
+  overflow: hidden;
+  font-size: var(--font-name);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.banMeta {
+  overflow: hidden;
+  color: rgba(var(--pulse-ink), 0.4);
+  font-size: var(--font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

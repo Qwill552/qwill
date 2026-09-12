@@ -1,16 +1,18 @@
 .overlay {
-  z-index: 500;
+  z-index: 120;
 }
 
-.text {
-  margin: 0 0 var(--space-4);
+.hint {
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--font-meta);
 }
 
-.form {
-  display: flex;
-  flex-direction: column;
+.label {
+  display: block;
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
 }
 
 .input {
@@ -73,7 +75,7 @@
 }
 
 .submitButton {
-  background: var(--primary);
+  background: var(--danger);
   color: var(--text-on-primary);
 }
 

@@ -101,3 +101,25 @@
   cursor: default;
   opacity: 0.6;
 }
+
+.reportText {
+  padding: 0 15px 13px;
+}
+
+.reportComment {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.reportMeta {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}

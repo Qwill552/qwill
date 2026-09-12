@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { revealAdminUserPiiRequest } from '../../api/admin';
 import { Card } from '../../ui/Card';
+import { BlockIpDialog } from './BlockIpDialog';
 import styles from './PiiReveal.module.css';
 
 function formatDateTime(iso: string): string {
@@ -25,6 +26,8 @@ export function PiiReveal({ userId }: PiiRevealProps) {
   const [pii, setPii] = useState<AdminPiiDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blocking, setBlocking] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<string[]>([]);
   const hideTimer = useRef<number | null>(null);
 
   function clearHideTimer(): void {
@@ -37,6 +40,7 @@ export function PiiReveal({ userId }: PiiRevealProps) {
   useEffect(() => {
     setPii(null);
     setError(null);
+    setBlocked([]);
     clearHideTimer();
     return clearHideTimer;
   }, [userId]);
@@ -54,6 +58,16 @@ export function PiiReveal({ userId }: PiiRevealProps) {
       .finally(() => setBusy(false));
   }
 
+  function blockButton(address: string | null) {
+    if (!address) return undefined;
+    if (blocked.includes(address)) return <span className={styles.blockedMark}>Заблокирован</span>;
+    return (
+      <button type="button" className={styles.blockButton} onClick={() => setBlocking(address)}>
+        Блок
+      </button>
+    );
+  }
+
   return (
     <Card caption="IP и устройства">
       {!pii ? (
@@ -68,23 +82,39 @@ export function PiiReveal({ userId }: PiiRevealProps) {
         />
       ) : (
         <>
-          <Card.Row title="IP при регистрации" value={pii.signupIp ?? 'нет данных'} />
+          <Card.Row
+            title="IP при регистрации"
+            value={pii.signupIp ? undefined : 'нет данных'}
+            subtitle={pii.signupIp ?? undefined}
+            trailing={blockButton(pii.signupIp)}
+          />
           <Card.Row title="Устройство при регистрации" value={pii.signupUserAgent ?? 'нет данных'} />
           {pii.sessions.length === 0 ? (
             <Card.Row title="Сессии" subtitle="Активных сессий нет" />
           ) : (
-            pii.sessions.map((session) => (
-              <Card.Row
-                key={session.id}
-                title={session.lastSeenIp ?? session.ip ?? 'нет данных'}
-                subtitle={session.userAgent ?? 'нет данных'}
-                value={formatDateTime(session.createdAt)}
-              />
-            ))
+            pii.sessions.map((session) => {
+              const address = session.lastSeenIp ?? session.ip;
+              return (
+                <Card.Row
+                  key={session.id}
+                  title={address ?? 'нет данных'}
+                  subtitle={`${formatDateTime(session.createdAt)} · ${session.userAgent ?? 'устройство неизвестно'}`}
+                  trailing={blockButton(address)}
+                />
+              );
+            })
           )}
         </>
       )}
       {error && <Card.Row title="Ошибка" subtitle={error} danger />}
+
+      {blocking && (
+        <BlockIpDialog
+          address={blocking}
+          onClose={() => setBlocking(null)}
+          onBlocked={() => setBlocked((prev) => [...prev, blocking])}
+        />
+      )}
     </Card>
   );
 }

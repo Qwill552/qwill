@@ -59,7 +59,7 @@ export function ReauthDialog({ onDone }: ReauthDialogProps) {
 
   return (
     <div ref={trapRef} onKeyDown={handleKeyDown}>
-      <Modal title="Подтвердите пароль" onClose={() => onDone(false)} opaque>
+      <Modal title="Подтвердите пароль" onClose={() => onDone(false)} className={styles.overlay} opaque>
         <p className={styles.text}>
           Это действие открывает личные данные или меняет доступ. Введите пароль администратора — он
           не потребуется следующие 15 минут.

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { banUserRequest, createIpBanRequest, revealAdminUserPiiRequest } from '../../api/admin';
 import { Modal } from '../groups/Modal';
-import { durationLabel } from './IpBansScreen';
+import { durationLabel } from './ipBanFormat';
 import styles from './BanUserDialog.module.css';
 
 interface BanUserDialogProps {

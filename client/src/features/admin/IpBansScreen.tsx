@@ -18,31 +18,41 @@ import { GlassButton } from '../../ui/chrome/GlassButton';
 import { GlassPill } from '../../ui/chrome/GlassPill';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { Switch } from '../../ui/Switch';
+import { DetailModal, type DetailField } from './DetailModal';
+import {
+  banAuthorText,
+  banLifterText,
+  banStateText,
+  banUntilText,
+  durationLabel,
+  formatDateTime,
+} from './ipBanFormat';
 import styles from './IpBansScreen.module.css';
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Не удалось выполнить запрос';
 }
 
-export function durationLabel(days: IpBanDurationDays): string {
-  if (days === null) return 'Навсегда';
-  if (days === 1) return '1 день';
-  if (days === 90) return '90 дней';
-  return `${days} дней`;
+function banSummary(ban: IpBanDto): string {
+  if (ban.liftedAt) return `Снята ${formatDateTime(ban.liftedAt)} · ${banLifterText(ban)} · ${ban.reason}`;
+  return `${banUntilText(ban)} · ${banAuthorText(ban)} · ${ban.reason}`;
 }
 
-function banSubtitle(ban: IpBanDto): string {
-  const author = ban.createdByUsername ? `@${ban.createdByUsername}` : 'неизвестно кем';
-  const until = ban.expiresAt ? `до ${formatDate(ban.expiresAt)}` : 'бессрочно';
+function banFields(ban: IpBanDto): DetailField[] {
+  const fields: DetailField[] = [
+    { label: 'Диапазон', value: ban.cidr },
+    { label: 'Состояние', value: banStateText(ban) },
+    { label: 'Заблокирован', value: formatDateTime(ban.createdAt) },
+    { label: 'Кем', value: banAuthorText(ban) },
+    { label: 'До', value: ban.expiresAt ? formatDateTime(ban.expiresAt) : 'бессрочно' },
+  ];
   if (ban.liftedAt) {
-    const liftedBy = ban.liftedByUsername ? `@${ban.liftedByUsername}` : 'из консоли';
-    return `Снята ${formatDate(ban.liftedAt)} · ${liftedBy} · ${ban.reason}`;
+    fields.push({ label: 'Снята', value: formatDateTime(ban.liftedAt) });
+    fields.push({ label: 'Снял', value: banLifterText(ban) });
   }
-  return `${until} · ${author} · ${ban.reason}`;
+  fields.push({ label: 'Причина', value: ban.reason, block: true });
+  fields.push({ label: 'Запись', value: ban.id, block: true });
+  return fields;
 }
 
 export function IpBansScreen() {
@@ -53,6 +63,7 @@ export function IpBansScreen() {
   const [bans, setBans] = useState<IpBanDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<IpBanDto | null>(null);
 
   const [address, setAddress] = useState('');
   const [subnet, setSubnet] = useState(false);
@@ -93,7 +104,10 @@ export function IpBansScreen() {
     setBusy(true);
     setError(null);
     liftIpBanRequest(id)
-      .then(() => load())
+      .then((lifted) => {
+        setDetail((current) => (current && current.id === lifted.id ? lifted : current));
+        load();
+      })
       .catch((err: unknown) => setError(errorText(err)))
       .finally(() => setBusy(false));
   }
@@ -184,24 +198,27 @@ export function IpBansScreen() {
             <Card.Row title="Пусто" subtitle="Ни один адрес не блокировался" />
           ) : (
             bans.map((ban) => (
-              <Card.Row
-                key={ban.id}
-                className={ban.active ? undefined : styles.lifted}
-                title={ban.cidr}
-                subtitle={banSubtitle(ban)}
-                trailing={
-                  ban.active ? (
-                    <button
-                      type="button"
-                      className={styles.lift}
-                      onClick={() => handleLift(ban.id)}
-                      disabled={busy}
-                    >
-                      Снять
-                    </button>
-                  ) : undefined
-                }
-              />
+              <div key={ban.id} className={`${styles.banRow} ${ban.active ? '' : styles.lifted}`}>
+                <button
+                  type="button"
+                  className={styles.banInfo}
+                  onClick={() => setDetail(ban)}
+                  aria-label={`Подробности блокировки ${ban.cidr}`}
+                >
+                  <span className={styles.banCidr}>{ban.cidr}</span>
+                  <span className={styles.banMeta}>{banSummary(ban)}</span>
+                </button>
+                {ban.active && (
+                  <button
+                    type="button"
+                    className={styles.lift}
+                    onClick={() => handleLift(ban.id)}
+                    disabled={busy}
+                  >
+                    Снять
+                  </button>
+                )}
+              </div>
             ))
           )}
         </Card>
@@ -212,6 +229,26 @@ export function IpBansScreen() {
           </Card>
         )}
       </div>
+
+      {detail && (
+        <DetailModal
+          title={detail.cidr}
+          fields={banFields(detail)}
+          footer={
+            detail.active ? (
+              <button
+                type="button"
+                className={styles.lift}
+                onClick={() => handleLift(detail.id)}
+                disabled={busy}
+              >
+                Снять блокировку
+              </button>
+            ) : undefined
+          }
+          onClose={() => setDetail(null)}
+        />
+      )}
 
       {!isDesktop && (
         <ChromeBar>

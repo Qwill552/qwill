@@ -6,6 +6,7 @@ import { listAdminLogRequest } from '../api/admin';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { DetailModal, type DetailField } from '../features/admin/DetailModal';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
@@ -26,6 +27,31 @@ function entrySubtitle(entry: AdminLogEntryDto): string {
   return `${entry.action} · ${target} · ${entry.ip}`;
 }
 
+function prettyDetail(detail: string): string {
+  try {
+    return JSON.stringify(JSON.parse(detail), null, 2);
+  } catch {
+    return detail;
+  }
+}
+
+function entryFields(entry: AdminLogEntryDto): DetailField[] {
+  const fields: DetailField[] = [
+    { label: 'Когда', value: formatDateTime(entry.createdAt) },
+    { label: 'Действие', value: entry.action },
+    { label: 'Администратор', value: entry.adminUsername ? `@${entry.adminUsername}` : entry.adminId },
+    { label: 'Адрес', value: entry.ip },
+  ];
+  if (entry.targetUsername || entry.targetUserId) {
+    fields.push({ label: 'Пользователь', value: entry.targetUsername ? `@${entry.targetUsername}` : entry.targetUserId });
+  }
+  if (entry.targetChatId) fields.push({ label: 'Чат', value: entry.targetChatId });
+  if (entry.detail) fields.push({ label: 'Подробности', value: prettyDetail(entry.detail), block: true });
+  if (entry.userAgent) fields.push({ label: 'Устройство', value: entry.userAgent, block: true });
+  fields.push({ label: 'Запись', value: entry.id, block: true });
+  return fields;
+}
+
 /** Журнал администрирования: только чтение, без единого пишущего маршрута (R-32B).
  *  Курсорная пагинация — как в остальном API. */
 export function AdminLogScreen() {
@@ -42,6 +68,7 @@ export function AdminLogScreen() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminLogEntryDto | null>(null);
 
   function query(cursorValue?: string) {
     return {
@@ -145,6 +172,8 @@ export function AdminLogScreen() {
                 title={entry.adminUsername ? `@${entry.adminUsername}` : entry.adminId}
                 subtitle={entrySubtitle(entry)}
                 value={formatDateTime(entry.createdAt)}
+                onClick={() => setDetail(entry)}
+                chevron={false}
               />
             ))
           )}
@@ -162,6 +191,14 @@ export function AdminLogScreen() {
           </button>
         )}
       </div>
+
+      {detail && (
+        <DetailModal
+          title={detail.action}
+          fields={entryFields(detail)}
+          onClose={() => setDetail(null)}
+        />
+      )}
 
       {!isDesktop && (
         <ChromeBar>
