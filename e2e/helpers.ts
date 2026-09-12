@@ -33,12 +33,12 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
     await page.getByPlaceholder('Ваше имя').fill(user.displayName);
     await page.getByPlaceholder('Пароль').fill(user.password);
 
-    const answer = page.waitForResponse((response) => response.url().includes('/api/auth/register'), {
-      timeout: 20_000,
-    });
+    const answer = page
+      .waitForResponse((response) => response.url().includes('/api/auth/register'), { timeout: 20_000 })
+      .catch(() => null);
     await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
     const response = await answer;
-    if (response.status() !== 429) break;
+    if (response === null || response.status() !== 429) break;
 
     const reset = Number(response.headers()['ratelimit-reset'] ?? '60');
     const waitSeconds = Number.isFinite(reset) ? reset : 60;

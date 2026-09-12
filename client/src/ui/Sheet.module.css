@@ -18,6 +18,7 @@
   left: 0;
   z-index: 261;
   display: flex;
+  overflow: hidden;
   /* --header-h в проекте не объявлен нигде: var() без запасного значения делал всё
      объявление недействительным, шит оставался без max-height вовсе и на длинном
      содержимом уезжал верхом за экран, не прокручиваясь внутри себя (R-33A). */
@@ -26,39 +27,49 @@
   padding-bottom: var(--safe-bottom);
   border-top: 1px solid var(--sheet-border);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
-  background: var(--sheet-bg);
-  backdrop-filter: var(--sheet-blur);
   box-shadow: var(--sheet-shadow);
-  animation: rise var(--dur-menu) var(--ease-screen);
   /* Вертикальные жесты обрабатывает сам шит — браузеру их отдавать нельзя. */
   touch-action: none;
+}
+
+/* Поверхность вынесена отдельным слоем: при перетаскивании она стоит на месте экрана,
+   а едет только рамка со содержимым. Обрезка достаётся даром от overflow выше. */
+.surface {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+}
+
+.entering {
+  animation: rise var(--dur-menu) var(--ease-screen);
 }
 
 .sheetClosing {
   animation: rise var(--dur-close) var(--ease-close) reverse forwards;
 }
 
-/* Во время перетаскивания позицией управляет указатель, анимации нет. Заодно на время
-   движения шит перестаёт размывать подложку и становится непрозрачным — тем же рецептом,
-   каким токены переводят всё оформление в Строгий режим. Причина: backdrop-filter на
-   едущем слое пересчитывается каждый кадр по всей площади экрана, и это ровно тот фриз,
-   который видно пальцем (ux-ui/motion-cost.md; R-33A, замечание пользователя). */
+/* Во время перетаскивания позицией управляет указатель, анимации нет. */
 .dragging {
-  --sheet-bg: var(--surface-2);
-  --sheet-blur: none;
-
   animation: none;
   transition: none;
 }
 
-/* Отпустили, но не закрыли — доезд обратно. */
+/* Отпустили, но не закрыли — доезд обратно. Подложка возвращается тем же движением. */
 .settling {
   animation: none;
   transition: transform var(--dur-menu) var(--ease-screen);
 }
 
+.settling .surface {
+  transition: transform var(--dur-menu) var(--ease-screen);
+}
+
 /* Шапка целиком — рукоять перетаскивания: ручка, заголовок и подзаголовок. */
 .header {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   cursor: grab;
   touch-action: none;
@@ -115,6 +126,8 @@
 }
 
 .body {
+  position: relative;
+  z-index: 1;
   overflow-y: auto;
   padding: 0 var(--space-4) var(--space-4);
   overscroll-behavior: contain;
@@ -156,8 +169,11 @@
     border: 1px solid var(--sheet-border);
     border-radius: var(--radius-card);
     transform: translate(-50%, -50%);
-    animation: dialogIn var(--dur-menu) var(--ease-spring) both;
     touch-action: auto;
+  }
+
+  .dialog.entering {
+    animation: dialogIn var(--dur-menu) var(--ease-spring) both;
   }
 
   .dialogClosing {

@@ -18,11 +18,17 @@ interface CalendarMonthProps {
 }
 
 /** Файл раздаётся только с токеном, поэтому прямой src в <img> получает 401 — миниатюра
- *  идёт тем же путём, что и вся медиа клиента: кэш, объектный URL. */
+ *  идёт тем же путём, что и вся медиа клиента: кэш, объектный URL. Вуаль под число рисуется
+ *  вместе со снимком и только с ним: без неё белое число легло бы на светлую пилюлю. */
 function DayPreview({ file, chatId }: { file: FileDto; chatId: string }) {
   const src = useFileSrc(file.id, { tier: 'thumb', chatId, kind: 'photo' });
   if (!src) return null;
-  return <img className={styles.cellPreview} src={src} alt="" loading="lazy" />;
+  return (
+    <>
+      <img className={styles.cellPreview} src={src} alt="" loading="lazy" />
+      <span className={styles.cellVeil} aria-hidden="true" />
+    </>
+  );
 }
 
 export function CalendarMonth({
@@ -58,9 +64,7 @@ export function CalendarMonth({
             <button
               key={key}
               type="button"
-              className={`${styles.cell} ${selected === key ? styles.cellSelected : ''} ${
-                day?.preview ? styles.cellWithPhoto : ''
-              }`}
+              className={`${styles.cell} ${selected === key ? styles.cellSelected : ''}`}
               disabled={!day}
               aria-label={day ? `${dayTitle(key)}, сообщений: ${day.count}` : dayTitle(key)}
               onClick={day ? () => onPick(day) : undefined}

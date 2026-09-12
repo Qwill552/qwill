@@ -53,7 +53,12 @@ async function postText(chatId: string, senderId: string, at?: string): Promise<
   return message.id;
 }
 
-async function postPhoto(chatId: string, senderId: string, at?: string): Promise<number> {
+async function postPhoto(
+  chatId: string,
+  senderId: string,
+  at?: string,
+  albumId?: string,
+): Promise<{ messageId: number; fileId: string }> {
   clientSeq += 1;
   const sha256 = fakeSha256();
   const file = await prisma.file.create({
@@ -65,9 +70,10 @@ async function postPhoto(chatId: string, senderId: string, at?: string): Promise
     senderId,
     clientId: `cal_${RUN_ID}_${clientSeq}`,
     attachment: { fileId: file.id, sha256, originalName: 'a' },
+    albumId,
   });
   if (at) await prisma.message.update({ where: { id: message.id }, data: { createdAt: new Date(at) } });
-  return message.id;
+  return { messageId: message.id, fileId: file.id };
 }
 
 const WIDE = { from: '2024-01-01', to: '2025-12-31' } as const;
@@ -157,7 +163,7 @@ describe('chatCalendar.service (R-33A)', () => {
     const chatId = await createPrivateChat(alice.userId, bob.username);
 
     await postText(chatId, alice.userId, '2025-08-10T10:00:00.000Z');
-    const firstPhoto = await postPhoto(chatId, alice.userId, '2025-08-10T11:00:00.000Z');
+    const firstPhoto = (await postPhoto(chatId, alice.userId, '2025-08-10T11:00:00.000Z')).messageId;
     await postPhoto(chatId, alice.userId, '2025-08-10T12:00:00.000Z');
 
     const all = await getChatCalendar(chatId, alice.userId, { ...WIDE, tz: 'Europe/Moscow', filter: 'all' });
@@ -220,7 +226,7 @@ describe('двусторонняя страница вложений (R-33A)', (
     const chatId = await createPrivateChat(alice.userId, bob.username);
 
     const ids: number[] = [];
-    for (let i = 0; i < 5; i += 1) ids.push(await postPhoto(chatId, alice.userId));
+    for (let i = 0; i < 5; i += 1) ids.push((await postPhoto(chatId, alice.userId)).messageId);
 
     const newest = await listChatAttachments(chatId, alice.userId, { category: 'media', limit: 2 });
     expect(newest.items.map((item) => item.messageId)).toEqual([ids[4], ids[3]]);
@@ -315,5 +321,29 @@ describe('доступ к дедуплицированному файлу (R-33A
     });
 
     await expect(assertFileAccess(file.id, eve.userId)).rejects.toThrow();
+  });
+});
+
+describe('обложка дня (R-33A)', () => {
+  it('у альбома обложкой служит его первый снимок, а не последний', async () => {
+    const alice = await registerUser('album_alice');
+    const bob = await registerUser('album_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    await postPhoto(chatId, alice.userId, '2025-10-05T09:00:00.000Z');
+    const albumId = `alb_${RUN_ID}`;
+    const cover = await postPhoto(chatId, alice.userId, '2025-10-05T10:00:00.000Z', albumId);
+    await postPhoto(chatId, alice.userId, '2025-10-05T10:00:01.000Z', albumId);
+    await postPhoto(chatId, alice.userId, '2025-10-05T10:00:02.000Z', albumId);
+
+    const calendar = await getChatCalendar(chatId, alice.userId, {
+      from: '2025-10-01',
+      to: '2025-10-31',
+      tz: 'Europe/Moscow',
+      filter: 'all',
+    });
+
+    expect(calendar.days).toHaveLength(1);
+    expect(calendar.days[0]?.preview?.id).toBe(cover.fileId);
   });
 });

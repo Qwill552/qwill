@@ -254,3 +254,41 @@ test('из самого низа ленты выбор дня тоже пере�
   expect(around, 'этот сценарий должен идти без запроса окрестности — день уже загружен').toEqual([]);
   expect(await distanceFromBottom(page), 'лента должна уехать к началу дня, а не остаться внизу').toBeGreaterThan(200);
 });
+
+test('шторка, отпущенная на полпути, возвращается и остаётся на месте', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const me = uniqueUser('calsettle');
+  const other = uniqueUser('calsettleother');
+  await registerUser(page, me);
+
+  const mine = await prisma.user.findUniqueOrThrow({ where: { username: me.username } });
+  const chatId = await seedChat(mine.id, other.username, other.displayName);
+
+  await page.goto(`/chats/${chatId}`);
+  await expect(page.locator('.message-wrap').last()).toBeVisible();
+  await page.waitForTimeout(1500);
+
+  await openCalendarFromFeed(page);
+  const sheet = page.getByRole('dialog', { name: 'Календарь' });
+  const resting = (await sheet.boundingBox())!;
+
+  const grabX = resting.x + resting.width / 2;
+  const grabY = resting.y + 14;
+  await page.mouse.move(grabX, grabY);
+  await page.mouse.down();
+  await page.mouse.move(grabX, grabY + 120, { steps: 12 });
+  await page.mouse.up();
+
+  await page.waitForTimeout(500);
+  const samples: number[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const box = await sheet.boundingBox();
+    samples.push(box ? box.y : -1);
+    await page.waitForTimeout(60);
+  }
+
+  for (const y of samples) {
+    expect(Math.abs(y - resting.y), `шторка не должна проигрывать въезд заново: ${samples.join(', ')}`).toBeLessThan(8);
+  }
+});

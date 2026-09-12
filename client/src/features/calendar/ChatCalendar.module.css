@@ -105,16 +105,16 @@
 }
 
 /* Число поверх снимка: сам снимок остаётся в полную силу, читаемость даёт вуаль из
-   токена поверхности, а не приглушение картинки. */
-.cellWithPhoto::after {
-  content: '';
+   токена поверхности, а не приглушение картинки. Вуаль живёт в разметке рядом со снимком,
+   поэтому не появляется, когда снимок не приехал, — иначе клетка выглядела бы чёрной. */
+.cellVeil {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--scrim-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--scrim-tint) 40%, transparent);
 }
 
-.cellWithPhoto .cellNumber,
-.cellWithPhoto .cellCount {
+.cellVeil ~ .cellNumber,
+.cellVeil ~ .cellCount {
   z-index: 1;
   color: var(--text-on-primary);
 }

@@ -75,11 +75,16 @@ export async function getChatCalendar(
           GROUP BY 1
           ORDER BY 1`;
 
+  // Обложкой дня берётся последний присланный снимок, но у альбома — его **первый** элемент:
+  // альбом человек воспринимает как одну картинку, и это его обложка (решение пользователя).
+  // Отсюда сортировка по «ключу группы» (последнее сообщение альбома) вниз, а внутри
+  // группы — по номеру сообщения вверх.
   const previewsQuery = prisma.$queryRaw<PreviewRow[]>`
     SELECT DISTINCT ON (date) date, "previewFileId", "thumbnailFileId", "imageFileId"
     FROM (
       SELECT to_char(${day}, 'YYYY-MM-DD') AS date,
              a."messageId" AS "messageId",
+             max(a."messageId") OVER (PARTITION BY coalesce(m."albumId", a."messageId"::text)) AS "groupKey",
              a."previewFileId" AS "previewFileId",
              a."thumbnailFileId" AS "thumbnailFileId",
              CASE
@@ -91,7 +96,7 @@ export async function getChatCalendar(
       JOIN "File" f ON f.id = a."fileId"
       WHERE ${scope} AND ${mediaCondition()} AND ${range}
     ) picked
-    ORDER BY date, "messageId" DESC`;
+    ORDER BY date, "groupKey" DESC, "messageId" ASC`;
 
   const boundQuery = (direction: Prisma.Sql) => prisma.$queryRaw<BoundRow[]>`
     SELECT to_char(${day}, 'YYYY-MM-DD') AS date

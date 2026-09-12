@@ -31,13 +31,21 @@ type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 export function Sheet({ title, subtitle, onClose, action, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
+  // Въезд снизу играется один раз. Раньше `rise` висел на самом шите, а `.dragging`/`.settling`
+  // гасили анимацию целиком — и как только шит возвращался в состояние покоя, анимация
+  // запускалась заново: доехав обратно, он снова прыгал снизу (R-33A, найдено пользователем).
+  const [entering, setEntering] = useState(true);
   const desktop = useLayoutMode() === 'desktop';
 
   // Жест живёт в ref, а не в состоянии: перерисовывать на каждое движение пальца незачем.
   const gesture = useRef({ active: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
 
   const startClose = useCallback(() => {
+    // На уходе подложка снова едет вместе со шитом — иначе размытая полоса осталась бы
+    // висеть на экране, пока шит уже уехал.
+    if (surfaceRef.current) surfaceRef.current.style.transform = '';
     setPhase((current) => (current === 'closing' ? current : 'closing'));
   }, []);
 
@@ -46,14 +54,26 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
 
 
   useEffect(() => {
+    const ms = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-menu')) || 0;
+    const timer = window.setTimeout(() => setEntering(false), ms + 50);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (phase !== 'closing') return;
     const ms = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-close')) || 0;
     const timer = window.setTimeout(onClose, ms);
     return () => window.clearTimeout(timer);
   }, [phase, onClose]);
 
+  /** Шит едет, размытая подложка — нет: она сдвигается ровно на столько же в обратную
+   *  сторону и остаётся на месте экрана, обрезанная рамкой шита. Так область, которую
+   *  размывает backdrop-filter, от кадра к кадру не меняется — пересчитывать нечего, и
+   *  фон чата не «уезжает» вместе со шторкой (ux-ui/motion-cost.md; решение пользователя). */
   function offsetTo(px: number): void {
-    if (sheetRef.current) sheetRef.current.style.transform = px > 0 ? `translateY(${px}px)` : '';
+    const shift = px > 0 ? `translateY(${px}px)` : '';
+    if (sheetRef.current) sheetRef.current.style.transform = shift;
+    if (surfaceRef.current) surfaceRef.current.style.transform = px > 0 ? `translateY(${-px}px)` : '';
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
@@ -132,6 +152,7 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
 
   const sheetClass = [
     styles.sheet,
+    entering ? styles.entering : '',
     desktop ? styles.dialog : '',
     phase === 'dragging' ? styles.dragging : '',
     phase === 'settling' ? styles.settling : '',
@@ -155,6 +176,7 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
         aria-label={title}
         onTransitionEnd={() => setPhase((current) => (current === 'settling' ? 'open' : current))}
       >
+        <div ref={surfaceRef} className={styles.surface} aria-hidden="true" />
         {/* Тянется вся шапка, а не только пилюля: за 28 px ручки попасть пальцем трудно
             (R-33A, замечание пользователя). */}
         <div
