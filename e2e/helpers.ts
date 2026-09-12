@@ -22,13 +22,35 @@ export function uniqueUser(label: string): TestUser {
   };
 }
 
+/** Регистрация ограничена десятью попытками в минуту на адрес (`authLimiter`), и в dev эта
+ *  защита включена — а прогон нескольких спек подряд её выбирает. Раньше это выглядело как
+ *  зависший `waitForURL` и читалось как поломка самой ленты: отсюда явная проверка ответа. */
 export async function registerUser(page: Page, user: TestUser): Promise<void> {
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Создать аккаунт' }).click();
-  await page.getByPlaceholder('Имя пользователя (@username)').fill(user.username);
-  await page.getByPlaceholder('Ваше имя').fill(user.displayName);
-  await page.getByPlaceholder('Пароль').fill(user.password);
-  await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+  for (let attempt = 0; ; attempt += 1) {
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+    await page.getByPlaceholder('Имя пользователя (@username)').fill(user.username);
+    await page.getByPlaceholder('Ваше имя').fill(user.displayName);
+    await page.getByPlaceholder('Пароль').fill(user.password);
+
+    const answer = page.waitForResponse((response) => response.url().includes('/api/auth/register'), {
+      timeout: 20_000,
+    });
+    await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+    const response = await answer;
+    if (response.status() !== 429) break;
+
+    const reset = Number(response.headers()['ratelimit-reset'] ?? '60');
+    const waitSeconds = Number.isFinite(reset) ? reset : 60;
+    if (attempt >= 1 || waitSeconds > 20) {
+      throw new Error(
+        `Регистрация отбита лимитом 10/мин на адрес (authLimiter, включён вне NODE_ENV=test). ` +
+          `Это ограничение приложения, а не поломка теста: гоняйте спеки по одной или подождите ${waitSeconds} с.`,
+      );
+    }
+    await page.waitForTimeout((waitSeconds + 1) * 1000);
+  }
+
   await page.waitForURL('**/chats');
   await expect(page.getByText('Qwill')).toBeVisible();
 }
