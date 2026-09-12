@@ -105,15 +105,22 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
   // на `invoke` шит уходит. Ничего не пересчитывается — только смещение (ux-ui/motion-cost.md).
   useEffect(() => {
     if (desktop) return;
+    // Высота меряется один раз на входе в жест: читать offsetHeight каждый кадр — это и есть
+    // пересчёт раскладки в середине движения (ux-ui/motion-cost.md).
+    let height = 0;
     return registerOverlayBackGesture({
       progress: (ratio) => {
-        const height = sheetRef.current?.offsetHeight ?? 0;
-        setPhase((current) => (current === 'closing' ? current : 'dragging'));
+        if (height === 0) {
+          height = sheetRef.current?.offsetHeight ?? 0;
+          setPhase((current) => (current === 'closing' ? current : 'dragging'));
+        }
         offsetTo(height * ratio * SYSTEM_BACK_TRAVEL);
       },
       settle: (committed) => {
+        const travelled = height;
+        height = 0;
         if (committed) {
-          offsetTo(sheetRef.current?.offsetHeight ?? 0);
+          offsetTo(travelled);
           startClose();
           return;
         }
