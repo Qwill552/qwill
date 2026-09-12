@@ -36,7 +36,7 @@ async function postText(chatId: string, senderId: string, content: string): Prom
   return message.id;
 }
 
-describe('message.searchMessagesInChat (R-33)', () => {
+describe('message.searchMessagesInChat (R-33, R-33B)', () => {
   afterAll(async () => {
     await prisma.chat.deleteMany({ where: { id: { in: createdChatIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
@@ -103,13 +103,101 @@ describe('message.searchMessagesInChat (R-33)', () => {
     expect(result.messages[0]?.content).toBe('найди меня тест 2');
   });
 
-  it('пустой запрос отдаёт пустой результат', async () => {
+  it('пустой запрос отдаёт всю историю чата и верный total (R-33B)', async () => {
     const alice = await registerUser('empty_alice');
     const bob = await registerUser('empty_bob');
     const chatId = await createPrivateChat(alice.userId, bob.username);
-    await postText(chatId, alice.userId, 'что угодно');
+    const first = await postText(chatId, alice.userId, 'что угодно');
+    const second = await postText(chatId, bob.userId, 'и ещё одно');
 
     const result = await searchMessagesInChat(chatId, alice.userId, '   ', {}, 50);
+    expect(result.total).toBe(2);
+    expect(result.messages.map((m) => m.id)).toEqual([second, first]);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('совпадение по началу слова: «прив» находит «привет», «ивет» — нет', async () => {
+    const alice = await registerUser('pref_alice');
+    const bob = await registerUser('pref_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await postText(chatId, alice.userId, 'привет, как дела');
+
+    const hit = await searchMessagesInChat(chatId, alice.userId, 'прив', {}, 50);
+    expect(hit.total).toBe(1);
+
+    const miss = await searchMessagesInChat(chatId, alice.userId, 'ивет', {}, 50);
+    expect(miss.total).toBe(0);
+    expect(miss.messages).toHaveLength(0);
+  });
+
+  it('совпадение считается с начала любого слова', async () => {
+    const alice = await registerUser('word_alice');
+    const bob = await registerUser('word_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await postText(chatId, alice.userId, 'сегодня звонил Иван Петров');
+
+    expect((await searchMessagesInChat(chatId, alice.userId, 'петров', {}, 50)).total).toBe(1);
+    expect((await searchMessagesInChat(chatId, alice.userId, 'етров', {}, 50)).total).toBe(0);
+  });
+
+  it('несколько слов — И по началам всех слов', async () => {
+    const alice = await registerUser('both_alice');
+    const bob = await registerUser('both_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    const both = await postText(chatId, alice.userId, 'привет, увидимся во вторник');
+    await postText(chatId, alice.userId, 'привет ещё раз');
+
+    const result = await searchMessagesInChat(chatId, alice.userId, 'прив вторн', {}, 50);
+    expect(result.total).toBe(1);
+    expect(result.messages.map((m) => m.id)).toEqual([both]);
+  });
+
+  it('регистр и ё/е не мешают', async () => {
+    const alice = await registerUser('yo_alice');
+    const bob = await registerUser('yo_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await postText(chatId, alice.userId, 'Ёлка стоит в углу');
+    await postText(chatId, alice.userId, 'ежевика поспела');
+
+    expect((await searchMessagesInChat(chatId, alice.userId, 'елка', {}, 50)).total).toBe(1);
+    expect((await searchMessagesInChat(chatId, alice.userId, 'ЁЛКА', {}, 50)).total).toBe(1);
+  });
+
+  it('fromUserId сужает и выдачу, и total', async () => {
+    const alice = await registerUser('from_alice');
+    const bob = await registerUser('from_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    const mine = await postText(chatId, alice.userId, 'общее слово от алисы');
+    await postText(chatId, bob.userId, 'общее слово от боба');
+
+    const all = await searchMessagesInChat(chatId, alice.userId, 'общее', {}, 50);
+    expect(all.total).toBe(2);
+
+    const onlyAlice = await searchMessagesInChat(chatId, alice.userId, 'общее', {}, 50, alice.userId);
+    expect(onlyAlice.total).toBe(1);
+    expect(onlyAlice.messages.map((m) => m.id)).toEqual([mine]);
+
+    const emptyQueryFrom = await searchMessagesInChat(chatId, alice.userId, '', {}, 50, bob.userId);
+    expect(emptyQueryFrom.total).toBe(1);
+  });
+
+  it('подпись к фото находится наравне с обычным текстом', async () => {
+    const alice = await registerUser('cap_alice');
+    const bob = await registerUser('cap_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    const caption = await postText(chatId, alice.userId, 'подпись к снимку: закат');
+
+    const result = await searchMessagesInChat(chatId, alice.userId, 'закат', {}, 50);
+    expect(result.messages.map((m) => m.id)).toEqual([caption]);
+  });
+
+  it('запрос из одних знаков препинания ничего не находит', async () => {
+    const alice = await registerUser('punct_alice');
+    const bob = await registerUser('punct_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    await postText(chatId, alice.userId, 'обычное сообщение');
+
+    const result = await searchMessagesInChat(chatId, alice.userId, '!!! ???', {}, 50);
     expect(result).toEqual({ messages: [], total: 0, hasMore: false });
   });
 

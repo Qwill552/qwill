@@ -1,90 +1,95 @@
-import type { MessageDto } from '@messenger/shared';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { Avatar } from '../../ui/Avatar';
-import { EmptyState } from '../chats/EmptyState';
-import { formatAttachmentDateTime } from '../messages/dayLabel';
+import { useAuthStore } from '../../stores/authStore';
+import { useChatSearchStore } from '../../stores/chatSearchStore';
+import { useChatStore } from '../../stores/chatStore';
+import { Chip } from '../../ui/Chip';
 import { scrollParentOf } from '../../ui/scrollParent';
-import { highlight } from './SearchResults';
+import { EmptyState } from '../chats/EmptyState';
+import { ChatSearchFromPicker } from './ChatSearchFromPicker';
+import { ChatSearchRow } from './ChatSearchRow';
 import styles from './ChatSearchList.module.css';
 
 const LOAD_AHEAD_PX = 600;
 
 interface ChatSearchListProps {
-  messages: MessageDto[];
-  query: string;
-  loading: boolean;
-  hasMore: boolean;
-  onLoadMore: () => void;
-  onSelect: (messageId: number) => void;
+  chatId: string;
+  isGroup: boolean;
 }
 
-/** Мобильный список найденного — поверх ленты, под полем поиска (R-33). Тап по строке
- *  прыгает к сообщению тем же приёмом, что и закреп (см. showInChat.focusMessageInChat). */
-export function ChatSearchList({ messages, query, loading, hasMore, onLoadMore, onSelect }: ChatSearchListProps) {
+export function ChatSearchList({ chatId, isGroup }: ChatSearchListProps) {
+  const results = useChatSearchStore((s) => s.results);
+  const query = useChatSearchStore((s) => s.query);
+  const index = useChatSearchStore((s) => s.index);
+  const loading = useChatSearchStore((s) => s.loading);
+  const hasMore = useChatSearchStore((s) => s.hasMore);
+  const fromUserId = useChatSearchStore((s) => s.fromUserId);
+  const loadMore = useChatSearchStore((s) => s.loadMore);
+  const selectResult = useChatSearchStore((s) => s.selectResult);
+  const setFrom = useChatSearchStore((s) => s.setFrom);
+  const members = useChatStore((s) => s.membersByChat[chatId]);
+  const myId = useAuthStore((s) => s.user?.id) ?? null;
+
+  const [pickerOpen, setPickerOpen] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const onLoadMoreRef = useRef(onLoadMore);
-  onLoadMoreRef.current = onLoadMore;
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel || !hasMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onLoadMoreRef.current();
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreRef.current();
       },
       { root: scrollParentOf(sentinel), rootMargin: `0px 0px ${LOAD_AHEAD_PX}px 0px` },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, messages.length]);
+  }, [hasMore, results.length]);
 
-  if (query.trim().length === 0) return null;
-
-  if (messages.length === 0) {
-    return (
-      <div className={styles.wrap}>
-        {loading ? <p className={styles.hint}>Ищу…</p> : <EmptyState title="Ничего не нашлось" subtitle="Попробуйте другой запрос" />}
-      </div>
-    );
-  }
+  const fromMember = fromUserId ? members?.find((member) => member.userId === fromUserId) : undefined;
 
   return (
     <div className={`${styles.wrap} hide-native-scrollbar`}>
-      {messages.map((message) => (
-        <SearchRow key={message.id} message={message} query={query} onSelect={onSelect} />
-      ))}
-      {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
-      {loading && <p className={styles.hint}>Ищу…</p>}
-    </div>
-  );
-}
+      {isGroup && (
+        <div className={styles.chips}>
+          <Chip
+            label={fromMember ? `От: ${fromMember.displayName}` : 'От кого'}
+            active={Boolean(fromUserId)}
+            onClick={() => (fromUserId ? setFrom(null) : setPickerOpen(true))}
+          />
+        </div>
+      )}
 
-function SearchRow({
-  message,
-  query,
-  onSelect,
-}: {
-  message: MessageDto;
-  query: string;
-  onSelect: (messageId: number) => void;
-}) {
-  return (
-    <button type="button" className={styles.row} onClick={() => onSelect(message.id)}>
-      <Avatar
-        label={message.sender?.displayName ?? '?'}
-        avatarUrl={message.sender?.avatarUrl}
-        size={44}
-        color={message.sender?.avatarColor}
-        colorKey={message.sender?.id}
-      />
-      <span className={styles.body}>
-        <span className={styles.line}>
-          <span className={styles.name}>{message.sender?.displayName ?? 'Удалённый аккаунт'}</span>
-          <span className={styles.date}>{formatAttachmentDateTime(message.createdAt)}</span>
-        </span>
-        <span className={styles.snippet}>{highlight(message.content ?? '', query.trim())}</span>
-      </span>
-    </button>
+      {results.length === 0 ? (
+        <div className={styles.empty}>
+          {loading ? (
+            <p className={styles.hint}>Ищу…</p>
+          ) : (
+            <EmptyState title="Ничего не нашлось" subtitle="Попробуйте другой запрос" />
+          )}
+        </div>
+      ) : (
+        <>
+          {results.map((message, position) => (
+            <ChatSearchRow
+              key={message.id}
+              message={message}
+              query={query}
+              own={message.sender?.id === myId}
+              active={position === index}
+              onSelect={() => selectResult(position)}
+            />
+          ))}
+          {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+          {loading && <p className={styles.hint}>Ищу…</p>}
+        </>
+      )}
+
+      {pickerOpen && (
+        <ChatSearchFromPicker chatId={chatId} onPick={(userId) => setFrom(userId)} onClose={() => setPickerOpen(false)} />
+      )}
+    </div>
   );
 }

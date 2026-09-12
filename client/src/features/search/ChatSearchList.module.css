@@ -1,76 +1,29 @@
 .wrap {
   position: absolute;
   top: var(--chat-header-h);
-  left: 0;
   right: 0;
   bottom: 0;
-  overflow-y: auto;
+  left: 0;
   z-index: 4;
+  overflow-y: auto;
+  padding-bottom: calc(
+    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + var(--space-6)
+  );
   background: var(--bg);
-  padding-bottom: var(--space-6);
 }
 
-.row {
+.chips {
   display: flex;
-  width: 100%;
-  min-height: 60px;
-  align-items: center;
-  gap: 13px;
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.row:active {
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-}
-
-.row:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-}
-
-.body {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-3) 16px;
 }
 
-.name {
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.date {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.snippet {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.empty {
+  padding-top: var(--space-6);
 }
 
 .hint {
+  margin: 0;
   padding: var(--space-4);
   color: var(--text-secondary);
   font-size: 14px;

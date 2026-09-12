@@ -92,18 +92,16 @@ export interface ChatLinksPage {
   hasMore: boolean;
 }
 
-/** Поиск по тексту сообщений одного чата (R-33). Раскладка (R-24) сюда не распространяется —
- *  решение пользователя. */
 export const chatSearchQuerySchema = z.object({
   q: z.string().max(MESSAGE_MAX_LENGTH).default(''),
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(CHAT_SEARCH_PAGE_SIZE),
+  fromUserId: z.string().min(1).optional(),
 });
 export type ChatSearchQuery = z.infer<typeof chatSearchQuerySchema>;
 
 export interface ChatSearchResponse {
   messages: MessageDto[];
-  /** Общее число совпадений в чате, не только загруженная страница — для счётчика «3 из 17». */
   total: number;
   hasMore: boolean;
 }

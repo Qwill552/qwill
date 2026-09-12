@@ -26,10 +26,3 @@
 .input::placeholder {
   color: var(--text-secondary);
 }
-
-.counter {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  white-space: nowrap;
-}

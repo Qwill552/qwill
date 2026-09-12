@@ -134,9 +134,9 @@ chatsRouter.get('/:id/messages/around/:messageId', (req, res, next) => {
 
 chatsRouter.get('/:id/messages/search', (req, res, next) => {
   try {
-    const { q, before, limit } = parseOrThrow(chatSearchQuerySchema, req.query);
+    const { q, before, limit, fromUserId } = parseOrThrow(chatSearchQuerySchema, req.query);
     messageService
-      .searchMessagesInChat(paramId(req, 'id'), req.userId!, q, { before }, limit)
+      .searchMessagesInChat(paramId(req, 'id'), req.userId!, q, { before }, limit, fromUserId)
       .then((result) => res.json(result))
       .catch(next);
   } catch (error) {

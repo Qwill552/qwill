@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { createReportRequest } from '../api/admin';
-import { useEscapeKey } from '../app/hotkeys';
+import { useEscapeKey, useHotkey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
 import { bottomLift, registerInsetMover, setEmojiPanelLift } from '../app/bottomInset';
 import { useLayoutMode } from '../app/useLayoutMode';
@@ -13,12 +13,12 @@ import { BlockedBar } from '../features/chat/BlockedBar';
 import { BlockUserModal } from '../features/chat/BlockUserModal';
 import { ServiceChatBar } from '../features/chat/ServiceChatBar';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
-import { focusMessageInChat } from '../features/chat/showInChat';
 import { DeleteChatModal } from '../features/chats/DeleteChatModal';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { ChatSearchBar } from '../features/search/ChatSearchBar';
+import { ChatSearchBottomBar } from '../features/search/ChatSearchBottomBar';
 import { ChatSearchList } from '../features/search/ChatSearchList';
-import { useChatSearch } from '../features/search/useChatSearch';
+import { useChatSearchStore } from '../stores/chatSearchStore';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
@@ -109,7 +109,6 @@ export function ChatScreen() {
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerApiRef = useRef<MessageComposerHandle>(null);
@@ -152,11 +151,15 @@ export function ChatScreen() {
    *  когда узел появляется, и `MessageList` получает валидный контейнер, а не `null`. */
   const [pinnedSlot, setPinnedSlot] = useState<HTMLDivElement | null>(null);
 
-  const chatSearch = useChatSearch(chatId);
-  const setChatSearchQuery = chatSearch.setQuery;
-  function closeSearch(): void {
-    setSearchOpen(false);
-    setChatSearchQuery('');
+  const searchOpen = useChatSearchStore((s) => s.open && s.chatId === chatId);
+  const searchMode = useChatSearchStore((s) => s.mode);
+  const openSearch = useChatSearchStore((s) => s.openSearch);
+  const closeSearch = useChatSearchStore((s) => s.close);
+  const setSearchMode = useChatSearchStore((s) => s.setMode);
+
+  function stepBackFromSearch(): void {
+    if (searchMode === 'list') setSearchMode('chat');
+    else closeSearch();
   }
 
   const handleReply = useCallback((message: LocalMessage) => setComposerContext({ mode: 'reply', message }), []);
@@ -177,9 +180,11 @@ export function ChatScreen() {
   // оно открывается позже (из выбранной строки), поэтому в истории окажется выше и закроется первым.
   useBackHandler(selectionMode, exitSelection);
   useEscapeKey(selectionMode, exitSelection);
-  // Поиск внутри чата — первый уровень отката «назад»/Escape (R-33, «Готово когда»).
-  useBackHandler(searchOpen, closeSearch);
-  useEscapeKey(searchOpen, closeSearch);
+  useBackHandler(searchOpen && !isDesktop, stepBackFromSearch);
+  useEscapeKey(searchOpen && !isDesktop, stepBackFromSearch);
+  useHotkey(isDesktop && Boolean(chatId), { code: 'KeyF', mod: true, allowInInput: true }, () => {
+    if (chatId) openSearch(chatId);
+  });
 
   useEffect(() => {
     if (!chatId) return;
@@ -193,18 +198,9 @@ export function ChatScreen() {
     setGroupPanelOpen(openPanelRequested);
     setHeaderMenuAnchor(null);
     setReporting(false);
-    setSearchOpen(false);
-    setChatSearchQuery('');
+    closeSearch();
     exitSelection();
-  }, [chatId, exitSelection, openPanelRequested, setChatSearchQuery]);
-
-  useEffect(() => {
-    // Десктоп: лента прыгает к текущему совпадению и подсвечивает его при каждой смене
-    // позиции — включая первый найденный результат сразу после ввода запроса. На телефоне
-    // прыжок происходит только по тапу строки (ChatSearchList), лента за оверлеем не едет.
-    if (!isDesktop || !searchOpen || !chatId || chatSearch.activeMessageId === null) return;
-    void focusMessageInChat(chatId, chatSearch.activeMessageId);
-  }, [isDesktop, searchOpen, chatId, chatSearch.activeMessageId]);
+  }, [chatId, exitSelection, openPanelRequested, closeSearch]);
 
   useEffect(() => {
     // Отвечали/редактировали сообщение, которое тем временем удалили (своё действие или
@@ -449,7 +445,9 @@ export function ChatScreen() {
     id: 'search',
     label: 'Поиск',
     icon: 'search',
-    onSelect: () => setSearchOpen(true),
+    onSelect: () => {
+      if (chatId) openSearch(chatId);
+    },
   };
 
   const lastForeignMessage = [...messages]
@@ -557,19 +555,7 @@ export function ChatScreen() {
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
-      {!isDesktop && searchOpen && (
-        <ChatSearchList
-          messages={chatSearch.messages}
-          query={chatSearch.query}
-          loading={chatSearch.loading}
-          hasMore={chatSearch.hasMore}
-          onLoadMore={chatSearch.loadMore}
-          onSelect={(messageId) => {
-            closeSearch();
-            void focusMessageInChat(chatId, messageId);
-          }}
-        />
-      )}
+      {!isDesktop && searchOpen && searchMode === 'list' && <ChatSearchList chatId={chatId} isGroup={isGroup} />}
 
       <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
         {selectionMode ? (
@@ -583,18 +569,8 @@ export function ChatScreen() {
             onForward={() => setForwardRequest([...selectedIds])}
             onDelete={handleSelectionDelete}
           />
-        ) : searchOpen ? (
-          <ChatSearchBar
-            isDesktop={isDesktop}
-            query={chatSearch.query}
-            onQueryChange={chatSearch.setQuery}
-            total={chatSearch.total}
-            activeIndex={chatSearch.activeIndex}
-            loading={chatSearch.loading}
-            onNext={chatSearch.goNext}
-            onPrev={chatSearch.goPrev}
-            onClose={closeSearch}
-          />
+        ) : searchOpen && !isDesktop ? (
+          <ChatSearchBar onClose={closeSearch} />
         ) : (
           <>
             {/* На десктопе список чатов виден слева всегда — кнопке «назад» там не место
@@ -635,7 +611,12 @@ export function ChatScreen() {
               leadingLabel="Открыть фото профиля"
             />
             {isDesktop && (
-              <GlassButton variant="plain" icon="search" label="Поиск в чате" onClick={() => setSearchOpen(true)} />
+              <GlassButton
+                variant="plain"
+                icon="search"
+                label="Поиск в чате"
+                onClick={() => openSearch(chatId)}
+              />
             )}
             {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
             {!isService && (
@@ -689,6 +670,8 @@ export function ChatScreen() {
               onReply={handleSelectionReply}
               onForward={() => setForwardRequest([...selectedIds])}
             />
+          ) : searchOpen && !isDesktop ? (
+            <ChatSearchBottomBar chatId={chatId} />
           ) : isService ? (
             <ServiceChatBar chatId={chatId} muted={muted} />
           ) : blocked ? (

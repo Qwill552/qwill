@@ -25,7 +25,7 @@ import { assertChatWritable, assertMember } from './chat.js';
 import { assertFileOwnershipProof, readStoredFile, toFileDto } from './file.js';
 import * as pushService from './push.js';
 import { assertSupportSendAllowed, incomingSupportMessageAdminId } from './support.js';
-import { ChatRole } from '../generated/prisma/client.js';
+import { ChatRole, Prisma } from '../generated/prisma/client.js';
 import type { Announcement, Attachment, Call, File, Message, Reaction, User } from '../generated/prisma/client.js';
 
 type ReplyWithRelations = Message & { sender: User | null; attachments: { id: string }[] };
@@ -542,51 +542,67 @@ export async function reactToMessage(input: ReactToMessageInput): Promise<Messag
   return toReactionDtos(reactions);
 }
 
+const SEARCH_WORD_SEPARATOR = /[^\p{L}\p{N}]+/u;
+
+function toPrefixTsQuery(raw: string): string | null {
+  const words = raw
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .split(SEARCH_WORD_SEPARATOR)
+    .filter((word) => word.length > 0);
+  if (words.length === 0) return null;
+  return words.map((word) => `${word}:*`).join(' & ');
+}
+
 export async function searchMessagesInChat(
   chatId: string,
   userId: string,
   q: string,
   cursor: { before?: number },
   limit: number,
+  fromUserId?: string,
 ): Promise<ChatSearchResponse> {
   await assertMember(chatId, userId);
 
-  const query = q.trim();
-  if (query.length === 0) return { messages: [], total: 0, hasMore: false };
+  const trimmed = q.trim();
+  const tsQuery = trimmed.length > 0 ? toPrefixTsQuery(trimmed) : null;
+  if (trimmed.length > 0 && tsQuery === null) return { messages: [], total: 0, hasMore: false };
 
   const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
   const floor = member.clearedUpToMessageId ?? 0;
 
-  const countIdFilter: { gt?: number } = {};
-  if (floor > 0) countIdFilter.gt = floor;
-  const contentFilter = { contains: query, mode: 'insensitive' as const };
+  const filters: Prisma.Sql[] = [Prisma.sql`m."chatId" = ${chatId}`, Prisma.sql`m."deletedAt" IS NULL`];
+  if (floor > 0) filters.push(Prisma.sql`m.id > ${floor}`);
+  if (fromUserId) filters.push(Prisma.sql`m."senderId" = ${fromUserId}`);
+  if (tsQuery) {
+    filters.push(
+      Prisma.sql`to_tsvector('simple', translate(coalesce(m.content, ''), 'ёЁ', 'ее')) @@ to_tsquery('simple', ${tsQuery})`,
+    );
+  }
+  const where = Prisma.join(filters, ' AND ');
+  const beforeCursor = cursor.before ? Prisma.sql`AND m.id < ${cursor.before}` : Prisma.empty;
 
-  const pageIdFilter: { gt?: number; lt?: number } = { ...countIdFilter };
-  if (cursor.before) pageIdFilter.lt = cursor.before;
-
-  const [total, rows] = await Promise.all([
-    prisma.message.count({
-      where: {
-        chatId,
-        deletedAt: null,
-        content: contentFilter,
-        ...(Object.keys(countIdFilter).length > 0 ? { id: countIdFilter } : {}),
-      },
-    }),
-    prisma.message.findMany({
-      where: {
-        chatId,
-        deletedAt: null,
-        content: contentFilter,
-        ...(Object.keys(pageIdFilter).length > 0 ? { id: pageIdFilter } : {}),
-      },
-      orderBy: { id: 'desc' },
-      take: limit + 1,
-      include: messageInclude,
-    }),
+  const [countRows, idRows] = await Promise.all([
+    prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM "Message" m WHERE ${where}`,
+    prisma.$queryRaw<{ id: number }[]>`
+      SELECT m.id
+      FROM "Message" m
+      WHERE ${where} ${beforeCursor}
+      ORDER BY m.id DESC
+      LIMIT ${limit + 1}`,
   ]);
 
-  const hasMore = rows.length > limit;
-  const page = rows.slice(0, limit);
-  return { messages: page.map(toMessageDto), total, hasMore };
+  const total = countRows[0]?.count ?? 0;
+  const hasMore = idRows.length > limit;
+  const ids = idRows.slice(0, limit).map((row) => row.id);
+  if (ids.length === 0) return { messages: [], total, hasMore: false };
+
+  const rows = await prisma.message.findMany({ where: { id: { in: ids } }, include: messageInclude });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const messages = ids
+    .map((id) => byId.get(id))
+    .filter((row): row is (typeof rows)[number] => row !== undefined)
+    .map((row) => toMessageDto(row));
+
+  return { messages, total, hasMore };
 }

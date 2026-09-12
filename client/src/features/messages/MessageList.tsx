@@ -4,7 +4,9 @@ import { createPortal } from 'react-dom';
 
 import { chatCalendarRequest } from '../../api/chats';
 import { onBottomInset, registerInsetMover } from '../../app/bottomInset';
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { useAuthStore } from '../../stores/authStore';
+import { useChatSearchStore } from '../../stores/chatSearchStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
 import { startDissolve } from '../../ui/dissolve';
@@ -225,6 +227,9 @@ export function MessageList({
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
   const hasMoreAfter = useChatStore((s) => s.hasMoreAfterByChat[chatId]) ?? false;
+  const searchInChat = useChatSearchStore((s) => s.open && s.chatId === chatId && s.mode === 'chat');
+  const mobileLayout = useLayoutMode() === 'mobile';
+  const searchArrowsShown = searchInChat && mobileLayout;
   const focus = useChatStore((s) => s.focusByChat[chatId]) ?? null;
   const feedEpoch = useChatStore((s) => s.feedEpochByChat[chatId]) ?? 0;
   const loadMoreAfter = useChatStore((s) => s.loadMoreAfter);
@@ -1256,9 +1261,9 @@ export function MessageList({
       <button
         type="button"
         ref={jumpRef}
-        className={`${styles.jump} ${showJump || !isViewportNewest ? '' : styles.jumpHidden}`}
+        className={`${styles.jump} ${(showJump || !isViewportNewest) && !searchArrowsShown ? '' : styles.jumpHidden}`}
         aria-label="К последним сообщениям"
-        tabIndex={showJump || !isViewportNewest ? 0 : -1}
+        tabIndex={(showJump || !isViewportNewest) && !searchArrowsShown ? 0 : -1}
         onClick={handleJump}
       >
         <Icon name="chevron-down" size={22} />

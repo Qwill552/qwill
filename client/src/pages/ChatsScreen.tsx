@@ -10,6 +10,7 @@ import { BugReportDialog } from '../features/support/BugReportDialog';
 import { isEmptyPrivateChat, selectVisibleChats } from '../features/chats/visibleChats';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
+import { useChatSearchStore } from '../stores/chatSearchStore';
 import { useChatStore } from '../stores/chatStore';
 import { useUiStore } from '../stores/uiStore';
 import { Avatar } from '../ui/Avatar';
@@ -86,6 +87,11 @@ export function ChatsScreen() {
    *  показывать обе разом нельзя (см. .searchWrapMuted в ChatsScreen.module.css). */
   const [searchRetreating, setSearchRetreating] = useState(false);
 
+  const chatSearchOpen = useChatSearchStore((s) => s.open && s.chatId !== null);
+  const closeChatSearch = useChatSearchStore((s) => s.close);
+  const searchRevealRef = useRef<RevealOrigin | null>(null);
+  searchRevealRef.current = searchReveal;
+
   const filterRowEnabled = folderTabsEnabled || isAdmin;
   const effectiveFilter = filterRowEnabled ? filter : 'all';
 
@@ -125,6 +131,12 @@ export function ChatsScreen() {
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
+
+  useEffect(() => {
+    if (layout !== 'desktop' || !chatSearchOpen || searchRevealRef.current) return;
+    const trigger = searchTriggerRef.current;
+    if (trigger) openSearchReveal(trigger, SEARCH_PILL_RADIUS, false);
+  }, [layout, chatSearchOpen]);
 
   useEffect(() => {
     listRef.current?.restoreScrollTop(savedScrollTop);
@@ -387,6 +399,7 @@ export function ChatsScreen() {
           onClose={() => {
             setSearchReveal(null);
             setSearchDock(null);
+            closeChatSearch();
           }}
           onOpenChat={openChat}
         />

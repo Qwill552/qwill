@@ -4,6 +4,8 @@ import { AmbientBlobs } from '../../app/AmbientBlobs';
 import { useEscapeKey } from '../../app/hotkeys';
 import { useBackHandler } from '../../app/useBackHandler';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
+import { useChatSearchStore } from '../../stores/chatSearchStore';
+import { ChatSearchPanel } from '../search/ChatSearchPanel';
 import { RecentSearches } from '../search/RecentSearches';
 import { SearchResults } from '../search/SearchResults';
 import styles from './SearchReveal.module.css';
@@ -61,6 +63,8 @@ const FEATHER_PX = 28;
 const LABEL_DELAY_MS = 100;
 const LABEL_FADE_MS = 160;
 
+const CHAT_SEARCH_DEBOUNCE_MS = 250;
+
 /** Открытие поиска — двухэтапная хореография:
  *  1. строка поиска едет геометрией (top/left/width/height/border-radius — тот же приём,
  *     которым капсула раньше раздвигалась во весь экран) от места нажатия (`origin`) к месту
@@ -91,6 +95,33 @@ export function SearchReveal({
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [query, setQuery] = useState('');
 
+  const inChat = useChatSearchStore((s) => s.open && s.chatId !== null);
+  const chatDraft = useChatSearchStore((s) => s.draft);
+  const setChatDraft = useChatSearchStore((s) => s.setDraft);
+  const submitChatSearch = useChatSearchStore((s) => s.submit);
+  const closeChatSearch = useChatSearchStore((s) => s.close);
+  const debounceRef = useRef(0);
+
+  const runChatSearch = useCallback(
+    (immediate: boolean) => {
+      window.clearTimeout(debounceRef.current);
+      if (immediate) {
+        submitChatSearch({ jump: false });
+        return;
+      }
+      debounceRef.current = window.setTimeout(() => submitChatSearch({ jump: false }), CHAT_SEARCH_DEBOUNCE_MS);
+    },
+    [submitChatSearch],
+  );
+
+  useEffect(() => () => window.clearTimeout(debounceRef.current), []);
+
+  const dropChatSearch = useCallback(() => {
+    window.clearTimeout(debounceRef.current);
+    setQuery(useChatSearchStore.getState().draft);
+    closeChatSearch();
+  }, [closeChatSearch]);
+
   // ChatsScreen.tsx передаёт эти колбэки инлайн-стрелками — новая ссылка на каждый его рендер.
   // Через ref, а не в зависимостях эффекта: посторонний ререндер ChatsScreen (например, от
   // presence) не должен перезапускать таймер возврата и звать onRetreatStart повторно.
@@ -107,8 +138,22 @@ export function SearchReveal({
     setPhase((p) => (p === 'wave-close' || p === 'retreat' ? p : 'wave-close'));
   }, []);
 
-  useBackHandler(phase !== 'wave-close' && phase !== 'retreat', startClose);
-  useEscapeKey(phase !== 'wave-close' && phase !== 'retreat', startClose);
+  const stepBack = useCallback(() => {
+    const chatSearch = useChatSearchStore.getState();
+    if (!chatSearch.open || chatSearch.chatId === null) {
+      startClose();
+      return;
+    }
+    if (chatSearch.draft.length > 0) {
+      chatSearch.setDraft('');
+      chatSearch.submit({ jump: false });
+      return;
+    }
+    dropChatSearch();
+  }, [dropChatSearch, startClose]);
+
+  useBackHandler(phase !== 'wave-close' && phase !== 'retreat', stepBack);
+  useEscapeKey(phase !== 'wave-close' && phase !== 'retreat', stepBack);
 
   useLayoutEffect(() => {
     const rect = rootRef.current?.getBoundingClientRect();
@@ -268,12 +313,24 @@ export function SearchReveal({
           className={styles.dockInput}
           style={labelStyle}
           type="text"
-          value={query}
-          placeholder={placeholder}
-          aria-label="Поиск чатов и людей"
+          value={inChat ? chatDraft : query}
+          placeholder={inChat ? 'Поиск в чате' : placeholder}
+          aria-label={inChat ? 'Поиск в чате' : 'Поиск чатов и людей'}
           autoComplete="off"
           enterKeyHint="search"
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            if (!inChat) {
+              setQuery(event.target.value);
+              return;
+            }
+            setChatDraft(event.target.value);
+            runChatSearch(false);
+          }}
+          onKeyDown={(event) => {
+            if (!inChat || event.key !== 'Enter') return;
+            event.preventDefault();
+            runChatSearch(true);
+          }}
         />
         <button type="button" className={styles.close} aria-label="Закрыть" onClick={startClose}>
           <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -289,7 +346,9 @@ export function SearchReveal({
           </div>
           <div ref={waveBodyRef} className={`${styles.waveBody} hide-native-scrollbar`} style={waveBodyStyle}>
             <ScrollIndicator target={waveBodyRef} />
-            {query.trim().length > 0 ? (
+            {inChat ? (
+              <ChatSearchPanel onDropChat={dropChatSearch} />
+            ) : query.trim().length > 0 ? (
               <SearchResults query={query} onOpenChat={onOpenChat} />
             ) : (
               <RecentSearches onOpenChat={onOpenChat} />

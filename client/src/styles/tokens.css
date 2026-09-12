@@ -105,6 +105,11 @@
   --unread-badge: #4d8dff;
   --unread-muted: #c4cddf;
 
+  --search-hit-bg: var(--primary-soft);
+  --search-hit-ink: var(--primary);
+  --search-hit-bg-out: var(--text-on-out);
+  --search-hit-ink-out: var(--primary-press);
+
   /* Подложка затемнения. В тёмной теме совпадает с --chat-bg, в светлой — своя:
      светлый скрим ничего не затемняет. */
   --scrim-tint: #1c202d;

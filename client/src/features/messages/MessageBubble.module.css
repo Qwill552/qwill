@@ -203,3 +203,14 @@
     backdrop-filter: none;
   }
 }
+
+.hit {
+  border-radius: 4px;
+  background: var(--search-hit-bg);
+  color: var(--search-hit-ink);
+}
+
+.out .hit {
+  background: var(--search-hit-bg-out);
+  color: var(--search-hit-ink-out);
+}

@@ -1,5 +1,5 @@
 import type { ChatSearchResult, SearchResultsDto, UserSearchResult } from '@messenger/shared';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 
 import { isAbortError, NetworkError } from '../../api/client';
 import { searchRequest } from '../../api/search';
@@ -10,40 +10,14 @@ import { formatLastSeen } from '../../utils/presence';
 import { OfficialMark } from '../chat/OfficialMark';
 import { SERVICE_AVATAR_SRC } from '../chat/serviceChat';
 import { EmptyState } from '../chats/EmptyState';
+import { highlight } from './highlight';
 import styles from './SearchResults.module.css';
 
 const DEBOUNCE_MS = 250;
-const WORD_BOUNDARY = /[\s_.@-]/;
 
 interface SearchResultsProps {
   query: string;
   onOpenChat: (chatId: string) => void;
-}
-
-export function highlight(text: string, needle: string): ReactNode {
-  if (needle.length === 0) return text;
-
-  const haystack = text.toLowerCase();
-  const target = needle.toLowerCase();
-  const parts: ReactNode[] = [];
-  let from = 0;
-  let at = haystack.indexOf(target);
-
-  while (at !== -1) {
-    if (at === 0 || WORD_BOUNDARY.test(text[at - 1] ?? '')) {
-      if (at > from) parts.push(text.slice(from, at));
-      parts.push(
-        <mark key={at} className={styles.hit}>
-          {text.slice(at, at + needle.length)}
-        </mark>,
-      );
-      from = at + needle.length;
-    }
-    at = haystack.indexOf(target, at + 1);
-  }
-  if (parts.length === 0) return text;
-  if (from < text.length) parts.push(text.slice(from));
-  return parts;
 }
 
 export function SearchResults({ query, onOpenChat }: SearchResultsProps) {

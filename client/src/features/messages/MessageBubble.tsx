@@ -1,6 +1,7 @@
 import { splitTextWithLinks } from '@messenger/shared';
 import { Fragment, type MouseEvent, type ReactNode } from 'react';
 
+import { useChatSearchStore } from '../../stores/chatSearchStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { tintVar } from '../../ui/tint';
@@ -14,8 +15,35 @@ import { AttachmentView, isVoiceAttachment, LocalAttachmentPreview } from './Att
 import { CallMessage } from './CallMessage';
 import { LinkPreviewCard, useRenderableLinkPreview } from './LinkPreviewCard';
 import { MessageMeta } from './MessageMeta';
+import { highlightRanges, sliceByRanges } from '../search/highlight';
 import { ReplyQuote } from './ReplyQuote';
 import styles from './MessageBubble.module.css';
+
+const EMPTY_HITS: ReturnType<typeof highlightRanges> = [];
+
+function spanStarts(spans: ReturnType<typeof splitTextWithLinks> | null): number[] {
+  if (!spans) return [];
+  const starts: number[] = [];
+  let offset = 0;
+  for (const span of spans) {
+    starts.push(offset);
+    offset += span.value.length;
+  }
+  return starts;
+}
+
+function renderHighlighted(text: string, from: number, length: number, hits: ReturnType<typeof highlightRanges>): ReactNode {
+  if (hits.length === 0) return parseEmoji(text.slice(from, from + length));
+  return sliceByRanges(text, hits, from, from + length).map((piece, index) =>
+    piece.hit ? (
+      <mark key={index} className={styles.hit}>
+        {parseEmoji(piece.value)}
+      </mark>
+    ) : (
+      <Fragment key={index}>{parseEmoji(piece.value)}</Fragment>
+    ),
+  );
+}
 
 interface MessageBubbleProps {
   message: LocalMessage;
@@ -55,7 +83,10 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
   const cancelMessage = useChatStore((s) => s.cancelMessage);
   const emojiOnly = bare ? emojiOnlyContent(message.content ?? '') : null;
 
+  const searchQuery = useChatSearchStore((s) => (s.open && s.chatId === message.chatId ? s.query : ''));
   const spans = message.content ? splitTextWithLinks(message.content) : null;
+  const hits = message.content && searchQuery ? highlightRanges(message.content, searchQuery) : EMPTY_HITS;
+  const spanOffsets = spanStarts(spans);
   const firstLink = message.deletedAt ? null : (spans?.find((span) => span.kind === 'link')?.href ?? null);
   const metaUnderCard = useRenderableLinkPreview(firstLink) !== null;
 
@@ -213,7 +244,9 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
                           {span.value}
                         </a>
                       ) : (
-                        <Fragment key={i}>{parseEmoji(span.value)}</Fragment>
+                        <Fragment key={i}>
+                          {renderHighlighted(message.content ?? '', spanOffsets[i]!, span.value.length, hits)}
+                        </Fragment>
                       ),
                     )
                   : null}

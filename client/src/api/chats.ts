@@ -96,15 +96,19 @@ export function getChatAttachmentCountsRequest(chatId: string): Promise<ChatAtta
   return apiRequest<ChatAttachmentCounts>(`/api/chats/${chatId}/attachments/counts`);
 }
 
-export function searchInChatRequest(
-  chatId: string,
-  q: string,
-  before?: number,
-  signal?: AbortSignal,
-): Promise<ChatSearchResponse> {
+export interface SearchInChatOptions {
+  before?: number;
+  fromUserId?: string | null;
+  signal?: AbortSignal;
+}
+
+export function searchInChatRequest(chatId: string, q: string, options: SearchInChatOptions = {}): Promise<ChatSearchResponse> {
   const params = new URLSearchParams({ q });
-  if (before !== undefined) params.set('before', String(before));
-  return apiRequest<ChatSearchResponse>(`/api/chats/${chatId}/messages/search?${params.toString()}`, { signal });
+  if (options.before !== undefined) params.set('before', String(options.before));
+  if (options.fromUserId) params.set('fromUserId', options.fromUserId);
+  return apiRequest<ChatSearchResponse>(`/api/chats/${chatId}/messages/search?${params.toString()}`, {
+    signal: options.signal,
+  });
 }
 
 export function updateGroupRequest(chatId: string, input: UpdateGroupInput): Promise<ChatUpdatedEvent> {
