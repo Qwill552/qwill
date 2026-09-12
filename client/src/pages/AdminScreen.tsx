@@ -163,6 +163,11 @@ export function AdminScreen() {
                 subtitle="Кто, что и когда сделал"
                 onClick={() => navigate('/admin/log')}
               />
+              <Card.Row
+                title="Блокировки IP"
+                subtitle="Адрес или подсеть — отдельно от бана аккаунта"
+                onClick={() => navigate('/admin/ip-bans')}
+              />
             </Card>
 
             <Card caption="Рубильники">

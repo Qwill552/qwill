@@ -9,12 +9,14 @@ import { initProfileFonts } from './lib/profileFonts.js';
 import { telegramNotifyState } from './lib/telegram.js';
 import { createSocketServer } from './realtime/index.js';
 import { ensureStorageDirs } from './services/file.js';
+import { loadIpBans } from './services/ipBan.js';
 
 /** Порядок старта: env → БД → storage → http → socket (секция 3, 7). */
 async function main(): Promise<void> {
   await connectDatabase();
   await ensureStorageDirs();
   initProfileFonts();
+  await loadIpBans();
 
   const app = createApp();
   const httpServer = devHttpsCredentials

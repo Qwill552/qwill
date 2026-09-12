@@ -70,6 +70,49 @@ export type BanUserInput = z.infer<typeof banUserSchema>;
 export const setUserCardSchema = z.object({ disabled: z.boolean() });
 export type SetUserCardInput = z.infer<typeof setUserCardSchema>;
 
+/** Сроки блокировки по IP: список один на форму и на проверку, чтобы они не разъезжались.
+ *  null — «навсегда», осознанный выбор из того же списка. */
+export const IP_BAN_DURATION_DAYS = [1, 7, 30, 90, null] as const;
+export type IpBanDurationDays = (typeof IP_BAN_DURATION_DAYS)[number];
+
+export const IP_BAN_DEFAULT_DAYS: IpBanDurationDays = 30;
+export const IP_BAN_REASON_MAX_LENGTH = 500;
+
+export const IP_BANNED_MESSAGE = 'Доступ с этого адреса закрыт';
+export const IP_BAN_SELF_MESSAGE = 'В этот диапазон попадает ваш собственный адрес';
+export const IP_BAN_INVALID_MESSAGE = 'Это не похоже на IP-адрес';
+
+export const createIpBanSchema = z.object({
+  ip: z.string().trim().min(1, 'Введите адрес').max(64),
+  subnet: z.boolean(),
+  reason: z
+    .string()
+    .trim()
+    .min(1, 'Укажите причину')
+    .max(IP_BAN_REASON_MAX_LENGTH, `Не длиннее ${IP_BAN_REASON_MAX_LENGTH} символов`),
+  days: z
+    .number()
+    .int()
+    .nullable()
+    .refine(
+      (value) => (IP_BAN_DURATION_DAYS as readonly (number | null)[]).includes(value),
+      'Недопустимый срок',
+    ),
+});
+export type CreateIpBanInput = z.infer<typeof createIpBanSchema>;
+
+export interface IpBanDto {
+  id: string;
+  cidr: string;
+  reason: string;
+  expiresAt: string | null;
+  createdAt: string;
+  createdByUsername: string | null;
+  liftedAt: string | null;
+  liftedByUsername: string | null;
+  active: boolean;
+}
+
 export const adminReauthSchema = z.object({
   password: z.string().min(1, 'Введите пароль'),
 });
@@ -202,6 +245,8 @@ export const ADMIN_ACTION_VALUES = [
   'reauth.fail',
   'settings.chatAccess',
   'chat.open',
+  'ip.ban',
+  'ip.unban',
 ] as const;
 export type AdminActionName = (typeof ADMIN_ACTION_VALUES)[number];
 

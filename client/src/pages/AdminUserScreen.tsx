@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import {
-  banUserRequest,
   clearAdminUserAvatarRequest,
   clearAdminUserBioRequest,
   getAdminUserRequest,
@@ -17,6 +16,7 @@ import {
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { BanUserDialog } from '../features/admin/BanUserDialog';
 import { PiiReveal } from '../features/admin/PiiReveal';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
@@ -59,6 +59,7 @@ export function AdminUserScreen() {
   const [muteUntil, setMuteUntil] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
 
   const load = useCallback(() => {
     if (!userId) return;
@@ -89,9 +90,11 @@ export function AdminUserScreen() {
   }
 
   function handleBan(banned: boolean): void {
-    void run(() =>
-      banned ? banUserRequest(userId, banReason.trim() || 'Нарушение правил') : unbanUserRequest(userId),
-    );
+    if (banned) {
+      setBanDialogOpen(true);
+      return;
+    }
+    void run(() => unbanUserRequest(userId));
   }
 
   function handleCardDisabled(disabled: boolean): void {
@@ -197,6 +200,16 @@ export function AdminUserScreen() {
               />
             </div>
           </Card>
+
+          {banDialogOpen && (
+            <BanUserDialog
+              userId={userId}
+              username={user.username}
+              initialReason={banReason}
+              onClose={() => setBanDialogOpen(false)}
+              onBanned={setUser}
+            />
+          )}
 
           <Card caption="Поддержка">
             <Card.Row

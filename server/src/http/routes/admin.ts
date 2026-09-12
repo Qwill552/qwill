@@ -4,6 +4,7 @@ import {
   adminUpdateProfileSchema,
   banUserSchema,
   closeReportSchema,
+  createIpBanSchema,
   markReportWorkingSchema,
   messagesQuerySchema,
   muteSupportSchema,
@@ -15,7 +16,7 @@ import {
 import { Router, type Request } from 'express';
 
 import { parseOrThrow } from '../../lib/validate.js';
-import { disconnectUserSockets } from '../../realtime/index.js';
+import { disconnectBannedIpSockets, disconnectUserSockets } from '../../realtime/index.js';
 import {
   banUser,
   clearUserAvatar,
@@ -40,6 +41,7 @@ import {
   unbanUser,
 } from '../../services/admin.js';
 import { getChatForAdmin, getMessagesForAdmin } from '../../services/adminChat.js';
+import { createIpBan, liftIpBan, listIpBans } from '../../services/ipBan.js';
 import { adminActor, requireAdmin, requireAdminTicket, requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -198,6 +200,27 @@ adminRouter.get('/chats/:id/messages', requireAdminTicket, (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+adminRouter.get('/ip-bans', (_req, res, next) => {
+  listIpBans()
+    .then((bans) => res.json(bans))
+    .catch(next);
+});
+
+adminRouter.post('/ip-bans', requireAdminTicket, validateBody(createIpBanSchema), (req, res, next) => {
+  createIpBan(adminActor(req), req.body)
+    .then(async (ban) => {
+      await disconnectBannedIpSockets();
+      res.status(201).json(ban);
+    })
+    .catch(next);
+});
+
+adminRouter.delete('/ip-bans/:id', requireAdminTicket, (req, res, next) => {
+  liftIpBan(adminActor(req), paramId(req))
+    .then((ban) => res.json(ban))
+    .catch(next);
 });
 
 adminRouter.get('/reports', (req, res, next) => {

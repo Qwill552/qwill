@@ -9,7 +9,9 @@ import {
   type AdminSettingsDto,
   type AdminTicketDto,
   type AdminUserCardDto,
+  type CreateIpBanInput,
   type CreateReportInput,
+  type IpBanDto,
   type MessagesPage,
   type ReportGroupDto,
   type ReportGroupView,
@@ -154,6 +156,26 @@ export function getAdminChatMessagesRequest(chatId: string, before?: number): Pr
   const query = before ? `?before=${before}` : '';
   return ticketed(() =>
     apiRequest<MessagesPage>(`/api/admin/chats/${chatId}/messages${query}`, { headers: ticketHeaders() }),
+  );
+}
+
+export function listIpBansRequest(): Promise<IpBanDto[]> {
+  return apiRequest<IpBanDto[]>('/api/admin/ip-bans');
+}
+
+export function createIpBanRequest(input: CreateIpBanInput): Promise<IpBanDto> {
+  return ticketed(() =>
+    apiRequest<IpBanDto>('/api/admin/ip-bans', {
+      method: 'POST',
+      body: input,
+      headers: ticketHeaders(),
+    }),
+  );
+}
+
+export function liftIpBanRequest(id: string): Promise<IpBanDto> {
+  return ticketed(() =>
+    apiRequest<IpBanDto>(`/api/admin/ip-bans/${id}`, { method: 'DELETE', headers: ticketHeaders() }),
   );
 }
 

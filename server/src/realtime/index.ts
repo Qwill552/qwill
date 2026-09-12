@@ -31,6 +31,7 @@ import { Server as SocketServer, type Socket } from 'socket.io';
 import { env, isAllowedClientOrigin } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { AppError, rateLimited } from '../lib/errors.js';
+import { ipFromHandshake } from '../lib/clientIp.js';
 import { logger } from '../lib/logger.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { assertNotBanned } from '../services/auth.js';
@@ -44,6 +45,7 @@ import {
   sendMessage,
 } from '../services/message.js';
 import * as callService from '../services/call.js';
+import { isIpBanned } from '../services/ipBan.js';
 import { getUserById } from '../services/user.js';
 import { registerCallHandlers } from './call-handlers.js';
 import { presenceStore } from './presence.js';
@@ -89,6 +91,14 @@ export async function disconnectUserSockets(userId: string): Promise<void> {
   if (!io) return;
   const sockets = await io.in(userRoom(userId)).fetchSockets();
   for (const socket of sockets) socket.disconnect(true);
+}
+
+export async function disconnectBannedIpSockets(): Promise<void> {
+  if (!io) return;
+  const sockets = await io.fetchSockets();
+  for (const socket of sockets) {
+    if (isIpBanned(ipFromHandshake(socket.handshake))) socket.disconnect(true);
+  }
 }
 
 export function emitToChat(chatId: string, event: string, payload: unknown): void {
@@ -395,6 +405,11 @@ export function createSocketServer(httpServer: HttpServer | HttpsServer): Socket
   // Access-токен передаётся в handshake.auth — та же проверка, что и на HTTP (секция 3),
   // включая отказ забаненному: иначе разорванный сокет тут же переподключится (R-32A).
   io.use((socket, next) => {
+    if (isIpBanned(ipFromHandshake(socket.handshake))) {
+      next(new Error('ip_banned'));
+      return;
+    }
+
     const token = socket.handshake.auth?.token as string | undefined;
     if (!token) {
       next(new Error('unauthorized'));

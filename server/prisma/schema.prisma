@@ -548,3 +548,30 @@ model Announcement {
 
   messages Message[]
 }
+
+/// Блокировка по IP — вторая мера рядом с баном аккаунта (R-32H): бан не мешает завести
+/// следующий аккаунт, блокировка адреса мешает.
+model IpBan {
+  id String @id @default(cuid(2))
+
+  /// Нормализованный CIDR: одиночный адрес хранится как /32 (IPv4) или /128 (IPv6),
+  /// подсеть — как /24 или /64. Уникален: повторная блокировка того же диапазона
+  /// продлевает существующую запись, а не заводит вторую.
+  cidr String @unique
+
+  reason String
+
+  /// null — бессрочно. Истёкшие записи не удаляются: журнал того, кого и за что
+  /// блокировали, полезнее чистой таблицы.
+  expiresAt DateTime?
+
+  createdAt         DateTime @default(now())
+  createdById       String
+  createdByUsername String?
+
+  liftedAt         DateTime?
+  liftedById       String?
+  liftedByUsername String?
+
+  @@index([expiresAt])
+}

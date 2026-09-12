@@ -7,6 +7,7 @@ import { pinoHttp } from 'pino-http';
 import { env, isAllowedClientOrigin } from './config/env.js';
 import { cardHostMiddleware } from './http/cardHost.js';
 import { errorHandler, notFoundHandler } from './http/middleware/errorHandler.js';
+import { ipBanGuard } from './http/middleware/ipBan.js';
 import { generalLimiter } from './http/middleware/rateLimit.js';
 import { sameOriginGuard } from './http/middleware/sameOrigin.js';
 import { adminRouter } from './http/routes/admin.js';
@@ -71,6 +72,7 @@ export function createApp(): Express {
   // Роуты объявляются здесь и только здесь — не после server.listen(), как раньше.
   // healthRouter — до общего лимитера, чтобы мониторинг не упирался в 200/мин (секция 8).
   app.use('/api', healthRouter);
+  app.use('/api', ipBanGuard);
   app.use('/api', generalLimiter);
   app.use('/api/app', appVersionRouter);
   app.use('/api/auth', authRouter);

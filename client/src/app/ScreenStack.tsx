@@ -45,6 +45,7 @@ import {
   useDesktopColumnsStore,
 } from '../stores/desktopColumnsStore';
 import { AdminChatView } from '../features/admin/AdminChatView';
+import { IpBansScreen } from '../features/admin/IpBansScreen';
 import { ChatInfoCard } from '../features/chat/ChatInfoCard';
 import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
@@ -117,6 +118,7 @@ const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
   if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
+  if (matchPath('/admin/ip-bans', pathname)) return { title: 'Блокировки IP', backTo: '/admin' };
   if (matchPath('/admin/chats/:chatId', pathname)) return { title: 'Режим чтения', backTo: '/admin' };
   if (matchPath('/admin/users/:id/profile', pathname)) return { title: 'Профиль', backTo: '/admin' };
   if (matchPath('/admin/users/:id', pathname)) return { title: 'Пользователь', backTo: '/admin' };
@@ -155,6 +157,7 @@ const RouteSwitch = memo(
         <Route path="/admin/users/:id" element={<AdminUserScreen />} />
         <Route path="/admin/users/:id/profile" element={<UserProfileScreen />} />
         <Route path="/admin/log" element={<AdminLogScreen />} />
+        <Route path="/admin/ip-bans" element={<IpBansScreen />} />
         <Route path="/admin/chats/:chatId" element={<AdminChatView />} />
         <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
