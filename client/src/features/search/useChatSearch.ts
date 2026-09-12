@@ -1,5 +1,5 @@
 import type { MessageDto } from '@messenger/shared';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { searchInChatRequest } from '../../api/chats';
 import { isAbortError, NetworkError } from '../../api/client';
@@ -36,10 +36,13 @@ export function useChatSearch(chatId: string | undefined): ChatSearchState {
   const loadingMoreRef = useRef(false);
   const advanceOnLoadRef = useRef(false);
 
-  function setQuery(value: string): void {
+  // Стабильная ссылка: используется как зависимость эффекта сброса поиска при смене чата
+  // в ChatScreen.tsx — пересоздаваясь на каждый рендер, обычная функция запускала бы тот
+  // эффект (а с ним exitSelection и другие setState) на каждый рендер, а не на смену чата.
+  const setQuery = useCallback((value: string) => {
     setQueryState(value);
     setActiveIndex(0);
-  }
+  }, []);
 
   useEffect(() => {
     const trimmed = query.trim();
