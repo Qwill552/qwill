@@ -23,7 +23,7 @@ export function ChatSearchBar({ onClose }: ChatSearchBarProps) {
 
   return (
     <div className={styles.bar} role="search">
-      <GlassButton variant="chrome" icon="back" label="Выйти из поиска" onClick={onClose} />
+      <GlassButton icon="back" label="Выйти из поиска" onClick={onClose} />
 
       <div className={styles.field}>
         <Icon name="search" size={18} className={styles.icon} />
@@ -46,7 +46,6 @@ export function ChatSearchBar({ onClose }: ChatSearchBarProps) {
 
       {draft.length > 0 && (
         <GlassButton
-          variant="chrome"
           icon="close"
           label="Очистить поле"
           onClick={() => {

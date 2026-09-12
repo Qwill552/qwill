@@ -47,14 +47,12 @@ export function ChatSearchBottomBar({ chatId }: ChatSearchBottomBarProps) {
       {!listMode && (
         <div className={styles.arrows}>
           <GlassButton
-            variant="chrome"
             icon="chevron-up"
             label="К более старому совпадению"
             disabled={!canOlder}
             onClick={next}
           />
           <GlassButton
-            variant="chrome"
             icon="chevron-down"
             label="К более новому совпадению"
             disabled={!canNewer}

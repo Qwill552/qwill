@@ -7,18 +7,12 @@
 }
 
 .field {
-  display: flex;
-  height: 40px;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
+  composes: pill cap from '../../ui/chrome/GlassPill.module.css';
+}
+
+.bar .field {
   gap: var(--space-2);
-  padding: 0 14px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-bg);
-  box-shadow: var(--chrome-shadow);
-  backdrop-filter: var(--chrome-blur);
+  padding: 5px 14px;
 }
 
 .icon {
@@ -27,8 +21,8 @@
 }
 
 .input {
+  height: 40px;
   min-width: 0;
-  height: 100%;
   flex: 1;
   border: none;
   background: transparent;
