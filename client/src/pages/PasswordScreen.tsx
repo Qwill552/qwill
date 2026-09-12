@@ -7,13 +7,59 @@ import { ApiError } from '../api/client';
 import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { Modal } from '../features/groups/Modal';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../ui/Card';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
+import { IconButton } from '../ui/IconButton';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import styles from './PasswordScreen.module.css';
+
+interface PasswordFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+}
+
+function PasswordField({ id, label, value, onChange, autoComplete }: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <>
+      <label className={styles.label} htmlFor={id}>
+        {label}
+      </label>
+      <div className={styles.inputRow}>
+        <input
+          id={id}
+          className={styles.input}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+        />
+        <IconButton
+          icon={visible ? 'eye-off' : 'eye'}
+          label={visible ? 'Скрыть пароль' : 'Показать пароль'}
+          variant="plain"
+          size={20}
+          className={styles.toggle}
+          onClick={() => setVisible((prev) => !prev)}
+        />
+      </div>
+    </>
+  );
+}
+
+function successText(terminatedSessions: number): string {
+  if (terminatedSessions === 0) return 'Пароль изменён. Других активных сеансов не было.';
+  if (terminatedSessions === 1) return 'Пароль изменён. Завершён 1 сеанс на другом устройстве.';
+  return `Пароль изменён. Завершено сеансов на других устройствах: ${terminatedSessions}.`;
+}
 
 export function PasswordScreen() {
   const navigate = useNavigate();
@@ -26,24 +72,32 @@ export function PasswordScreen() {
   const [repeat, setRepeat] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const minLength = role === 'admin' ? ADMIN_PASSWORD_MIN_LENGTH : PASSWORD_MIN_LENGTH;
   const mismatch = repeat.length > 0 && next !== repeat;
-  const canSubmit = !pending && current.length > 0 && next.length >= minLength && next === repeat;
+  const sameAsOld = next.length > 0 && current.length > 0 && next === current;
+  const canSubmit =
+    !pending && current.length > 0 && next.length >= minLength && next === repeat && !sameAsOld;
 
-  async function handleSubmit(event: FormEvent): Promise<void> {
+  function handleSubmit(event: FormEvent): void {
     event.preventDefault();
     if (!canSubmit) return;
+    setError(null);
+    setConfirming(true);
+  }
 
+  async function handleConfirm(): Promise<void> {
     setPending(true);
     setError(null);
     try {
-      await changePasswordRequest(current, next);
+      const { terminatedSessions } = await changePasswordRequest(current, next);
       setCurrent('');
       setNext('');
       setRepeat('');
-      setDone(true);
+      setDone(successText(terminatedSessions));
+      setConfirming(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить пароль');
     } finally {
@@ -61,40 +115,26 @@ export function PasswordScreen() {
         <ScrollIndicator target={scrollerRef} />
 
         <Card caption="Смена пароля">
-          <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
-            <label className={styles.label} htmlFor="password-current">
-              Текущий пароль
-            </label>
-            <input
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <PasswordField
               id="password-current"
-              className={styles.input}
-              type="password"
+              label="Текущий пароль"
               value={current}
-              onChange={(event) => setCurrent(event.target.value)}
+              onChange={setCurrent}
               autoComplete="current-password"
             />
-
-            <label className={styles.label} htmlFor="password-next">
-              Новый пароль
-            </label>
-            <input
+            <PasswordField
               id="password-next"
-              className={styles.input}
-              type="password"
+              label="Новый пароль"
               value={next}
-              onChange={(event) => setNext(event.target.value)}
+              onChange={setNext}
               autoComplete="new-password"
             />
-
-            <label className={styles.label} htmlFor="password-repeat">
-              Повторите новый пароль
-            </label>
-            <input
+            <PasswordField
               id="password-repeat"
-              className={styles.input}
-              type="password"
+              label="Повторите новый пароль"
               value={repeat}
-              onChange={(event) => setRepeat(event.target.value)}
+              onChange={setRepeat}
               autoComplete="new-password"
             />
 
@@ -105,8 +145,9 @@ export function PasswordScreen() {
             </p>
 
             {mismatch && <p className={styles.error}>Пароли не совпадают</p>}
-            {error && <p className={styles.error}>{error}</p>}
-            {done && <p className={styles.success}>Пароль изменён</p>}
+            {sameAsOld && <p className={styles.error}>Новый пароль совпадает со старым</p>}
+            {!confirming && error && <p className={styles.error}>{error}</p>}
+            {done && <p className={styles.success}>{done}</p>}
 
             <button type="submit" className={styles.button} disabled={!canSubmit}>
               Сменить пароль
@@ -114,6 +155,33 @@ export function PasswordScreen() {
           </form>
         </Card>
       </div>
+
+      {confirming && (
+        <Modal title="Сменить пароль?" onClose={() => setConfirming(false)}>
+          <p className={styles.confirmText}>
+            Смена пароля завершит сеансы на всех остальных устройствах — войти там придётся заново.
+          </p>
+          {error && <p className={styles.error}>{error}</p>}
+          <div className={styles.actions}>
+            <button
+              className={styles.cancelButton}
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+            >
+              Отмена
+            </button>
+            <button
+              className={styles.confirmButton}
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={pending}
+            >
+              Сменить
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {!isDesktop && (
         <ChromeBar>

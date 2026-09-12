@@ -46,8 +46,13 @@ export const loginSchema = z.object({
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Введите текущий пароль'),
   newPassword: passwordSchema,
+  refreshToken: z.string().min(1).optional(),
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export interface ChangePasswordResponse {
+  terminatedSessions: number;
+}
 
 export const refreshSchema = z.object({
   // Кука — основной путь в браузере; тело — для Capacitor, где кука сторонняя (секция 6).

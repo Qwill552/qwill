@@ -76,9 +76,10 @@ authRouter.post(
   requireAuth,
   validateBody(changePasswordSchema),
   (req, res, next) => {
+    const currentRefreshToken = readRefreshToken(req);
     authService
-      .changePassword(req.userId!, req.body.currentPassword, req.body.newPassword)
-      .then(() => res.status(204).end())
+      .changePassword(req.userId!, req.body.currentPassword, req.body.newPassword, currentRefreshToken)
+      .then(({ terminatedSessions }) => res.status(200).json({ terminatedSessions }))
       .catch(next);
   },
 );

@@ -122,7 +122,8 @@ export async function changePassword(
   userId: string,
   currentPassword: string,
   newPassword: string,
-): Promise<void> {
+  currentRefreshToken: string | undefined,
+): Promise<{ terminatedSessions: number }> {
   const user = await getUserById(userId);
   if (!(await verifyPassword(currentPassword, user.passwordHash))) {
     throw new AppError(ErrorCode.INVALID_CREDENTIALS, 400, 'Неверный текущий пароль');
@@ -134,11 +135,26 @@ export async function changePassword(
       fields: { newPassword: `Пароль не короче ${minLength} символов` },
     });
   }
+  if (newPassword === currentPassword) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 400, 'Новый пароль совпадает со старым', {
+      fields: { newPassword: 'Новый пароль совпадает со старым' },
+    });
+  }
 
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
   });
+
+  const currentSessionHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : undefined;
+  const { count } = await prisma.session.deleteMany({
+    where: {
+      userId,
+      ...(currentSessionHash ? { refreshTokenHash: { not: currentSessionHash } } : {}),
+    },
+  });
+
+  return { terminatedSessions: count };
 }
 
 export async function requireUserFromAccessToken(authorizationHeader: string | undefined) {

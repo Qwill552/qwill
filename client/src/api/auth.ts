@@ -1,4 +1,10 @@
-import type { AuthResponse, LoginInput, PublicUser, RegisterInput } from '@messenger/shared';
+import type {
+  AuthResponse,
+  ChangePasswordResponse,
+  LoginInput,
+  PublicUser,
+  RegisterInput,
+} from '@messenger/shared';
 
 import { apiRequest } from './client';
 
@@ -32,8 +38,11 @@ export function logoutRequest(): Promise<void> {
   return apiRequest<void>('/api/auth/logout', { method: 'POST', body: {}, skipAuthRetry: true });
 }
 
-export function changePasswordRequest(currentPassword: string, newPassword: string): Promise<void> {
-  return apiRequest<void>('/api/auth/password', {
+export function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResponse> {
+  return apiRequest<ChangePasswordResponse>('/api/auth/password', {
     method: 'POST',
     body: { currentPassword, newPassword },
   });

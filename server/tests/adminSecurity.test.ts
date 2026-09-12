@@ -89,7 +89,7 @@ describe('защита админского аккаунта (R-32E)', () => {
         .post('/api/auth/password')
         .set('Authorization', `Bearer ${admin.token}`)
         .send({ currentPassword: PASSWORD, newPassword: LONG_PASSWORD });
-      expect(long.status).toBe(204);
+      expect(long.status).toBe(200);
 
       const stored = await prisma.user.findUniqueOrThrow({ where: { id: admin.userId } });
       expect(stored.mustChangePassword).toBe(false);
@@ -113,7 +113,7 @@ describe('защита админского аккаунта (R-32E)', () => {
         .post('/api/auth/password')
         .set('Authorization', `Bearer ${user.token}`)
         .send({ currentPassword: PASSWORD, newPassword: SHORT_PASSWORD });
-      expect(ok.status).toBe(204);
+      expect(ok.status).toBe(200);
     });
   });
 
