@@ -114,7 +114,7 @@ export function VoiceTab({
   fastScroll?: FastScrollBinding;
   selection?: AttachmentSelectionBinding;
 }) {
-  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'voice');
+  const { items, setItems, status, hasMoreBefore, sentinelRef, retry } = useChatAttachments(chatId, 'voice');
 
   useEffect(() => {
     fastScroll?.setItems(items);
@@ -170,7 +170,7 @@ export function VoiceTab({
           onMenu={menu.open}
         />
       ))}
-      {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {hasMoreBefore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
       {menu.node}
     </div>
   );

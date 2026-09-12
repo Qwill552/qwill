@@ -4,6 +4,9 @@ import { Icon } from '../../ui/Icon';
 import styles from './FastScroller.module.css';
 
 const HIDE_DELAY_MS = 1500;
+/** Тап отделяется от протяжки так же, как в Telegram (RecyclerListView.java:689). */
+const TAP_MAX_MS = 200;
+const TAP_SLOP_PX = 8;
 
 export interface FastScrollItem {
   createdAt: string;
@@ -19,6 +22,8 @@ interface FastScrollerProps {
   sentinelRef: RefObject<HTMLElement | null>;
   listRef: RefObject<HTMLElement | null>;
   itemsRef: RefObject<FastScrollItem[]>;
+  /** Короткий тап по ползунку и нажатие плашки месяца открывают календарь (R-33A). */
+  onOpenCalendar?: (iso: string) => void;
 }
 
 interface Metrics {
@@ -32,6 +37,7 @@ interface Drag {
   pointerId: number;
   grabY: number;
   startOffset: number;
+  startTime: number;
   labelled: boolean;
 }
 
@@ -50,14 +56,14 @@ function monthLabel(iso: string): string {
   return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${date.getFullYear()}`;
 }
 
-export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastScrollerProps) {
+export function FastScroller({ scroller, sentinelRef, listRef, itemsRef, onOpenCalendar }: FastScrollerProps) {
   const [offset, setOffset] = useState(0);
   const [visible, setVisible] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [label, setLabel] = useState<string | null>(null);
+  const [label, setLabel] = useState<{ text: string; iso: string } | null>(null);
 
   const trackRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLButtonElement>(null);
   const hideTimer = useRef<number | undefined>(undefined);
   const dragRef = useRef<Drag | null>(null);
   const offsetRef = useRef(0);
@@ -107,6 +113,13 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
     return low;
   }
 
+  function visibleIso(): string | null {
+    const metrics = measure();
+    if (!metrics) return null;
+    const index = firstVisibleIndex(metrics);
+    return index === null ? null : (itemsRef.current[index]?.createdAt ?? null);
+  }
+
   function severalMonths(): boolean {
     const items = itemsRef.current;
     const first = items[0];
@@ -118,7 +131,7 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
   function updateLabel(metrics: Metrics): void {
     const index = firstVisibleIndex(metrics);
     const item = index === null ? null : itemsRef.current[index];
-    setLabel(item ? monthLabel(item.createdAt) : null);
+    setLabel(item ? { text: monthLabel(item.createdAt), iso: item.createdAt } : null);
   }
 
   useEffect(() => {
@@ -176,9 +189,16 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
       if (!drag || event.pointerId !== drag.pointerId) return;
       dragRef.current = null;
       setDragging(false);
-      setLabel(null);
       window.clearTimeout(hideTimer.current);
       hideTimer.current = window.setTimeout(() => setVisible(false), HIDE_DELAY_MS);
+
+      const tapped =
+        event.type === 'pointerup' &&
+        event.timeStamp - drag.startTime < TAP_MAX_MS &&
+        Math.abs(event.clientY - drag.grabY) <= TAP_SLOP_PX;
+      if (!tapped || !onOpenCalendar) return;
+      const iso = visibleIso();
+      if (iso) onOpenCalendar(iso);
     }
 
     window.addEventListener('pointermove', handleMove, { passive: true });
@@ -191,7 +211,7 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
     };
   });
 
-  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
+  function handlePointerDown(event: ReactPointerEvent<HTMLElement>): void {
     if (!event.isPrimary || dragRef.current) return;
     const metrics = measure();
     if (!metrics) return;
@@ -200,6 +220,7 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
       pointerId: event.pointerId,
       grabY: event.clientY,
       startOffset: offsetRef.current,
+      startTime: event.timeStamp,
       labelled,
     };
     setDragging(true);
@@ -208,19 +229,42 @@ export function FastScroller({ scroller, sentinelRef, listRef, itemsRef }: FastS
     if (labelled) updateLabel(metrics);
   }
 
+  const interactive = onOpenCalendar !== undefined;
+
   return (
-    <div ref={trackRef} className={styles.track} aria-hidden="true">
-      <div
+    <div ref={trackRef} className={styles.track} aria-hidden={interactive ? undefined : 'true'}>
+      {label && (
+        <button
+          type="button"
+          className={`${styles.label} ${visible ? styles.labelVisible : ''} ${dragging ? styles.labelDragging : ''}`}
+          style={{ transform: `translateY(${offset}px)` }}
+          data-no-back-swipe="true"
+          aria-label={`Календарь, ${label.text}`}
+          tabIndex={interactive && visible ? 0 : -1}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => onOpenCalendar?.(label.iso)}
+        >
+          {label.text}
+        </button>
+      )}
+      <button
         ref={thumbRef}
+        type="button"
         className={`${styles.thumb} ${visible ? styles.visible : ''} ${dragging ? styles.dragging : ''}`}
         style={{ transform: `translateY(${offset}px)` }}
         data-no-back-swipe="true"
+        aria-label="Календарь"
+        tabIndex={interactive && visible ? 0 : -1}
         onPointerDown={handlePointerDown}
+        onClick={(event) => {
+          if (event.detail !== 0) return;
+          const iso = visibleIso();
+          if (iso) onOpenCalendar?.(iso);
+        }}
       >
         <Icon name="chevron-up" size={16} className={styles.glyph} />
         <Icon name="chevron-down" size={16} className={styles.glyph} />
-        {label && <span className={styles.label}>{label}</span>}
-      </div>
+      </button>
     </div>
   );
 }

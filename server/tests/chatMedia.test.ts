@@ -176,7 +176,8 @@ describe('chatMedia.service (PM-1)', () => {
     ];
 
     const firstPage = await listChatAttachments(chatId, alice.userId, { category: 'media', limit: 2 });
-    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.hasMoreBefore).toBe(true);
+    expect(firstPage.hasMoreAfter).toBe(false);
     expect(firstPage.items.map((i) => i.messageId)).toEqual([ids[3], ids[2]]);
 
     const secondPage = await listChatAttachments(chatId, alice.userId, {
@@ -184,7 +185,8 @@ describe('chatMedia.service (PM-1)', () => {
       limit: 2,
       before: firstPage.items[1]!.messageId,
     });
-    expect(secondPage.hasMore).toBe(false);
+    expect(secondPage.hasMoreBefore).toBe(false);
+    expect(secondPage.hasMoreAfter).toBe(true);
     expect(secondPage.items.map((i) => i.messageId)).toEqual([ids[1], ids[0]]);
   });
 

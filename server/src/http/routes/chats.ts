@@ -1,6 +1,7 @@
 import {
   addMemberSchema,
   chatAttachmentsQuerySchema,
+  chatCalendarQuerySchema,
   chatLinksQuerySchema,
   chatMuteSchema,
   chatSearchQuerySchema,
@@ -29,6 +30,7 @@ import {
   syncPresenceBetween,
   unsubscribeUserFromChat,
 } from '../../realtime/index.js';
+import * as chatCalendarService from '../../services/chatCalendar.js';
 import * as chatMediaService from '../../services/chatMedia.js';
 import * as chatService from '../../services/chat.js';
 import * as groupService from '../../services/group.js';
@@ -176,6 +178,18 @@ chatsRouter.get('/:id/attachments/counts', (req, res, next) => {
     .countChatAttachments(paramId(req, 'id'), req.userId!)
     .then((counts) => res.json(counts))
     .catch(next);
+});
+
+chatsRouter.get('/:id/calendar', (req, res, next) => {
+  try {
+    const query = parseOrThrow(chatCalendarQuerySchema, req.query);
+    chatCalendarService
+      .getChatCalendar(paramId(req, 'id'), req.userId!, query)
+      .then((calendar) => res.json(calendar))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
 });
 
 chatsRouter.get('/:id/links', (req, res, next) => {

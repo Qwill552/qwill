@@ -34,6 +34,9 @@ export const SEARCH_PAGE_SIZE = 20;
 /** Курсорная пагинация поиска внутри чата (R-33). */
 export const CHAT_SEARCH_PAGE_SIZE = 30;
 
+/** Ширина одного запроса календаря чата в месяцах (R-33A). */
+export const CHAT_CALENDAR_MAX_MONTHS = 24;
+
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;
 

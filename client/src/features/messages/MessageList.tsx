@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { MessageReactionDto } from '@messenger/shared';
 import { createPortal } from 'react-dom';
 
+import { chatCalendarRequest } from '../../api/chats';
 import { onBottomInset, registerInsetMover } from '../../app/bottomInset';
 import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
@@ -11,6 +12,8 @@ import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
 import { Icon } from '../../ui/Icon';
 import { cssDurationMs } from '../../ui/motion';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
+import { dayKeyOfIso } from '../calendar/calendarDates';
+import { ChatCalendar } from '../calendar/ChatCalendar';
 import { isServiceChat } from '../chat/serviceChat';
 import { groupAlbums, mergeReactions } from '../media/albums';
 import { MediaFeedContext, useMediaFeedScope } from '../media/mediaFeedScope';
@@ -279,6 +282,7 @@ export function MessageList({
   const dayDividerHeight = useRef(DAY_DIVIDER_ESTIMATE);
   const floatingDateIdle = useRef(0);
   const [floatingDate, setFloatingDate] = useState<{ iso: string; offset: number } | null>(null);
+  const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const loadingUp = useRef(false);
   const loadingDown = useRef(false);
   const retryUpAt = useRef(0);
@@ -590,6 +594,30 @@ export function MessageList({
   }
 
   flashMessageRef.current = flashMessage;
+
+  const openCalendarAt = useCallback((iso: string) => setCalendarDay(dayKeyOfIso(iso)), []);
+
+  function jumpToDayStart(iso: string): void {
+    const key = dayKeyOfIso(iso);
+    const entries = displayEntriesRef.current;
+    const index = entries.findIndex((item) => dayKeyOfIso(item.row.message.createdAt) === key);
+    const known = index > 0 || (index === 0 && !hasMore);
+    if (known) {
+      scrollToMessage(entries[index]!.row.message.id);
+      return;
+    }
+    chatCalendarRequest(chatId, { from: key, to: key }, 'all')
+      .then((calendar) => {
+        const day = calendar.days[0];
+        if (day) void openChatAt(chatId, day.firstMessageId);
+      })
+      .catch(() => undefined);
+  }
+
+  function pickCalendarDay(firstMessageId: number): void {
+    setCalendarDay(null);
+    scrollToMessage(firstMessageId);
+  }
 
   function scrollToMessage(messageId: number): void {
     const el = listRef.current;
@@ -1170,6 +1198,7 @@ export function MessageList({
             flash={flashId !== null && entry.row.groupIds.includes(flashId)}
             listRef={listRef}
             atBottomRef={atVeryBottom}
+            onOpenCalendar={openCalendarAt}
           />
         ))}
 
@@ -1195,7 +1224,22 @@ export function MessageList({
 
       </div>
 
-      <FloatingDate iso={floatingDate?.iso ?? null} offset={floatingDate?.offset ?? 0} />
+      <FloatingDate
+        iso={floatingDate?.iso ?? null}
+        offset={floatingDate?.offset ?? 0}
+        onJumpToDay={jumpToDayStart}
+      />
+
+      {calendarDay && (
+        <ChatCalendar
+          chatId={chatId}
+          filter="all"
+          anchorDate={calendarDay}
+          selected={calendarDay}
+          onPick={(day) => pickCalendarDay(day.firstMessageId)}
+          onClose={() => setCalendarDay(null)}
+        />
+      )}
 
       <button
         type="button"
@@ -1233,6 +1277,7 @@ const MessageListRow = memo(function MessageListRow({
   flash,
   listRef,
   atBottomRef,
+  onOpenCalendar,
 }: {
   entry: RenderRow;
   index: number;
@@ -1249,6 +1294,7 @@ const MessageListRow = memo(function MessageListRow({
   flash: boolean;
   listRef: React.RefObject<HTMLDivElement | null>;
   atBottomRef: React.RefObject<boolean>;
+  onOpenCalendar: (iso: string) => void;
 }) {
   const { row, own, read, isReal, canEdit, canDelete, canPin, canReply, canReact, isPinned, showUnread } = entry;
   const { message, groupIds, album, reactions, sameAuthorAsPrev, sameAuthorAsNext } = row;
@@ -1313,7 +1359,7 @@ const MessageListRow = memo(function MessageListRow({
 
   return (
     <div className={`${styles.row} ${collapsing ? styles.rowCollapsing : ''}`} data-row-index={index}>
-      {row.showDay && <DateDivider iso={message.createdAt} />}
+      {row.showDay && <DateDivider iso={message.createdAt} onOpenCalendar={onOpenCalendar} />}
       {showUnread && <UnreadDivider count={unreadCount} />}
 
       <div

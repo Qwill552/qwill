@@ -9,7 +9,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { avatarGradientFor } from '../../ui/tint';
 import type { FastScrollBinding } from './FastScroller';
 import { useShowInChatMenu, useShowInChatTrigger } from './showInChat';
-import { usePagedByMessage } from './useChatAttachments';
+import { usePagedByMessage, type PagedCursor } from './useChatAttachments';
 import styles from './LinksTab.module.css';
 
 const SKELETON_ROWS = 8;
@@ -57,8 +57,16 @@ function LinkRow({ item, onMenu }: { item: ChatLinkDto; onMenu: (messageId: numb
 }
 
 export function LinksTab({ chatId, fastScroll }: { chatId: string; fastScroll?: FastScrollBinding }) {
-  const loadPage = useCallback((before?: number) => getChatLinksRequest(chatId, before), [chatId]);
-  const { items, status, hasMore, sentinelRef, retry } = usePagedByMessage(loadPage);
+  const loadPage = useCallback(
+    (cursor?: PagedCursor) =>
+      getChatLinksRequest(chatId, cursor?.before).then((page) => ({
+        items: page.items,
+        hasMoreBefore: page.hasMore,
+        hasMoreAfter: false,
+      })),
+    [chatId],
+  );
+  const { items, status, hasMoreBefore, sentinelRef, retry } = usePagedByMessage(loadPage);
   const menu = useShowInChatMenu(chatId);
 
   useEffect(() => {
@@ -98,7 +106,7 @@ export function LinksTab({ chatId, fastScroll }: { chatId: string; fastScroll?: 
       {items.map((item, index) => (
         <LinkRow key={`${item.messageId}:${index}`} item={item} onMenu={menu.open} />
       ))}
-      {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {hasMoreBefore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
       {menu.node}
     </div>
   );

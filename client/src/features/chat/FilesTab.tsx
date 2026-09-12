@@ -123,7 +123,7 @@ export function FilesTab({
   fastScroll?: FastScrollBinding;
   selection?: AttachmentSelectionBinding;
 }) {
-  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, 'file');
+  const { items, setItems, status, hasMoreBefore, sentinelRef, retry } = useChatAttachments(chatId, 'file');
   const menu = useShowInChatMenu(chatId);
 
   useEffect(() => {
@@ -168,7 +168,7 @@ export function FilesTab({
       {items.map((item) => (
         <FileRow key={item.attachment.id} item={item} selection={selection} onMenu={menu.open} />
       ))}
-      {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {hasMoreBefore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
       {menu.node}
     </div>
   );

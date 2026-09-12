@@ -1,9 +1,11 @@
 import type { ChatAttachmentCategory, ChatAttachmentDto } from '@messenger/shared';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
+import { cssDurationMs } from '../../ui/motion';
+import { scrollParentOf } from '../../ui/scrollParent';
 import { Skeleton } from '../../ui/Skeleton';
 import { MediaTile } from '../media/MediaTile';
 import { openMediaViewerList, useMediaViewerStore, type MediaViewerItem } from '../media/mediaViewerStore';
@@ -14,15 +16,23 @@ import styles from './MediaTabGrid.module.css';
 
 const SKELETON_TILES = 12;
 
+export interface MediaJumpTarget {
+  messageId: number;
+  token: number;
+}
+
 interface MediaTabGridProps {
   chatId: string;
   category?: ChatAttachmentCategory;
   fastScroll?: FastScrollBinding;
   selection?: AttachmentSelectionBinding;
+  /** Прыжок к вложению дня из календаря (R-33A); token меняется на каждый выбор. */
+  jumpTarget?: MediaJumpTarget | null;
 }
 
-export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection }: MediaTabGridProps) {
-  const { items, setItems, status, hasMore, sentinelRef, retry } = useChatAttachments(chatId, category);
+export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection, jumpTarget }: MediaTabGridProps) {
+  const { items, setItems, status, hasMoreBefore, hasMoreAfter, sentinelRef, topSentinelRef, jumpTo, retry } =
+    useChatAttachments(chatId, category);
 
   const myUserId = useChatStore((s) => s.myUserId);
   const myName = useAuthStore((s) => s.user?.displayName ?? '');
@@ -30,6 +40,45 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection
 
   const itemsRef = useRef<ChatAttachmentDto[]>(items);
   itemsRef.current = items;
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const pendingJump = useRef<number | null>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
+  const [flashId, setFlashId] = useState<number | null>(null);
+
+  function focusAttachment(messageId: number): boolean {
+    const index = itemsRef.current.findIndex((item) => item.messageId === messageId);
+    const grid = gridRef.current;
+    const tile = index >= 0 ? (grid?.children[index] as HTMLElement | undefined) : undefined;
+    if (!grid || !tile) return false;
+    const scroller = scrollParentOf(grid);
+    if (scroller) {
+      const row = grid.closest('[data-media-section]')?.querySelector('[data-tabs-row]');
+      const inset =
+        (parseFloat(getComputedStyle(scroller).paddingTop) || 0) + (row?.getBoundingClientRect().height ?? 0);
+      const top = scroller.scrollTop + tile.getBoundingClientRect().top - scroller.getBoundingClientRect().top - inset;
+      scroller.scrollTop = Math.max(0, top);
+    }
+    window.clearTimeout(flashTimer.current);
+    setFlashId(messageId);
+    flashTimer.current = window.setTimeout(() => setFlashId(null), cssDurationMs('--dur-flash'));
+    return true;
+  }
+
+  useEffect(() => {
+    if (!jumpTarget) return;
+    if (focusAttachment(jumpTarget.messageId)) return;
+    pendingJump.current = jumpTarget.messageId;
+    void jumpTo(jumpTarget.messageId);
+  }, [jumpTarget?.token]);
+
+  useLayoutEffect(() => {
+    const messageId = pendingJump.current;
+    if (messageId === null) return;
+    if (focusAttachment(messageId)) pendingJump.current = null;
+  }, [items]);
+
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
   useEffect(() => {
     fastScroll?.setItems(items);
@@ -89,15 +138,23 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection
 
   return (
     <>
-      <div className={styles.grid} ref={fastScroll?.listRef}>
+      {hasMoreAfter && <div ref={topSentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      <div
+        className={styles.grid}
+        ref={(element) => {
+          gridRef.current = element;
+          fastScroll?.listRef(element);
+        }}
+      >
         {items.map((item) => {
           const selected = selection?.active && selection.selectedIds.has(item.messageId);
+          const flashing = flashId === item.messageId;
           return (
             <MediaTile
               key={item.attachment.id}
               attachment={item.attachment}
               chatId={chatId}
-              className={`${styles.tile} ${selected ? styles.tileSelected : ''}`}
+              className={`${styles.tile} ${selected ? styles.tileSelected : ''} ${flashing ? styles.tileFlash : ''}`}
               standalone
               selected={selected}
               selectionMode={selection?.active ?? false}
@@ -119,7 +176,7 @@ export function MediaTabGrid({ chatId, category = 'media', fastScroll, selection
           );
         })}
       </div>
-      {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+      {hasMoreBefore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
     </>
   );
 }

@@ -9,13 +9,15 @@
   height: 0;
 }
 
-.row {
+/* Кнопка «⋮» живёт в той же капсуле, но вне `role="tablist"` (R-33A): полоса вкладок
+   прокручивается вбок, и внутри неё кнопка уехала бы вместе с вкладками. Капсула одна —
+   отдельный размывающий слой на кнопку не заводится (правило 7 CLAUDE.md). */
+.rowWrap {
   position: sticky;
   z-index: 3;
   top: 0;
   display: flex;
-  overflow-x: auto;
-  gap: var(--space-1);
+  align-items: center;
   margin: 0 calc(var(--safe-right) + var(--chrome-pad-x)) var(--space-2)
     calc(var(--safe-left) + var(--chrome-pad-x));
   padding: calc((var(--chrome-h) - var(--tap-min)) / 2);
@@ -24,6 +26,32 @@
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
   box-shadow: var(--chrome-shadow);
+}
+
+.row {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  gap: var(--space-1);
+}
+
+.overflow {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  place-items: center;
+}
+
+.overflow:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .tab {

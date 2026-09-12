@@ -61,27 +61,55 @@ export async function listChatAttachments(
   await assertMember(chatId, userId);
 
   const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
-  const idFilter: { gt?: number; lt?: number } = {};
-  if (member.clearedUpToMessageId) idFilter.gt = member.clearedUpToMessageId;
-  if (query.before) idFilter.lt = query.before;
+  const floor = member.clearedUpToMessageId ?? 0;
+  const kind = categoryWhereMap[query.category];
 
+  function whereMessages(idFilter: { gt?: number; lt?: number }): Prisma.AttachmentWhereInput {
+    const bounds = { ...idFilter };
+    if (floor > 0) bounds.gt = Math.max(bounds.gt ?? 0, floor);
+    return { ...kind, message: { chatId, deletedAt: null, ...(Object.keys(bounds).length > 0 ? { id: bounds } : {}) } };
+  }
+
+  async function exists(idFilter: { gt?: number; lt?: number }): Promise<boolean> {
+    const row = await prisma.attachment.findFirst({ where: whereMessages(idFilter), select: { id: true } });
+    return row !== null;
+  }
+
+  const forward = query.after !== undefined;
   const rows = await prisma.attachment.findMany({
-    where: {
-      ...categoryWhereMap[query.category],
-      message: { chatId, deletedAt: null, ...(Object.keys(idFilter).length > 0 ? { id: idFilter } : {}) },
-    },
+    where: whereMessages(forward ? { gt: query.after! } : query.before !== undefined ? { lt: query.before } : {}),
     include: {
       file: true,
       thumbnail: true,
       preview: true,
       message: { select: { id: true, createdAt: true, senderId: true } },
     },
-    orderBy: { message: { id: 'desc' } },
+    orderBy: { messageId: forward ? 'asc' : 'desc' },
     take: query.limit + 1,
   });
 
-  const hasMore = rows.length > query.limit;
+  const overflow = rows.length > query.limit;
   const page = rows.slice(0, query.limit);
+  if (forward) page.reverse();
+
+  const newest = page[0]?.message.id;
+  const oldest = page.at(-1)?.message.id;
+
+  const [hasMoreBefore, hasMoreAfter] = await Promise.all([
+    forward
+      ? oldest !== undefined
+        ? exists({ lt: oldest })
+        : exists({ lt: query.after! + 1 })
+      : Promise.resolve(overflow),
+    forward
+      ? Promise.resolve(overflow)
+      : newest !== undefined
+        ? exists({ gt: newest })
+        : query.before !== undefined
+          ? exists({ gt: query.before - 1 })
+          : Promise.resolve(false),
+  ]);
+
   const items: ChatAttachmentDto[] = page.map((row) => ({
     messageId: row.message.id,
     createdAt: row.message.createdAt.toISOString(),
@@ -89,7 +117,7 @@ export async function listChatAttachments(
     attachment: toAttachmentDto(row),
   }));
 
-  return { items, hasMore };
+  return { items, hasMoreBefore, hasMoreAfter };
 }
 
 export async function countChatAttachments(chatId: string, userId: string): Promise<ChatAttachmentCounts> {

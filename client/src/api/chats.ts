@@ -2,6 +2,8 @@ import type {
   ChatAttachmentCategory,
   ChatAttachmentCounts,
   ChatAttachmentsPage,
+  ChatCalendarFilter,
+  ChatCalendarResponse,
   ChatDto,
   ChatLinksPage,
   ChatListResponse,
@@ -61,11 +63,26 @@ export function syncMessagesRequest(
 export function getChatAttachmentsRequest(
   chatId: string,
   category: ChatAttachmentCategory,
-  before?: number,
+  cursor?: { before?: number; after?: number },
 ): Promise<ChatAttachmentsPage> {
   const params = new URLSearchParams({ category });
-  if (before !== undefined) params.set('before', String(before));
+  if (cursor?.before !== undefined) params.set('before', String(cursor.before));
+  if (cursor?.after !== undefined) params.set('after', String(cursor.after));
   return apiRequest<ChatAttachmentsPage>(`/api/chats/${chatId}/attachments?${params.toString()}`);
+}
+
+export function chatCalendarRequest(
+  chatId: string,
+  range: { from: string; to: string },
+  filter: ChatCalendarFilter,
+): Promise<ChatCalendarResponse> {
+  const params = new URLSearchParams({
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    from: range.from,
+    to: range.to,
+    filter,
+  });
+  return apiRequest<ChatCalendarResponse>(`/api/chats/${chatId}/calendar?${params.toString()}`);
 }
 
 export function getChatLinksRequest(chatId: string, before?: number): Promise<ChatLinksPage> {

@@ -23,6 +23,24 @@
   transition: transform var(--dur-check) var(--ease-screen), border-radius var(--dur-check) var(--ease-screen);
 }
 
+/* Вспышка найденного снимка после прыжка из календаря (R-33A) — теми же полутора
+   секундами, что и вспышка пузыря в ленте. */
+.tileFlash {
+  animation: tileFlash var(--dur-flash) var(--ease-screen);
+}
+
+@keyframes tileFlash {
+  from {
+    outline: 3px solid var(--primary);
+    outline-offset: -3px;
+  }
+
+  to {
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+  }
+}
+
 .checkbox {
   position: absolute;
   top: 6px;

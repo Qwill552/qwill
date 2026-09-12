@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  CHAT_CALENDAR_MAX_MONTHS,
   CHAT_SEARCH_PAGE_SIZE,
   CHAT_TITLE_MAX_LENGTH,
   MESSAGE_BATCH_LIMIT,
@@ -8,7 +9,7 @@ import {
   MESSAGES_PAGE_SIZE,
 } from './constants.js';
 import { isSingleEmoji } from './emoji.js';
-import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto } from './files.js';
+import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto, type FileDto } from './files.js';
 import type { LinkPreviewDto } from './links.js';
 import type { AvatarColor } from './user.js';
 
@@ -37,11 +38,17 @@ export type MessagesSyncQuery = z.infer<typeof messagesSyncQuerySchema>;
 
 export type ChatAttachmentCategory = 'media' | 'file' | 'voice' | 'gif';
 
-export const chatAttachmentsQuerySchema = z.object({
-  category: z.enum(['media', 'file', 'voice', 'gif']),
-  before: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
-});
+export const chatAttachmentsQuerySchema = z
+  .object({
+    category: z.enum(['media', 'file', 'voice', 'gif']),
+    before: z.coerce.number().int().positive().optional(),
+    after: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
+  })
+  .refine((value) => value.before === undefined || value.after === undefined, {
+    message: 'before и after вместе не передаются',
+    path: ['after'],
+  });
 export type ChatAttachmentsQuery = z.infer<typeof chatAttachmentsQuerySchema>;
 
 export interface ChatAttachmentDto {
@@ -53,7 +60,8 @@ export interface ChatAttachmentDto {
 
 export interface ChatAttachmentsPage {
   items: ChatAttachmentDto[];
-  hasMore: boolean;
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
 }
 
 export interface ChatAttachmentCounts {
@@ -98,6 +106,60 @@ export interface ChatSearchResponse {
   /** Общее число совпадений в чате, не только загруженная страница — для счётчика «3 из 17». */
   total: number;
   hasMore: boolean;
+}
+
+export type ChatCalendarFilter = 'all' | 'media';
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isCalendarDate(value: string): boolean {
+  if (!DATE_ONLY.test(value)) return false;
+  const time = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(time)) return false;
+  return new Date(time).toISOString().slice(0, 10) === value;
+}
+
+function monthNumber(date: string): number {
+  return Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7));
+}
+
+export function isSupportedTimeZone(value: string): boolean {
+  if (value.length === 0 || value.length > 64) return false;
+  const supported = Intl.supportedValuesOf;
+  if (typeof supported === 'function') return supported('timeZone').includes(value);
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const chatCalendarQuerySchema = z
+  .object({
+    tz: z.string().max(64).refine(isSupportedTimeZone, 'Неизвестный часовой пояс'),
+    from: z.string().refine(isCalendarDate, 'Некорректная дата'),
+    to: z.string().refine(isCalendarDate, 'Некорректная дата'),
+    filter: z.enum(['all', 'media']).default('all'),
+  })
+  .refine((value) => value.to >= value.from, { message: 'Конец диапазона раньше начала', path: ['to'] })
+  .refine((value) => monthNumber(value.to) - monthNumber(value.from) <= CHAT_CALENDAR_MAX_MONTHS, {
+    message: 'Слишком широкий диапазон',
+    path: ['to'],
+  });
+export type ChatCalendarQuery = z.infer<typeof chatCalendarQuerySchema>;
+
+export interface ChatCalendarDay {
+  date: string;
+  count: number;
+  firstMessageId: number;
+  preview: FileDto | null;
+}
+
+export interface ChatCalendarResponse {
+  days: ChatCalendarDay[];
+  minDate: string | null;
+  maxDate: string | null;
 }
 
 /** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).

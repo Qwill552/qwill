@@ -17,6 +17,7 @@
   gap: 2px;
   width: 28px;
   height: 52px;
+  padding: 0;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
@@ -46,26 +47,55 @@
   cursor: grabbing;
 }
 
+.thumb:focus-visible,
+.label:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .glyph {
   display: block;
 }
 
+/* Плашка месяца живёт столько же, сколько ползунок, и открывает календарь (R-33A):
+   потому она вынесена из ползунка — кнопка в кнопке недопустима. Смещение то же самое. */
 .label {
   position: absolute;
-  top: 50%;
-  right: calc(100% + var(--space-2));
+  top: 9px;
+  right: calc(var(--safe-right) + var(--space-1) + 28px + var(--space-2));
   display: flex;
   align-items: center;
   height: 34px;
   padding: 0 var(--space-4);
-  transform: translateY(-50%);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
   box-shadow: var(--card-shadow);
   color: var(--text-primary);
+  font-family: inherit;
   font-size: var(--font-meta);
   font-weight: 600;
   white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--dur-scrollbar) ease;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.label::before {
+  content: '';
+  position: absolute;
+  inset: -5px -8px;
+}
+
+.labelVisible {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Пока ползунок тянут, плашка событий не берёт — иначе перехватила бы протяжку,
+   начатую рядом с ней. */
+.labelDragging {
   pointer-events: none;
 }

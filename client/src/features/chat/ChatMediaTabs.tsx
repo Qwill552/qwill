@@ -14,6 +14,10 @@ import { getChatAttachmentCountsRequest } from '../../api/chats';
 import { useBackHandler } from '../../app/useBackHandler';
 import { useChatStore } from '../../stores/chatStore';
 import { haptic } from '../../ui/haptic';
+import { Icon } from '../../ui/Icon';
+import { Menu } from '../../ui/Menu';
+import { dayKeyOfIso } from '../calendar/calendarDates';
+import { ChatCalendar } from '../calendar/ChatCalendar';
 import { DeleteMessageModal } from '../messages/DeleteMessageModal';
 import { ForwardSheet } from '../messages/ForwardSheet';
 import { isDeletableSelection } from '../messages/messageDeleting';
@@ -21,7 +25,7 @@ import { FastScroller, type FastScrollBinding, type FastScrollItem } from './Fas
 import { FilesTab } from './FilesTab';
 import { LinksTab } from './LinksTab';
 import { MediaSelectionBar } from './MediaSelectionBar';
-import { MediaTabGrid } from './MediaTabGrid';
+import { MediaTabGrid, type MediaJumpTarget } from './MediaTabGrid';
 import type { AttachmentSelectionBinding, AttachmentSelectionItem } from './mediaSelection';
 import { plural } from './plural';
 import { useShowInChat } from './showInChat';
@@ -148,6 +152,9 @@ export function ChatMediaTabs({
   );
   const [forwarding, setForwarding] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const [calendarAnchor, setCalendarAnchor] = useState<string | null>(null);
+  const [jumpTarget, setJumpTarget] = useState<MediaJumpTarget | null>(null);
 
   const myUserId = useChatStore((s) => s.myUserId);
   const deleteMessagesBatch = useChatStore((s) => s.deleteMessagesBatch);
@@ -289,6 +296,17 @@ export function ChatMediaTabs({
 
   const active = tabs[index];
   const fastScrollable = counts !== null && active !== undefined && countOf(counts, active.id) >= FAST_SCROLL_MIN_ITEMS;
+
+  const mediaTabActive = active?.id === 'media';
+
+  function openCalendarAt(iso: string): void {
+    setCalendarAnchor(dayKeyOfIso(iso));
+  }
+
+  function openCalendarFromMenu(): void {
+    const newest = listItemsRef.current[0]?.createdAt;
+    setCalendarAnchor(dayKeyOfIso(newest ?? new Date().toISOString()));
+  }
 
   const fastScroll = useMemo<FastScrollBinding>(
     () => ({
@@ -554,7 +572,7 @@ export function ChatMediaTabs({
   if (tabs.length === 0) return null;
 
   return (
-    <div ref={sectionRef} className={styles.section}>
+    <div ref={sectionRef} className={styles.section} data-media-section="true">
       <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />
 
       {fastScrollable && (
@@ -563,6 +581,7 @@ export function ChatMediaTabs({
           sentinelRef={sentinelRef}
           listRef={listElementRef}
           itemsRef={listItemsRef}
+          onOpenCalendar={mediaTabActive ? openCalendarAt : undefined}
         />
       )}
 
@@ -577,32 +596,46 @@ export function ChatMediaTabs({
           onDelete={() => setConfirmingDelete(true)}
         />
       ) : (
-        <div
-          ref={rowRef}
-          className={`${styles.row} hide-native-scrollbar`}
-          role="tablist"
-          aria-label="Вложения чата"
-          data-no-back-swipe="true"
-          onKeyDown={handleTabKeyDown}
-        >
-          {tabs.map((tab, i) => (
+        <div className={styles.rowWrap} data-tabs-row="true">
+          <div
+            ref={rowRef}
+            className={`${styles.row} hide-native-scrollbar`}
+            role="tablist"
+            aria-label="Вложения чата"
+            data-no-back-swipe="true"
+            onKeyDown={handleTabKeyDown}
+          >
+            {tabs.map((tab, i) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`chat-media-tab-${tab.id}`}
+                aria-selected={i === index}
+                aria-controls={`chat-media-panel-${tab.id}`}
+                tabIndex={i === index ? 0 : -1}
+                className={`${styles.tab} ${i === index ? styles.tabActive : ''}`}
+                onClick={() => {
+                  selectTab(i);
+                  focusTab(i);
+                }}
+              >
+                <span className={styles.tabPill}>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {mediaTabActive && (
             <button
-              key={tab.id}
               type="button"
-              role="tab"
-              id={`chat-media-tab-${tab.id}`}
-              aria-selected={i === index}
-              aria-controls={`chat-media-panel-${tab.id}`}
-              tabIndex={i === index ? 0 : -1}
-              className={`${styles.tab} ${i === index ? styles.tabActive : ''}`}
-              onClick={() => {
-                selectTab(i);
-                focusTab(i);
-              }}
+              className={styles.overflow}
+              aria-label="Ещё"
+              aria-haspopup="menu"
+              onClick={(event) => setMenuAnchor(event.currentTarget.getBoundingClientRect())}
             >
-              <span className={styles.tabPill}>{tab.label}</span>
+              <Icon name="more" size={20} />
             </button>
-          ))}
+          )}
         </div>
       )}
 
@@ -636,6 +669,7 @@ export function ChatMediaTabs({
                   chatId={chatId}
                   fastScroll={slot === 0 ? fastScroll : undefined}
                   selection={slot === 0 ? tabSelection : undefined}
+                  jumpTarget={slot === 0 ? jumpTarget : undefined}
                 />
               )}
               {tab.id === 'file' && (
@@ -665,6 +699,27 @@ export function ChatMediaTabs({
           );
         })}
       </div>
+
+      {menuAnchor && (
+        <Menu
+          anchor={menuAnchor}
+          items={[{ id: 'calendar', label: 'Календарь', icon: 'calendar', onSelect: openCalendarFromMenu }]}
+          onClose={() => setMenuAnchor(null)}
+        />
+      )}
+
+      {calendarAnchor && (
+        <ChatCalendar
+          chatId={chatId}
+          filter="media"
+          anchorDate={calendarAnchor}
+          onPick={(day) => {
+            setCalendarAnchor(null);
+            setJumpTarget({ messageId: day.firstMessageId, token: Date.now() });
+          }}
+          onClose={() => setCalendarAnchor(null)}
+        />
+      )}
 
       {forwarding && selection && (
         <ForwardSheet
