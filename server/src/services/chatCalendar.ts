@@ -10,6 +10,8 @@ import { assertMember } from './chat.js';
 import { toFileDto } from './file.js';
 import { Prisma } from '../generated/prisma/client.js';
 
+const PREVIEW_FALLBACK_MAX_BYTES = 256 * 1024;
+
 interface DayRow {
   date: string;
   count: number;
@@ -80,7 +82,10 @@ export async function getChatCalendar(
              a."messageId" AS "messageId",
              a."previewFileId" AS "previewFileId",
              a."thumbnailFileId" AS "thumbnailFileId",
-             CASE WHEN f."mimeType" LIKE 'image/%' THEN a."fileId" END AS "imageFileId"
+             CASE
+               WHEN f."mimeType" LIKE 'image/%' AND f.size <= ${PREVIEW_FALLBACK_MAX_BYTES}
+               THEN a."fileId"
+             END AS "imageFileId"
       FROM "Attachment" a
       JOIN "Message" m ON m.id = a."messageId"
       JOIN "File" f ON f.id = a."fileId"

@@ -42,6 +42,12 @@
   gap: var(--space-1);
 }
 
+/* Месяц, чьи дни ещё едут: пустая клетка в нём не должна читаться как «в этот день
+   не писали» (R-33A). */
+.gridLoading {
+  opacity: 0.4;
+}
+
 .outside {
   display: grid;
   min-height: var(--tap-min);

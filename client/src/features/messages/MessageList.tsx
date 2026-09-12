@@ -15,6 +15,7 @@ import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { dayKeyOfIso } from '../calendar/calendarDates';
 import { ChatCalendar } from '../calendar/ChatCalendar';
 import { isServiceChat } from '../chat/serviceChat';
+import { focusMessageInChat } from '../chat/showInChat';
 import { groupAlbums, mergeReactions } from '../media/albums';
 import { MediaFeedContext, useMediaFeedScope } from '../media/mediaFeedScope';
 import { DateDivider, FloatingDate, UnreadDivider } from './Dividers';
@@ -603,20 +604,20 @@ export function MessageList({
     const index = entries.findIndex((item) => dayKeyOfIso(item.row.message.createdAt) === key);
     const known = index > 0 || (index === 0 && !hasMore);
     if (known) {
-      scrollToMessage(entries[index]!.row.message.id);
+      void focusMessageInChat(chatId, entries[index]!.row.message.id);
       return;
     }
     chatCalendarRequest(chatId, { from: key, to: key }, 'all')
       .then((calendar) => {
         const day = calendar.days[0];
-        if (day) void openChatAt(chatId, day.firstMessageId);
+        if (day) void focusMessageInChat(chatId, day.firstMessageId);
       })
       .catch(() => undefined);
   }
 
   function pickCalendarDay(firstMessageId: number): void {
     setCalendarDay(null);
-    scrollToMessage(firstMessageId);
+    void focusMessageInChat(chatId, firstMessageId);
   }
 
   function scrollToMessage(messageId: number): void {

@@ -9,6 +9,8 @@ export interface ChatCalendarData {
   minDate: string | null;
   maxDate: string | null;
   status: 'loading' | 'ready' | 'error';
+  /** Месяцы, чьи дни уже приехали: пустая клетка в них значит «не писали», а не «ещё не знаем». */
+  settled: ReadonlySet<string>;
   ensureMonths: (from: string, to: string) => void;
 }
 
@@ -19,6 +21,7 @@ export function useChatCalendar(chatId: string, filter: ChatCalendarFilter): Cha
     maxDate: null,
   });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set());
 
   const requestedRef = useRef<Set<string>>(new Set());
   const pendingRef = useRef(0);
@@ -28,6 +31,7 @@ export function useChatCalendar(chatId: string, filter: ChatCalendarFilter): Cha
     pendingRef.current = 0;
     setDays(new Map());
     setBounds({ minDate: null, maxDate: null });
+    setSettled(new Set());
     setStatus('loading');
   }, [chatId, filter]);
 
@@ -57,6 +61,11 @@ export function useChatCalendar(chatId: string, filter: ChatCalendarFilter): Cha
             return next;
           });
           setBounds({ minDate: response.minDate, maxDate: response.maxDate });
+          setSettled((prev) => {
+            const next = new Set(prev);
+            for (let index = first; index <= last; index += 1) next.add(monthFromIndex(index));
+            return next;
+          });
           pendingRef.current -= 1;
           if (pendingRef.current === 0) setStatus('ready');
         })
@@ -71,5 +80,5 @@ export function useChatCalendar(chatId: string, filter: ChatCalendarFilter): Cha
     [chatId, filter],
   );
 
-  return { days, minDate: bounds.minDate, maxDate: bounds.maxDate, status, ensureMonths };
+  return { days, minDate: bounds.minDate, maxDate: bounds.maxDate, status, settled, ensureMonths };
 }

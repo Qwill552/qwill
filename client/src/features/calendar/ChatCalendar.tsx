@@ -29,9 +29,9 @@ export function ChatCalendar({ chatId, filter, anchorDate, selected = null, onPi
   const anchorMonth = monthOf(anchorDate);
 
   const body = desktop ? (
-    <DesktopMonths anchorMonth={anchorMonth} selected={selected} calendar={calendar} onPick={onPick} />
+    <DesktopMonths chatId={chatId} anchorMonth={anchorMonth} selected={selected} calendar={calendar} onPick={onPick} />
   ) : (
-    <MobileMonths anchorMonth={anchorMonth} selected={selected} calendar={calendar} onPick={onPick} />
+    <MobileMonths chatId={chatId} anchorMonth={anchorMonth} selected={selected} calendar={calendar} onPick={onPick} />
   );
 
   if (desktop) {
@@ -50,6 +50,7 @@ export function ChatCalendar({ chatId, filter, anchorDate, selected = null, onPi
 }
 
 interface MonthsProps {
+  chatId: string;
   anchorMonth: string;
   selected: string | null;
   calendar: ReturnType<typeof useChatCalendar>;
@@ -66,8 +67,8 @@ function Weekdays() {
   );
 }
 
-function MobileMonths({ anchorMonth, selected, calendar, onPick }: MonthsProps) {
-  const { days, minDate, maxDate, status, ensureMonths } = calendar;
+function MobileMonths({ chatId, anchorMonth, selected, calendar, onPick }: MonthsProps) {
+  const { days, minDate, maxDate, status, settled, ensureMonths } = calendar;
   const [range, setRange] = useState(() => ({ earliest: shiftMonth(anchorMonth, -WINDOW_STEP + 1), latest: anchorMonth }));
 
   const stackRef = useRef<HTMLDivElement>(null);
@@ -141,15 +142,23 @@ function MobileMonths({ anchorMonth, selected, calendar, onPick }: MonthsProps) 
       <div ref={topRef} className={styles.edge} aria-hidden="true" />
       {status === 'error' && days.size === 0 && <p className={styles.failure}>Не удалось загрузить календарь</p>}
       {months.map((month) => (
-        <CalendarMonth key={month} month={month} days={days} selected={selected} onPick={onPick} />
+        <CalendarMonth
+          key={month}
+          month={month}
+          chatId={chatId}
+          days={days}
+          selected={selected}
+          loading={!settled.has(month)}
+          onPick={onPick}
+        />
       ))}
       <div ref={bottomRef} className={styles.edge} aria-hidden="true" />
     </div>
   );
 }
 
-function DesktopMonths({ anchorMonth, selected, calendar, onPick }: MonthsProps) {
-  const { days, minDate, maxDate, status, ensureMonths } = calendar;
+function DesktopMonths({ chatId, anchorMonth, selected, calendar, onPick }: MonthsProps) {
+  const { days, minDate, maxDate, status, settled, ensureMonths } = calendar;
   const [month, setMonth] = useState(anchorMonth);
 
   useEffect(() => {
@@ -186,7 +195,16 @@ function DesktopMonths({ anchorMonth, selected, calendar, onPick }: MonthsProps)
       </div>
       <Weekdays />
       {status === 'error' && days.size === 0 && <p className={styles.failure}>Не удалось загрузить календарь</p>}
-      <CalendarMonth month={month} days={days} selected={selected} withTitle={false} neighbours onPick={onPick} />
+      <CalendarMonth
+        month={month}
+        chatId={chatId}
+        days={days}
+        selected={selected}
+        loading={!settled.has(month)}
+        withTitle={false}
+        neighbours
+        onPick={onPick}
+      />
     </div>
   );
 }

@@ -18,7 +18,10 @@
   left: 0;
   z-index: 261;
   display: flex;
-  max-height: calc(100dvh - var(--header-h) - var(--safe-top));
+  /* --header-h в проекте не объявлен нигде: var() без запасного значения делал всё
+     объявление недействительным, шит оставался без max-height вовсе и на длинном
+     содержимом уезжал верхом за экран, не прокручиваясь внутри себя (R-33A). */
+  max-height: calc(100dvh - var(--chrome-space-top));
   flex-direction: column;
   padding-bottom: var(--safe-bottom);
   border-top: 1px solid var(--sheet-border);
