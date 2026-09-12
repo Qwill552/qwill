@@ -3,10 +3,8 @@ import { useState } from 'react';
 import { useChatSearchStore } from '../../stores/chatSearchStore';
 import { GlassButton } from '../../ui/chrome/GlassButton';
 import { Icon } from '../../ui/Icon';
-import { ChatCalendar } from '../calendar/ChatCalendar';
-import { dayKeyOfIso } from '../calendar/calendarDates';
+import { DatePickerSheet } from '../calendar/DatePickerSheet';
 import { plural } from '../chat/plural';
-import { jumpToSearchResult } from './jumpToSearchResult';
 import styles from './ChatSearchBottomBar.module.css';
 
 interface ChatSearchBottomBarProps {
@@ -25,9 +23,8 @@ export function ChatSearchBottomBar({ chatId }: ChatSearchBottomBarProps) {
   const next = useChatSearchStore((s) => s.next);
   const prev = useChatSearchStore((s) => s.prev);
 
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  const current = results[index];
   const canOlder = index + 1 < results.length || hasMore;
   const canNewer = index > 0;
   const listMode = mode === 'list';
@@ -66,7 +63,7 @@ export function ChatSearchBottomBar({ chatId }: ChatSearchBottomBarProps) {
           type="button"
           className={styles.calendar}
           aria-label="Календарь"
-          onClick={() => setCalendarOpen(true)}
+          onClick={() => setDatePickerOpen(true)}
         >
           <Icon name="calendar" size={20} />
         </button>
@@ -80,18 +77,7 @@ export function ChatSearchBottomBar({ chatId }: ChatSearchBottomBarProps) {
         </button>
       </div>
 
-      {calendarOpen && (
-        <ChatCalendar
-          chatId={chatId}
-          filter="all"
-          anchorDate={dayKeyOfIso(current?.createdAt ?? new Date().toISOString())}
-          onPick={(day) => {
-            setCalendarOpen(false);
-            void jumpToSearchResult(chatId, day.firstMessageId);
-          }}
-          onClose={() => setCalendarOpen(false)}
-        />
-      )}
+      {datePickerOpen && <DatePickerSheet chatId={chatId} onClose={() => setDatePickerOpen(false)} />}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/db/prisma.js';
-import { getChatCalendar } from '../src/services/chatCalendar.js';
+import { firstMessageAtDate, getChatCalendar } from '../src/services/chatCalendar.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
 import { assertFileAccess } from '../src/services/file.js';
 import { listChatAttachments } from '../src/services/chatMedia.js';
@@ -345,5 +345,130 @@ describe('обложка дня (R-33A)', () => {
 
     expect(calendar.days).toHaveLength(1);
     expect(calendar.days[0]?.preview?.id).toBe(cover.fileId);
+  });
+});
+
+describe('firstMessageAtDate (R-33C)', () => {
+  it('день с сообщениями даёт первое сообщение этого дня', async () => {
+    const alice = await registerUser('atd_alice');
+    const bob = await registerUser('atd_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    await postText(chatId, alice.userId, '2025-02-10T10:00:00.000Z');
+    const first = await postText(chatId, alice.userId, '2025-02-12T08:00:00.000Z');
+    await postText(chatId, alice.userId, '2025-02-12T09:00:00.000Z');
+
+    const found = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-02-12' });
+    expect(found.messageId).toBe(first);
+  });
+
+  it('в пустой день берётся первое сообщение не раньше выбранного', async () => {
+    const alice = await registerUser('atd_gap_alice');
+    const bob = await registerUser('atd_gap_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    await postText(chatId, alice.userId, '2025-03-01T10:00:00.000Z');
+    const after = await postText(chatId, alice.userId, '2025-03-20T10:00:00.000Z');
+
+    const found = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-03-10' });
+    expect(found.messageId).toBe(after);
+  });
+
+  it('дата раньше начала переписки даёт самое старое сообщение', async () => {
+    const alice = await registerUser('atd_early_alice');
+    const bob = await registerUser('atd_early_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    const oldest = await postText(chatId, alice.userId, '2025-04-01T10:00:00.000Z');
+    await postText(chatId, alice.userId, '2025-04-02T10:00:00.000Z');
+
+    const found = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2020-01-01' });
+    expect(found.messageId).toBe(oldest);
+  });
+
+  it('дата позже последнего сообщения даёт самое новое', async () => {
+    const alice = await registerUser('atd_late_alice');
+    const bob = await registerUser('atd_late_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    await postText(chatId, alice.userId, '2025-05-01T10:00:00.000Z');
+    const newest = await postText(chatId, alice.userId, '2025-05-02T10:00:00.000Z');
+
+    const found = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-12-31' });
+    expect(found.messageId).toBe(newest);
+  });
+
+  it('день считается в поясе клиента, как и в календаре', async () => {
+    const alice = await registerUser('atd_tz_alice');
+    const bob = await registerUser('atd_tz_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    const late = await postText(chatId, alice.userId, '2025-06-10T22:30:00.000Z');
+
+    const moscow = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-06-11' });
+    expect(moscow.messageId).toBe(late);
+
+    const newYork = await firstMessageAtDate(chatId, alice.userId, { tz: 'America/New_York', date: '2025-06-11' });
+    expect(newYork.messageId).toBe(late);
+    const newYorkSameDay = await firstMessageAtDate(chatId, alice.userId, {
+      tz: 'America/New_York',
+      date: '2025-06-10',
+    });
+    expect(newYorkSameDay.messageId).toBe(late);
+  });
+
+  it('очищенная и удалённая история не считаются, пустой чат даёт null', async () => {
+    const alice = await registerUser('atd_clr_alice');
+    const bob = await registerUser('atd_clr_bob');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+
+    const empty = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-07-01' });
+    expect(empty.messageId).toBeNull();
+
+    await postText(chatId, alice.userId, '2025-07-01T10:00:00.000Z');
+    const cursor = await postText(chatId, alice.userId, '2025-07-02T10:00:00.000Z');
+    const kept = await postText(chatId, alice.userId, '2025-07-03T10:00:00.000Z');
+    await prisma.chatMember.update({
+      where: { chatId_userId: { chatId, userId: alice.userId } },
+      data: { clearedUpToMessageId: cursor },
+    });
+
+    const found = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-07-01' });
+    expect(found.messageId).toBe(kept);
+
+    await prisma.message.update({ where: { id: kept }, data: { deletedAt: new Date() } });
+    const gone = await firstMessageAtDate(chatId, alice.userId, { tz: 'Europe/Moscow', date: '2025-07-01' });
+    expect(gone.messageId).toBeNull();
+  });
+
+  it('чужой чат дату не отдаёт', async () => {
+    const alice = await registerUser('atd_own_alice');
+    const bob = await registerUser('atd_own_bob');
+    const eve = await registerUser('atd_own_eve');
+    const chatId = await createPrivateChat(alice.userId, bob.username);
+    const only = await postText(chatId, alice.userId, '2025-08-01T10:00:00.000Z');
+
+    await expect(
+      firstMessageAtDate(chatId, eve.userId, { tz: 'Europe/Moscow', date: '2025-08-01' }),
+    ).rejects.toThrow();
+
+    const forbidden = await request
+      .get(`/api/chats/${chatId}/messages/at-date`)
+      .query({ tz: 'Europe/Moscow', date: '2025-08-01' })
+      .set('Authorization', `Bearer ${eve.token}`);
+    expect(forbidden.status).toBe(403);
+
+    const mine = await request
+      .get(`/api/chats/${chatId}/messages/at-date`)
+      .query({ tz: 'Europe/Moscow', date: '2025-08-01' })
+      .set('Authorization', `Bearer ${alice.token}`);
+    expect(mine.status).toBe(200);
+    expect(mine.body.messageId).toBe(only);
+
+    const badDate = await request
+      .get(`/api/chats/${chatId}/messages/at-date`)
+      .query({ tz: 'Europe/Moscow', date: '2025-13-45' })
+      .set('Authorization', `Bearer ${alice.token}`);
+    expect(badDate.status).toBe(400);
   });
 });

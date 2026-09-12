@@ -160,6 +160,16 @@ export interface ChatCalendarResponse {
   maxDate: string | null;
 }
 
+export const chatMessageAtDateQuerySchema = z.object({
+  tz: z.string().max(64).refine(isSupportedTimeZone, 'Неизвестный часовой пояс'),
+  date: z.string().refine(isCalendarDate, 'Некорректная дата'),
+});
+export type ChatMessageAtDateQuery = z.infer<typeof chatMessageAtDateQuerySchema>;
+
+export interface ChatMessageAtDateResponse {
+  messageId: number | null;
+}
+
 /** Отправка сообщения — только через сокет, единственный способ создать сообщение (секция 3).
  *  content — подпись; обязателен, только если вложения нет. */
 export const messageSendSchema = z

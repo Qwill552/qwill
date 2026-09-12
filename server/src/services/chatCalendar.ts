@@ -3,6 +3,8 @@ import {
   type ChatCalendarDay,
   type ChatCalendarQuery,
   type ChatCalendarResponse,
+  type ChatMessageAtDateQuery,
+  type ChatMessageAtDateResponse,
 } from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
@@ -27,6 +29,10 @@ interface PreviewRow {
 
 interface BoundRow {
   date: string;
+}
+
+interface MessageIdRow {
+  id: number;
 }
 
 function dayExpression(tz: string): Prisma.Sql {
@@ -138,4 +144,33 @@ export async function getChatCalendar(
     minDate: oldest[0]?.date ?? null,
     maxDate: newest[0]?.date ?? null,
   };
+}
+
+export async function firstMessageAtDate(
+  chatId: string,
+  userId: string,
+  query: ChatMessageAtDateQuery,
+): Promise<ChatMessageAtDateResponse> {
+  await assertMember(chatId, userId);
+
+  const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+  const floor = member.clearedUpToMessageId ?? 0;
+  const day = dayExpression(query.tz);
+  const scope = Prisma.sql`m."chatId" = ${chatId} AND m."deletedAt" IS NULL AND m.id > ${floor}`;
+
+  const [atOrAfter] = await prisma.$queryRaw<MessageIdRow[]>`
+    SELECT m.id::int AS id
+    FROM "Message" m
+    WHERE ${scope} AND ${day} >= ${query.date}::date
+    ORDER BY m.id ASC
+    LIMIT 1`;
+  if (atOrAfter) return { messageId: atOrAfter.id };
+
+  const [newest] = await prisma.$queryRaw<MessageIdRow[]>`
+    SELECT m.id::int AS id
+    FROM "Message" m
+    WHERE ${scope}
+    ORDER BY m.id DESC
+    LIMIT 1`;
+  return { messageId: newest?.id ?? null };
 }

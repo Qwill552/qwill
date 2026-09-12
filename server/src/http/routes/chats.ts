@@ -3,6 +3,7 @@ import {
   chatAttachmentsQuerySchema,
   chatCalendarQuerySchema,
   chatLinksQuerySchema,
+  chatMessageAtDateQuerySchema,
   chatMuteSchema,
   chatSearchQuerySchema,
   createGroupSchema,
@@ -138,6 +139,18 @@ chatsRouter.get('/:id/messages/search', (req, res, next) => {
     messageService
       .searchMessagesInChat(paramId(req, 'id'), req.userId!, q, { before }, limit, fromUserId)
       .then((result) => res.json(result))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.get('/:id/messages/at-date', (req, res, next) => {
+  try {
+    const query = parseOrThrow(chatMessageAtDateQuerySchema, req.query);
+    chatCalendarService
+      .firstMessageAtDate(paramId(req, 'id'), req.userId!, query)
+      .then((found) => res.json(found))
       .catch(next);
   } catch (error) {
     next(error);

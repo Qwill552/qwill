@@ -544,6 +544,8 @@
   --dur-pulse: 1000ms; /* кольцо потерянной связи на экране звонка */
   --dur-flash: 1500ms; /* подсветка сообщения после перехода «показать в чате» */
   --dur-media-fade: 220ms; /* проявление снимка поверх пятна BlurHash */
+  --dur-wheel-settle: 800ms; /* доводка барабана выбора даты к ближайшей строке */
+  --dur-wheel-step: 300ms; /* шаг барабана на одну строку по тапу или стрелке */
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-close: ease-in;
@@ -579,6 +581,8 @@
     --dur-pulse: 1ms;
     --dur-flash: 1ms;
     --dur-media-fade: 1ms;
+    --dur-wheel-settle: 1ms;
+    --dur-wheel-step: 1ms;
     --transition: 1ms linear;
   }
 }

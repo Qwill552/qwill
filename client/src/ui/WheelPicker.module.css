@@ -1,0 +1,41 @@
+.wheel {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  color: var(--text-primary);
+}
+
+.wheel:active {
+  cursor: grabbing;
+}
+
+.selection {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--primary-soft);
+  border-radius: var(--radius-md);
+}
+
+.items {
+  position: absolute;
+  inset: 0;
+}
+
+.item {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.2em;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}

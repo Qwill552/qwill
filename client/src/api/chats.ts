@@ -7,6 +7,7 @@ import type {
   ChatDto,
   ChatLinksPage,
   ChatListResponse,
+  ChatMessageAtDateResponse,
   ChatSearchResponse,
   ChatUpdatedEvent,
   CreateGroupInput,
@@ -83,6 +84,11 @@ export function chatCalendarRequest(
     filter,
   });
   return apiRequest<ChatCalendarResponse>(`/api/chats/${chatId}/calendar?${params.toString()}`);
+}
+
+export function messageAtDateRequest(chatId: string, date: string): Promise<ChatMessageAtDateResponse> {
+  const params = new URLSearchParams({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone, date });
+  return apiRequest<ChatMessageAtDateResponse>(`/api/chats/${chatId}/messages/at-date?${params.toString()}`);
 }
 
 export function getChatLinksRequest(chatId: string, before?: number): Promise<ChatLinksPage> {
