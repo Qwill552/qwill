@@ -8,6 +8,7 @@ import { cancelMediaDownload, hasCachedMedia } from '../../cache/mediaCache';
 import { readAutoDownloadSettings, shouldAutoDownload, type AutoDownloadKind } from '../../cache/settings';
 import { getNetworkKind, getSaveData } from '../../net/connection';
 import { scrollParentOf } from '../../ui/scrollParent';
+import { feedFileIdOf, feedUsesDownscaled } from './feedQuality';
 import { MEDIA_LOAD_MARGIN_PX, useMediaFeed } from './mediaFeedScope';
 
 export function needsOriginalInList(attachment: AttachmentDto): boolean {
@@ -180,10 +181,8 @@ function useAutoDownloadGate(attachment: AttachmentDto, previewFileId: string): 
 }
 
 export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null, enabled = true): string | undefined {
-  const fileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
-  const hasDownscaled = Boolean(attachment.preview ?? attachment.thumbnail);
-  return useFileSrc(enabled ? fileId : null, {
-    tier: hasDownscaled ? 'thumb' : 'full',
+  return useFileSrc(enabled ? feedFileIdOf(attachment) : null, {
+    tier: feedUsesDownscaled(attachment) ? 'thumb' : 'full',
     chatId,
     kind: mediaKindOf(attachment),
   });
@@ -205,7 +204,7 @@ export function useProgressiveSrc(
 ): ProgressiveMedia {
   const feed = useMediaFeed();
   const reached = useReachedViewport(ref);
-  const previewFileId = attachment.preview?.id ?? attachment.thumbnail?.id ?? attachment.file.id;
+  const previewFileId = feedFileIdOf(attachment);
   const gate = useAutoDownloadGate(attachment, previewFileId);
   const unlocked = gate.allowed || gate.manual;
 

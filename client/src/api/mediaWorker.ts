@@ -34,7 +34,8 @@ export interface ImageDone {
   kind: 'image';
   thumb: Blob;
   thumbHash: string;
-  preview: Blob;
+  /** null — исходник и так не крупнее превью: пересжатие только испортило бы картинку. */
+  preview: Blob | null;
   width: number;
   height: number;
 }
@@ -99,8 +100,13 @@ async function renderImage(job: ImageJob): Promise<ImageDone> {
     const thumb = await thumbCanvas.convertToBlob({ type: 'image/jpeg', quality: job.thumbQuality });
 
     const previewTarget = fitDimensions(size.width, size.height, job.previewMax);
-    const previewCanvas = downscale(thumbCanvas, { width: thumbCanvas.width, height: thumbCanvas.height }, previewTarget);
-    const preview = await previewCanvas.convertToBlob({ type: 'image/jpeg', quality: job.previewQuality });
+    const previewWorthIt = Math.max(size.width, size.height) > job.previewMax;
+    const previewCanvas = previewWorthIt
+      ? downscale(thumbCanvas, { width: thumbCanvas.width, height: thumbCanvas.height }, previewTarget)
+      : null;
+    const preview = previewCanvas
+      ? await previewCanvas.convertToBlob({ type: 'image/jpeg', quality: job.previewQuality })
+      : null;
 
     return {
       id: job.id,

@@ -15,7 +15,8 @@ const HASH_CHUNK_SIZE = 8 * 1024 * 1024;
 export interface ImageAssets {
   thumb: Blob;
   thumbHash: string;
-  preview: Blob;
+  /** null — исходник и так не крупнее превью: пересжатие только испортило бы картинку. */
+  preview: Blob | null;
   width: number;
   height: number;
 }
@@ -41,12 +42,15 @@ async function imageAssetsOnMainThread(blob: Blob): Promise<ImageAssets> {
   );
   const thumb = await canvasToJpegBlob(thumbCanvas, THUMBNAIL_JPEG_QUALITY);
 
-  const previewCanvas = downscaleInSteps(
-    thumbCanvas,
-    { x: 0, y: 0, width: thumbCanvas.width, height: thumbCanvas.height },
-    fitDimensions(width, height, PREVIEW_MAX_DIMENSION),
-  );
-  const preview = await canvasToJpegBlob(previewCanvas, PREVIEW_JPEG_QUALITY);
+  const previewCanvas =
+    Math.max(width, height) > PREVIEW_MAX_DIMENSION
+      ? downscaleInSteps(
+          thumbCanvas,
+          { x: 0, y: 0, width: thumbCanvas.width, height: thumbCanvas.height },
+          fitDimensions(width, height, PREVIEW_MAX_DIMENSION),
+        )
+      : null;
+  const preview = previewCanvas ? await canvasToJpegBlob(previewCanvas, PREVIEW_JPEG_QUALITY) : null;
 
   return { thumb, thumbHash: await hashOnMainThread(thumb), preview, width, height };
 }

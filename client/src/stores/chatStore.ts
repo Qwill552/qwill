@@ -343,7 +343,7 @@ async function persistOutbox(entry: OutboxEntry): Promise<boolean> {
 interface PreparedImage {
   thumb: File;
   thumbSha256: string;
-  preview: Blob;
+  preview: Blob | null;
   width: number;
   height: number;
 }
@@ -1398,7 +1398,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       void prepareImage(clientId, file)
         .then((prepared) => {
           get().updateLocalAttachment(chatId, clientId, {
-            previewUrl: URL.createObjectURL(prepared.preview),
+            previewUrl: URL.createObjectURL(prepared.preview ?? file),
             width: prepared.width,
             height: prepared.height,
           });
@@ -1465,10 +1465,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         width = prepared.width;
         height = prepared.height;
 
-        const previewFile = new File([prepared.preview], 'preview.jpg', { type: 'image/jpeg' });
-        const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
-        previewFileId = uploadedPreview.id;
-        previewSha256 = uploadedPreview.sha256;
+        if (prepared.preview) {
+          const previewFile = new File([prepared.preview], 'preview.jpg', { type: 'image/jpeg' });
+          const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
+          previewFileId = uploadedPreview.id;
+          previewSha256 = uploadedPreview.sha256;
+        }
       } else if (isVideo) {
         const thumb = await generateVideoThumbnail(file);
         const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
@@ -1479,10 +1481,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         videoDuration = thumb.duration;
 
         const previewAssets = await buildImageAssets(thumb.file);
-        const previewFile = new File([previewAssets.preview], 'preview.jpg', { type: 'image/jpeg' });
-        const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
-        previewFileId = uploadedPreview.id;
-        previewSha256 = uploadedPreview.sha256;
+        if (previewAssets.preview) {
+          const previewFile = new File([previewAssets.preview], 'preview.jpg', { type: 'image/jpeg' });
+          const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
+          previewFileId = uploadedPreview.id;
+          previewSha256 = uploadedPreview.sha256;
+        }
       }
 
       const uploaded = await uploadFile(
