@@ -46,8 +46,20 @@ export function ChatSearchBottomBar({ chatId }: ChatSearchBottomBarProps) {
     <div className={styles.wrap}>
       {!listMode && (
         <div className={styles.arrows}>
-          <GlassButton icon="chevron-up" label="К более старому совпадению" disabled={!canOlder} onClick={next} />
-          <GlassButton icon="chevron-down" label="К более новому совпадению" disabled={!canNewer} onClick={prev} />
+          <GlassButton
+            variant="chrome"
+            icon="chevron-up"
+            label="К более старому совпадению"
+            disabled={!canOlder}
+            onClick={next}
+          />
+          <GlassButton
+            variant="chrome"
+            icon="chevron-down"
+            label="К более новому совпадению"
+            disabled={!canNewer}
+            onClick={prev}
+          />
         </div>
       )}
 

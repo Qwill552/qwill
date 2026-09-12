@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useChatSearchStore } from '../../stores/chatSearchStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Chip } from '../../ui/Chip';
+import { cssDurationMs } from '../../ui/motion';
 import { scrollParentOf } from '../../ui/scrollParent';
 import { EmptyState } from '../chats/EmptyState';
 import { ChatSearchFromPicker } from './ChatSearchFromPicker';
@@ -15,9 +16,10 @@ const LOAD_AHEAD_PX = 600;
 interface ChatSearchListProps {
   chatId: string;
   isGroup: boolean;
+  visible: boolean;
 }
 
-export function ChatSearchList({ chatId, isGroup }: ChatSearchListProps) {
+export function ChatSearchList({ chatId, isGroup, visible }: ChatSearchListProps) {
   const results = useChatSearchStore((s) => s.results);
   const query = useChatSearchStore((s) => s.query);
   const index = useChatSearchStore((s) => s.index);
@@ -31,6 +33,7 @@ export function ChatSearchList({ chatId, isGroup }: ChatSearchListProps) {
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [mounted, setMounted] = useState(visible);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
@@ -48,44 +51,57 @@ export function ChatSearchList({ chatId, isGroup }: ChatSearchListProps) {
     return () => observer.disconnect();
   }, [hasMore, results.length]);
 
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setMounted(false), cssDurationMs('--dur-close'));
+    return () => window.clearTimeout(timer);
+  }, [visible]);
+
   const fromMember = fromUserId ? members?.find((member) => member.userId === fromUserId) : undefined;
 
-  return (
-    <div className={`${styles.wrap} hide-native-scrollbar`}>
-      {isGroup && (
-        <div className={styles.chips}>
-          <Chip
-            label={fromMember ? `От: ${fromMember.displayName}` : 'От кого'}
-            active={Boolean(fromUserId)}
-            onClick={() => (fromUserId ? setFrom(null) : setPickerOpen(true))}
-          />
-        </div>
-      )}
+  if (!mounted) return null;
 
-      {results.length === 0 ? (
-        <div className={styles.empty}>
-          {loading ? (
-            <p className={styles.hint}>Ищу…</p>
-          ) : (
-            <EmptyState title="Ничего не нашлось" subtitle="Попробуйте другой запрос" />
-          )}
-        </div>
-      ) : (
-        <>
-          {results.map((message, position) => (
-            <ChatSearchRow
-              key={message.id}
-              message={message}
-              query={query}
-              own={message.sender?.id === myId}
-              active={position === index}
-              onSelect={() => selectResult(position)}
+  return (
+    <div className={`${styles.wrap} ${visible ? styles.opening : styles.closing}`}>
+      <div className={`${styles.body} hide-native-scrollbar`}>
+        {isGroup && (
+          <div className={styles.chips}>
+            <Chip
+              label={fromMember ? `От: ${fromMember.displayName}` : 'От кого'}
+              active={Boolean(fromUserId)}
+              onClick={() => (fromUserId ? setFrom(null) : setPickerOpen(true))}
             />
-          ))}
-          {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
-          {loading && <p className={styles.hint}>Ищу…</p>}
-        </>
-      )}
+          </div>
+        )}
+
+        {results.length === 0 ? (
+          <div className={styles.empty}>
+            {loading ? (
+              <p className={styles.hint}>Ищу…</p>
+            ) : (
+              <EmptyState title="Ничего не нашлось" subtitle="Попробуйте другой запрос" />
+            )}
+          </div>
+        ) : (
+          <>
+            {results.map((message, position) => (
+              <ChatSearchRow
+                key={message.id}
+                message={message}
+                query={query}
+                own={message.sender?.id === myId}
+                active={position === index}
+                onSelect={() => selectResult(position)}
+              />
+            ))}
+            {hasMore && <div ref={sentinelRef} className={styles.sentinel} aria-hidden="true" />}
+            {loading && <p className={styles.hint}>Ищу…</p>}
+          </>
+        )}
+      </div>
 
       {pickerOpen && (
         <ChatSearchFromPicker chatId={chatId} onPick={(userId) => setFrom(userId)} onClose={() => setPickerOpen(false)} />

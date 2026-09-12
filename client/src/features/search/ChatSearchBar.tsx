@@ -23,26 +23,30 @@ export function ChatSearchBar({ onClose }: ChatSearchBarProps) {
 
   return (
     <div className={styles.bar} role="search">
-      <GlassButton variant="plain" icon="back" label="Выйти из поиска" onClick={onClose} />
-      <Icon name="search" size={18} className={styles.icon} />
-      <input
-        className={styles.input}
-        type="text"
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          if (event.target.value.length === 0) submit({ jump: false });
-        }}
-        onKeyDown={handleKeyDown}
-        placeholder="Поиск в чате"
-        aria-label="Поиск в чате"
-        autoComplete="off"
-        enterKeyHint="search"
-        autoFocus
-      />
+      <GlassButton variant="chrome" icon="back" label="Выйти из поиска" onClick={onClose} />
+
+      <div className={styles.field}>
+        <Icon name="search" size={18} className={styles.icon} />
+        <input
+          className={styles.input}
+          type="text"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            if (event.target.value.length === 0) submit({ jump: false });
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Поиск в чате"
+          aria-label="Поиск в чате"
+          autoComplete="off"
+          enterKeyHint="search"
+          autoFocus
+        />
+      </div>
+
       {draft.length > 0 && (
         <GlassButton
-          variant="plain"
+          variant="chrome"
           icon="close"
           label="Очистить поле"
           onClick={() => {

@@ -1,15 +1,50 @@
 .wrap {
   position: absolute;
-  top: var(--chat-header-h);
-  right: 0;
-  bottom: 0;
-  left: 0;
   z-index: 4;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100dvh - 28px), transparent 100dvh);
+  mask-repeat: no-repeat;
+  mask-size: 100% calc(100dvh + 28px);
+}
+
+.opening {
+  animation: listReveal var(--dur-screen) var(--ease-screen) both;
+}
+
+.closing {
+  animation: listHide var(--dur-close) var(--ease-close) both;
+  pointer-events: none;
+}
+
+@keyframes listReveal {
+  from {
+    mask-position: 0 calc(var(--chat-header-h) - 100dvh);
+  }
+
+  to {
+    mask-position: 0 0;
+  }
+}
+
+@keyframes listHide {
+  from {
+    mask-position: 0 0;
+  }
+
+  to {
+    mask-position: 0 calc(var(--chat-header-h) - 100dvh);
+  }
+}
+
+.body {
+  height: 100%;
   overflow-y: auto;
+  padding-top: var(--chat-header-h);
   padding-bottom: calc(
     var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + var(--space-6)
   );
-  background: var(--bg);
 }
 
 .chips {

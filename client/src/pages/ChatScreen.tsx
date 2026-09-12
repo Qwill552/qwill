@@ -555,7 +555,9 @@ export function ChatScreen() {
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
-      {!isDesktop && searchOpen && searchMode === 'list' && <ChatSearchList chatId={chatId} isGroup={isGroup} />}
+      {!isDesktop && searchOpen && (
+        <ChatSearchList chatId={chatId} isGroup={isGroup} visible={searchMode === 'list'} />
+      )}
 
       <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
         {selectionMode ? (

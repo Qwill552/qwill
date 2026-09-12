@@ -25,6 +25,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-pill);
   background: var(--chrome-bg);
+  box-shadow: var(--chrome-shadow);
   backdrop-filter: var(--chrome-blur);
 }
 
