@@ -5,6 +5,7 @@ import type {
   ChatDto,
   ChatLinksPage,
   ChatListResponse,
+  ChatSearchResponse,
   ChatUpdatedEvent,
   CreateGroupInput,
   CreatePrivateChatInput,
@@ -76,6 +77,17 @@ export function getChatLinksRequest(chatId: string, before?: number): Promise<Ch
 
 export function getChatAttachmentCountsRequest(chatId: string): Promise<ChatAttachmentCounts> {
   return apiRequest<ChatAttachmentCounts>(`/api/chats/${chatId}/attachments/counts`);
+}
+
+export function searchInChatRequest(
+  chatId: string,
+  q: string,
+  before?: number,
+  signal?: AbortSignal,
+): Promise<ChatSearchResponse> {
+  const params = new URLSearchParams({ q });
+  if (before !== undefined) params.set('before', String(before));
+  return apiRequest<ChatSearchResponse>(`/api/chats/${chatId}/messages/search?${params.toString()}`, { signal });
 }
 
 export function updateGroupRequest(chatId: string, input: UpdateGroupInput): Promise<ChatUpdatedEvent> {

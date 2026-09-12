@@ -3,6 +3,7 @@ import {
   chatAttachmentsQuerySchema,
   chatLinksQuerySchema,
   chatMuteSchema,
+  chatSearchQuerySchema,
   createGroupSchema,
   createPrivateChatSchema,
   deleteChatQuerySchema,
@@ -123,6 +124,18 @@ chatsRouter.get('/:id/messages/around/:messageId', (req, res, next) => {
     chatService
       .getMessagesAround(paramId(req, 'id'), req.userId!, messageId, limit)
       .then((window) => res.json(window))
+      .catch(next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+chatsRouter.get('/:id/messages/search', (req, res, next) => {
+  try {
+    const { q, before, limit } = parseOrThrow(chatSearchQuerySchema, req.query);
+    messageService
+      .searchMessagesInChat(paramId(req, 'id'), req.userId!, q, { before }, limit)
+      .then((result) => res.json(result))
       .catch(next);
   } catch (error) {
     next(error);

@@ -13,8 +13,12 @@ import { BlockedBar } from '../features/chat/BlockedBar';
 import { BlockUserModal } from '../features/chat/BlockUserModal';
 import { ServiceChatBar } from '../features/chat/ServiceChatBar';
 import { isServiceChat, SERVICE_AVATAR_SRC } from '../features/chat/serviceChat';
+import { focusMessageInChat } from '../features/chat/showInChat';
 import { DeleteChatModal } from '../features/chats/DeleteChatModal';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
+import { ChatSearchBar } from '../features/search/ChatSearchBar';
+import { ChatSearchList } from '../features/search/ChatSearchList';
+import { useChatSearch } from '../features/search/useChatSearch';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
@@ -105,6 +109,7 @@ export function ChatScreen() {
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerApiRef = useRef<MessageComposerHandle>(null);
@@ -147,6 +152,13 @@ export function ChatScreen() {
    *  когда узел появляется, и `MessageList` получает валидный контейнер, а не `null`. */
   const [pinnedSlot, setPinnedSlot] = useState<HTMLDivElement | null>(null);
 
+  const chatSearch = useChatSearch(chatId);
+  const setChatSearchQuery = chatSearch.setQuery;
+  function closeSearch(): void {
+    setSearchOpen(false);
+    setChatSearchQuery('');
+  }
+
   const handleReply = useCallback((message: LocalMessage) => setComposerContext({ mode: 'reply', message }), []);
   const handleEdit = useCallback((message: LocalMessage) => setComposerContext({ mode: 'edit', message }), []);
 
@@ -165,6 +177,9 @@ export function ChatScreen() {
   // оно открывается позже (из выбранной строки), поэтому в истории окажется выше и закроется первым.
   useBackHandler(selectionMode, exitSelection);
   useEscapeKey(selectionMode, exitSelection);
+  // Поиск внутри чата — первый уровень отката «назад»/Escape (R-33, «Готово когда»).
+  useBackHandler(searchOpen, closeSearch);
+  useEscapeKey(searchOpen, closeSearch);
 
   useEffect(() => {
     if (!chatId) return;
@@ -178,8 +193,18 @@ export function ChatScreen() {
     setGroupPanelOpen(openPanelRequested);
     setHeaderMenuAnchor(null);
     setReporting(false);
+    setSearchOpen(false);
+    setChatSearchQuery('');
     exitSelection();
-  }, [chatId, exitSelection, openPanelRequested]);
+  }, [chatId, exitSelection, openPanelRequested, setChatSearchQuery]);
+
+  useEffect(() => {
+    // Десктоп: лента прыгает к текущему совпадению и подсвечивает его при каждой смене
+    // позиции — включая первый найденный результат сразу после ввода запроса. На телефоне
+    // прыжок происходит только по тапу строки (ChatSearchList), лента за оверлеем не едет.
+    if (!isDesktop || !searchOpen || !chatId || chatSearch.activeMessageId === null) return;
+    void focusMessageInChat(chatId, chatSearch.activeMessageId);
+  }, [isDesktop, searchOpen, chatId, chatSearch.activeMessageId]);
 
   useEffect(() => {
     // Отвечали/редактировали сообщение, которое тем временем удалили (своё действие или
@@ -420,6 +445,13 @@ export function ChatScreen() {
     },
   };
 
+  const searchItem: MenuItem = {
+    id: 'search',
+    label: 'Поиск',
+    icon: 'search',
+    onSelect: () => setSearchOpen(true),
+  };
+
   const lastForeignMessage = [...messages]
     .reverse()
     .find((message) => message.id > 0 && message.sender && message.sender.id !== myId);
@@ -453,15 +485,16 @@ export function ChatScreen() {
   const canReport = !isService && !isSupportChat && lastForeignMessage !== undefined;
 
   const headerMenuItems: MenuItem[] = isService
-    ? [muteItem]
+    ? [searchItem, muteItem]
     : isGroup
       ? isDesktop
         ? [editItem, muteItem, ...(canReport ? [reportItem] : [])]
-        : [profileItem, muteItem, ...(canReport ? [reportItem] : [])]
+        : [profileItem, searchItem, muteItem, ...(canReport ? [reportItem] : [])]
       : isDesktop
         ? [editItem, muteItem, ...(canReport ? [reportItem] : []), ...(otherMemberId ? [blockItem] : []), deleteItem]
         : [
             profileItem,
+            searchItem,
             muteItem,
             ...(canReport ? [reportItem] : []),
             ...(otherMemberId ? [blockItem] : []),
@@ -524,6 +557,20 @@ export function ChatScreen() {
           читается чётко, а не сквозь размытие подложки. Содержимое порталит MessageList. */}
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
+      {!isDesktop && searchOpen && (
+        <ChatSearchList
+          messages={chatSearch.messages}
+          query={chatSearch.query}
+          loading={chatSearch.loading}
+          hasMore={chatSearch.hasMore}
+          onLoadMore={chatSearch.loadMore}
+          onSelect={(messageId) => {
+            closeSearch();
+            void focusMessageInChat(chatId, messageId);
+          }}
+        />
+      )}
+
       <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
         {selectionMode ? (
           <SelectionHeader
@@ -535,6 +582,18 @@ export function ChatScreen() {
             onCopy={handleSelectionCopy}
             onForward={() => setForwardRequest([...selectedIds])}
             onDelete={handleSelectionDelete}
+          />
+        ) : searchOpen ? (
+          <ChatSearchBar
+            isDesktop={isDesktop}
+            query={chatSearch.query}
+            onQueryChange={chatSearch.setQuery}
+            total={chatSearch.total}
+            activeIndex={chatSearch.activeIndex}
+            loading={chatSearch.loading}
+            onNext={chatSearch.goNext}
+            onPrev={chatSearch.goPrev}
+            onClose={closeSearch}
           />
         ) : (
           <>
@@ -575,9 +634,9 @@ export function ChatScreen() {
               }
               leadingLabel="Открыть фото профиля"
             />
-            {/* Поиск по чату — задел на будущее (ux-ui/14-desktop/03): функции поиска
-                внутри переписки в продукте пока нет. */}
-            {isDesktop && <GlassButton variant="plain" icon="search" label="Поиск в чате" onClick={() => {}} />}
+            {isDesktop && (
+              <GlassButton variant="plain" icon="search" label="Поиск в чате" onClick={() => setSearchOpen(true)} />
+            )}
             {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
             {!isService && (
               <GlassButton

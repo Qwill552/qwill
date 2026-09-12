@@ -6,15 +6,22 @@ import { useLongPress } from '../../ui/gestures/useLongPress';
 import { haptic } from '../../ui/haptic';
 import { Menu } from '../../ui/Menu';
 
+/** Прыжок и подсветка сообщения в уже открытом или ещё не открытом чате — переиспользуется
+ *  и когда сам чат уже на экране (поиск внутри него, R-33), и когда до него ещё предстоит
+ *  перейти (см. useShowInChat ниже). */
+export async function focusMessageInChat(chatId: string, messageId: number): Promise<void> {
+  const store = useChatStore.getState();
+  const loaded = store.messagesByChat[chatId]?.some((m) => m.id === messageId) ?? false;
+  if (loaded) store.focusMessage(chatId, messageId);
+  else await store.openChatAt(chatId, messageId);
+}
+
 export function useShowInChat(): (chatId: string, messageId: number) => Promise<void> {
   const navigate = useNavigate();
 
   return useCallback(
     async (chatId: string, messageId: number) => {
-      const store = useChatStore.getState();
-      const loaded = store.messagesByChat[chatId]?.some((m) => m.id === messageId) ?? false;
-      if (loaded) store.focusMessage(chatId, messageId);
-      else await store.openChatAt(chatId, messageId);
+      await focusMessageInChat(chatId, messageId);
       navigate(`/chats/${chatId}`);
     },
     [navigate],

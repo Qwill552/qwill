@@ -1,5 +1,6 @@
 import type {
   AttachmentDto,
+  ChatSearchResponse,
   MessageAnnouncementDto,
   MessageAttachmentInput,
   MessageCallDto,
@@ -539,4 +540,53 @@ export async function reactToMessage(input: ReactToMessageInput): Promise<Messag
     orderBy: { createdAt: 'asc' },
   });
   return toReactionDtos(reactions);
+}
+
+export async function searchMessagesInChat(
+  chatId: string,
+  userId: string,
+  q: string,
+  cursor: { before?: number },
+  limit: number,
+): Promise<ChatSearchResponse> {
+  await assertMember(chatId, userId);
+
+  const query = q.trim();
+  if (query.length === 0) return { messages: [], total: 0, hasMore: false };
+
+  const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
+  const floor = member.clearedUpToMessageId ?? 0;
+
+  const countIdFilter: { gt?: number } = {};
+  if (floor > 0) countIdFilter.gt = floor;
+  const contentFilter = { contains: query, mode: 'insensitive' as const };
+
+  const pageIdFilter: { gt?: number; lt?: number } = { ...countIdFilter };
+  if (cursor.before) pageIdFilter.lt = cursor.before;
+
+  const [total, rows] = await Promise.all([
+    prisma.message.count({
+      where: {
+        chatId,
+        deletedAt: null,
+        content: contentFilter,
+        ...(Object.keys(countIdFilter).length > 0 ? { id: countIdFilter } : {}),
+      },
+    }),
+    prisma.message.findMany({
+      where: {
+        chatId,
+        deletedAt: null,
+        content: contentFilter,
+        ...(Object.keys(pageIdFilter).length > 0 ? { id: pageIdFilter } : {}),
+      },
+      orderBy: { id: 'desc' },
+      take: limit + 1,
+      include: messageInclude,
+    }),
+  ]);
+
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
+  return { messages: page.map(toMessageDto), total, hasMore };
 }

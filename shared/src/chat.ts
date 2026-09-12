@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { CHAT_TITLE_MAX_LENGTH, MESSAGE_BATCH_LIMIT, MESSAGE_MAX_LENGTH, MESSAGES_PAGE_SIZE } from './constants.js';
+import {
+  CHAT_SEARCH_PAGE_SIZE,
+  CHAT_TITLE_MAX_LENGTH,
+  MESSAGE_BATCH_LIMIT,
+  MESSAGE_MAX_LENGTH,
+  MESSAGES_PAGE_SIZE,
+} from './constants.js';
 import { isSingleEmoji } from './emoji.js';
 import { messageAttachmentInputSchema, sha256Schema, type AttachmentDto } from './files.js';
 import type { LinkPreviewDto } from './links.js';
@@ -75,6 +81,22 @@ export interface ChatLinkDto {
 
 export interface ChatLinksPage {
   items: ChatLinkDto[];
+  hasMore: boolean;
+}
+
+/** Поиск по тексту сообщений одного чата (R-33). Раскладка (R-24) сюда не распространяется —
+ *  решение пользователя. */
+export const chatSearchQuerySchema = z.object({
+  q: z.string().max(MESSAGE_MAX_LENGTH).default(''),
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(CHAT_SEARCH_PAGE_SIZE),
+});
+export type ChatSearchQuery = z.infer<typeof chatSearchQuerySchema>;
+
+export interface ChatSearchResponse {
+  messages: MessageDto[];
+  /** Общее число совпадений в чате, не только загруженная страница — для счётчика «3 из 17». */
+  total: number;
   hasMore: boolean;
 }
 

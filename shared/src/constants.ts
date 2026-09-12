@@ -31,6 +31,9 @@ export const MESSAGES_PAGE_SIZE = 50;
 /** Максимум строк на секцию в ответе на GET /search (этап 4). */
 export const SEARCH_PAGE_SIZE = 20;
 
+/** Курсорная пагинация поиска внутри чата (R-33). */
+export const CHAT_SEARCH_PAGE_SIZE = 30;
+
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;
 

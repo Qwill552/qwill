@@ -1,0 +1,82 @@
+.wrap {
+  position: absolute;
+  top: var(--chat-header-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  z-index: 4;
+  background: var(--bg);
+  padding-bottom: var(--space-6);
+}
+
+.row {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  gap: 13px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:active {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.snippet {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint {
+  padding: var(--space-4);
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.sentinel {
+  height: 1px;
+}
