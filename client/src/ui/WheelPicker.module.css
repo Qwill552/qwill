@@ -17,8 +17,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  background: var(--primary-soft);
-  border-radius: var(--radius-md);
+  border-top: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
 }
 
 .items {
