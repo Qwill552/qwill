@@ -292,3 +292,45 @@ test('шторка, отпущенная на полпути, возвращае
     expect(Math.abs(y - resting.y), `шторка не должна проигрывать въезд заново: ${samples.join(', ')}`).toBeLessThan(8);
   }
 });
+
+test('шторка, уведённая за порог, доезжает вниз, а не исчезает', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const me = uniqueUser('calclose');
+  const other = uniqueUser('calcloseother');
+  await registerUser(page, me);
+
+  const mine = await prisma.user.findUniqueOrThrow({ where: { username: me.username } });
+  const chatId = await seedChat(mine.id, other.username, other.displayName);
+
+  await page.goto(`/chats/${chatId}`);
+  await expect(page.locator('.message-wrap').last()).toBeVisible();
+  await page.waitForTimeout(1500);
+
+  await openCalendarFromFeed(page);
+  const sheet = page.getByRole('dialog', { name: 'Календарь' });
+  const resting = (await sheet.boundingBox())!;
+
+  const grabX = resting.x + resting.width / 2;
+  const grabY = resting.y + 14;
+  await page.mouse.move(grabX, grabY);
+  await page.mouse.down();
+  await page.mouse.move(grabX, grabY + resting.height * 0.6, { steps: 14 });
+  const sampling = page.evaluate(async () => {
+    const out: number[] = [];
+    for (let i = 0; i < 14; i += 1) {
+      const node = document.querySelector('[role="dialog"][aria-label="Календарь"]');
+      if (node) out.push(Math.round(node.getBoundingClientRect().y));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    return out;
+  });
+  await page.mouse.up();
+  const seen = await sampling;
+
+  await expect(sheet).toBeHidden({ timeout: 5_000 });
+
+  const distinct = [...new Set(seen)];
+  expect(distinct.length, `уход должен быть движением, а не прыжком: ${seen.join(', ')}`).toBeGreaterThan(2);
+  expect(seen[seen.length - 1]!, 'шторка должна уезжать вниз').toBeGreaterThan(seen[0]!);
+});

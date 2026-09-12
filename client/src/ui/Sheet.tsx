@@ -23,6 +23,10 @@ const CLOSE_RATIO = 0.4;
 const FLING_VELOCITY = 0.6;
 /** Доля высоты шита, на которую он уезжает за полным прогрессом системного жеста «назад». */
 const SYSTEM_BACK_TRAVEL = 0.35;
+/** Доводка после отпускания: медленнее этого (px/мс) шит не уезжает, и границы длительности. */
+const CLOSE_MIN_SPEED = 1.2;
+const CLOSE_MIN_MS = 120;
+const CLOSE_MAX_MS = 320;
 
 type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 
@@ -41,9 +45,35 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
   // Жест живёт в ref, а не в состоянии: перерисовывать на каждое движение пальца незачем.
   const gesture = useRef({ active: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
 
+  /** Длительность доводки, когда шит уходит жестом: закрытие продолжает движение пальца,
+   *  а не подменяет его своей анимацией с нуля. */
+  const flingCloseMs = useRef<number | null>(null);
+
   const startClose = useCallback(() => {
     setPhase((current) => (current === 'closing' ? current : 'closing'));
   }, []);
+
+  /** Отпустили за порогом: шит доезжает вниз из того места, где его оставил палец, со
+   *  скоростью броска — как экран в свайпе назад. Раньше он мгновенно ставился вниз и
+   *  только потом играл свою анимацию, из-за чего просто исчезал (R-33A, замечание
+   *  пользователя). */
+  const flingClose = useCallback(
+    (fromPx: number, velocity: number) => {
+      const element = sheetRef.current;
+      const height = element?.offsetHeight ?? 0;
+      const remaining = Math.max(0, height - fromPx);
+      const speed = Math.max(CLOSE_MIN_SPEED, Math.abs(velocity));
+      const duration = Math.min(CLOSE_MAX_MS, Math.max(CLOSE_MIN_MS, remaining / speed));
+
+      flingCloseMs.current = duration;
+      if (element) {
+        element.style.transition = `transform ${Math.round(duration)}ms var(--ease-close)`;
+        element.style.transform = `translateY(${height}px)`;
+      }
+      startClose();
+    },
+    [startClose],
+  );
 
   useBackHandler(phase !== 'closing', startClose);
   useEscapeKey(phase !== 'closing', startClose);
@@ -57,8 +87,8 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
 
   useEffect(() => {
     if (phase !== 'closing') return;
-    const ms = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-close')) || 0;
-    const timer = window.setTimeout(onClose, ms);
+    const token = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-close')) || 0;
+    const timer = window.setTimeout(onClose, flingCloseMs.current ?? token);
     return () => window.clearTimeout(timer);
   }, [phase, onClose]);
 
@@ -104,9 +134,7 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
     const flung = g.velocity > FLING_VELOCITY;
 
     if (flung || travelled > height * CLOSE_RATIO) {
-      // Доводим до низа и уходим — обратного хода уже не будет.
-      offsetTo(height);
-      startClose();
+      flingClose(travelled, g.velocity);
       return;
     }
 
@@ -130,18 +158,17 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
         offsetTo(height * ratio * SYSTEM_BACK_TRAVEL);
       },
       settle: (committed) => {
-        const travelled = height;
+        const travelled = height * SYSTEM_BACK_TRAVEL;
         height = 0;
         if (committed) {
-          offsetTo(travelled);
-          startClose();
+          flingClose(travelled, 0);
           return;
         }
         setPhase('settling');
         offsetTo(0);
       },
     });
-  }, [desktop, startClose]);
+  }, [desktop, flingClose]);
 
   const sheetClass = [
     styles.sheet,
@@ -149,7 +176,11 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
     desktop ? styles.dialog : '',
     phase === 'dragging' ? styles.dragging : '',
     phase === 'settling' ? styles.settling : '',
-    phase === 'closing' ? (desktop ? styles.dialogClosing : styles.sheetClosing) : '',
+    phase === 'closing' && flingCloseMs.current === null
+      ? desktop
+        ? styles.dialogClosing
+        : styles.sheetClosing
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -158,6 +189,11 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
     <>
       <div
         className={`${styles.scrim} ${desktop ? styles.scrimPlain : ''} ${phase === 'closing' ? styles.scrimClosing : ''}`}
+        style={
+          phase === 'closing' && flingCloseMs.current !== null
+            ? { animationDuration: `${Math.round(flingCloseMs.current)}ms` }
+            : undefined
+        }
         onClick={startClose}
         aria-hidden="true"
       />
