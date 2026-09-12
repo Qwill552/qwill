@@ -31,7 +31,6 @@ type Phase = 'open' | 'dragging' | 'settling' | 'closing';
 export function Sheet({ title, subtitle, onClose, action, children }: SheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const surfaceRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('open');
   // Въезд снизу играется один раз. Раньше `rise` висел на самом шите, а `.dragging`/`.settling`
   // гасили анимацию целиком — и как только шит возвращался в состояние покоя, анимация
@@ -43,9 +42,6 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
   const gesture = useRef({ active: false, startY: 0, lastY: 0, lastTime: 0, velocity: 0 });
 
   const startClose = useCallback(() => {
-    // На уходе подложка снова едет вместе со шитом — иначе размытая полоса осталась бы
-    // висеть на экране, пока шит уже уехал.
-    if (surfaceRef.current) surfaceRef.current.style.transform = '';
     setPhase((current) => (current === 'closing' ? current : 'closing'));
   }, []);
 
@@ -66,14 +62,11 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
     return () => window.clearTimeout(timer);
   }, [phase, onClose]);
 
-  /** Шит едет, размытая подложка — нет: она сдвигается ровно на столько же в обратную
-   *  сторону и остаётся на месте экрана, обрезанная рамкой шита. Так область, которую
-   *  размывает backdrop-filter, от кадра к кадру не меняется — пересчитывать нечего, и
-   *  фон чата не «уезжает» вместе со шторкой (ux-ui/motion-cost.md; решение пользователя). */
+  /** Едет только рамка. Размытие лежит на скриме, который не двигается вообще, поэтому
+   *  размытая картинка остаётся на месте экрана сама собой — пересчитывать нечего и
+   *  догонять нечему (ux-ui/motion-cost.md; решение пользователя). */
   function offsetTo(px: number): void {
-    const shift = px > 0 ? `translateY(${px}px)` : '';
-    if (sheetRef.current) sheetRef.current.style.transform = shift;
-    if (surfaceRef.current) surfaceRef.current.style.transform = px > 0 ? `translateY(${-px}px)` : '';
+    if (sheetRef.current) sheetRef.current.style.transform = px > 0 ? `translateY(${px}px)` : '';
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
@@ -176,7 +169,6 @@ export function Sheet({ title, subtitle, onClose, action, children }: SheetProps
         aria-label={title}
         onTransitionEnd={() => setPhase((current) => (current === 'settling' ? 'open' : current))}
       >
-        <div ref={surfaceRef} className={styles.surface} aria-hidden="true" />
         {/* Тянется вся шапка, а не только пилюля: за 28 px ручки попасть пальцем трудно
             (R-33A, замечание пользователя). */}
         <div

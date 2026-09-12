@@ -1,9 +1,14 @@
+/* Размытие шторки живёт здесь, а не на ней самой: скрим неподвижен, поэтому размытая
+   картинка стоит на месте экрана, а едет только рамка. Пока backdrop-filter был на самой
+   шторке, композитор не успевал перерисовывать размытый слой за анимацией её transform —
+   при доезде обратно подложка отставала и обнажала верх (R-33A, найдено пользователем,
+   подтверждено на Pixel 9 Pro по USB). Заодно слоёв размытия стало не два, а один. */
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 260;
   background: var(--scrim-bg);
-  backdrop-filter: var(--scrim-blur);
+  backdrop-filter: var(--sheet-blur);
   animation: fade var(--dur-menu) var(--ease-screen);
 }
 
@@ -18,7 +23,6 @@
   left: 0;
   z-index: 261;
   display: flex;
-  overflow: hidden;
   /* --header-h в проекте не объявлен нигде: var() без запасного значения делал всё
      объявление недействительным, шит оставался без max-height вовсе и на длинном
      содержимом уезжал верхом за экран, не прокручиваясь внутри себя (R-33A). */
@@ -27,19 +31,10 @@
   padding-bottom: var(--safe-bottom);
   border-top: 1px solid var(--sheet-border);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--sheet-bg);
   box-shadow: var(--sheet-shadow);
   /* Вертикальные жесты обрабатывает сам шит — браузеру их отдавать нельзя. */
   touch-action: none;
-}
-
-/* Поверхность вынесена отдельным слоем: при перетаскивании она стоит на месте экрана,
-   а едет только рамка со содержимым. Обрезка достаётся даром от overflow выше. */
-.surface {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  background: var(--sheet-bg);
-  backdrop-filter: var(--sheet-blur);
 }
 
 .entering {
@@ -56,13 +51,9 @@
   transition: none;
 }
 
-/* Отпустили, но не закрыли — доезд обратно. Подложка возвращается тем же движением. */
+/* Отпустили, но не закрыли — доезд обратно. */
 .settling {
   animation: none;
-  transition: transform var(--dur-menu) var(--ease-screen);
-}
-
-.settling .surface {
   transition: transform var(--dur-menu) var(--ease-screen);
 }
 
@@ -168,6 +159,7 @@
     padding-bottom: 0;
     border: 1px solid var(--sheet-border);
     border-radius: var(--radius-card);
+    backdrop-filter: var(--sheet-blur);
     transform: translate(-50%, -50%);
     touch-action: auto;
   }

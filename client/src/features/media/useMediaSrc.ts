@@ -180,8 +180,29 @@ function useAutoDownloadGate(attachment: AttachmentDto, previewFileId: string): 
   };
 }
 
-export function usePreviewSrc(attachment: AttachmentDto, chatId: string | null, enabled = true): string | undefined {
-  return useFileSrc(enabled ? feedFileIdOf(attachment) : null, {
+/** Настоящая ширина коробки под картинку — по ней выбирается копия. Меряется один раз,
+ *  после раскладки: к моменту загрузки элемент уже на месте, а во время движения ничего
+ *  не читается (ux-ui/motion-cost.md). */
+function useBoxCssWidth(ref: RefObject<Element | null> | undefined): number | undefined {
+  const [width, setWidth] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const node = ref?.current;
+    if (!node) return;
+    const measured = Math.round(node.getBoundingClientRect().width);
+    if (measured > 0) setWidth(measured);
+  }, [ref]);
+
+  return width;
+}
+
+export function usePreviewSrc(
+  attachment: AttachmentDto,
+  chatId: string | null,
+  enabled = true,
+  boxCssWidth?: number,
+): string | undefined {
+  return useFileSrc(enabled ? feedFileIdOf(attachment, window.devicePixelRatio, boxCssWidth) : null, {
     tier: feedUsesDownscaled(attachment) ? 'thumb' : 'full',
     chatId,
     kind: mediaKindOf(attachment),
@@ -204,11 +225,12 @@ export function useProgressiveSrc(
 ): ProgressiveMedia {
   const feed = useMediaFeed();
   const reached = useReachedViewport(ref);
-  const previewFileId = feedFileIdOf(attachment);
+  const boxCssWidth = useBoxCssWidth(ref);
+  const previewFileId = feedFileIdOf(attachment, window.devicePixelRatio, boxCssWidth);
   const gate = useAutoDownloadGate(attachment, previewFileId);
   const unlocked = gate.allowed || gate.manual;
 
-  const preview = usePreviewSrc(attachment, chatId, (feed === null || reached) && unlocked);
+  const preview = usePreviewSrc(attachment, chatId, (feed === null || reached) && unlocked, boxCssWidth);
   const wanted =
     unlocked && needsOriginalInList(attachment) && reached && attachment.thumbnail ? attachment.file.id : null;
   const rawOriginal = useFileSrc(wanted, { tier: 'full', chatId, kind: mediaKindOf(attachment) });
