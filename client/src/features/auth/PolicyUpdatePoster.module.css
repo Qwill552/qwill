@@ -379,7 +379,7 @@
 .scroll {
   position: absolute;
   right: calc(24 * var(--poster-art-u));
-  top: 66%;
+  top: 56%;
   z-index: 1;
   width: calc(250 * var(--poster-art-u));
   animation: calc(var(--dur-theme) * 2) var(--ease-spring) calc(var(--dur-tab) * 3) both objIn;
@@ -503,7 +503,7 @@
 
 .star7 {
   left: calc(26 * var(--poster-art-u));
-  top: 83.906%;
+  top: 33%;
   width: calc(52 * var(--poster-art-u));
   height: calc(52 * var(--poster-art-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-sky));
@@ -512,7 +512,7 @@
 
 .star8 {
   right: calc(388 * var(--poster-art-u));
-  top: 81.374%;
+  top: 26%;
   width: calc(40 * var(--poster-art-u));
   height: calc(40 * var(--poster-art-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-lav));
@@ -616,9 +616,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  width: calc(92 * var(--poster-u));
-  height: calc(46 * var(--poster-u));
-  padding: calc(5 * var(--poster-u));
+  width: calc(92 * var(--poster-u) * var(--poster-toggle-scale));
+  height: calc(46 * var(--poster-u) * var(--poster-toggle-scale));
+  padding: calc(5 * var(--poster-u) * var(--poster-toggle-scale));
   border: max(calc(2 * var(--poster-u)), 1px) solid var(--poster-lav);
   border-radius: var(--radius-pill);
   background: var(--poster-lilac);
@@ -645,16 +645,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(34 * var(--poster-u));
-  height: calc(34 * var(--poster-u));
+  width: calc(34 * var(--poster-u) * var(--poster-toggle-scale));
+  height: calc(34 * var(--poster-u) * var(--poster-toggle-scale));
   border-radius: 50%;
   background: var(--poster-white);
   color: var(--poster-toggle-ico);
 }
 
 .themeToggleIcon {
-  width: calc(20 * var(--poster-u));
-  height: calc(20 * var(--poster-u));
+  width: calc(20 * var(--poster-u) * var(--poster-toggle-scale));
+  height: calc(20 * var(--poster-u) * var(--poster-toggle-scale));
 }
 
 .themeToggle:focus-visible {
@@ -683,7 +683,7 @@
 
 .title {
   max-width: 100%;
-  margin: auto 0 0;
+  margin: 18dvh 0 0;
   color: var(--poster-ink);
   font-size: calc(116 * var(--poster-u));
   font-weight: 800;
@@ -748,6 +748,7 @@
 .doc {
   display: inline-flex;
   align-items: center;
+  width: 100%;
   gap: max(calc(12 * var(--poster-u)), var(--space-2));
   min-height: max(calc(59 * var(--poster-u)), var(--tap-min));
   padding: 0 max(calc(26 * var(--poster-u)), var(--space-4));
@@ -1157,6 +1158,18 @@
 
   .scroll {
     top: 50.633%;
+  }
+
+  .star7 {
+    top: 83.906%;
+  }
+
+  .star8 {
+    top: 81.374%;
+  }
+
+  .doc {
+    width: auto;
   }
 
   .hint {

@@ -498,12 +498,14 @@
 
 :root {
   --poster-art-u: calc(var(--poster-u) * 1.6);
+  --poster-toggle-scale: 2;
 }
 
 @media (min-width: 900px) {
   :root {
     --poster-u: calc(min(1080px, 100dvw - 2 * var(--space-5)) / 1080);
     --poster-art-u: var(--poster-u);
+    --poster-toggle-scale: 1;
   }
 }
 

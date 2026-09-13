@@ -3,6 +3,7 @@ import type { PublicUser } from '@messenger/shared';
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useLayoutMode } from '../../app/useLayoutMode';
 import { Icon } from '../../ui/Icon';
 import { Switch } from '../../ui/Switch';
 import styles from './PolicyUpdatePoster.module.css';
@@ -50,6 +51,7 @@ export function PolicyUpdatePoster({
   onToggleTheme,
 }: PolicyUpdatePosterProps) {
   const navigate = useNavigate();
+  const layout = useLayoutMode();
   const frameRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const gateLabelId = useId();
@@ -202,7 +204,7 @@ export function PolicyUpdatePoster({
                 </h1>
 
                 <p className={styles.subtitle}>
-                  Новая версия вступает в силу для всех, кто пользуется Qwill.
+                  Новая версия вступает в&nbsp;силу для всех, кто пользуется Qwill.
                 </p>
               </div>
             </section>
@@ -257,7 +259,7 @@ export function PolicyUpdatePoster({
 
                   <div className={styles.gate}>
                     <span className={styles.gateLabel} id={gateLabelId}>
-                      Я прочитал(а) новую версию
+                      Я прочитал(а) новую&nbsp;версию
                     </span>
                     <Switch checked={read} onChange={setRead} labelledBy={gateLabelId} />
                   </div>
@@ -269,7 +271,7 @@ export function PolicyUpdatePoster({
                       onClick={onDecline}
                       disabled={pending}
                     >
-                      Не принимаю
+                      {layout === 'mobile' ? 'Отказываюсь' : 'Не принимаю'}
                     </button>
                     <div className={styles.acceptSlot}>
                       {error && (
