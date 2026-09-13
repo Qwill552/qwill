@@ -498,7 +498,7 @@
 
 :root {
   --poster-art-u: calc(var(--poster-u) * 1.6);
-  --poster-toggle-scale: 2;
+  --poster-toggle-scale: 1.333;
 }
 
 @media (min-width: 900px) {

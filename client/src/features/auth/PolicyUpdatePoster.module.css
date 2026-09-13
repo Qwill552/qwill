@@ -378,8 +378,8 @@
 
 .scroll {
   position: absolute;
-  right: calc(24 * var(--poster-art-u));
-  top: 56%;
+  right: 0;
+  top: 50%;
   z-index: 1;
   width: calc(250 * var(--poster-art-u));
   animation: calc(var(--dur-theme) * 2) var(--ease-spring) calc(var(--dur-tab) * 3) both objIn;
@@ -503,7 +503,7 @@
 
 .star7 {
   left: calc(26 * var(--poster-art-u));
-  top: 33%;
+  top: 61%;
   width: calc(52 * var(--poster-art-u));
   height: calc(52 * var(--poster-art-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-sky));
@@ -512,7 +512,7 @@
 
 .star8 {
   right: calc(388 * var(--poster-art-u));
-  top: 26%;
+  top: 54%;
   width: calc(40 * var(--poster-art-u));
   height: calc(40 * var(--poster-art-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-lav));
@@ -683,7 +683,7 @@
 
 .title {
   max-width: 100%;
-  margin: 18dvh 0 0;
+  margin: 13dvh 0 0;
   color: var(--poster-ink);
   font-size: calc(116 * var(--poster-u));
   font-weight: 800;
@@ -1157,6 +1157,7 @@
   }
 
   .scroll {
+    right: calc(24 * var(--poster-art-u));
     top: 50.633%;
   }
 
