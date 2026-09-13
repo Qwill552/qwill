@@ -7,6 +7,7 @@ import supertest from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/prisma.js';
 import { banUser, revokeAdminRole } from '../src/services/admin.js';
@@ -30,7 +31,7 @@ async function registerUser(suffix: string): Promise<TestUser> {
   const username = `r32e_${RUN_ID}_${suffix}`;
   const res = await request
     .post('/api/auth/register')
-    .send({ username, password: PASSWORD, displayName: 'Проверка' , termsVersion: '1.0', privacyVersion: '1.0' });
+    .send({ username, password: PASSWORD, displayName: 'Проверка' , ...CURRENT_LEGAL_VERSIONS });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };

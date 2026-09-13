@@ -23,6 +23,7 @@ import webpush from 'web-push';
 import { getMessaging } from 'firebase-admin/messaging';
 
 import { createApp } from '../src/app.js';
+import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { prisma } from '../src/db/prisma.js';
 import { getOrCreatePrivateChat } from '../src/services/chat.js';
 import { sendMessage } from '../src/services/message.js';
@@ -39,7 +40,7 @@ const createdChatIds: string[] = [];
 
 async function registerUser(suffix: string): Promise<{ token: string; userId: string; username: string }> {
   const username = `stage9_${RUN_ID}_${suffix}`;
-  const res = await request.post('/api/auth/register').send({ username, password: 'password123', displayName: 'Пушер' , termsVersion: '1.0', privacyVersion: '1.0' });
+  const res = await request.post('/api/auth/register').send({ username, password: 'password123', displayName: 'Пушер' , ...CURRENT_LEGAL_VERSIONS });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };

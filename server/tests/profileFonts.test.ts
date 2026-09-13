@@ -5,6 +5,7 @@ import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/prisma.js';
 import {
@@ -64,7 +65,7 @@ describe('шрифты визитки (R-30C)', () => {
   it('блок @font-face вставляется сервером в документ визитки', async () => {
     const registered = await request
       .post('/api/auth/register')
-      .send({ username: `font_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , termsVersion: '1.0', privacyVersion: '1.0' });
+      .send({ username: `font_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , ...CURRENT_LEGAL_VERSIONS });
     const token = registered.body.accessToken as string;
     const userId = registered.body.user.id as string;
 
@@ -89,7 +90,7 @@ describe('шрифты визитки (R-30C)', () => {
   it('в документ попадают только семейства, упомянутые в самой визитке', async () => {
     const registered = await request
       .post('/api/auth/register')
-      .send({ username: `font2_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , termsVersion: '1.0', privacyVersion: '1.0' });
+      .send({ username: `font2_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , ...CURRENT_LEGAL_VERSIONS });
     const token = registered.body.accessToken as string;
     const userId = registered.body.user.id as string;
 

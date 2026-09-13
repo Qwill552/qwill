@@ -15,6 +15,7 @@ import supertest from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { prisma } from '../src/db/prisma.js';
 import { createSocketServer } from '../src/realtime/index.js';
 import { getLiveCallsForParticipant } from '../src/services/call.js';
@@ -36,7 +37,7 @@ async function registerUser(suffix: string): Promise<{ userId: string; username:
   const username = `callsig_${RUN_ID}_${suffix}`;
   const res = await request
     .post('/api/auth/register')
-    .send({ username, password: 'password123', displayName: suffix , termsVersion: '1.0', privacyVersion: '1.0' });
+    .send({ username, password: 'password123', displayName: suffix , ...CURRENT_LEGAL_VERSIONS });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { userId: res.body.user.id as string, username, accessToken: res.body.accessToken as string };

@@ -8,6 +8,7 @@ import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/db/prisma.js';
 import { ensureStorageDirs } from '../src/services/file.js';
@@ -22,7 +23,7 @@ const createdStoredNames: string[] = [];
 async function registerUser(suffix: string): Promise<{ token: string; userId: string }> {
   const res = await request
     .post('/api/auth/register')
-    .send({ username: `ava_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Аватар' , termsVersion: '1.0', privacyVersion: '1.0' });
+    .send({ username: `ava_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Аватар' , ...CURRENT_LEGAL_VERSIONS });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string };

@@ -13,8 +13,14 @@ interface LegalDocVersion {
 }
 
 const LEGAL_DOC_VERSIONS: Record<LegalDocId, LegalDocVersion[]> = {
-  terms: [{ version: '1.0', fileName: 'terms-1.0.md' }],
-  privacy: [{ version: '1.0', fileName: 'privacy-1.0.md' }],
+  terms: [
+    { version: '1.1', fileName: 'terms-1.1.md' },
+    { version: '1.0', fileName: 'terms-1.0.md' },
+  ],
+  privacy: [
+    { version: '1.1', fileName: 'privacy-1.1.md' },
+    { version: '1.0', fileName: 'privacy-1.0.md' },
+  ],
 };
 
 export const CURRENT_LEGAL_VERSIONS: LegalVersionsDto = {
