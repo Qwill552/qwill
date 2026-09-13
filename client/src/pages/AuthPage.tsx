@@ -33,6 +33,7 @@ export function AuthPage() {
 
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
+  const [usernameFocused, setUsernameFocused] = useState(false);
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -150,9 +151,11 @@ export function AuthPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              onFocus={() => setUsernameFocused(true)}
+              onBlur={() => setUsernameFocused(false)}
             />
             {mode === 'register' && (
-              <div className={`${styles.tooltip} ${username ? styles.tooltipVisible : ''}`}>
+              <div className={`${styles.tooltip} ${usernameFocused ? styles.tooltipVisible : ''}`}>
                 Выбирайте имя пользователя с умом! Его невозможно изменить после регистрации. По
                 нему вас смогут найти другие люди.
               </div>

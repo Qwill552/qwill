@@ -74,7 +74,8 @@ jobs:
             server/package.json server/prisma.config.ts server/dist server/prisma server/assets \
             client/package.json client/dist \
             scripts/announce.mjs \
-            deploy
+            deploy \
+            legal
 
       - name: Upload and activate
         env:
