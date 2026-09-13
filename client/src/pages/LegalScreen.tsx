@@ -1,14 +1,18 @@
+import { Capacitor } from '@capacitor/core';
 import type { LegalDocId, LegalDocumentDto } from '@messenger/shared';
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { getCurrentLegalVersionsRequest, getLegalDocumentRequest } from '../api/legal';
+import { IconButton } from '../ui/IconButton';
 import { renderLegalDocumentMarkdown } from '../utils/markdown';
 import styles from './LegalScreen.module.css';
 
 export function LegalScreen() {
   const { doc, version } = useParams<{ doc: LegalDocId; version?: string }>();
+  const navigate = useNavigate();
+  const showBack = Capacitor.isNativePlatform();
   const [legalDoc, setLegalDoc] = useState<LegalDocumentDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +32,15 @@ export function LegalScreen() {
   }, [doc, version]);
 
   return (
-    <div className={styles.screen}>
+    <div className={`${styles.screen} ${showBack ? styles.screenWithBack : ''}`}>
+      {showBack && (
+        <IconButton
+          icon="back"
+          label="Назад"
+          className={styles.back}
+          onClick={() => navigate(-1)}
+        />
+      )}
       <main className={styles.body}>
         {error && <p className={styles.error}>{error}</p>}
         {!error && !legalDoc && <p className={styles.loading}>Загрузка…</p>}

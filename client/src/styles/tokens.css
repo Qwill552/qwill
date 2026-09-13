@@ -397,6 +397,127 @@
   --auth-card-border-strong: rgb(255 255 255 / 18%);
 }
 
+/* ──────────────────────  Афиша обновления политики (искл.)  ────────────────────── */
+
+:root {
+  --poster-ink: #372a56;
+  --poster-ink-2: #6d5f93;
+  --poster-white: #fff;
+  --poster-lilac: #ece1fb;
+  --poster-lav: #d3bdf7;
+  --poster-violet: #9268ef;
+  --poster-violet-d: #6b3bd6;
+  --poster-pink: #ffd6ea;
+  --poster-hot: #ff7fbb;
+  --poster-hot-d: #ff5fa8;
+  --poster-sky: #c8e6ff;
+  --poster-mint: #c4f2e6;
+  --poster-cloud-1: #fff;
+  --poster-cloud-2: #f0f1fc;
+  --poster-cloud-3: #d7dcf3;
+  --poster-sheet: #eef2ff;
+  --poster-sheet-roll: #cfd6f2;
+  --poster-card: #fff;
+  --poster-card-edge: #fff;
+  --poster-gate: #f6f2fe;
+  --poster-off-bg: #e3dcf5;
+  --poster-off-fg: #a79ec6;
+  --poster-ok: #8be3c8;
+  --poster-ok-d: #3fbf9e;
+  --poster-ok-lit: #fff;
+  --poster-face: #372a56;
+  --poster-face-glint: #fff;
+  --poster-paper: #fff;
+  --poster-lock-1: #d3bdf7;
+  --poster-lock-2: #9268ef;
+  --poster-lock-3: #6b3bd6;
+  --poster-lock-hole: #ece1fb;
+  --poster-gloss: #fff;
+  --poster-star: #fff;
+  --poster-cta-h: #6b3bd6;
+  --poster-toggle-ico: #6b3bd6;
+  --poster-cloud-filter: none;
+  --poster-smoke-filter: none;
+  --poster-canvas: linear-gradient(
+    168deg,
+    #ece1fb 0%,
+    #ffd6ea 28%,
+    #c8e6ff 56%,
+    #c4f2e6 76%,
+    #ece1fb 100%
+  );
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --poster-ink: #ece6ff;
+  --poster-ink-2: #a99cd4;
+  --poster-lilac: #2f2752;
+  --poster-lav: #574a8f;
+  --poster-violet: #8a5ef0;
+  --poster-violet-d: #c9b2ff;
+  --poster-pink: #e58fc0;
+  --poster-sky: #7fb6e8;
+  --poster-mint: #7fd8c4;
+  --poster-cloud-1: #b3aed6;
+  --poster-cloud-2: #a8a3cc;
+  --poster-cloud-3: #8e89b4;
+  --poster-sheet: #aca7cb;
+  --poster-sheet-roll: #a09bc0;
+  --poster-card: #241c40;
+  --poster-card-edge: #3f3468;
+  --poster-gate: #2c2450;
+  --poster-off-bg: #332b52;
+  --poster-off-fg: #7a6fa6;
+  --poster-ok: #63cfb0;
+  --poster-ok-d: #2f9b80;
+  --poster-ok-lit: #5cc0a4;
+  --poster-face: #241d3c;
+  --poster-paper: #b7b2d6;
+  --poster-lock-1: #4a3a86;
+  --poster-lock-2: #453681;
+  --poster-lock-3: #3b2e70;
+  --poster-lock-hole: #bdb6e0;
+  --poster-gloss: transparent;
+  --poster-cta-h: #7146d8;
+  --poster-cloud-filter: brightness(0.66) sepia(0.28) hue-rotate(212deg) saturate(1.6);
+  --poster-smoke-filter: brightness(0.4) contrast(1.15);
+  --poster-canvas: linear-gradient(
+    168deg,
+    #16112b 0%,
+    #241638 24%,
+    #141f3c 52%,
+    #13302f 76%,
+    #1a1332 100%
+  );
+}
+
+:root {
+  --poster-u: calc(100dvw / 1080);
+}
+
+@media (min-width: 900px) {
+  :root {
+    --poster-u: calc(min(920px, 100dvw - 48px) / 1080);
+  }
+}
+
+:root {
+  --poster-card-bg: color-mix(in srgb, var(--poster-card) 90%, transparent);
+  --poster-pill-bg: color-mix(in srgb, var(--poster-card) 78%, transparent);
+  --poster-hint-bg: color-mix(in srgb, var(--poster-card) 86%, transparent);
+  --poster-cta-bg: linear-gradient(118deg, var(--poster-violet) 0%, var(--poster-hot) 100%);
+  --poster-cta-bg-hover: linear-gradient(118deg, var(--poster-cta-h) 0%, var(--poster-hot-d) 100%);
+  --poster-gloss-fade: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--poster-gloss) 55%, transparent) 0%,
+    transparent 100%
+  );
+  --poster-goo-filter: blur(calc(13 * var(--poster-u))) contrast(16) var(--poster-cloud-filter);
+  --poster-puff-filter: blur(calc(9 * var(--poster-u)));
+  --poster-shadow: var(--shadow-lg);
+}
+
 /* ─────────────────────────────  Типографика  ───────────────────────────── */
 
 /* Базовый размер переключается тремя ступенями; всё остальное считается от него в em,

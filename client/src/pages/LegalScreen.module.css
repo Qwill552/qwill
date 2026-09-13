@@ -12,6 +12,20 @@
   margin: 0 auto;
 }
 
+.back {
+  position: fixed;
+  left: calc(var(--safe-left) + var(--space-3));
+  top: calc(var(--safe-top) + var(--space-3));
+  z-index: 10;
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--chrome-shadow);
+}
+
+.screenWithBack {
+  padding-top: calc(var(--space-5) + var(--tap-min) + env(safe-area-inset-top));
+}
+
 .loading,
 .error {
   color: var(--text-secondary);

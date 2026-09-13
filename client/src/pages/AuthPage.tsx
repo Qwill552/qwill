@@ -223,7 +223,6 @@ export function AuthPage() {
 
       {showConsent && (
         <ConsentDialog
-          variant="signup"
           pending={consentPending}
           error={consentError}
           onConfirm={() => void handleConsentConfirm()}
