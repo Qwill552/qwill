@@ -49,29 +49,30 @@
   }
 
   .frameWrap {
-    width: calc(1080 * var(--poster-u));
+    width: calc(1080 * var(--poster-u) + 2 * var(--space-3));
     height: auto;
     max-height: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--chrome-border);
+    border-radius: calc(48 * var(--poster-u) + var(--space-3));
+    background: var(--surface);
+    box-shadow: var(--poster-shadow);
   }
 
   .frame {
+    border: 1px solid var(--border);
     border-radius: calc(48 * var(--poster-u));
-    box-shadow: var(--poster-shadow);
   }
 
   .poster {
     min-height: calc(1920 * var(--poster-u));
-  }
-
-  .title {
-    max-width: calc(700 * var(--poster-u));
   }
 }
 
 .hero {
   position: relative;
   flex: 1;
-  min-height: calc(1106 * var(--poster-u));
+  min-height: max(calc(1106 * var(--poster-u)), 100dvh);
   padding: calc(76 * var(--poster-u)) calc(76 * var(--poster-u)) 0;
   padding-top: calc(76 * var(--poster-u) + var(--safe-top));
 }
@@ -80,7 +81,7 @@
 
 .cloud {
   position: absolute;
-  top: calc(-30 * var(--poster-u));
+  top: -2.712%;
   right: calc(-130 * var(--poster-u));
   z-index: 1;
   width: calc(470 * var(--poster-u));
@@ -306,7 +307,7 @@
 .lock {
   position: absolute;
   left: calc(-78 * var(--poster-u));
-  top: calc(592 * var(--poster-u));
+  top: 53.526%;
   z-index: 1;
   width: calc(292 * var(--poster-u));
   animation: calc(var(--dur-theme) * 2) var(--ease-spring) calc(var(--dur-tab) * 2) both objIn;
@@ -376,7 +377,7 @@
 .scroll {
   position: absolute;
   right: calc(24 * var(--poster-u));
-  top: calc(560 * var(--poster-u));
+  top: 50.633%;
   z-index: 1;
   width: calc(250 * var(--poster-u));
   animation: calc(var(--dur-theme) * 2) var(--ease-spring) calc(var(--dur-tab) * 3) both objIn;
@@ -446,7 +447,7 @@
 
 .star1 {
   left: calc(40 * var(--poster-u));
-  top: calc(176 * var(--poster-u));
+  top: 15.913%;
   width: calc(78 * var(--poster-u));
   height: calc(78 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-pink));
@@ -455,7 +456,7 @@
 
 .star2 {
   left: calc(512 * var(--poster-u));
-  top: calc(66 * var(--poster-u));
+  top: 5.967%;
   width: calc(50 * var(--poster-u));
   height: calc(50 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-sky));
@@ -464,7 +465,7 @@
 
 .star3 {
   right: calc(300 * var(--poster-u));
-  top: calc(420 * var(--poster-u));
+  top: 37.975%;
   width: calc(60 * var(--poster-u));
   height: calc(60 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-lav));
@@ -473,7 +474,7 @@
 
 .star4 {
   left: calc(300 * var(--poster-u));
-  top: calc(806 * var(--poster-u));
+  top: 72.875%;
   width: calc(44 * var(--poster-u));
   height: calc(44 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-mint));
@@ -482,7 +483,7 @@
 
 .star5 {
   right: calc(118 * var(--poster-u));
-  top: calc(358 * var(--poster-u));
+  top: 32.369%;
   width: calc(36 * var(--poster-u));
   height: calc(36 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-hot));
@@ -491,7 +492,7 @@
 
 .star6 {
   left: calc(664 * var(--poster-u));
-  top: calc(596 * var(--poster-u));
+  top: 53.888%;
   width: calc(66 * var(--poster-u));
   height: calc(66 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-pink));
@@ -500,7 +501,7 @@
 
 .star7 {
   left: calc(26 * var(--poster-u));
-  top: calc(928 * var(--poster-u));
+  top: 83.906%;
   width: calc(52 * var(--poster-u));
   height: calc(52 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-sky));
@@ -509,7 +510,7 @@
 
 .star8 {
   right: calc(388 * var(--poster-u));
-  top: calc(900 * var(--poster-u));
+  top: 81.374%;
   width: calc(40 * var(--poster-u));
   height: calc(40 * var(--poster-u));
   background: linear-gradient(160deg, var(--poster-star), var(--poster-lav));
@@ -535,7 +536,7 @@
 
 .smoke1 {
   left: calc(-190 * var(--poster-u));
-  top: calc(20 * var(--poster-u));
+  top: 1.808%;
   width: calc(840 * var(--poster-u));
   height: calc(321 * var(--poster-u));
   opacity: 0.72;
@@ -544,7 +545,7 @@
 
 .smoke2 {
   right: calc(-280 * var(--poster-u));
-  top: calc(190 * var(--poster-u));
+  top: 17.179%;
   width: calc(780 * var(--poster-u));
   height: calc(298 * var(--poster-u));
   opacity: 0.4;
@@ -553,7 +554,7 @@
 
 .smoke3 {
   left: calc(-270 * var(--poster-u));
-  top: calc(600 * var(--poster-u));
+  top: 54.25%;
   width: calc(920 * var(--poster-u));
   height: calc(352 * var(--poster-u));
   opacity: 0.78;
@@ -562,7 +563,7 @@
 
 .smoke4 {
   right: calc(-210 * var(--poster-u));
-  top: calc(500 * var(--poster-u));
+  top: 45.208%;
   width: calc(800 * var(--poster-u));
   height: calc(306 * var(--poster-u));
   opacity: 0.6;
@@ -1127,6 +1128,21 @@
   from {
     transform: translate(-50%, var(--space-2));
     opacity: 0;
+  }
+}
+
+@media (min-width: 900px) {
+  .hero {
+    min-height: calc(1106 * var(--poster-u));
+  }
+
+  .title {
+    max-width: calc(700 * var(--poster-u));
+  }
+
+  .hint {
+    right: calc(var(--safe-right) + var(--space-5));
+    bottom: calc(var(--safe-bottom) + var(--space-5));
   }
 }
 

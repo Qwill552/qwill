@@ -1,0 +1,4 @@
+.backdrop {
+  position: fixed;
+  inset: var(--titlebar-h) 0 0;
+}

@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 
 import { useAuthStore } from '../stores/authStore';
 import { ConsentGate } from './ConsentGate';
+import styles from './ProtectedRoute.module.css';
 import { useLayoutMode } from './useLayoutMode';
 
 /** Пускает дальше только authenticated; остальные статусы обрабатываются выше, в App (секция 4). */
@@ -18,7 +19,7 @@ export function ProtectedRoute() {
     return (
       <>
         {layout === 'desktop' && (
-          <div inert>
+          <div className={styles.backdrop} inert>
             <Outlet />
           </div>
         )}
