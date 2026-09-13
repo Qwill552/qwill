@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect } from 'react';
 
 import { AdminReauthGate } from '../features/admin/ReauthDialog';
 import { CallOverlay } from '../features/calls/CallOverlay';
+import { ScreenSourcePicker } from '../features/calls/ScreenSourcePicker';
 import { AvatarViewer } from '../features/media/AvatarViewer';
 import { MediaViewer } from '../features/media/MediaViewer';
 import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
@@ -39,6 +40,7 @@ export function AppShell() {
       <TabBar />
       <UpdateBanner />
       <CallOverlay />
+      <ScreenSourcePicker />
       <MediaViewer />
       <AvatarViewer />
       <AdminReauthGate />
