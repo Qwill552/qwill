@@ -496,9 +496,14 @@
   --poster-u: calc(100dvw / 880);
 }
 
+:root {
+  --poster-art-u: calc(var(--poster-u) * 1.6);
+}
+
 @media (min-width: 900px) {
   :root {
     --poster-u: calc(min(1080px, 100dvw - 2 * var(--space-5)) / 1080);
+    --poster-art-u: var(--poster-u);
   }
 }
 
@@ -513,8 +518,8 @@
     color-mix(in srgb, var(--poster-gloss) 55%, transparent) 0%,
     transparent 100%
   );
-  --poster-goo-filter: blur(calc(13 * var(--poster-u))) contrast(16) var(--poster-cloud-filter);
-  --poster-puff-filter: blur(calc(9 * var(--poster-u)));
+  --poster-goo-filter: blur(calc(13 * var(--poster-art-u))) contrast(16) var(--poster-cloud-filter);
+  --poster-puff-filter: blur(calc(9 * var(--poster-art-u)));
   --poster-shadow: var(--shadow-lg);
 }
 
