@@ -493,12 +493,12 @@
 }
 
 :root {
-  --poster-u: calc(100dvw / 1080);
+  --poster-u: calc(100dvw / 880);
 }
 
 @media (min-width: 900px) {
   :root {
-    --poster-u: calc(min(920px, 100dvw - 48px) / 1080);
+    --poster-u: calc(min(1080px, 100dvw - 2 * var(--space-5)) / 1080);
   }
 }
 

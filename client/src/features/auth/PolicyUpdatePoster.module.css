@@ -2,15 +2,32 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   background: var(--scrim-bg);
   backdrop-filter: var(--scrim-blur);
 }
 
-.overlay::-webkit-scrollbar {
+.frameWrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+}
+
+.frame {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.frame::-webkit-scrollbar {
   display: none;
 }
 
@@ -18,19 +35,43 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: calc(1080 * var(--poster-u));
+  width: 100%;
   min-height: max(calc(1920 * var(--poster-u)), 100dvh);
-  margin: 0 auto;
   overflow: hidden;
   color: var(--poster-ink);
   background: var(--poster-canvas);
   font-family: var(--font-display);
 }
 
+@media (min-width: 900px) {
+  .overlay {
+    padding: var(--space-5);
+  }
+
+  .frameWrap {
+    width: calc(1080 * var(--poster-u));
+    height: auto;
+    max-height: 100%;
+  }
+
+  .frame {
+    border-radius: calc(48 * var(--poster-u));
+    box-shadow: var(--poster-shadow);
+  }
+
+  .poster {
+    min-height: calc(1920 * var(--poster-u));
+  }
+
+  .title {
+    max-width: calc(700 * var(--poster-u));
+  }
+}
+
 .hero {
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-height: calc(1106 * var(--poster-u));
   padding: calc(76 * var(--poster-u)) calc(76 * var(--poster-u)) 0;
   padding-top: calc(76 * var(--poster-u) + var(--safe-top));
 }
@@ -635,7 +676,7 @@
 }
 
 .title {
-  max-width: calc(700 * var(--poster-u));
+  max-width: 100%;
   margin: calc(132 * var(--poster-u)) 0 0;
   color: var(--poster-ink);
   font-size: calc(116 * var(--poster-u));
@@ -934,7 +975,7 @@
 /* ─────────────────────────────  Подсказка прокрутки  ───────────────────────────── */
 
 .hint {
-  position: fixed;
+  position: absolute;
   right: calc(var(--safe-right) + 28px);
   bottom: calc(var(--safe-bottom) + 28px);
   z-index: 30;
