@@ -383,6 +383,9 @@
 
   --auth-danger: #d14343;
   --auth-danger-soft: rgb(209 67 67 / 10%);
+
+  --auth-z-card: 2;
+  --auth-z-cloud: 3;
 }
 
 :root[data-theme='dark'],
@@ -546,6 +549,7 @@
   --dur-media-fade: 220ms; /* проявление снимка поверх пятна BlurHash */
   --dur-wheel-settle: 800ms; /* доводка барабана выбора даты к ближайшей строке */
   --dur-wheel-step: 300ms; /* шаг барабана на одну строку по тапу или стрелке */
+  --dur-cloud-pop: 320ms;
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-close: ease-in;
@@ -583,6 +587,7 @@
     --dur-media-fade: 1ms;
     --dur-wheel-settle: 1ms;
     --dur-wheel-step: 1ms;
+    --dur-cloud-pop: 1ms;
     --transition: 1ms linear;
   }
 }

@@ -9,7 +9,7 @@
 
 .card {
   position: relative;
-  z-index: 2;
+  z-index: var(--auth-z-card);
   width: 100%;
   max-width: 400px;
   margin: var(--space-4);

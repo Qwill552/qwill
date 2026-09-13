@@ -1,11 +1,26 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
-import styles from './SkyScene.module.css';
+import { cssDurationMs } from "../../ui/motion";
+import styles from "./SkyScene.module.css";
 
-const CLOUD_CLASSES = [styles.cloud1, styles.cloud2, styles.cloud3, styles.cloud4, styles.cloud5];
+const CLOUD_CLASSES = [
+  styles.cloud1,
+  styles.cloud2,
+  styles.cloud3,
+  styles.cloud4,
+  styles.cloud5,
+];
 
 /** Минимальное расстояние (px) между центрами облаков при переразмещении. */
 const MIN_DISTANCE = 180;
+
+const CLOUD_CROWN_HEIGHT_ABOVE_BODY = 60;
+
+const MIN_BASE_SCALE = 0.6;
+const BASE_SCALE_SPREAD = 0.5;
+const PLACEMENT_ATTEMPTS = 50;
+
+type Spot = { top: number; left: number };
 
 /**
  * Анимированная сцена дня/ночи с кликабельными "лопающимися" облаками —
@@ -14,42 +29,70 @@ const MIN_DISTANCE = 180;
  * чем реагирует React, так что не стоит гонять это через state/ре-рендер.
  */
 export function SkyScene() {
+  const sceneRef = useRef<HTMLDivElement | null>(null);
   const cloudRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    const clouds = cloudRefs.current.filter((el): el is HTMLDivElement => el !== null);
-    if (clouds.length === 0) return;
+    const scene = sceneRef.current;
+    const clouds = cloudRefs.current.filter(
+      (el): el is HTMLDivElement => el !== null,
+    );
+    if (!scene || clouds.length === 0) return;
 
     const poppingClass = styles.popping!;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
-    function getValidPosition(current: HTMLDivElement): { top: number; left: number } {
-      const others = clouds.filter((c) => c !== current && !c.classList.contains(poppingClass));
-      let top = 0;
-      let left = 0;
-      let attempts = 0;
-      let valid = false;
+    function pickInRange(min: number, max: number): number {
+      if (max <= min) return (min + max) / 2;
+      return min + Math.random() * (max - min);
+    }
 
-      while (!valid && attempts < 50) {
-        top = 5 + Math.random() * 80;
-        left = 5 + Math.random() * 80;
-        valid = true;
+    const nextSpot = (cloud: HTMLDivElement, scale: number): Spot | null => {
+      const sceneRect = scene.getBoundingClientRect();
+      if (sceneRect.width < 1 || sceneRect.height < 1) return null;
 
-        for (const other of others) {
+      const centerX = cloud.offsetWidth / 2;
+      const centerY = cloud.offsetHeight / 2;
+      const halfWidth = centerX * scale;
+      const halfHeight = centerY * scale;
+      const halfWithCrown = (centerY + CLOUD_CROWN_HEIGHT_ABOVE_BODY) * scale;
+
+      const minLeft = halfWidth - centerX;
+      const maxLeft = sceneRect.width - centerX - halfWidth;
+      const minTop = halfWithCrown - centerY;
+      const maxTop = sceneRect.height - centerY - halfHeight;
+
+      const takenCenters = clouds
+        .filter(
+          (other) => other !== cloud && !other.classList.contains(poppingClass),
+        )
+        .map((other) => {
           const rect = other.getBoundingClientRect();
-          const newTopPx = (top / 100) * window.innerHeight;
-          const newLeftPx = (left / 100) * window.innerWidth;
-          const distance = Math.hypot(rect.top - newTopPx, rect.left - newLeftPx);
-          if (distance < MIN_DISTANCE) {
-            valid = false;
-            break;
-          }
-        }
-        attempts += 1;
+          return {
+            x: rect.left - sceneRect.left + rect.width / 2,
+            y: rect.top - sceneRect.top + rect.height / 2,
+          };
+        });
+
+      let left = pickInRange(minLeft, maxLeft);
+      let top = pickInRange(minTop, maxTop);
+
+      for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt += 1) {
+        left = pickInRange(minLeft, maxLeft);
+        top = pickInRange(minTop, maxTop);
+        const x = left + centerX;
+        const y = top + centerY;
+        const clear = takenCenters.every(
+          (center) => Math.hypot(center.x - x, center.y - y) >= MIN_DISTANCE,
+        );
+        if (clear) break;
       }
 
-      return { top, left };
-    }
+      return {
+        top: (top / sceneRect.height) * 100,
+        left: (left / sceneRect.width) * 100,
+      };
+    };
 
     function handleClick(cloud: HTMLDivElement) {
       return () => {
@@ -57,14 +100,19 @@ export function SkyScene() {
         cloud.classList.add(poppingClass);
 
         const timeout = setTimeout(() => {
-          const { top, left } = getValidPosition(cloud);
-          cloud.style.bottom = 'auto';
-          cloud.style.right = 'auto';
-          cloud.style.top = `${top}%`;
-          cloud.style.left = `${left}%`;
-          cloud.style.setProperty('--base-scale', (0.6 + Math.random() * 0.5).toFixed(2));
+          const scale = Number(
+            (MIN_BASE_SCALE + Math.random() * BASE_SCALE_SPREAD).toFixed(2),
+          );
+          const spot = nextSpot(cloud, scale);
+          if (spot) {
+            cloud.style.bottom = "auto";
+            cloud.style.right = "auto";
+            cloud.style.top = `${spot.top}%`;
+            cloud.style.left = `${spot.left}%`;
+            cloud.style.setProperty("--base-scale", String(scale));
+          }
           cloud.classList.remove(poppingClass);
-        }, 400);
+        }, cssDurationMs("--dur-cloud-pop"));
 
         timeouts.push(timeout);
       };
@@ -72,8 +120,8 @@ export function SkyScene() {
 
     const cleanups = clouds.map((cloud) => {
       const onClick = handleClick(cloud);
-      cloud.addEventListener('click', onClick);
-      return () => cloud.removeEventListener('click', onClick);
+      cloud.addEventListener("click", onClick);
+      return () => cloud.removeEventListener("click", onClick);
     });
 
     return () => {
@@ -83,7 +131,7 @@ export function SkyScene() {
   }, []);
 
   return (
-    <div className={styles.scene}>
+    <div className={styles.scene} ref={sceneRef}>
       <div className={styles.stars} />
       <div className={styles.celestial}>
         <div className={styles.sunWrapper}>
@@ -100,6 +148,7 @@ export function SkyScene() {
       {CLOUD_CLASSES.map((cloudClass, index) => (
         <div
           key={index}
+          aria-hidden="true"
           ref={(el) => {
             cloudRefs.current[index] = el;
           }}

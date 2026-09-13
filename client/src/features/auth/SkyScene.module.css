@@ -9,7 +9,7 @@
   transition: background 1s ease;
 }
 
-:root[data-theme='dark'] .scene {
+:root[data-theme="dark"] .scene {
   background: var(--auth-sky-night);
 }
 
@@ -23,8 +23,16 @@
     radial-gradient(1px 1px at 30% 60%, var(--auth-white) 100%, transparent),
     radial-gradient(2px 2px at 50% 10%, var(--auth-white) 90%, transparent),
     radial-gradient(1px 1px at 10% 80%, var(--auth-white) 100%, transparent),
-    radial-gradient(2.5px 2.5px at 90% 80%, var(--auth-white) 100%, transparent),
-    radial-gradient(1.5px 1.5px at 60% 70%, var(--auth-white) 100%, transparent),
+    radial-gradient(
+      2.5px 2.5px at 90% 80%,
+      var(--auth-white) 100%,
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 60% 70%,
+      var(--auth-white) 100%,
+      transparent
+    ),
     radial-gradient(1.5px 1.5px at 20% 45%, var(--auth-white) 90%, transparent),
     radial-gradient(2px 2px at 45% 85%, var(--auth-white) 80%, transparent),
     radial-gradient(1px 1px at 80% 25%, var(--auth-white) 100%, transparent),
@@ -34,7 +42,7 @@
   z-index: 0;
 }
 
-:root[data-theme='dark'] .stars {
+:root[data-theme="dark"] .stars {
   opacity: 1;
 }
 
@@ -60,7 +68,7 @@
     opacity 0.8s ease;
 }
 
-:root[data-theme='dark'] .sunWrapper {
+:root[data-theme="dark"] .sunWrapper {
   transform: translate(300px, 150px);
   opacity: 0;
 }
@@ -133,7 +141,7 @@
     opacity 0.8s ease;
 }
 
-:root[data-theme='dark'] .moon {
+:root[data-theme="dark"] .moon {
   transform: translate(12px, -8px) rotate(0deg);
   opacity: 1;
 }
@@ -142,16 +150,17 @@
   position: absolute;
   background: var(--auth-white);
   border-radius: 50px;
+  transform: scale(var(--base-scale, 1));
   transition:
     background 1s ease,
     opacity 1s ease,
-    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform var(--dur-cloud-pop) var(--ease-spring);
   cursor: pointer;
 }
 
 .cloud::before,
 .cloud::after {
-  content: '';
+  content: "";
   position: absolute;
   background: inherit;
   border-radius: 50%;
@@ -164,15 +173,18 @@
   animation: morph-ccw 10s ease-in-out infinite;
 }
 
-:root[data-theme='dark'] .cloud {
+:root[data-theme="dark"] .cloud {
   background: var(--auth-cloud-night);
   opacity: 0.6;
 }
 
 .popping {
-  transform: scale(0) !important;
+  transform: scale(calc(var(--base-scale, 1) * 0.4));
   opacity: 0 !important;
   pointer-events: none;
+  transition:
+    transform var(--dur-cloud-pop) var(--ease-close),
+    opacity var(--dur-cloud-pop) var(--ease-close);
 }
 
 @keyframes morph-cw {
@@ -212,7 +224,7 @@
   left: 15%;
   width: 160px;
   height: 50px;
-  z-index: 1;
+  z-index: var(--auth-z-cloud);
 }
 .cloud1::before {
   width: 70px;
@@ -232,7 +244,7 @@
   left: 78%;
   width: 200px;
   height: 60px;
-  z-index: 1;
+  z-index: var(--auth-z-cloud);
 }
 .cloud2::before {
   width: 80px;
@@ -252,7 +264,7 @@
   left: 5%;
   width: 220px;
   height: 70px;
-  z-index: 1;
+  z-index: var(--auth-z-cloud);
 }
 .cloud3::before {
   width: 90px;
@@ -272,7 +284,7 @@
   left: 72%;
   width: 180px;
   height: 55px;
-  z-index: 3;
+  z-index: var(--auth-z-cloud);
 }
 .cloud4::before {
   width: 80px;
@@ -292,7 +304,7 @@
   left: 25%;
   width: 120px;
   height: 40px;
-  z-index: 3;
+  z-index: var(--auth-z-cloud);
 }
 .cloud5::before {
   width: 50px;
