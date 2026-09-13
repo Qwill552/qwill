@@ -1,26 +1,22 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
-import { cssDurationMs } from "../../ui/motion";
-import styles from "./SkyScene.module.css";
+import { cssDurationMs } from '../../ui/motion';
+import styles from './SkyScene.module.css';
 
-const CLOUD_CLASSES = [
-  styles.cloud1,
-  styles.cloud2,
-  styles.cloud3,
-  styles.cloud4,
-  styles.cloud5,
-];
+const CLOUD_CLASSES = [styles.cloud1, styles.cloud2, styles.cloud3, styles.cloud4, styles.cloud5];
 
 /** Минимальное расстояние (px) между центрами облаков при переразмещении. */
 const MIN_DISTANCE = 180;
 
 const CLOUD_CROWN_HEIGHT_ABOVE_BODY = 60;
-
 const MIN_BASE_SCALE = 0.6;
 const BASE_SCALE_SPREAD = 0.5;
 const PLACEMENT_ATTEMPTS = 50;
 
-type Spot = { top: number; left: number };
+interface Spot {
+  top: number;
+  left: number;
+}
 
 /**
  * Анимированная сцена дня/ночи с кликабельными "лопающимися" облаками —
@@ -34,9 +30,7 @@ export function SkyScene() {
 
   useEffect(() => {
     const scene = sceneRef.current;
-    const clouds = cloudRefs.current.filter(
-      (el): el is HTMLDivElement => el !== null,
-    );
+    const clouds = cloudRefs.current.filter((el): el is HTMLDivElement => el !== null);
     if (!scene || clouds.length === 0) return;
 
     const poppingClass = styles.popping!;
@@ -63,9 +57,7 @@ export function SkyScene() {
       const maxTop = sceneRect.height - centerY - halfHeight;
 
       const takenCenters = clouds
-        .filter(
-          (other) => other !== cloud && !other.classList.contains(poppingClass),
-        )
+        .filter((other) => other !== cloud && !other.classList.contains(poppingClass))
         .map((other) => {
           const rect = other.getBoundingClientRect();
           return {
@@ -88,10 +80,7 @@ export function SkyScene() {
         if (clear) break;
       }
 
-      return {
-        top: (top / sceneRect.height) * 100,
-        left: (left / sceneRect.width) * 100,
-      };
+      return { top: (top / sceneRect.height) * 100, left: (left / sceneRect.width) * 100 };
     };
 
     function handleClick(cloud: HTMLDivElement) {
@@ -100,19 +89,17 @@ export function SkyScene() {
         cloud.classList.add(poppingClass);
 
         const timeout = setTimeout(() => {
-          const scale = Number(
-            (MIN_BASE_SCALE + Math.random() * BASE_SCALE_SPREAD).toFixed(2),
-          );
+          const scale = Number((MIN_BASE_SCALE + Math.random() * BASE_SCALE_SPREAD).toFixed(2));
           const spot = nextSpot(cloud, scale);
           if (spot) {
-            cloud.style.bottom = "auto";
-            cloud.style.right = "auto";
+            cloud.style.bottom = 'auto';
+            cloud.style.right = 'auto';
             cloud.style.top = `${spot.top}%`;
             cloud.style.left = `${spot.left}%`;
-            cloud.style.setProperty("--base-scale", String(scale));
+            cloud.style.setProperty('--base-scale', String(scale));
           }
           cloud.classList.remove(poppingClass);
-        }, cssDurationMs("--dur-cloud-pop"));
+        }, cssDurationMs('--dur-cloud-pop'));
 
         timeouts.push(timeout);
       };
@@ -120,8 +107,8 @@ export function SkyScene() {
 
     const cleanups = clouds.map((cloud) => {
       const onClick = handleClick(cloud);
-      cloud.addEventListener("click", onClick);
-      return () => cloud.removeEventListener("click", onClick);
+      cloud.addEventListener('click', onClick);
+      return () => cloud.removeEventListener('click', onClick);
     });
 
     return () => {
@@ -131,7 +118,7 @@ export function SkyScene() {
   }, []);
 
   return (
-    <div className={styles.scene} ref={sceneRef}>
+    <div className={styles.scene} ref={sceneRef} data-theme-motion>
       <div className={styles.stars} />
       <div className={styles.celestial}>
         <div className={styles.sunWrapper}>

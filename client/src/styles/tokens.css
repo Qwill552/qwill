@@ -602,9 +602,9 @@
    setThemeAttribute в stores/uiStore.ts), поэтому обычные переходы — наведение, нажатие —
    не задеты: у них между двумя пересчётами стиля атрибута уже нет. */
 [data-theme-swap],
-[data-theme-swap] *,
-[data-theme-swap] *::before,
-[data-theme-swap] *::after {
+[data-theme-swap] *:not([data-theme-motion], [data-theme-motion] *),
+[data-theme-swap] *:not([data-theme-motion], [data-theme-motion] *)::before,
+[data-theme-swap] *:not([data-theme-motion], [data-theme-motion] *)::after {
   transition: none !important;
 }
 

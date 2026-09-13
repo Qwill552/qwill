@@ -9,7 +9,7 @@
   transition: background 1s ease;
 }
 
-:root[data-theme="dark"] .scene {
+:root[data-theme='dark'] .scene {
   background: var(--auth-sky-night);
 }
 
@@ -23,16 +23,8 @@
     radial-gradient(1px 1px at 30% 60%, var(--auth-white) 100%, transparent),
     radial-gradient(2px 2px at 50% 10%, var(--auth-white) 90%, transparent),
     radial-gradient(1px 1px at 10% 80%, var(--auth-white) 100%, transparent),
-    radial-gradient(
-      2.5px 2.5px at 90% 80%,
-      var(--auth-white) 100%,
-      transparent
-    ),
-    radial-gradient(
-      1.5px 1.5px at 60% 70%,
-      var(--auth-white) 100%,
-      transparent
-    ),
+    radial-gradient(2.5px 2.5px at 90% 80%, var(--auth-white) 100%, transparent),
+    radial-gradient(1.5px 1.5px at 60% 70%, var(--auth-white) 100%, transparent),
     radial-gradient(1.5px 1.5px at 20% 45%, var(--auth-white) 90%, transparent),
     radial-gradient(2px 2px at 45% 85%, var(--auth-white) 80%, transparent),
     radial-gradient(1px 1px at 80% 25%, var(--auth-white) 100%, transparent),
@@ -42,7 +34,7 @@
   z-index: 0;
 }
 
-:root[data-theme="dark"] .stars {
+:root[data-theme='dark'] .stars {
   opacity: 1;
 }
 
@@ -68,7 +60,7 @@
     opacity 0.8s ease;
 }
 
-:root[data-theme="dark"] .sunWrapper {
+:root[data-theme='dark'] .sunWrapper {
   transform: translate(300px, 150px);
   opacity: 0;
 }
@@ -141,7 +133,7 @@
     opacity 0.8s ease;
 }
 
-:root[data-theme="dark"] .moon {
+:root[data-theme='dark'] .moon {
   transform: translate(12px, -8px) rotate(0deg);
   opacity: 1;
 }
@@ -160,7 +152,7 @@
 
 .cloud::before,
 .cloud::after {
-  content: "";
+  content: '';
   position: absolute;
   background: inherit;
   border-radius: 50%;
@@ -173,7 +165,7 @@
   animation: morph-ccw 10s ease-in-out infinite;
 }
 
-:root[data-theme="dark"] .cloud {
+:root[data-theme='dark'] .cloud {
   background: var(--auth-cloud-night);
   opacity: 0.6;
 }
