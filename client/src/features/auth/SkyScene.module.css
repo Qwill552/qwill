@@ -142,6 +142,7 @@
   position: absolute;
   background: var(--auth-white);
   border-radius: 50px;
+  opacity: var(--cloud-rest-opacity, 1);
   transform: scale(var(--base-scale, 1));
   transition:
     background 1s ease,
@@ -167,16 +168,91 @@
 
 :root[data-theme='dark'] .cloud {
   background: var(--auth-cloud-night);
-  opacity: 0.6;
+  --cloud-rest-opacity: 0.6;
+}
+
+.reforming {
+  pointer-events: none;
+  animation: cloud-reform var(--dur-cloud-pop) var(--ease-spring) forwards;
 }
 
 .popping {
-  transform: scale(calc(var(--base-scale, 1) * 0.4));
-  opacity: 0 !important;
   pointer-events: none;
-  transition:
-    transform var(--dur-cloud-pop) var(--ease-close),
-    opacity var(--dur-cloud-pop) var(--ease-close);
+  animation: cloud-burst var(--dur-cloud-pop) linear forwards;
+}
+
+@keyframes cloud-reform {
+  0% {
+    transform: scale(calc(var(--base-scale, 1) * 0.35));
+    opacity: 0;
+  }
+  100% {
+    transform: scale(var(--base-scale, 1));
+    opacity: var(--cloud-rest-opacity, 1);
+  }
+}
+
+.popping::before {
+  animation: crown-fly-left var(--dur-cloud-pop) linear forwards;
+}
+
+.popping::after {
+  animation: crown-fly-right var(--dur-cloud-pop) linear forwards;
+}
+
+@keyframes cloud-burst {
+  0% {
+    transform: scale(var(--base-scale, 1));
+    opacity: var(--cloud-rest-opacity, 1);
+    animation-timing-function: var(--ease-screen);
+  }
+  30% {
+    transform: scale(calc(var(--base-scale, 1) * 1.18), calc(var(--base-scale, 1) * 1.06));
+    opacity: var(--cloud-rest-opacity, 1);
+    animation-timing-function: var(--ease-close);
+  }
+  55% {
+    transform: scale(calc(var(--base-scale, 1) * 1.5));
+    opacity: calc(var(--cloud-rest-opacity, 1) * 0.45);
+  }
+  100% {
+    transform: scale(calc(var(--base-scale, 1) * 1.85));
+    opacity: 0;
+  }
+}
+
+@keyframes crown-fly-left {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: var(--ease-screen);
+  }
+  30% {
+    transform: translate(0, -6%) scale(1.12) rotate(-4deg);
+    opacity: 1;
+    animation-timing-function: var(--ease-screen);
+  }
+  100% {
+    transform: translate(-115%, -85%) scale(0.28) rotate(-38deg);
+    opacity: 0;
+  }
+}
+
+@keyframes crown-fly-right {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    animation-timing-function: var(--ease-screen);
+  }
+  30% {
+    transform: translate(0, -6%) scale(1.12) rotate(4deg);
+    opacity: 1;
+    animation-timing-function: var(--ease-screen);
+  }
+  100% {
+    transform: translate(118%, -72%) scale(0.32) rotate(34deg);
+    opacity: 0;
+  }
 }
 
 @keyframes morph-cw {

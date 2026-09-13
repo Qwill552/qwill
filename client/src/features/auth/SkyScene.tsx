@@ -34,6 +34,7 @@ export function SkyScene() {
     if (!scene || clouds.length === 0) return;
 
     const poppingClass = styles.popping!;
+    const reformingClass = styles.reforming!;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     function pickInRange(min: number, max: number): number {
@@ -86,8 +87,10 @@ export function SkyScene() {
     function handleClick(cloud: HTMLDivElement) {
       return () => {
         if (cloud.classList.contains(poppingClass)) return;
+        cloud.classList.remove(reformingClass);
         cloud.classList.add(poppingClass);
 
+        const popMs = cssDurationMs('--dur-cloud-pop');
         const timeout = setTimeout(() => {
           const scale = Number((MIN_BASE_SCALE + Math.random() * BASE_SCALE_SPREAD).toFixed(2));
           const spot = nextSpot(cloud, scale);
@@ -99,7 +102,9 @@ export function SkyScene() {
             cloud.style.setProperty('--base-scale', String(scale));
           }
           cloud.classList.remove(poppingClass);
-        }, cssDurationMs('--dur-cloud-pop'));
+          cloud.classList.add(reformingClass);
+          timeouts.push(setTimeout(() => cloud.classList.remove(reformingClass), popMs));
+        }, popMs);
 
         timeouts.push(timeout);
       };
