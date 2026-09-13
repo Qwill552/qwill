@@ -1,14 +1,18 @@
-import { loginSchema, registerSchema } from '@messenger/shared';
+import { ErrorCode, loginSchema, registerSchema, type LegalVersionsDto } from '@messenger/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
+import { getCurrentLegalVersionsRequest } from '../api/legal';
+import { ConsentDialog } from '../features/auth/ConsentDialog';
 import { SkyScene } from '../features/auth/SkyScene';
 import { useAuthStore } from '../stores/authStore';
 import { useUiStore } from '../stores/uiStore';
 import styles from './AuthPage.module.css';
 
 type Mode = 'login' | 'register';
+
+const registerFormSchema = registerSchema.omit({ termsVersion: true, privacyVersion: true });
 
 function issuesToFieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -34,10 +38,20 @@ export function AuthPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [legalVersions, setLegalVersions] = useState<LegalVersionsDto | null>(null);
+  const [showConsent, setShowConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [consentPending, setConsentPending] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') navigate('/chats', { replace: true });
   }, [status, navigate]);
+
+  useEffect(() => {
+    getCurrentLegalVersionsRequest()
+      .then(setLegalVersions)
+      .catch(() => undefined);
+  }, []);
 
   function switchMode() {
     setMode((current) => (current === 'login' ? 'register' : 'login'));
@@ -49,35 +63,71 @@ export function AuthPage() {
     event.preventDefault();
     setFormError(null);
 
-    try {
-      if (mode === 'login') {
-        const result = loginSchema.safeParse({ username, password });
-        if (!result.success) {
-          setFieldErrors(issuesToFieldErrors(result.error.issues));
-          return;
-        }
-        setFieldErrors({});
-        setSubmitting(true);
-        await login(result.data);
-      } else {
-        const result = registerSchema.safeParse({ username, password, displayName });
-        if (!result.success) {
-          setFieldErrors(issuesToFieldErrors(result.error.issues));
-          return;
-        }
-        setFieldErrors({});
-        setSubmitting(true);
-        await register(result.data);
+    if (mode === 'login') {
+      const result = loginSchema.safeParse({ username, password });
+      if (!result.success) {
+        setFieldErrors(issuesToFieldErrors(result.error.issues));
+        return;
       }
+      setFieldErrors({});
+      setSubmitting(true);
+      try {
+        await login(result.data);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          setFormError(error.message);
+          if (error.fields) setFieldErrors(error.fields);
+        } else {
+          setFormError('Не удалось выполнить запрос. Проверьте соединение.');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    const result = registerFormSchema.safeParse({ username, password, displayName });
+    if (!result.success) {
+      setFieldErrors(issuesToFieldErrors(result.error.issues));
+      return;
+    }
+    setFieldErrors({});
+    setConsentError(null);
+    setShowConsent(true);
+  }
+
+  async function handleConsentConfirm(): Promise<void> {
+    if (!legalVersions) {
+      setConsentError('Документы ещё загружаются, попробуйте через секунду');
+      return;
+    }
+
+    setConsentPending(true);
+    setConsentError(null);
+    try {
+      await register({
+        username,
+        password,
+        displayName,
+        termsVersion: legalVersions.termsVersion,
+        privacyVersion: legalVersions.privacyVersion,
+      });
     } catch (error) {
-      if (error instanceof ApiError) {
-        setFormError(error.message);
-        if (error.fields) setFieldErrors(error.fields);
+      if (error instanceof ApiError && error.code === ErrorCode.LEGAL_VERSION_OUTDATED) {
+        setConsentError('Документы обновились, попробуйте ещё раз');
+        getCurrentLegalVersionsRequest()
+          .then(setLegalVersions)
+          .catch(() => undefined);
+      } else if (error instanceof ApiError && error.fields) {
+        setShowConsent(false);
+        setFieldErrors(error.fields);
+      } else if (error instanceof ApiError) {
+        setConsentError(error.message);
       } else {
-        setFormError('Не удалось выполнить запрос. Проверьте соединение.');
+        setConsentError('Не удалось выполнить запрос. Проверьте соединение.');
       }
     } finally {
-      setSubmitting(false);
+      setConsentPending(false);
     }
   }
 
@@ -167,6 +217,16 @@ export function AuthPage() {
           {theme === 'dark' ? '🌙' : '☀️'}
         </button>
       </div>
+
+      {showConsent && (
+        <ConsentDialog
+          variant="signup"
+          pending={consentPending}
+          error={consentError}
+          onConfirm={() => void handleConsentConfirm()}
+          onCancel={() => setShowConsent(false)}
+        />
+      )}
     </div>
   );
 }

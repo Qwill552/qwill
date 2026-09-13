@@ -9,6 +9,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from './constants.js';
+import type { PendingConsentDto } from './legal.js';
 import { isReservedUsername, type AvatarColor, type UserRole } from './user.js';
 
 /** `@username` неизменяем после регистрации — хранится и сравнивается в нижнем регистре (секция 2). */
@@ -36,6 +37,8 @@ export const registerSchema = z.object({
     .trim()
     .min(DISPLAY_NAME_MIN_LENGTH, 'Введите имя')
     .max(DISPLAY_NAME_MAX_LENGTH, `Имя не длиннее ${DISPLAY_NAME_MAX_LENGTH} символов`),
+  termsVersion: z.string().min(1, 'Примите условия регистрации'),
+  privacyVersion: z.string().min(1, 'Примите условия регистрации'),
 });
 
 export const loginSchema = z.object({
@@ -78,6 +81,7 @@ export interface PublicUser {
   /** Визитка выключена администрацией: редактор HTML заперт, режим «О себе» переключить нельзя.
    *  Отдаётся только про себя — `toPublicUser` не применяется к чужим пользователям. */
   cardDisabled: boolean;
+  pendingConsent: PendingConsentDto | null;
 }
 
 export interface AuthResponse {

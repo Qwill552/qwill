@@ -103,6 +103,12 @@ model User {
 
   supportMutedUntil DateTime?
 
+  termsVersion    String?
+  termsAcceptedAt DateTime?
+  privacyVersion  String?
+  signupIp        String?
+  signupUserAgent String?
+
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 

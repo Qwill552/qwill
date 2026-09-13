@@ -20,7 +20,7 @@ interface TestUser {
 
 async function registerUser(suffix: string, displayName: string): Promise<TestUser> {
   const username = `r32d_${RUN_ID}_${suffix}`;
-  const res = await request.post('/api/auth/register').send({ username, password: PASSWORD, displayName });
+  const res = await request.post('/api/auth/register').send({ username, password: PASSWORD, displayName , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };

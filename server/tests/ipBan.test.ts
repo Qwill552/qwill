@@ -30,7 +30,7 @@ async function registerUser(suffix: string, ip = ADMIN_IP): Promise<TestUser> {
   const res = await request
     .post('/api/auth/register')
     .set('X-Forwarded-For', ip)
-    .send({ username, password: PASSWORD, displayName: 'Проверка' });
+    .send({ username, password: PASSWORD, displayName: 'Проверка' , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };

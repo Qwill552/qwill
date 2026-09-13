@@ -47,7 +47,7 @@ async function registerUser(suffix: string): Promise<{ token: string; userId: st
   const username = `sec_${RUN_ID}_${suffix}`;
   const res = await request
     .post('/api/auth/register')
-    .send({ username, password: 'password123', displayName: 'Секьюрити' });
+    .send({ username, password: 'password123', displayName: 'Секьюрити' , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };
@@ -325,7 +325,7 @@ describe('security.test.ts — обязательный набор отказо�
     }> {
       const res = await request
         .post('/api/auth/register')
-        .send({ username: `sec30d_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Куки' });
+        .send({ username: `sec30d_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Куки' , termsVersion: '1.0', privacyVersion: '1.0' });
       expect(res.status).toBe(201);
       createdUserIds.push(res.body.user.id as string);
 

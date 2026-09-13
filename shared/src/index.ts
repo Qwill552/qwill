@@ -8,6 +8,7 @@ export * from './errors.js';
 export * from './files.js';
 export * from './ip.js';
 export * from './keyboardLayout.js';
+export * from './legal.js';
 export * from './links.js';
 export * from './push.js';
 export * from './search.js';

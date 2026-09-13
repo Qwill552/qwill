@@ -15,7 +15,7 @@ const createdChatIds: string[] = [];
 
 async function registerUser(suffix: string): Promise<{ userId: string; username: string }> {
   const username = `decline_${RUN_ID}_${suffix}`;
-  const res = await request.post('/api/auth/register').send({ username, password: 'password123', displayName: suffix });
+  const res = await request.post('/api/auth/register').send({ username, password: 'password123', displayName: suffix , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { userId: res.body.user.id as string, username };

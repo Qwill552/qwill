@@ -540,8 +540,8 @@ export async function revealUserPii(actor: AdminActor, targetUserId: string): Pr
 
   await recordAdminAction(actor, { action: 'user.pii.reveal', targetUserId });
   return {
-    signupIp: null,
-    signupUserAgent: null,
+    signupIp: user.signupIp,
+    signupUserAgent: user.signupUserAgent,
     sessions: sessions.map(toSessionDto),
   };
 }

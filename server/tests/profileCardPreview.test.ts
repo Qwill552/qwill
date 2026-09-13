@@ -18,7 +18,7 @@ const createdImageOwnerIds: string[] = [];
 async function registerUser(suffix: string): Promise<{ token: string; userId: string }> {
   const res = await request
     .post('/api/auth/register')
-    .send({ username: `r30b_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Визитка' });
+    .send({ username: `r30b_${RUN_ID}_${suffix}`, password: 'password123', displayName: 'Визитка' , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string };

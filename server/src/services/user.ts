@@ -15,6 +15,7 @@ import {
   toUserRole,
 } from '@messenger/shared';
 
+import { pendingConsentFor } from '../config/legal.js';
 import { prisma } from '../db/prisma.js';
 import { randomAvatarColor, toAvatarColor } from '../lib/avatarColor.js';
 import { AppError, banned, notFound } from '../lib/errors.js';
@@ -37,6 +38,7 @@ export function toPublicUser(user: User): PublicUser {
     lastSeenAt: user.lastSeenAt.toISOString(),
     role: toUserRole(user.role),
     cardDisabled: user.cardDisabled,
+    pendingConsent: pendingConsentFor(user),
   };
 }
 
@@ -44,6 +46,10 @@ export async function createUser(input: {
   username: string;
   password: string;
   displayName: string;
+  termsVersion: string;
+  privacyVersion: string;
+  signupIp?: string | null;
+  signupUserAgent?: string | null;
 }): Promise<User> {
   if (isReservedUsername(input.username)) {
     throw new AppError(ErrorCode.USERNAME_TAKEN, 409, 'Это имя пользователя занято сервисом');
@@ -61,6 +67,11 @@ export async function createUser(input: {
       passwordHash,
       displayName: input.displayName,
       avatarColor: randomAvatarColor(),
+      termsVersion: input.termsVersion,
+      termsAcceptedAt: new Date(),
+      privacyVersion: input.privacyVersion,
+      signupIp: input.signupIp ?? null,
+      signupUserAgent: input.signupUserAgent ?? null,
     },
   });
 }

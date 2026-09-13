@@ -64,7 +64,7 @@ describe('шрифты визитки (R-30C)', () => {
   it('блок @font-face вставляется сервером в документ визитки', async () => {
     const registered = await request
       .post('/api/auth/register')
-      .send({ username: `font_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' });
+      .send({ username: `font_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , termsVersion: '1.0', privacyVersion: '1.0' });
     const token = registered.body.accessToken as string;
     const userId = registered.body.user.id as string;
 
@@ -89,7 +89,7 @@ describe('шрифты визитки (R-30C)', () => {
   it('в документ попадают только семейства, упомянутые в самой визитке', async () => {
     const registered = await request
       .post('/api/auth/register')
-      .send({ username: `font2_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' });
+      .send({ username: `font2_${Date.now().toString(36)}`, password: 'password123', displayName: 'Шрифты' , termsVersion: '1.0', privacyVersion: '1.0' });
     const token = registered.body.accessToken as string;
     const userId = registered.body.user.id as string;
 

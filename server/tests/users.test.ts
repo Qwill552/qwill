@@ -25,7 +25,7 @@ async function registerUser(suffix: string, displayName: string): Promise<{ toke
   const username = `stage8_${RUN_ID}_${suffix}`;
   const res = await request
     .post('/api/auth/register')
-    .send({ username, password: 'password123', displayName });
+    .send({ username, password: 'password123', displayName , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string };
@@ -45,7 +45,7 @@ describe('users profile/settings (этап 8)', () => {
       const res = await request
         .patch('/api/users/me')
         .set('Authorization', `Bearer ${token}`)
-        .send({ displayName: 'После правки' });
+        .send({ displayName: 'После правки' , termsVersion: '1.0', privacyVersion: '1.0' });
 
       expect(res.status).toBe(200);
       expect(res.body.displayName).toBe('После правки');

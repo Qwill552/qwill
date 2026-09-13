@@ -20,7 +20,7 @@ interface TestUser {
 
 async function registerUser(suffix: string, displayName: string): Promise<TestUser> {
   const username = `r32b_${RUN_ID}_${suffix}`;
-  const res = await request.post('/api/auth/register').send({ username, password: PASSWORD, displayName });
+  const res = await request.post('/api/auth/register').send({ username, password: PASSWORD, displayName , termsVersion: '1.0', privacyVersion: '1.0' });
   expect(res.status).toBe(201);
   createdUserIds.push(res.body.user.id as string);
   return { token: res.body.accessToken as string, userId: res.body.user.id as string, username };
@@ -88,7 +88,7 @@ describe('панель администрирования (R-32B)', () => {
       const res = await request
         .patch(`/api/admin/users/${target.userId}/profile`)
         .set('Authorization', `Bearer ${admin.token}`)
-        .send({ displayName: 'Новое имя' });
+        .send({ displayName: 'Новое имя' , termsVersion: '1.0', privacyVersion: '1.0' });
       expect(res.status).toBe(200);
       expect(res.body.displayName).toBe('Новое имя');
 
@@ -198,7 +198,7 @@ describe('панель администрирования (R-32B)', () => {
       await request
         .patch(`/api/admin/users/${target.userId}/profile`)
         .set('Authorization', `Bearer ${admin.token}`)
-        .send({ displayName: 'Отмеченный в журнале' });
+        .send({ displayName: 'Отмеченный в журнале' , termsVersion: '1.0', privacyVersion: '1.0' });
 
       const page = await request.get('/api/admin/log').set('Authorization', `Bearer ${admin.token}`);
       expect(page.status).toBe(200);

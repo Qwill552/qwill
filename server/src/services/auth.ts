@@ -6,6 +6,7 @@ import {
   type UserRole,
 } from '@messenger/shared';
 
+import { CURRENT_LEGAL_VERSIONS } from '../config/legal.js';
 import { prisma } from '../db/prisma.js';
 import { AppError, banned, unauthorized } from '../lib/errors.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
@@ -56,10 +57,31 @@ async function issueSession(
 }
 
 export async function register(
-  input: { username: string; password: string; displayName: string },
+  input: {
+    username: string;
+    password: string;
+    displayName: string;
+    termsVersion: string;
+    privacyVersion: string;
+  },
   client: ClientContext,
 ): Promise<SessionTokens> {
-  const user = await createUser(input);
+  if (
+    input.termsVersion !== CURRENT_LEGAL_VERSIONS.termsVersion ||
+    input.privacyVersion !== CURRENT_LEGAL_VERSIONS.privacyVersion
+  ) {
+    throw new AppError(
+      ErrorCode.LEGAL_VERSION_OUTDATED,
+      409,
+      'Документы обновились, обновите страницу и попробуйте снова',
+    );
+  }
+
+  const user = await createUser({
+    ...input,
+    signupIp: client.ip,
+    signupUserAgent: client.userAgent,
+  });
   return issueSession(user, client);
 }
 

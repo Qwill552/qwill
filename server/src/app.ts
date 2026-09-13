@@ -18,6 +18,7 @@ import { callsRouter } from './http/routes/calls.js';
 import { chatsRouter } from './http/routes/chats.js';
 import { filesRouter } from './http/routes/files.js';
 import { healthRouter } from './http/routes/health.js';
+import { legalRouter } from './http/routes/legal.js';
 import { linksRouter } from './http/routes/links.js';
 import { pushRouter } from './http/routes/push.js';
 import { reportsRouter } from './http/routes/reports.js';
@@ -76,6 +77,7 @@ export function createApp(): Express {
   app.use('/api', generalLimiter);
   app.use('/api/app', appVersionRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/legal', legalRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/card-fonts', cardFontsRouter);
   app.use('/api/chats', chatsRouter);
