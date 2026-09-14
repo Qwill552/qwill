@@ -31,7 +31,11 @@ function run(command, args, cwd, env) {
 const apiUrl = resolveApiUrl();
 console.log(`API для десктопной сборки: ${apiUrl}`);
 
-run('npm', ['run', 'build', '-w', '@messenger/client'], repoRoot, { ...process.env, VITE_API_URL: apiUrl });
+run('npm', ['run', 'build', '-w', '@messenger/client'], repoRoot, {
+  ...process.env,
+  NODE_ENV: 'production',
+  VITE_API_URL: apiUrl,
+});
 
 const built = await stat(clientDist).catch(() => null);
 if (!built?.isDirectory()) {
