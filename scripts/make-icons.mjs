@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const WEB_SOURCE = path.join(repoRoot, 'qwill.png');
-const ANDROID_SOURCE = path.join(repoRoot, 'qwill-android.png');
-const FAVICON_DARK_SOURCE = path.join(repoRoot, 'qwill-no-background.png');
+const BRAND_DIR = path.join(repoRoot, 'brand');
+const WEB_SOURCE = path.join(BRAND_DIR, 'qwill.png');
+const ANDROID_SOURCE = path.join(BRAND_DIR, 'qwill-android.png');
+const FAVICON_DARK_SOURCE = path.join(BRAND_DIR, 'qwill-no-background.png');
 
 const WEB_ICONS = [
   { file: 'icon-192.png', size: 192, source: WEB_SOURCE },
