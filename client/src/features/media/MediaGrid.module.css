@@ -2,8 +2,8 @@
   composes: no-native-media-menu from global;
   display: flex;
   overflow: hidden;
-  width: min(78vw, var(--bubble-media-max-w), calc(60dvh * var(--grid-ratio)));
-  max-height: 60dvh;
+  width: min(78vw, var(--bubble-media-max-w), calc(var(--bubble-media-max-h) * var(--grid-ratio)));
+  max-height: var(--bubble-media-max-h);
   flex-direction: column;
   border-radius: calc(var(--radius-bubble) - 4px);
   gap: 2px;

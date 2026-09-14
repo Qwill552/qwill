@@ -613,6 +613,7 @@
 
   --bubble-max-w: 76%;
   --bubble-media-max-w: 560px;
+  --bubble-media-max-h: 60dvh;
   --bubble-pad-y: 8px;
   --bubble-pad-x: 12px;
 
@@ -693,6 +694,7 @@
 @media (min-width: 900px) {
   :root {
     --bubble-media-max-w: 640px;
+    --bubble-media-max-h: min(60dvh, 600px);
     /* Сплошная полоса под шапкой, а не плавающая капсула, — на ней та же высота смотрится
        теснее, чем на телефоне (ux-ui/14-desktop/03). */
     --pinned-banner-h: 56px;

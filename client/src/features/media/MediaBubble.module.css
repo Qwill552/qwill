@@ -1,5 +1,5 @@
 .single {
   display: flex;
-  width: min(78vw, var(--bubble-media-max-w), calc(60dvh * var(--media-ratio)), var(--media-natural-w));
+  width: min(78vw, var(--bubble-media-max-w), calc(var(--bubble-media-max-h) * var(--media-ratio)), var(--media-natural-w));
   border-radius: calc(var(--radius-bubble) - 4px);
 }
