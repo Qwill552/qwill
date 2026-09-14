@@ -60,7 +60,7 @@
 
 .controls {
   position: absolute;
-  top: calc(var(--safe-top) + var(--space-2));
+  top: calc(var(--overlay-top) + var(--space-2));
   right: var(--space-2);
   display: flex;
   gap: var(--space-2);

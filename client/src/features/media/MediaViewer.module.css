@@ -77,7 +77,7 @@
   left: 0;
   display: flex;
   align-items: center;
-  padding: calc(var(--safe-top) + var(--space-2)) var(--space-2) var(--space-4);
+  padding: calc(var(--overlay-top) + var(--space-2)) var(--space-2) var(--space-4);
   background: linear-gradient(var(--viewer-chrome-bg), transparent);
   color: var(--viewer-ink);
   gap: var(--space-2);
