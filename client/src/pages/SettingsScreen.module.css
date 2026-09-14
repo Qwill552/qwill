@@ -146,10 +146,39 @@
 }
 
 .version {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
   margin: var(--space-2) 0 0;
   color: var(--text-secondary);
   font-size: var(--font-caption);
   text-align: center;
+}
+
+.license {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  text-decoration: none;
+  transition:
+    background var(--dur-tab) ease,
+    color var(--dur-tab) ease;
+}
+
+@media (hover: hover) {
+  .license:hover {
+    background: var(--hover-row);
+    text-decoration: underline;
+  }
+}
+
+.license:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 @media (min-width: 900px) {

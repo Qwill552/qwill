@@ -260,9 +260,22 @@ export function SettingsScreen() {
           />
         </Card>
 
-        {isApkUpdateSupported() && currentVersionName && (
-          <p className={styles.version}>Qwill {currentVersionName}</p>
-        )}
+        <p className={styles.version}>
+          {isApkUpdateSupported() && currentVersionName && (
+            <>
+              <span>Qwill {currentVersionName}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <a
+            className={styles.license}
+            href="https://github.com/Qwill552/qwill/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            AGPL-3.0
+          </a>
+        </p>
       </div>
 
       {bugReportOpen && <BugReportDialog onClose={() => setBugReportOpen(false)} />}
