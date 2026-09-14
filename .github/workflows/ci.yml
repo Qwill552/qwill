@@ -5,13 +5,9 @@ on:
     branches: [main]
     paths-ignore:
       - "**.md"
-      - "references/**"
-      - "design-archive/**"
   pull_request:
     paths-ignore:
       - "**.md"
-      - "references/**"
-      - "design-archive/**"
   workflow_dispatch:
 
 # Пуш в main не отменяем: у деплоя дальше по цепочке миграции, а прерванная миграция —

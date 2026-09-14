@@ -44,7 +44,7 @@ jobs:
           SHA: ${{ steps.resolve.outputs.sha }}
           REPO: ${{ github.repository }}
         run: |
-          DOC_ONLY='^(.*\.md|references/.*|design-archive/.*)$'
+          DOC_ONLY='^.*\.md$'
           CANDIDATE="$SHA"
           CONCLUSION=""
           for _ in $(seq 1 30); do
