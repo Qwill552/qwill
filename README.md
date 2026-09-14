@@ -1,4 +1,4 @@
-# Messenger
+# Qwill
 
 Мессенджер на Express 5 + Socket.io + Prisma и React 19 + Vite.
 План работ и все принятые решения — в [`project-design.md`](./project-design.md).
