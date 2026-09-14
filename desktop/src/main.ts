@@ -3,7 +3,7 @@ import { app, ipcMain, session } from 'electron';
 import { configureApiSession } from './apiSession';
 import { APP_ENTRY_URL, handleAppProtocol, registerAppScheme, resolveClientRoot } from './protocol';
 import { pickScreenSource, registerScreenSourcePicker } from './screenSources';
-import { createMainWindow, focusExistingWindow, setWindowTitleTheme } from './window';
+import { createMainWindow, enforceDesktopWidth, focusExistingWindow, setWindowTitleTheme } from './window';
 
 registerAppScheme();
 
@@ -27,6 +27,10 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   ipcMain.handle('qwill:app-version', () => app.getVersion());
+
+  ipcMain.handle('qwill:ensure-desktop-width', () => {
+    enforceDesktopWidth();
+  });
 
   ipcMain.handle('qwill:set-title-theme', (_event, theme: unknown) => {
     if (theme !== 'light' && theme !== 'dark') return;

@@ -6,6 +6,7 @@ import { ScreenSourcePicker } from '../features/calls/ScreenSourcePicker';
 import { AvatarViewer } from '../features/media/AvatarViewer';
 import { MediaViewer } from '../features/media/MediaViewer';
 import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
+import { keepDesktopWidth } from '../native/desktop';
 import { applyDesktopListWidth, useDesktopColumnsStore } from '../stores/desktopColumnsStore';
 import { AmbientBlobs } from './AmbientBlobs';
 import { useAppUpdateStore } from './appUpdate';
@@ -13,7 +14,7 @@ import { ScreenStack } from './ScreenStack';
 import styles from './AppShell.module.css';
 import { TabBar } from './TabBar';
 import { UpdateBanner } from './UpdateBanner';
-import { useLayoutMode } from './useLayoutMode';
+import { DESKTOP_MIN_WIDTH, useLayoutMode } from './useLayoutMode';
 
 /** Каркас авторизованной части приложения: канвас + контент вкладок + таб-бар. `100dvh` и
  *  safe-area берутся из tokens.css (html/body/#root), здесь только слои [канвас][контент]
@@ -32,6 +33,8 @@ export function AppShell() {
   useEffect(() => {
     void checkAppUpdate();
   }, [checkAppUpdate]);
+
+  useEffect(() => keepDesktopWidth(DESKTOP_MIN_WIDTH), []);
 
   return (
     <div className={`${styles.shell} ${layout === 'desktop' ? styles.desktop : ''}`}>

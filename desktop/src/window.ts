@@ -24,7 +24,7 @@ const DEFAULT_STATE: WindowState = {
   maximized: false,
   theme: 'light',
 };
-const MIN_WIDTH = 420;
+const MIN_WIDTH = 900;
 const MIN_HEIGHT = 560;
 const SAVE_DEBOUNCE_MS = 400;
 const TITLEBAR_HEIGHT = 32;
@@ -195,6 +195,19 @@ export function setWindowTitleTheme(theme: Theme): void {
   } catch {
     return;
   }
+}
+
+export function enforceDesktopWidth(): void {
+  const [window] = BrowserWindow.getAllWindows();
+  if (!window || window.isDestroyed()) return;
+
+  const minimum = Math.ceil(MIN_WIDTH * window.webContents.getZoomFactor());
+  window.setMinimumSize(minimum, MIN_HEIGHT);
+
+  const bounds = window.getBounds();
+  const available = screen.getDisplayMatching(bounds).workArea.width;
+  const width = Math.min(minimum, available);
+  if (bounds.width < width) window.setBounds({ ...bounds, width });
 }
 
 export function focusExistingWindow(): void {

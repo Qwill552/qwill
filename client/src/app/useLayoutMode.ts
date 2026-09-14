@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
+import { isDesktopShell } from '../native/desktop';
+
 export const DESKTOP_MIN_WIDTH = 900;
 
 export type LayoutMode = 'mobile' | 'desktop';
@@ -12,7 +14,7 @@ function subscribe(onChange: () => void): () => void {
 }
 
 export function isDesktopViewport(): boolean {
-  return desktopQuery.matches;
+  return desktopQuery.matches || isDesktopShell();
 }
 
 export function useLayoutMode(): LayoutMode {

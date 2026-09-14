@@ -15,6 +15,7 @@ export interface DesktopBridge {
   isDesktop: true;
   getVersion(): Promise<string>;
   setTitleTheme(theme: 'light' | 'dark'): Promise<void>;
+  ensureDesktopWidth?(): Promise<void>;
   onScreenSourceRequest?(handler: (request: unknown) => void): () => void;
   chooseScreenSource?(requestId: number, sourceId: string | null): void;
 }
@@ -44,6 +45,20 @@ export function setDesktopTitleTheme(theme: 'light' | 'dark'): void {
   const bridge = desktopBridge();
   if (!bridge) return;
   void bridge.setTitleTheme(theme).catch(() => undefined);
+}
+
+export function keepDesktopWidth(minWidth: number): () => void {
+  const bridge = desktopBridge();
+  if (!bridge?.ensureDesktopWidth) return () => undefined;
+
+  const tooNarrow = window.matchMedia(`(max-width: ${minWidth - 1}px)`);
+  const widen = (): void => {
+    if (tooNarrow.matches) void bridge.ensureDesktopWidth?.().catch(() => undefined);
+  };
+
+  widen();
+  tooNarrow.addEventListener('change', widen);
+  return () => tooNarrow.removeEventListener('change', widen);
 }
 
 function parseScreenSource(raw: unknown): DesktopScreenSource | null {
