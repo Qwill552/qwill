@@ -89,6 +89,9 @@ jobs:
 
   deploy:
     needs: promote
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/deploy.yml
     with:
       channel: prod

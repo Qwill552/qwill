@@ -10,6 +10,10 @@ on:
       - "**.md"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 # Пуш в main не отменяем: у деплоя дальше по цепочке миграции, а прерванная миграция —
 # это испорченная база. PR-прогоны перебивать друг другом можно и нужно.
 concurrency:
