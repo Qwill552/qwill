@@ -23,7 +23,7 @@
 .card {
   position: relative;
   display: flex;
-  width: min(420px, 100%);
+  width: min(500px, 100%);
   height: min(680px, 86dvh);
   flex-direction: column;
   overflow: hidden;
@@ -36,7 +36,7 @@
 }
 
 .cardWide {
-  width: min(500px, 100%);
+  width: min(580px, 100%);
 }
 
 .cardChromeless {

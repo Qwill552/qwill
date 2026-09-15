@@ -57,7 +57,6 @@ export function AdvancedScreen() {
               icon="monitor"
               tint="indigo"
               title="Запускать Qwill при запуске системы"
-              subtitle="Приложение стартует свёрнутым в трей"
               trailing={
                 <Switch
                   checked={autostartEnabled}
