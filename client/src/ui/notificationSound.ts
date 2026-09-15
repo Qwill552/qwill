@@ -5,8 +5,10 @@ const TONES = [
 const PEAK_GAIN = 0.16;
 const ATTACK_S = 0.008;
 const SILENCE = 0.0001;
+const MIN_INTERVAL_MS = 1000;
 
 let context: AudioContext | null = null;
+let lastPlayedAt = 0;
 
 function audioContext(): AudioContext | null {
   if (context) return context;
@@ -31,7 +33,13 @@ function tone(target: AudioContext, startAt: number, frequency: number, duration
   oscillator.stop(startAt + duration + 0.02);
 }
 
+/** Пачка сообщений не должна превращаться в очередь из звуков: на пришедшие подряд
+ *  уведомления играет один, как в Telegram. */
 export function playNotificationSound(): void {
+  const now = Date.now();
+  if (now - lastPlayedAt < MIN_INTERVAL_MS) return;
+  lastPlayedAt = now;
+
   const target = audioContext();
   if (!target) return;
 
