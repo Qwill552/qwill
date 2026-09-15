@@ -1,14 +1,17 @@
+/* Полоса готового обновления внизу колонки чатов. Отрисовка повторяет Telegram Desktop
+   (dialogs_widget.cpp, Widget::BottomButton::paintEvent): прямоугольник во всю ширину
+   колонки, без скруглений и полей, высота 46, горизонтальный градиент зелень→бирюза,
+   полужирная белая надпись по центру с круглой иконкой обновления слева. */
+
 .button {
   display: flex;
+  height: 46px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  margin: 0 var(--space-3) var(--space-3);
   padding: 0 var(--space-3);
   border: none;
-  border-radius: var(--radius-pill);
-  background: var(--primary);
+  background: linear-gradient(90deg, var(--update-live-from), var(--update-live-to));
   color: var(--text-on-primary);
   font: inherit;
   font-size: var(--font-body);
@@ -18,23 +21,25 @@
   animation: rise var(--dur-menu) var(--ease-spring) both;
 }
 
+.button:hover {
+  filter: brightness(1.06);
+}
+
 .button:active {
-  background: var(--primary-press);
+  filter: brightness(0.94);
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: 2px solid var(--text-on-primary);
+  outline-offset: -4px;
 }
 
 @keyframes rise {
   from {
-    transform: translateY(120%);
-    opacity: 0;
+    transform: translateY(100%);
   }
 
   to {
     transform: translateY(0);
-    opacity: 1;
   }
 }
