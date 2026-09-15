@@ -513,7 +513,13 @@ function notifyDesktopIfNeeded(message: MessageDto, state: ChatState): void {
   const preview = desktopNotificationBody(message);
   const body = chat.type === 'GROUP' && message.sender ? `${message.sender.displayName}: ${preview}` : preview;
 
-  notifyDesktop({ title: chat.title, body, chatId: message.chatId });
+  notifyDesktop({
+    title: chat.title,
+    body,
+    chatId: message.chatId,
+    time: new Date(message.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+    avatarColor: chat.otherMember?.avatarColor ?? null,
+  });
   playNotificationSound();
 }
 

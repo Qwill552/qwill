@@ -188,6 +188,10 @@ export async function createMainWindow(
   return window;
 }
 
+export function windowTheme(): Theme {
+  return activeTheme;
+}
+
 export function setWindowTitleTheme(theme: Theme): void {
   activeTheme = theme;
   for (const window of BrowserWindow.getAllWindows()) {

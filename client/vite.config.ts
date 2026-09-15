@@ -43,7 +43,14 @@ export default defineConfig(() => {
         injectManifest: {
           // API — отдельный origin (секция 6), в прекэш статики попадать не должен.
           globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,json,jpg,woff2}'],
-          globIgnores: ['**/wallpaper/patterns/*.svg'],
+          // notification.html открывает только десктопная оболочка, где service worker
+          // выключен вовсе (D-1), — в прекэше браузера ему делать нечего.
+          globIgnores: [
+            '**/wallpaper/patterns/*.svg',
+            'notification.html',
+            'assets/notification-*.js',
+            'assets/notification-*.css',
+          ],
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         },
         // Без этого SW не обслуживается в `npm run dev` — пуши было бы нельзя проверить без сборки.
@@ -59,6 +66,17 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(here, 'src'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        // Вторая страница — плашка уведомления десктопной оболочки (D-13). Отдельным входом,
+        // а не маршрутом внутри приложения: второе окно с полным клиентом означало бы второй
+        // сокет и вторую сессию ради карточки на 88 пикселей.
+        input: {
+          main: path.resolve(here, 'index.html'),
+          notification: path.resolve(here, 'notification.html'),
+        },
       },
     },
     server: {

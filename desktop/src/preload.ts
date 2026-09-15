@@ -10,6 +10,11 @@ const UPDATER_AUTO_SET_CHANNEL = 'qwill:updater-auto-set';
 const NOTIFY_CHANNEL = 'qwill:notify';
 const BADGE_CHANNEL = 'qwill:set-badge-count';
 const CLOSE_CHAT_CHANNEL = 'qwill:close-chat-notifications';
+const POPUP_SHOW_CHANNEL = 'qwill:notification-show';
+const POPUP_CLOSE_CHAT_CHANNEL = 'qwill:notification-close-chat';
+const POPUP_THEME_CHANNEL = 'qwill:notification-theme';
+const POPUP_OPEN_CHANNEL = 'qwill:notification-open';
+const POPUP_RESIZE_CHANNEL = 'qwill:notification-resize';
 const AUTOSTART_GET_CHANNEL = 'qwill:autostart-get';
 const AUTOSTART_SET_CHANNEL = 'qwill:autostart-set';
 const DEEP_LINK_CHANNEL = 'qwill:deep-link';
@@ -70,4 +75,24 @@ contextBridge.exposeInMainWorld('qwill', {
     };
   },
   getPendingDeepLink: (): Promise<unknown> => ipcRenderer.invoke(DEEP_LINK_PENDING_CHANNEL),
+});
+
+function subscribe(channel: string, handler: (payload: unknown) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => handler(payload);
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
+
+contextBridge.exposeInMainWorld('qwillNotifications', {
+  onShow: (handler: (item: unknown) => void): (() => void) => subscribe(POPUP_SHOW_CHANNEL, handler),
+  onCloseChat: (handler: (chatId: unknown) => void): (() => void) => subscribe(POPUP_CLOSE_CHAT_CHANNEL, handler),
+  onTheme: (handler: (theme: unknown) => void): (() => void) => subscribe(POPUP_THEME_CHANNEL, handler),
+  open: (chatId: string): void => {
+    ipcRenderer.send(POPUP_OPEN_CHANNEL, chatId);
+  },
+  resize: (height: number): void => {
+    ipcRenderer.send(POPUP_RESIZE_CHANNEL, height);
+  },
 });

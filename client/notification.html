@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Qwill</title>
+    <script>
+      // Тема приходит от оболочки адресом окна — до первого кадра, иначе плашка моргнёт
+      // чужой темой поверх экрана (тот же приём, что в index.html).
+      (function () {
+        var theme = new URLSearchParams(window.location.search).get('theme');
+        document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="notifications"></div>
+    <script type="module" src="/src/notification/main.tsx"></script>
+  </body>
+</html>

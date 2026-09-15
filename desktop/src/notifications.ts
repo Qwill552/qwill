@@ -3,6 +3,7 @@ import zlib from 'node:zlib';
 import { BrowserWindow, Notification, app, ipcMain, nativeImage, type NativeImage } from 'electron';
 
 import { routeDeepLink } from './deeplink';
+import { closePopupNotifications, showPopupNotification } from './notificationPopup';
 import { focusExistingWindow } from './window';
 
 const NOTIFY_CHANNEL = 'qwill:notify';
@@ -30,6 +31,8 @@ interface NotifyPayload {
   title: string;
   body: string;
   chatId: string;
+  time?: string;
+  avatarColor?: string | null;
 }
 
 function isNotifyPayload(value: unknown): value is NotifyPayload {
@@ -42,6 +45,8 @@ function isNotifyPayload(value: unknown): value is NotifyPayload {
   );
 }
 
+let nextPopupId = 1;
+
 const shownByChat = new Map<string, Notification[]>();
 
 function forget(chatId: string, notification: Notification): void {
@@ -53,7 +58,19 @@ function forget(chatId: string, notification: Notification): void {
   else shownByChat.set(chatId, rest);
 }
 
+/** Плашку рисуем сами (D-13); системный тост остаётся запасным путём — если своё окно
+ *  почему-то не поднялось, человек всё равно узнает о сообщении. */
 function showMessageNotification(payload: NotifyPayload): void {
+  const shownByPopup = showPopupNotification({
+    id: nextPopupId++,
+    chatId: payload.chatId,
+    title: payload.title,
+    body: payload.body,
+    time: payload.time ?? '',
+    avatarColor: payload.avatarColor ?? null,
+  });
+  if (shownByPopup) return;
+
   if (!Notification.isSupported()) return;
 
   const notification = new Notification({ title: payload.title, body: payload.body, silent: true });
@@ -68,6 +85,8 @@ function showMessageNotification(payload: NotifyPayload): void {
 }
 
 function closeChatNotifications(chatId: string): void {
+  closePopupNotifications(chatId);
+
   const shown = shownByChat.get(chatId);
   if (!shown) return;
 

@@ -1,0 +1,13 @@
+html,
+body,
+#notifications {
+  height: auto;
+  min-height: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}

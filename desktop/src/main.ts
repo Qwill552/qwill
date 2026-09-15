@@ -4,6 +4,7 @@ import { configureApiSession } from './apiSession';
 import { registerAutostart, shouldStartHidden } from './autostart';
 import { registerDeepLinkBridge, registerDeepLinkProtocol, routeDeepLinkFromArgv } from './deeplink';
 import { registerNotifications } from './notifications';
+import { registerNotificationPopup, setPopupTheme } from './notificationPopup';
 import {
   APP_ENTRY_URL,
   APP_USER_MODEL_ID,
@@ -51,10 +52,12 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('qwill:set-title-theme', (_event, theme: unknown) => {
     if (theme !== 'light' && theme !== 'dark') return;
     setWindowTitleTheme(theme);
+    setPopupTheme(theme);
   });
 
   registerUpdater();
   registerNotifications();
+  registerNotificationPopup();
   registerAutostart();
   registerDeepLinkBridge();
 
