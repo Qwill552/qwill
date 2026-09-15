@@ -12,6 +12,7 @@ export default tseslint.config(
       'design-archive/**',
       'client/android/**',
       'desktop/renderer/**',
+      'desktop/dist-release/**',
       'ds-bundle/**',
       '.ds-sync/**',
       '.design-sync/**',

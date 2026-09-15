@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { cp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { resolveApiUrl } from './apiUrl.mjs';
+import { makeDesktopIcons } from './icons.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const desktopDir = path.resolve(here, '..');
@@ -12,20 +13,7 @@ const clientDist = path.join(repoRoot, 'client', 'dist');
 const rendererDir = path.join(desktopDir, 'renderer');
 const apiConfigFile = path.join(desktopDir, 'api-origin.json');
 const devUpdateConfigFile = path.join(desktopDir, 'dev-app-update.yml');
-const brandIconFile = path.join(repoRoot, 'brand', 'qwill-no-background.png');
-const appIconFile = path.join(desktopDir, 'app-icon.png');
 const UPDATER_CACHE_DIR_NAME = 'qwill-updater';
-
-const MKCERT_DIR = path.join(homedir(), '.vite-plugin-mkcert');
-
-function devServerUsesHttps() {
-  return existsSync(path.join(MKCERT_DIR, 'dev.pem')) && existsSync(path.join(MKCERT_DIR, 'cert.pem'));
-}
-
-function resolveApiUrl() {
-  if (process.env.QWILL_API_URL) return process.env.QWILL_API_URL;
-  return `${devServerUsesHttps() ? 'https' : 'http'}://localhost:3000`;
-}
 
 function run(command, args, cwd, env) {
   const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: true, env });
@@ -50,7 +38,7 @@ if (!built?.isDirectory()) {
 await rm(rendererDir, { recursive: true, force: true });
 await mkdir(path.dirname(rendererDir), { recursive: true });
 await cp(clientDist, rendererDir, { recursive: true });
-await cp(brandIconFile, appIconFile);
+await makeDesktopIcons();
 await writeFile(apiConfigFile, `${JSON.stringify({ apiUrl }, null, 2)}\n`, 'utf8');
 await writeFile(
   devUpdateConfigFile,

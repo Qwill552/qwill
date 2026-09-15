@@ -4,16 +4,22 @@ import { app, nativeImage, type NativeImage } from 'electron';
 
 import { resolveClientRoot } from './protocol';
 
-const ICON_FILE = 'app-icon.png';
+const WINDOW_ICON_FILE = 'window.ico';
 const TRAY_SIZE = 16;
 
 let cached: NativeImage | null = null;
 
+function iconCandidates(): string[] {
+  const generated = app.isPackaged
+    ? path.join(process.resourcesPath, WINDOW_ICON_FILE)
+    : path.join(app.getAppPath(), 'build', WINDOW_ICON_FILE);
+  return [generated, path.join(resolveClientRoot(), 'icon-192.png')];
+}
+
 export function appIcon(): NativeImage {
   if (cached) return cached;
 
-  const candidates = [path.join(app.getAppPath(), ICON_FILE), path.join(resolveClientRoot(), 'icon-192.png')];
-  for (const candidate of candidates) {
+  for (const candidate of iconCandidates()) {
     const image = nativeImage.createFromPath(candidate);
     if (!image.isEmpty()) {
       cached = image;
@@ -30,5 +36,5 @@ export function trayIcon(): NativeImage {
 }
 
 export function windowIcon(): NativeImage {
-  return appIcon().resize({ width: 32, height: 32 });
+  return appIcon();
 }

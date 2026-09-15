@@ -82,7 +82,9 @@ release.tar.gz
 desktop/renderer/
 desktop/api-origin.json
 desktop/dev-app-update.yml
-desktop/app-icon.png
+desktop/dist-release/
+*.pfx
+*.cer
 
 client/android/.gradle/
 client/android/local.properties

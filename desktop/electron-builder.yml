@@ -1,0 +1,52 @@
+appId: com.qwill.desktop
+productName: Qwill
+copyright: Qwill
+
+extraMetadata:
+  name: qwill
+
+directories:
+  output: dist-release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+  - api-origin.json
+
+extraResources:
+  - from: renderer
+    to: client
+  - from: build/window.ico
+    to: window.ico
+
+protocols:
+  - name: Qwill
+    schemes:
+      - qwill
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  executableName: Qwill
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  runAfterFinish: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Qwill
+  deleteAppDataOnUninstall: false
+  artifactName: Qwill-Setup-${version}.${ext}
+
+publish:
+  provider: generic
+  url: https://dev.qwill.mooo.com/api/app/win

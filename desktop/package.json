@@ -1,6 +1,8 @@
 {
   "name": "@messenger/desktop",
   "productName": "Qwill",
+  "description": "Qwill — мессенджер для Windows",
+  "author": "Qwill",
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
@@ -8,11 +10,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "node scripts/dist.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "electron": "^40.0.0"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
