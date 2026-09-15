@@ -5,6 +5,12 @@ const SCREEN_SOURCE_CHOSEN_CHANNEL = 'qwill:screen-source-chosen';
 const UPDATER_STATE_CHANNEL = 'qwill:updater-state';
 const UPDATER_CHECK_CHANNEL = 'qwill:updater-check';
 const UPDATER_INSTALL_CHANNEL = 'qwill:updater-install';
+const NOTIFY_CHANNEL = 'qwill:notify';
+const BADGE_CHANNEL = 'qwill:set-badge-count';
+const AUTOSTART_GET_CHANNEL = 'qwill:autostart-get';
+const AUTOSTART_SET_CHANNEL = 'qwill:autostart-set';
+const DEEP_LINK_CHANNEL = 'qwill:deep-link';
+const DEEP_LINK_PENDING_CHANNEL = 'qwill:deep-link-pending';
 
 contextBridge.exposeInMainWorld('qwill', {
   isDesktop: true,
@@ -37,4 +43,22 @@ contextBridge.exposeInMainWorld('qwill', {
       };
     },
   },
+  notify: (payload: unknown): void => {
+    ipcRenderer.send(NOTIFY_CHANNEL, payload);
+  },
+  setBadgeCount: (count: number): void => {
+    ipcRenderer.send(BADGE_CHANNEL, count);
+  },
+  autostart: {
+    get: (): Promise<boolean> => ipcRenderer.invoke(AUTOSTART_GET_CHANNEL) as Promise<boolean>,
+    set: (enabled: boolean): Promise<void> => ipcRenderer.invoke(AUTOSTART_SET_CHANNEL, enabled) as Promise<void>,
+  },
+  onDeepLink: (handler: (target: unknown) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, target: unknown): void => handler(target);
+    ipcRenderer.on(DEEP_LINK_CHANNEL, listener);
+    return () => {
+      ipcRenderer.removeListener(DEEP_LINK_CHANNEL, listener);
+    };
+  },
+  getPendingDeepLink: (): Promise<unknown> => ipcRenderer.invoke(DEEP_LINK_PENDING_CHANNEL),
 });

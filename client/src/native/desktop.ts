@@ -27,6 +27,22 @@ export interface DesktopUpdaterBridge {
   onState(handler: (state: unknown) => void): () => void;
 }
 
+export interface DesktopNotifyPayload {
+  title: string;
+  body: string;
+  chatId: string;
+}
+
+export interface DesktopAutostartBridge {
+  get(): Promise<boolean>;
+  set(enabled: boolean): Promise<void>;
+}
+
+export interface DesktopDeepLinkTarget {
+  type: 'chat' | 'user';
+  id: string;
+}
+
 export interface DesktopBridge {
   isDesktop: true;
   getVersion(): Promise<string>;
@@ -35,6 +51,11 @@ export interface DesktopBridge {
   onScreenSourceRequest?(handler: (request: unknown) => void): () => void;
   chooseScreenSource?(requestId: number, sourceId: string | null): void;
   updater?: DesktopUpdaterBridge;
+  notify?(payload: DesktopNotifyPayload): void;
+  setBadgeCount?(count: number): void;
+  autostart?: DesktopAutostartBridge;
+  onDeepLink?(handler: (target: unknown) => void): () => void;
+  getPendingDeepLink?(): Promise<unknown>;
 }
 
 declare global {
@@ -169,4 +190,51 @@ export function checkDesktopUpdate(): void {
 
 export function installDesktopUpdate(): void {
   desktopBridge()?.updater?.quitAndInstall();
+}
+
+export function notifyDesktop(payload: DesktopNotifyPayload): void {
+  desktopBridge()?.notify?.(payload);
+}
+
+export function setDesktopBadgeCount(count: number): void {
+  desktopBridge()?.setBadgeCount?.(count);
+}
+
+export function isDesktopAutostartAvailable(): boolean {
+  return desktopBridge()?.autostart !== undefined;
+}
+
+export function getDesktopAutostart(): Promise<boolean> {
+  const autostart = desktopBridge()?.autostart;
+  if (!autostart) return Promise.resolve(false);
+  return autostart.get().catch(() => false);
+}
+
+export function setDesktopAutostart(enabled: boolean): void {
+  void desktopBridge()?.autostart?.set(enabled).catch(() => undefined);
+}
+
+function parseDeepLinkTarget(raw: unknown): DesktopDeepLinkTarget | null {
+  const candidate = raw as Partial<DesktopDeepLinkTarget> | null;
+  if (!candidate || typeof candidate.id !== 'string') return null;
+  if (candidate.type !== 'chat' && candidate.type !== 'user') return null;
+  return { type: candidate.type, id: candidate.id };
+}
+
+export function subscribeToDesktopDeepLinks(handler: (target: DesktopDeepLinkTarget) => void): () => void {
+  const bridge = desktopBridge();
+  if (!bridge?.onDeepLink) return () => undefined;
+  return bridge.onDeepLink((raw) => {
+    const target = parseDeepLinkTarget(raw);
+    if (target) handler(target);
+  });
+}
+
+export function getPendingDesktopDeepLink(): Promise<DesktopDeepLinkTarget | null> {
+  const bridge = desktopBridge();
+  if (!bridge?.getPendingDeepLink) return Promise.resolve(null);
+  return bridge
+    .getPendingDeepLink()
+    .then(parseDeepLinkTarget)
+    .catch(() => null);
 }

@@ -1,12 +1,17 @@
 import { app, ipcMain, session } from 'electron';
 
 import { configureApiSession } from './apiSession';
+import { registerAutostart, shouldStartHidden } from './autostart';
+import { registerDeepLinkBridge, registerDeepLinkProtocol, routeDeepLinkFromArgv } from './deeplink';
+import { registerNotifications } from './notifications';
 import { APP_ENTRY_URL, handleAppProtocol, registerAppScheme, resolveClientRoot } from './protocol';
 import { pickScreenSource, registerScreenSourcePicker } from './screenSources';
+import { createTray, installCloseToTray } from './tray';
 import { registerUpdater, startUpdater } from './updater';
 import { createMainWindow, enforceDesktopWidth, focusExistingWindow, setWindowTitleTheme } from './window';
 
 registerAppScheme();
+registerDeepLinkProtocol();
 
 function configureDisplayMedia(): void {
   registerScreenSourcePicker();
@@ -21,7 +26,10 @@ function configureDisplayMedia(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', focusExistingWindow);
+  app.on('second-instance', (_event, argv) => {
+    focusExistingWindow();
+    routeDeepLinkFromArgv(argv);
+  });
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
@@ -39,12 +47,20 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   registerUpdater();
+  registerNotifications();
+  registerAutostart();
+  registerDeepLinkBridge();
 
   void app.whenReady().then(async () => {
     configureApiSession();
     configureDisplayMedia();
     handleAppProtocol(resolveClientRoot());
-    await createMainWindow(process.env.QWILL_DEV_SERVER ?? APP_ENTRY_URL);
+    createTray();
+    const window = await createMainWindow(process.env.QWILL_DEV_SERVER ?? APP_ENTRY_URL, {
+      startHidden: shouldStartHidden(),
+    });
+    installCloseToTray(window);
+    routeDeepLinkFromArgv(process.argv);
     await startUpdater();
   });
 }

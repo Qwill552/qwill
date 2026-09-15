@@ -10,6 +10,8 @@ import { keepDesktopWidth } from '../native/desktop';
 import { applyDesktopListWidth, useDesktopColumnsStore } from '../stores/desktopColumnsStore';
 import { AmbientBlobs } from './AmbientBlobs';
 import { useAppUpdateStore } from './appUpdate';
+import { useDesktopBadgeSync } from './desktopBadge';
+import { useDesktopDeepLinks } from './desktopDeepLinks';
 import { useDesktopUpdateStore } from './desktopUpdate';
 import { ScreenStack } from './ScreenStack';
 import styles from './AppShell.module.css';
@@ -39,6 +41,9 @@ export function AppShell() {
   useEffect(() => keepDesktopWidth(DESKTOP_MIN_WIDTH), []);
 
   useEffect(() => initDesktopUpdate(), [initDesktopUpdate]);
+
+  useDesktopBadgeSync();
+  useDesktopDeepLinks();
 
   return (
     <div className={`${styles.shell} ${layout === 'desktop' ? styles.desktop : ''}`}>

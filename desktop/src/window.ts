@@ -142,7 +142,10 @@ function keepNavigationInside(window: BrowserWindow): void {
   });
 }
 
-export async function createMainWindow(entryUrl: string): Promise<BrowserWindow> {
+export async function createMainWindow(
+  entryUrl: string,
+  options: { startHidden?: boolean } = {},
+): Promise<BrowserWindow> {
   const state = readState();
   const usePosition = fitsOnSomeDisplay(state);
   activeTheme = state.theme;
@@ -172,7 +175,9 @@ export async function createMainWindow(entryUrl: string): Promise<BrowserWindow>
 
   if (state.maximized) window.maximize();
 
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    if (!options.startHidden) window.show();
+  });
   keepNavigationInside(window);
   trackGeometry(window);
 

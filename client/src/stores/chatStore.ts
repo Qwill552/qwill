@@ -100,6 +100,7 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from '../features/messages/feedWindow';
+import { isDesktopShell, notifyDesktop } from '../native/desktop';
 import { getSocket } from '../realtime/socket';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -484,6 +485,32 @@ function scheduleOutboxRetry(drain: () => void): void {
     outboxRetryTimer = null;
     drain();
   }, nextRetryDelayMs(outboxRetryAttempt));
+}
+
+function desktopNotificationBody(message: MessageDto): string {
+  if (message.call) return message.call.status === 'DECLINED' ? 'Отклонённый звонок' : 'Звонок';
+  if (message.announcement) return `Новое обновление (${message.announcement.versionName})`;
+  if (message.content) return message.content;
+  if (message.attachment) {
+    const mimeType = message.attachment.file.mimeType;
+    if (mimeType.startsWith('audio/')) return 'Голосовое сообщение';
+    if (mimeType.startsWith('image/')) return 'Фото';
+    if (isPlayableVideoMimeType(mimeType)) return 'Видео';
+    return message.attachment.originalName || 'Файл';
+  }
+  return 'Новое сообщение';
+}
+
+function notifyDesktopIfNeeded(message: MessageDto, state: ChatState): void {
+  if (!isDesktopShell()) return;
+  if (message.sender?.id === state.myUserId) return;
+
+  const chat = state.chats.find((c) => c.id === message.chatId);
+  if (!chat || chat.muted) return;
+  if (state.activeChatId === message.chatId && document.hasFocus()) return;
+
+  const body = chat.type === 'GROUP' && message.sender ? `${message.sender.displayName}: ${desktopNotificationBody(message)}` : desktopNotificationBody(message);
+  notifyDesktop({ title: chat.title, body, chatId: message.chatId });
 }
 
 function isFeedLive(state: Pick<ChatState, 'viewportNewestByChat' | 'hasMoreAfterByChat'>, chatId: string): boolean {
@@ -2131,6 +2158,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     void writeCachedMessages([message]);
+    notifyDesktopIfNeeded(message, get());
 
     const state = get();
     if (!state.chats.some((c) => c.id === message.chatId)) {

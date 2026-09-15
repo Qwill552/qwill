@@ -6,6 +6,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 import { API_ORIGIN } from './apiSession';
+import { markQuitting } from './tray';
 
 const STATE_CHANNEL = 'qwill:updater-state';
 const CHECK_CHANNEL = 'qwill:updater-check';
@@ -63,6 +64,7 @@ export function registerUpdater(): void {
   ipcMain.handle(CHECK_CHANNEL, () => checkForUpdates());
   ipcMain.on(INSTALL_CHANNEL, () => {
     if (state.phase !== 'ready') return;
+    markQuitting();
     autoUpdater.quitAndInstall(true, true);
   });
 }

@@ -1,5 +1,5 @@
 import { AVATAR_MIME_TYPES } from '@messenger/shared';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { setAvatarRequest } from '../api/auth';
@@ -15,6 +15,7 @@ import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
 import { DesktopUpdateRow, useDesktopUpdateStatus } from '../features/updates/DesktopUpdate';
+import { getDesktopAutostart, isDesktopAutostartAvailable, setDesktopAutostart } from '../native/desktop';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -52,6 +53,18 @@ export function SettingsScreen() {
   const logout = useAuthStore((s) => s.logout);
   const folderTabsEnabled = useChatListPrefsStore((s) => s.folderTabsEnabled);
   const setFolderTabsEnabled = useChatListPrefsStore((s) => s.setFolderTabsEnabled);
+  const autostartAvailable = isDesktopAutostartAvailable();
+  const [autostartEnabled, setAutostartEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!autostartAvailable) return;
+    void getDesktopAutostart().then(setAutostartEnabled);
+  }, [autostartAvailable]);
+
+  function handleAutostartChange(enabled: boolean): void {
+    setAutostartEnabled(enabled);
+    setDesktopAutostart(enabled);
+  }
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -207,6 +220,17 @@ export function SettingsScreen() {
               <Switch checked={folderTabsEnabled} onChange={setFolderTabsEnabled} label="Папки с чатами" />
             }
           />
+          {autostartAvailable && (
+            <Card.Row
+              icon="monitor"
+              tint="indigo"
+              title="Автозапуск"
+              subtitle="Запускать Qwill при входе в Windows"
+              trailing={
+                <Switch checked={autostartEnabled} onChange={handleAutostartChange} label="Автозапуск" />
+              }
+            />
+          )}
           <Card.Row
             icon="monitor"
             tint="violet"
