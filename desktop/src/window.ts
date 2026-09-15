@@ -172,6 +172,7 @@ export async function createMainWindow(
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 

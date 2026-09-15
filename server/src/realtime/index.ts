@@ -46,6 +46,7 @@ import {
 } from '../services/message.js';
 import * as callService from '../services/call.js';
 import { isIpBanned } from '../services/ipBan.js';
+import * as pushService from '../services/push.js';
 import { getUserById } from '../services/user.js';
 import { registerCallHandlers } from './call-handlers.js';
 import { presenceStore } from './presence.js';
@@ -195,9 +196,11 @@ async function handleChatRead(userId: string, payload: ChatReadPayload): Promise
 
   // Членство проверяется в БД (markChatRead → assertMember), а не через socket.rooms —
   // join комнаты в bootstrapSocket асинхронный и может ещё не завершиться к этому моменту.
-  const lastReadMessageId = await markChatRead(payload.chatId, userId, payload.messageId);
+  const { lastReadMessageId, advanced } = await markChatRead(payload.chatId, userId, payload.messageId);
   const event: ChatReadEvent = { chatId: payload.chatId, userId, lastReadMessageId };
   io?.to(payload.chatId).emit(SocketEvent.ChatRead, event);
+
+  if (advanced) await pushService.notifyChatRead(userId, payload.chatId);
 }
 
 async function handleTyping(socket: Socket, userId: string, payload: TypingPayload, isTyping: boolean): Promise<void> {

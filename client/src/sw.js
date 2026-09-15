@@ -219,12 +219,23 @@ self.addEventListener('push', (event) => {
 
   const isCall = payload.kind === 'call';
 
+  // Прочтение на другом устройстве снимает уведомление и здесь: показывать нечего, гасим
+  // по тегу чата (R-38).
+  if (payload.kind === 'read') {
+    event.waitUntil(
+      self.registration
+        .getNotifications({ tag: `chat-${payload.chatId}` })
+        .then((notifications) => notifications.forEach((notification) => notification.close())),
+    );
+    return;
+  }
+
   event.waitUntil(
     self.registration.showNotification(payload.title ?? 'Messenger', {
       body: payload.body ?? '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      tag: isCall ? `call-${payload.chatId}` : undefined,
+      tag: isCall ? `call-${payload.chatId}` : `chat-${payload.chatId}`,
       requireInteraction: isCall,
       renotify: isCall,
       vibrate: isCall ? [1000, 500, 1000, 500] : undefined,

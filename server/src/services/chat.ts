@@ -303,19 +303,25 @@ export async function pinMessage(chatId: string, userId: string, messageId: numb
   return { chatId, message: toMessageDto(message) };
 }
 
-/** Курсор прочтения не может уйти назад — обновляем только если новое значение больше текущего (секция 3). */
-export async function markChatRead(chatId: string, userId: string, messageId: number): Promise<number> {
+/** Курсор прочтения не может уйти назад — обновляем только если новое значение больше текущего (секция 3).
+ *  `advanced` отличает настоящее прочтение от повторного отчёта о том же месте: на нём висит
+ *  рассылка пуша, снимающего уведомления с других устройств (R-38). */
+export async function markChatRead(
+  chatId: string,
+  userId: string,
+  messageId: number,
+): Promise<{ lastReadMessageId: number; advanced: boolean }> {
   await assertMember(chatId, userId);
 
   const member = await prisma.chatMember.findUniqueOrThrow({ where: { chatId_userId: { chatId, userId } } });
   const nextCursor = Math.max(member.lastReadMessageId ?? 0, messageId);
-  if (nextCursor === member.lastReadMessageId) return nextCursor;
+  if (nextCursor === member.lastReadMessageId) return { lastReadMessageId: nextCursor, advanced: false };
 
   await prisma.chatMember.update({
     where: { chatId_userId: { chatId, userId } },
     data: { lastReadMessageId: nextCursor },
   });
-  return nextCursor;
+  return { lastReadMessageId: nextCursor, advanced: true };
 }
 
 /** Уведомления по чату выключаются каждым участником для себя: заглушённый чат перестаёт

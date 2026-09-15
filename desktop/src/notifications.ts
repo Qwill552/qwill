@@ -7,6 +7,7 @@ import { focusExistingWindow } from './window';
 
 const NOTIFY_CHANNEL = 'qwill:notify';
 const BADGE_CHANNEL = 'qwill:set-badge-count';
+const CLOSE_CHAT_CHANNEL = 'qwill:close-chat-notifications';
 
 const BADGE_SIZE = 16;
 const BADGE_COLOR: readonly [number, number, number] = [108, 116, 250];
@@ -41,15 +42,37 @@ function isNotifyPayload(value: unknown): value is NotifyPayload {
   );
 }
 
+const shownByChat = new Map<string, Notification[]>();
+
+function forget(chatId: string, notification: Notification): void {
+  const shown = shownByChat.get(chatId);
+  if (!shown) return;
+
+  const rest = shown.filter((candidate) => candidate !== notification);
+  if (rest.length === 0) shownByChat.delete(chatId);
+  else shownByChat.set(chatId, rest);
+}
+
 function showMessageNotification(payload: NotifyPayload): void {
   if (!Notification.isSupported()) return;
 
-  const notification = new Notification({ title: payload.title, body: payload.body });
+  const notification = new Notification({ title: payload.title, body: payload.body, silent: true });
   notification.on('click', () => {
     focusExistingWindow();
     routeDeepLink({ type: 'chat', id: payload.chatId });
   });
+  notification.on('close', () => forget(payload.chatId, notification));
   notification.show();
+
+  shownByChat.set(payload.chatId, [...(shownByChat.get(payload.chatId) ?? []), notification]);
+}
+
+function closeChatNotifications(chatId: string): void {
+  const shown = shownByChat.get(chatId);
+  if (!shown) return;
+
+  shownByChat.delete(chatId);
+  for (const notification of shown) notification.close();
 }
 
 function crc32(buffer: Buffer): number {
@@ -187,5 +210,10 @@ export function registerNotifications(): void {
   ipcMain.on(BADGE_CHANNEL, (_event, payload: unknown) => {
     if (typeof payload !== 'number' || !Number.isFinite(payload)) return;
     applyBadgeCount(Math.max(0, Math.round(payload)));
+  });
+
+  ipcMain.on(CLOSE_CHAT_CHANNEL, (_event, chatId: unknown) => {
+    if (typeof chatId !== 'string' || chatId === '') return;
+    closeChatNotifications(chatId);
   });
 }

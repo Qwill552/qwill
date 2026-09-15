@@ -113,7 +113,8 @@ async function sendViaFcm(
 ): Promise<void> {
   if (!fcmReady || !sub.fcmToken) return;
 
-  const isDataOnly = notification.kind === 'call' || notification.kind === 'call-ended';
+  const isDataOnly =
+    notification.kind === 'call' || notification.kind === 'call-ended' || notification.kind === 'read';
 
   try {
     await getMessaging().send({
@@ -123,6 +124,7 @@ async function sendViaFcm(
       android: {
         priority: isDataOnly ? 'high' : 'normal',
         ...(options?.ttl === undefined ? {} : { ttl: options.ttl * 1000 }),
+        ...(isDataOnly ? {} : { notification: { tag: notification.chatId } }),
       },
     });
   } catch (error) {
@@ -173,6 +175,13 @@ export async function notifyOfflineMembersOfCall(
       ),
     ),
   );
+}
+
+/** Прочтение чата снимает уведомления по нему на **своих же** устройствах: сокет о них не
+ *  знает, уведомление уже показано системой (R-38). Своё устройство тоже в списке — оно
+ *  гасит то, чего у него нет, зато телефон, на котором чат и открыли, чистится сам. */
+export async function notifyChatRead(userId: string, chatId: string): Promise<void> {
+  await sendToUser(userId, { title: '', body: '', chatId, kind: 'read' }, { ttl: 300, urgency: 'high' });
 }
 
 export async function notifyCallEnded(callId: string, chatId: string, excludeUserId: string): Promise<void> {

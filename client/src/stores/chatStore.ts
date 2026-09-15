@@ -100,8 +100,9 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from '../features/messages/feedWindow';
-import { isDesktopShell, notifyDesktop } from '../native/desktop';
+import { closeDesktopChatNotifications, isDesktopShell, notifyDesktop } from '../native/desktop';
 import { getSocket } from '../realtime/socket';
+import { playNotificationSound } from '../ui/notificationSound';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
 
@@ -509,8 +510,11 @@ function notifyDesktopIfNeeded(message: MessageDto, state: ChatState): void {
   if (!chat || chat.muted) return;
   if (state.activeChatId === message.chatId && document.hasFocus()) return;
 
-  const body = chat.type === 'GROUP' && message.sender ? `${message.sender.displayName}: ${desktopNotificationBody(message)}` : desktopNotificationBody(message);
+  const preview = desktopNotificationBody(message);
+  const body = chat.type === 'GROUP' && message.sender ? `${message.sender.displayName}: ${preview}` : preview;
+
   notifyDesktop({ title: chat.title, body, chatId: message.chatId });
+  playNotificationSound();
 }
 
 function isFeedLive(state: Pick<ChatState, 'viewportNewestByChat' | 'hasMoreAfterByChat'>, chatId: string): boolean {
@@ -1985,6 +1989,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.ChatRead).on(SocketEvent.ChatRead, (event: ChatReadEvent) => {
+      if (event.userId === get().myUserId) closeDesktopChatNotifications(event.chatId);
       set((state) => {
         const cursors = { ...(state.readCursorsByChat[event.chatId] ?? {}) };
         cursors[event.userId] = event.lastReadMessageId;

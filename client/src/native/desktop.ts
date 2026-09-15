@@ -55,6 +55,7 @@ export interface DesktopBridge {
   updater?: DesktopUpdaterBridge;
   notify?(payload: DesktopNotifyPayload): void;
   setBadgeCount?(count: number): void;
+  closeChatNotifications?(chatId: string): void;
   autostart?: DesktopAutostartBridge;
   onDeepLink?(handler: (target: unknown) => void): () => void;
   getPendingDeepLink?(): Promise<unknown>;
@@ -210,6 +211,10 @@ export function notifyDesktop(payload: DesktopNotifyPayload): void {
 
 export function setDesktopBadgeCount(count: number): void {
   desktopBridge()?.setBadgeCount?.(count);
+}
+
+export function closeDesktopChatNotifications(chatId: string): void {
+  desktopBridge()?.closeChatNotifications?.(chatId);
 }
 
 export function isDesktopAutostartAvailable(): boolean {

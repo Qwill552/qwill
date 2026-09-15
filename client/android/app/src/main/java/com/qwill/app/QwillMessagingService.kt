@@ -1,8 +1,11 @@
 package com.qwill.app
 
+import androidx.core.app.NotificationManagerCompat
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+
+private const val FCM_NOTIFICATION_ID = 0
 
 class QwillMessagingService : FirebaseMessagingService() {
 
@@ -28,6 +31,12 @@ class QwillMessagingService : FirebaseMessagingService() {
 
         if (data["kind"] == "call-ended" && !callId.isNullOrEmpty()) {
             NativeCalls.reportEnded(applicationContext, callId)
+            return
+        }
+
+        val chatId = data["chatId"]
+        if (data["kind"] == "read" && !chatId.isNullOrEmpty()) {
+            NotificationManagerCompat.from(applicationContext).cancel(chatId, FCM_NOTIFICATION_ID)
             return
         }
 

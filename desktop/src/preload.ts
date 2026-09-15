@@ -9,6 +9,7 @@ const UPDATER_AUTO_GET_CHANNEL = 'qwill:updater-auto-get';
 const UPDATER_AUTO_SET_CHANNEL = 'qwill:updater-auto-set';
 const NOTIFY_CHANNEL = 'qwill:notify';
 const BADGE_CHANNEL = 'qwill:set-badge-count';
+const CLOSE_CHAT_CHANNEL = 'qwill:close-chat-notifications';
 const AUTOSTART_GET_CHANNEL = 'qwill:autostart-get';
 const AUTOSTART_SET_CHANNEL = 'qwill:autostart-set';
 const DEEP_LINK_CHANNEL = 'qwill:deep-link';
@@ -53,6 +54,9 @@ contextBridge.exposeInMainWorld('qwill', {
   },
   setBadgeCount: (count: number): void => {
     ipcRenderer.send(BADGE_CHANNEL, count);
+  },
+  closeChatNotifications: (chatId: string): void => {
+    ipcRenderer.send(CLOSE_CHAT_CHANNEL, chatId);
   },
   autostart: {
     get: (): Promise<boolean> => ipcRenderer.invoke(AUTOSTART_GET_CHANNEL) as Promise<boolean>,
