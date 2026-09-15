@@ -26,6 +26,8 @@ interface CardRowProps {
   trailing?: ReactNode;
   onClick?: () => void;
   danger?: boolean;
+  /** Надпись цветом --primary: строка-действие вроде «Обновить Qwill». */
+  accent?: boolean;
   /** Стрелка «›» по умолчанию появляется сама у нажимаемой строки без своего `trailing` —
    *  так она не забывается и не дублируется. Явный `false` гасит её там, где референс
    *  стрелку не рисует вовсе (например, вход в поиск на вкладке «Контакты»). */
@@ -43,6 +45,7 @@ function CardRow({
   trailing,
   onClick,
   danger,
+  accent,
   chevron,
   className,
 }: CardRowProps) {
@@ -66,6 +69,7 @@ function CardRow({
     styles.row,
     lead ? styles.withIcon : '',
     danger ? styles.danger : '',
+    accent ? styles.accent : '',
     onClick ? styles.interactive : '',
     className ?? '',
   ].join(' ');

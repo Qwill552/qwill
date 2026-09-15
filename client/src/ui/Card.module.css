@@ -75,6 +75,10 @@
   color: var(--danger);
 }
 
+.accent .title {
+  color: var(--primary);
+}
+
 .subtitle {
   overflow: hidden;
   color: rgba(var(--pulse-ink), 0.4);

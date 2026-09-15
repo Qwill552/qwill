@@ -24,14 +24,7 @@ export function DesktopUpdateRow({ className }: { className?: string }) {
 
   return (
     <Card className={className}>
-      <Card.Row
-        icon="retry"
-        tint="green"
-        title="Перезапустить и обновиться"
-        subtitle={`Версия ${state.version} загружена`}
-        onClick={install}
-        chevron={false}
-      />
+      <Card.Row title="Обновить Qwill" accent onClick={install} chevron={false} />
     </Card>
   );
 }
