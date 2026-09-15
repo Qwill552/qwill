@@ -1,7 +1,8 @@
 import { createReadStream } from 'node:fs';
+import path from 'node:path';
 
 import { ErrorCode, SocketEvent } from '@messenger/shared';
-import { Router } from 'express';
+import express, { Router } from 'express';
 
 import { env } from '../../config/env.js';
 import { emitToUser, subscribeUserToChat } from '../../realtime/index.js';
@@ -15,6 +16,28 @@ export const appVersionRouter: Router = Router();
 appVersionRouter.get('/version', (_req, res, next) => {
   appReleaseService
     .getAndroidRelease()
+    .then((release) => {
+      if (!release) {
+        res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Выпуск не опубликован' } });
+        return;
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(release);
+    })
+    .catch(next);
+});
+
+appVersionRouter.use(
+  '/win',
+  express.static(path.join(env.appReleaseDir, 'windows'), {
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
+    acceptRanges: true,
+  }),
+);
+
+appVersionRouter.get('/win/version', (_req, res, next) => {
+  appReleaseService
+    .getWindowsRelease()
     .then((release) => {
       if (!release) {
         res.status(404).json({ error: { code: ErrorCode.NOT_FOUND, message: 'Выпуск не опубликован' } });

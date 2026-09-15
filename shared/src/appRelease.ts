@@ -32,3 +32,32 @@ export interface AppVersionInfo {
 }
 
 export const APK_DOWNLOAD_PATH = '/api/app/apk';
+
+export const WINDOWS_RELEASE_BASE_PATH = '/api/app/win';
+
+export const APP_RELEASE_WINDOWS_MANIFEST_FILE = 'windows.json';
+
+export const windowsReleaseManifestSchema = z.object({
+  versionName: z.string().trim().min(1),
+  exeFile: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[\w.-]+\.exe$/, 'exeFile — имя файла рядом с манифестом, без путей'),
+  sha256: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[0-9a-f]{64}$/, 'sha256 — 64 шестнадцатеричных символа'),
+  changelog: z.array(z.string().trim().min(1)).default([]),
+});
+
+export type WindowsReleaseManifest = z.infer<typeof windowsReleaseManifestSchema>;
+
+export interface WindowsVersionInfo {
+  versionName: string;
+  exeUrl: string;
+  sizeBytes: number;
+  sha256: string;
+  changelog: string[];
+}
