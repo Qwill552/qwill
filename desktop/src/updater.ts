@@ -43,6 +43,11 @@ async function clearPending(): Promise<void> {
   await rm(pendingDir(), { recursive: true, force: true }).catch(() => undefined);
 }
 
+function isMissingRelease(error: Error): boolean {
+  const statusCode = (error as { statusCode?: unknown }).statusCode;
+  return statusCode === 404 || /Cannot find channel/i.test(error.message);
+}
+
 function updaterUsable(): boolean {
   if (app.isPackaged) return true;
   return existsSync(path.join(app.getAppPath(), DEV_CONFIG_FILE));
@@ -86,9 +91,13 @@ export async function startUpdater(): Promise<void> {
     }),
   );
   autoUpdater.on('update-downloaded', (info) => publish({ phase: 'ready', version: info.version }));
-  autoUpdater.on('error', (error) =>
-    publish({ phase: 'error', message: error.message || 'Не удалось проверить обновление' }),
-  );
+  autoUpdater.on('error', (error) => {
+    if (isMissingRelease(error)) {
+      publish({ phase: 'latest' });
+      return;
+    }
+    publish({ phase: 'error', message: error.message || 'Не удалось проверить обновление' });
+  });
 
   publish({ phase: 'idle' });
 

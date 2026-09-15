@@ -14,7 +14,7 @@ import { formatBytes } from '../features/messages/Attachment';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
-import { DesktopUpdateRow } from '../features/updates/DesktopUpdateRow';
+import { DesktopUpdateRow, useDesktopUpdateStatus } from '../features/updates/DesktopUpdateRow';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -73,6 +73,7 @@ export function SettingsScreen() {
   const openUpdateModal = useAppUpdateStore((s) => s.openModal);
   const desktopVersion = useDesktopUpdateStore((s) => s.currentVersion);
   const shownVersionName = desktopVersion ?? (isApkUpdateSupported() ? currentVersionName : null);
+  const updateStatus = useDesktopUpdateStatus();
 
   async function uploadAvatar(file: File): Promise<void> {
     setAvatarUploading(true);
@@ -270,6 +271,12 @@ export function SettingsScreen() {
           {shownVersionName && (
             <>
               <span>Qwill {shownVersionName}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          {updateStatus && (
+            <>
+              <span>{updateStatus}</span>
               <span aria-hidden="true">·</span>
             </>
           )}
