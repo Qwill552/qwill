@@ -1,19 +1,10 @@
-import path from 'node:path';
+import { Menu, Tray, app, type BrowserWindow } from 'electron';
 
-import { Menu, Tray, app, nativeImage, type BrowserWindow } from 'electron';
-
-import { resolveClientRoot } from './protocol';
+import { trayIcon } from './appIcon';
 import { focusExistingWindow } from './window';
-
-const TRAY_ICON_SIZE = 16;
 
 let tray: Tray | null = null;
 let quitting = false;
-
-function trayIcon() {
-  const source = nativeImage.createFromPath(path.join(resolveClientRoot(), 'icon-192.png'));
-  return source.resize({ width: TRAY_ICON_SIZE, height: TRAY_ICON_SIZE });
-}
 
 export function createTray(): void {
   if (tray) return;

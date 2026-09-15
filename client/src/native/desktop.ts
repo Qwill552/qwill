@@ -25,6 +25,8 @@ export interface DesktopUpdaterBridge {
   check(): Promise<void>;
   quitAndInstall(): void;
   onState(handler: (state: unknown) => void): () => void;
+  getAuto?(): Promise<boolean>;
+  setAuto?(enabled: boolean): Promise<void>;
 }
 
 export interface DesktopNotifyPayload {
@@ -190,6 +192,16 @@ export function checkDesktopUpdate(): void {
 
 export function installDesktopUpdate(): void {
   desktopBridge()?.updater?.quitAndInstall();
+}
+
+export function getDesktopAutoUpdate(): Promise<boolean> {
+  const updater = desktopBridge()?.updater;
+  if (!updater?.getAuto) return Promise.resolve(true);
+  return updater.getAuto().catch(() => true);
+}
+
+export function setDesktopAutoUpdate(enabled: boolean): void {
+  void desktopBridge()?.updater?.setAuto?.(enabled).catch(() => undefined);
 }
 
 export function notifyDesktop(payload: DesktopNotifyPayload): void {

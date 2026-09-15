@@ -12,6 +12,8 @@ const clientDist = path.join(repoRoot, 'client', 'dist');
 const rendererDir = path.join(desktopDir, 'renderer');
 const apiConfigFile = path.join(desktopDir, 'api-origin.json');
 const devUpdateConfigFile = path.join(desktopDir, 'dev-app-update.yml');
+const brandIconFile = path.join(repoRoot, 'brand', 'qwill-no-background.png');
+const appIconFile = path.join(desktopDir, 'app-icon.png');
 const UPDATER_CACHE_DIR_NAME = 'qwill-updater';
 
 const MKCERT_DIR = path.join(homedir(), '.vite-plugin-mkcert');
@@ -48,6 +50,7 @@ if (!built?.isDirectory()) {
 await rm(rendererDir, { recursive: true, force: true });
 await mkdir(path.dirname(rendererDir), { recursive: true });
 await cp(clientDist, rendererDir, { recursive: true });
+await cp(brandIconFile, appIconFile);
 await writeFile(apiConfigFile, `${JSON.stringify({ apiUrl }, null, 2)}\n`, 'utf8');
 await writeFile(
   devUpdateConfigFile,

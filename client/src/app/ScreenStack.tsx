@@ -24,6 +24,7 @@ import {
 import { AdminLogScreen } from '../pages/AdminLogScreen';
 import { AdminScreen } from '../pages/AdminScreen';
 import { AdminUserScreen } from '../pages/AdminUserScreen';
+import { AdvancedScreen } from '../pages/AdvancedScreen';
 import { AppearanceScreen } from '../pages/AppearanceScreen';
 import { CallTraceScreen } from '../pages/CallTraceScreen';
 import { ChatInfoScreen } from '../pages/ChatInfoScreen';
@@ -107,6 +108,7 @@ const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
   '/settings/appearance': 'Настройки чатов',
   '/settings/storage': 'Данные и память',
   '/settings/password': 'Пароль',
+  '/settings/advanced': 'Продвинутые настройки',
   '/settings/developer': 'Для разработчиков',
   '/settings/developer/call-trace': 'Трассировка звонка',
   '/profile/edit': 'Изменить профиль',
@@ -149,6 +151,7 @@ const RouteSwitch = memo(
         <Route path="/settings/appearance" element={<AppearanceScreen />} />
         <Route path="/settings/storage" element={<StorageScreen />} />
         <Route path="/settings/password" element={<PasswordScreen />} />
+        <Route path="/settings/advanced" element={<AdvancedScreen />} />
         <Route path="/settings/developer" element={<DeveloperScreen />} />
         <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />

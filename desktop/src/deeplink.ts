@@ -53,5 +53,9 @@ export function registerDeepLinkProtocol(): void {
 }
 
 export function registerDeepLinkBridge(): void {
-  ipcMain.handle(PENDING_CHANNEL, () => pendingDeepLink);
+  ipcMain.handle(PENDING_CHANNEL, () => {
+    const target = pendingDeepLink;
+    pendingDeepLink = null;
+    return target;
+  });
 }

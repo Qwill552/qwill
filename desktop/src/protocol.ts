@@ -7,6 +7,7 @@ export const APP_SCHEME = 'app';
 export const APP_HOST = 'qwill';
 export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
 export const APP_ENTRY_URL = `${APP_ORIGIN}/`;
+export const APP_USER_MODEL_ID = 'com.qwill.desktop';
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',

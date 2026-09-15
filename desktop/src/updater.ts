@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -11,6 +11,9 @@ import { markQuitting } from './tray';
 const STATE_CHANNEL = 'qwill:updater-state';
 const CHECK_CHANNEL = 'qwill:updater-check';
 const INSTALL_CHANNEL = 'qwill:updater-install';
+const AUTO_GET_CHANNEL = 'qwill:updater-auto-get';
+const AUTO_SET_CHANNEL = 'qwill:updater-auto-set';
+const SETTINGS_FILE = 'updater-settings.json';
 
 const FEED_PATH = '/api/app/win';
 const UPDATER_CACHE_DIR_NAME = 'qwill-updater';
@@ -27,6 +30,28 @@ type UpdaterState =
   | { phase: 'error'; message: string };
 
 let state: UpdaterState = { phase: 'disabled' };
+let autoUpdate = true;
+
+function settingsFilePath(): string {
+  return path.join(app.getPath('userData'), SETTINGS_FILE);
+}
+
+function readAutoUpdate(): boolean {
+  try {
+    const raw: unknown = JSON.parse(readFileSync(settingsFilePath(), 'utf8'));
+    return (raw as { autoUpdate?: unknown })?.autoUpdate !== false;
+  } catch {
+    return true;
+  }
+}
+
+function writeAutoUpdate(enabled: boolean): void {
+  try {
+    writeFileSync(settingsFilePath(), JSON.stringify({ autoUpdate: enabled }), 'utf8');
+  } catch {
+    return;
+  }
+}
 
 function publish(next: UpdaterState): void {
   state = next;
@@ -55,13 +80,35 @@ function updaterUsable(): boolean {
 }
 
 async function checkForUpdates(): Promise<void> {
+  if (!autoUpdate) return;
   if (state.phase === 'disabled' || state.phase === 'downloading' || state.phase === 'ready') return;
   await autoUpdater.checkForUpdates().catch(() => undefined);
+}
+
+async function applyAutoUpdate(enabled: boolean): Promise<void> {
+  if (enabled === autoUpdate) return;
+  autoUpdate = enabled;
+  writeAutoUpdate(enabled);
+  autoUpdater.autoInstallOnAppQuit = enabled;
+
+  if (state.phase === 'disabled') return;
+
+  if (!enabled) {
+    publish({ phase: 'idle' });
+    await clearPending();
+    return;
+  }
+  await checkForUpdates();
 }
 
 export function registerUpdater(): void {
   ipcMain.handle(STATE_CHANNEL, () => state);
   ipcMain.handle(CHECK_CHANNEL, () => checkForUpdates());
+  ipcMain.handle(AUTO_GET_CHANNEL, () => autoUpdate);
+  ipcMain.handle(AUTO_SET_CHANNEL, (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') return;
+    return applyAutoUpdate(enabled);
+  });
   ipcMain.on(INSTALL_CHANNEL, () => {
     if (state.phase !== 'ready') return;
     markQuitting();
@@ -75,8 +122,10 @@ export async function startUpdater(): Promise<void> {
     return;
   }
 
+  autoUpdate = readAutoUpdate();
+
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = autoUpdate;
   autoUpdater.forceDevUpdateConfig = !app.isPackaged;
   autoUpdater.setFeedURL({ provider: 'generic', url: `${API_ORIGIN}${FEED_PATH}` });
 

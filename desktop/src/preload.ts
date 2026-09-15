@@ -5,6 +5,8 @@ const SCREEN_SOURCE_CHOSEN_CHANNEL = 'qwill:screen-source-chosen';
 const UPDATER_STATE_CHANNEL = 'qwill:updater-state';
 const UPDATER_CHECK_CHANNEL = 'qwill:updater-check';
 const UPDATER_INSTALL_CHANNEL = 'qwill:updater-install';
+const UPDATER_AUTO_GET_CHANNEL = 'qwill:updater-auto-get';
+const UPDATER_AUTO_SET_CHANNEL = 'qwill:updater-auto-set';
 const NOTIFY_CHANNEL = 'qwill:notify';
 const BADGE_CHANNEL = 'qwill:set-badge-count';
 const AUTOSTART_GET_CHANNEL = 'qwill:autostart-get';
@@ -35,6 +37,9 @@ contextBridge.exposeInMainWorld('qwill', {
     quitAndInstall: (): void => {
       ipcRenderer.send(UPDATER_INSTALL_CHANNEL);
     },
+    getAuto: (): Promise<boolean> => ipcRenderer.invoke(UPDATER_AUTO_GET_CHANNEL) as Promise<boolean>,
+    setAuto: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(UPDATER_AUTO_SET_CHANNEL, enabled) as Promise<void>,
     onState: (handler: (state: unknown) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, state: unknown): void => handler(state);
       ipcRenderer.on(UPDATER_STATE_CHANNEL, listener);

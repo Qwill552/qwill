@@ -4,12 +4,19 @@ import { configureApiSession } from './apiSession';
 import { registerAutostart, shouldStartHidden } from './autostart';
 import { registerDeepLinkBridge, registerDeepLinkProtocol, routeDeepLinkFromArgv } from './deeplink';
 import { registerNotifications } from './notifications';
-import { APP_ENTRY_URL, handleAppProtocol, registerAppScheme, resolveClientRoot } from './protocol';
+import {
+  APP_ENTRY_URL,
+  APP_USER_MODEL_ID,
+  handleAppProtocol,
+  registerAppScheme,
+  resolveClientRoot,
+} from './protocol';
 import { pickScreenSource, registerScreenSourcePicker } from './screenSources';
 import { createTray, installCloseToTray } from './tray';
 import { registerUpdater, startUpdater } from './updater';
 import { createMainWindow, enforceDesktopWidth, focusExistingWindow, setWindowTitleTheme } from './window';
 
+app.setAppUserModelId(APP_USER_MODEL_ID);
 registerAppScheme();
 registerDeepLinkProtocol();
 
