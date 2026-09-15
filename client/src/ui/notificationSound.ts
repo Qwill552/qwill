@@ -36,15 +36,15 @@ function tone(target: AudioContext, startAt: number, frequency: number, duration
 /** Пачка сообщений не должна превращаться в очередь из звуков: на пришедшие подряд
  *  уведомления играет один, как в Telegram. */
 export function playNotificationSound(): void {
-  const now = Date.now();
-  if (now - lastPlayedAt < MIN_INTERVAL_MS) return;
-  lastPlayedAt = now;
+  const requestedAt = Date.now();
+  if (requestedAt - lastPlayedAt < MIN_INTERVAL_MS) return;
+  lastPlayedAt = requestedAt;
 
   const target = audioContext();
   if (!target) return;
 
   void target.resume().catch(() => undefined);
 
-  const now = target.currentTime;
-  for (const { frequency, start, duration } of TONES) tone(target, now + start, frequency, duration);
+  const startAt = target.currentTime;
+  for (const { frequency, start, duration } of TONES) tone(target, startAt + start, frequency, duration);
 }
