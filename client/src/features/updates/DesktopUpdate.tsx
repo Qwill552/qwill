@@ -1,5 +1,7 @@
 import { useDesktopUpdateStore } from '../../app/desktopUpdate';
 import { Card } from '../../ui/Card';
+import { Icon } from '../../ui/Icon';
+import styles from './DesktopUpdate.module.css';
 
 export function useDesktopUpdateStatus(): string | null {
   const state = useDesktopUpdateStore((s) => s.state);
@@ -14,6 +16,20 @@ export function useDesktopUpdateStatus(): string | null {
     default:
       return null;
   }
+}
+
+export function DesktopUpdateButton() {
+  const ready = useDesktopUpdateStore((s) => s.state.phase === 'ready');
+  const install = useDesktopUpdateStore((s) => s.install);
+
+  if (!ready) return null;
+
+  return (
+    <button type="button" className={styles.button} onClick={install}>
+      <Icon name="retry" size={18} />
+      Обновить Qwill
+    </button>
+  );
 }
 
 export function DesktopUpdateRow({ className }: { className?: string }) {

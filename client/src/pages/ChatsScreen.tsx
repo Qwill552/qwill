@@ -7,6 +7,7 @@ import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
+import { DesktopUpdateButton } from '../features/updates/DesktopUpdate';
 import { isEmptyPrivateChat, selectVisibleChats } from '../features/chats/visibleChats';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
@@ -388,6 +389,8 @@ export function ChatsScreen() {
       </div>
 
       <ChatList ref={listRef} filter={effectiveFilter} onScroll={handleScroll} />
+
+      <DesktopUpdateButton />
 
       {searchReveal && searchDock && (
         <SearchReveal

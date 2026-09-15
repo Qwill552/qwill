@@ -14,7 +14,7 @@ import { formatBytes } from '../features/messages/Attachment';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
-import { DesktopUpdateRow, useDesktopUpdateStatus } from '../features/updates/DesktopUpdateRow';
+import { DesktopUpdateRow, useDesktopUpdateStatus } from '../features/updates/DesktopUpdate';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
