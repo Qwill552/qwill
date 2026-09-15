@@ -4,7 +4,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 
 import { routeDeepLink } from './deeplink';
 import { APP_ORIGIN } from './protocol';
-import { focusExistingWindow, windowTheme } from './window';
+import { focusExistingWindow, getMainWindow, windowTheme } from './window';
 
 const SHOW_CHANNEL = 'qwill:notification-show';
 const CLOSE_CHAT_CHANNEL = 'qwill:notification-close-chat';
@@ -22,13 +22,14 @@ export interface PopupItem {
   body: string;
   time: string;
   avatarColor: string | null;
+  avatarUrl: string | null;
 }
 
 let popup: BrowserWindow | null = null;
 
 function popupBounds(height: number): Electron.Rectangle {
-  const [main] = BrowserWindow.getAllWindows().filter((candidate) => candidate !== popup);
-  const display = main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
+  const main = getMainWindow();
+  const display = main ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
   const { x, y, width, height: workHeight } = display.workArea;
 
   return {

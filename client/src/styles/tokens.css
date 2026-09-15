@@ -683,6 +683,7 @@
   --dur-pulse: 1000ms; /* кольцо потерянной связи на экране звонка */
   --dur-flash: 1500ms; /* подсветка сообщения после перехода «показать в чате» */
   --dur-media-fade: 220ms; /* проявление снимка поверх пятна BlurHash */
+  --dur-notify-hide: 4000ms; /* медленный уход плашки уведомления по бездействию (D-13) */
   --dur-wheel-settle: 800ms; /* доводка барабана выбора даты к ближайшей строке */
   --dur-wheel-step: 300ms; /* шаг барабана на одну строку по тапу или стрелке */
   --dur-cloud-pop: 190ms;
@@ -720,6 +721,7 @@
     --dur-press: 1ms;
     --dur-scrollbar: 1ms;
     --dur-pulse: 1ms;
+    --dur-notify-hide: 1ms;
     --dur-flash: 1ms;
     --dur-media-fade: 1ms;
     --dur-wheel-settle: 1ms;

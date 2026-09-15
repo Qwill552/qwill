@@ -15,9 +15,14 @@ import styles from './NotificationStack.module.css';
 const VISIBLE_LIMIT = 3;
 const LIFETIME_MS = 6000;
 const TICK_MS = 250;
+/** Длительность медленного затухания по бездействию — как `notifySlowHide` у Telegram
+ *  Desktop. Должна совпадать с `--dur-notify-hide`, иначе карточка исчезнет раньше, чем
+ *  доиграет прозрачность. */
+const FADE_MS = 4000;
 
 interface LiveItem extends DesktopNotificationItem {
   remainingMs: number;
+  fading: boolean;
 }
 
 function gradientOf(item: DesktopNotificationItem): string {
@@ -31,7 +36,7 @@ export function NotificationStack() {
 
   useEffect(() => {
     const stopShow = subscribeToNotificationShow((item) => {
-      setItems((current) => [...current, { ...item, remainingMs: LIFETIME_MS }]);
+      setItems((current) => [...current, { ...item, remainingMs: LIFETIME_MS, fading: false }]);
     });
 
     const stopClose = subscribeToNotificationCloseChat((chatId) => {
@@ -49,13 +54,25 @@ export function NotificationStack() {
     };
   }, []);
 
+  // Уход по бездействию — медленное затухание: карточка сначала помечается `fading`
+  // (CSS ведёт одну прозрачность, композитор справляется без пересчёта раскладки), и лишь
+  // когда затухание доиграло, строка выбрасывается. Наведение курсора возвращает её.
   useEffect(() => {
     const timer = setInterval(() => {
-      if (hoveredRef.current) return;
+      if (hoveredRef.current) {
+        setItems((current) =>
+          current.some((item) => item.fading)
+            ? current.map((item) => (item.fading ? { ...item, remainingMs: LIFETIME_MS, fading: false } : item))
+            : current,
+        );
+        return;
+      }
+
       setItems((current) =>
         current
           .map((item) => ({ ...item, remainingMs: item.remainingMs - TICK_MS }))
-          .filter((item) => item.remainingMs > 0),
+          .map((item) => (item.remainingMs <= 0 && !item.fading ? { ...item, fading: true, remainingMs: FADE_MS } : item))
+          .filter((item) => !(item.fading && item.remainingMs <= 0)),
       );
     }, TICK_MS);
 
@@ -93,7 +110,7 @@ export function NotificationStack() {
       {visible.map((item) => (
         <div
           key={item.id}
-          className={styles.card}
+          className={`${styles.card} ${item.fading ? styles.fading : ''}`}
           role="button"
           tabIndex={-1}
           onClick={() => {
@@ -103,6 +120,7 @@ export function NotificationStack() {
         >
           <span className={styles.avatar} style={{ ['--avatar-gradient' as string]: gradientOf(item) }}>
             {item.title.charAt(0).toUpperCase()}
+            {item.avatarUrl && <img className={styles.avatarImage} src={item.avatarUrl} alt="" />}
           </span>
 
           <span className={styles.body}>

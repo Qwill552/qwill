@@ -5,6 +5,7 @@ export interface DesktopNotificationItem {
   body: string;
   time: string;
   avatarColor: string | null;
+  avatarUrl: string | null;
 }
 
 export interface NotificationPopupBridge {
@@ -36,6 +37,7 @@ function parseItem(raw: unknown): DesktopNotificationItem | null {
     body: typeof candidate.body === 'string' ? candidate.body : '',
     time: typeof candidate.time === 'string' ? candidate.time : '',
     avatarColor: typeof candidate.avatarColor === 'string' ? candidate.avatarColor : null,
+    avatarUrl: typeof candidate.avatarUrl === 'string' ? candidate.avatarUrl : null,
   };
 }
 

@@ -1,10 +1,10 @@
 import zlib from 'node:zlib';
 
-import { BrowserWindow, Notification, app, ipcMain, nativeImage, type NativeImage } from 'electron';
+import { Notification, app, ipcMain, nativeImage, type NativeImage } from 'electron';
 
 import { routeDeepLink } from './deeplink';
 import { closePopupNotifications, showPopupNotification } from './notificationPopup';
-import { focusExistingWindow } from './window';
+import { focusExistingWindow, getMainWindow } from './window';
 
 const NOTIFY_CHANNEL = 'qwill:notify';
 const BADGE_CHANNEL = 'qwill:set-badge-count';
@@ -33,6 +33,7 @@ interface NotifyPayload {
   chatId: string;
   time?: string;
   avatarColor?: string | null;
+  avatarUrl?: string | null;
 }
 
 function isNotifyPayload(value: unknown): value is NotifyPayload {
@@ -68,6 +69,7 @@ function showMessageNotification(payload: NotifyPayload): void {
     body: payload.body,
     time: payload.time ?? '',
     avatarColor: payload.avatarColor ?? null,
+    avatarUrl: payload.avatarUrl ?? null,
   });
   if (shownByPopup) return;
 
@@ -214,11 +216,10 @@ function applyBadgeCount(count: number): void {
   lastBadgeCount = count;
 
   app.setBadgeCount(count);
-  const overlay = count > 0 ? renderBadgeIcon(count) : null;
-  const description = count > 0 ? `${count} непрочитанных` : '';
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.setOverlayIcon(overlay, description);
-  }
+
+  const main = getMainWindow();
+  if (!main) return;
+  main.setOverlayIcon(count > 0 ? renderBadgeIcon(count) : null, count > 0 ? `${count} непрочитанных` : '');
 }
 
 export function registerNotifications(): void {

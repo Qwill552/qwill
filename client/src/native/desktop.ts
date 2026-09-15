@@ -35,6 +35,7 @@ export interface DesktopNotifyPayload {
   chatId: string;
   time: string;
   avatarColor: string | null;
+  avatarUrl: string | null;
 }
 
 export interface DesktopAutostartBridge {

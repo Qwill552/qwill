@@ -17,7 +17,7 @@ import { createTray, installCloseToTray } from './tray';
 import { registerUpdater, startUpdater } from './updater';
 import { createMainWindow, enforceDesktopWidth, focusExistingWindow, setWindowTitleTheme } from './window';
 
-if (app.isPackaged) app.setAppUserModelId(APP_USER_MODEL_ID);
+app.setAppUserModelId(APP_USER_MODEL_ID);
 registerAppScheme();
 registerDeepLinkProtocol();
 

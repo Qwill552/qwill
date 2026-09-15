@@ -36,7 +36,9 @@
 }
 
 .avatar {
+  position: relative;
   display: grid;
+  overflow: hidden;
   width: 48px;
   height: 48px;
   flex-shrink: 0;
@@ -46,6 +48,14 @@
   font-size: 17px;
   font-weight: 700;
   place-items: center;
+}
+
+.avatarImage {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .body {
@@ -76,6 +86,7 @@
   flex-shrink: 0;
   color: var(--text-secondary);
   font-size: var(--font-caption);
+  transition: opacity var(--dur-press) var(--ease-screen);
 }
 
 /* Текст не обрезается многоточием, а затухает к правому краю — приём Telegram Desktop
@@ -93,30 +104,53 @@
 
 .close {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: calc(var(--space-3) - 13px);
+  right: calc(var(--space-4) - 15px);
   display: grid;
   width: 44px;
   height: 44px;
-  align-items: center;
   border: 0;
   background: none;
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0;
   place-items: center;
+  pointer-events: none;
   transition: opacity var(--dur-press) var(--ease-screen);
+}
+
+/* Крестик встаёт ровно на место времени, а не поверх него: под курсором время гаснет,
+   крестик проявляется. Так ничего не перекрывается и строка не прыгает. */
+.card:hover .time {
+  opacity: 0;
 }
 
 .card:hover .close,
 .close:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .close:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -4px;
   border-radius: var(--radius-pill);
+}
+
+/* Единственное, что анимируется, — прозрачность: её ведёт композитор, раскладка не
+   пересчитывается ни разу (ux-ui/motion-cost.md). */
+.fading {
+  animation: fadeOut var(--dur-notify-hide) linear forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes slideIn {

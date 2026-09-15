@@ -1023,13 +1023,23 @@ export function MessageList({
     markedUpTo.current = 0;
   }, [chatId]);
 
+  // Свёрнутое окно никто не читает. Раньше открытый чат отмечал прочитанным всё, что
+  // придёт, даже когда приложение в трее: уведомление на этом компьютере тут же гасло, а
+  // вместе с ним — уведомления на телефоне (они снимаются по прочтению, R-38).
+  const [documentVisible, setDocumentVisible] = useState(() => document.visibilityState === 'visible');
   useEffect(() => {
-    if (!isViewportNewest) return;
+    const sync = (): void => setDocumentVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isViewportNewest || !documentVisible) return;
     const last = lastSettledId(messages);
     if (last === null || last <= markedUpTo.current) return;
     markedUpTo.current = last;
     markRead(chatId, last);
-  }, [chatId, messages, isViewportNewest, markRead]);
+  }, [chatId, messages, isViewportNewest, markRead, documentVisible]);
 
   useEffect(() => {
     const side = prefetchSide.current;

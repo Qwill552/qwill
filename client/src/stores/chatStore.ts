@@ -100,9 +100,9 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from '../features/messages/feedWindow';
-import { closeDesktopChatNotifications, isDesktopShell, notifyDesktop } from '../native/desktop';
+import { closeDesktopChatNotifications } from '../native/desktop';
 import { getSocket } from '../realtime/socket';
-import { playNotificationSound } from '../ui/notificationSound';
+import { notifyDesktopOfMessage } from '../app/desktopNotify';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
 
@@ -486,41 +486,6 @@ function scheduleOutboxRetry(drain: () => void): void {
     outboxRetryTimer = null;
     drain();
   }, nextRetryDelayMs(outboxRetryAttempt));
-}
-
-function desktopNotificationBody(message: MessageDto): string {
-  if (message.call) return message.call.status === 'DECLINED' ? 'Отклонённый звонок' : 'Звонок';
-  if (message.announcement) return `Новое обновление (${message.announcement.versionName})`;
-  if (message.content) return message.content;
-  if (message.attachment) {
-    const mimeType = message.attachment.file.mimeType;
-    if (mimeType.startsWith('audio/')) return 'Голосовое сообщение';
-    if (mimeType.startsWith('image/')) return 'Фото';
-    if (isPlayableVideoMimeType(mimeType)) return 'Видео';
-    return message.attachment.originalName || 'Файл';
-  }
-  return 'Новое сообщение';
-}
-
-function notifyDesktopIfNeeded(message: MessageDto, state: ChatState): void {
-  if (!isDesktopShell()) return;
-  if (message.sender?.id === state.myUserId) return;
-
-  const chat = state.chats.find((c) => c.id === message.chatId);
-  if (!chat || chat.muted) return;
-  if (state.activeChatId === message.chatId && document.hasFocus()) return;
-
-  const preview = desktopNotificationBody(message);
-  const body = chat.type === 'GROUP' && message.sender ? `${message.sender.displayName}: ${preview}` : preview;
-
-  notifyDesktop({
-    title: chat.title,
-    body,
-    chatId: message.chatId,
-    time: new Date(message.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-    avatarColor: chat.otherMember?.avatarColor ?? null,
-  });
-  playNotificationSound();
 }
 
 function isFeedLive(state: Pick<ChatState, 'viewportNewestByChat' | 'hasMoreAfterByChat'>, chatId: string): boolean {
@@ -2169,7 +2134,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     void writeCachedMessages([message]);
-    notifyDesktopIfNeeded(message, get());
+
+    const notifiedChat = get().chats.find((c) => c.id === message.chatId);
+    if (notifiedChat) notifyDesktopOfMessage(message, notifiedChat, get().activeChatId);
 
     const state = get();
     if (!state.chats.some((c) => c.id === message.chatId)) {

@@ -40,7 +40,20 @@ const TITLEBAR_SYMBOL_BY_THEME: Record<Theme, string> = {
   dark: '#eef1f7',
 };
 
+/** Фон кнопок окна равен полосе перетаскивания (`--surface` у DesktopTitleBar). Прозрачным
+ *  его оставлять нельзя: Windows рисует подсветку наведения поверх этого цвета, и на
+ *  «свернуть»/«развернуть» её просто не видно — подсвечивается только крестик, у которого
+ *  свой красный фон. */
+const TITLEBAR_BACKGROUND_BY_THEME: Record<Theme, string> = {
+  light: '#ffffff',
+  dark: '#141a2b',
+};
+
 let activeTheme: Theme = DEFAULT_STATE.theme;
+/** Окон теперь больше одного (плашка уведомления, D-13), и `getAllWindows()[0]` перестало
+ *  означать «главное»: по нему трей поднимал не то окно, а тема пыталась перекрасить
+ *  несуществующую полосу у плашки и падала на полпути. */
+let mainWindow: BrowserWindow | null = null;
 
 function stateFilePath(): string {
   return path.join(app.getPath('userData'), 'window-state.json');
@@ -163,7 +176,7 @@ export async function createMainWindow(
     backgroundColor: BACKGROUND_BY_THEME[state.theme],
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#00000000',
+      color: TITLEBAR_BACKGROUND_BY_THEME[state.theme],
       symbolColor: TITLEBAR_SYMBOL_BY_THEME[state.theme],
       height: TITLEBAR_HEIGHT,
     },
@@ -174,6 +187,11 @@ export async function createMainWindow(
       sandbox: true,
       autoplayPolicy: 'no-user-gesture-required',
     },
+  });
+
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null;
   });
 
   if (state.maximized) window.maximize();
@@ -194,13 +212,13 @@ export function windowTheme(): Theme {
 
 export function setWindowTitleTheme(theme: Theme): void {
   activeTheme = theme;
-  for (const window of BrowserWindow.getAllWindows()) {
-    window.setTitleBarOverlay({
-      color: '#00000000',
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitleBarOverlay({
+      color: TITLEBAR_BACKGROUND_BY_THEME[theme],
       symbolColor: TITLEBAR_SYMBOL_BY_THEME[theme],
       height: TITLEBAR_HEIGHT,
     });
-    window.setBackgroundColor(BACKGROUND_BY_THEME[theme]);
+    mainWindow.setBackgroundColor(BACKGROUND_BY_THEME[theme]);
   }
   try {
     writeFileSync(stateFilePath(), JSON.stringify({ ...readState(), theme }), 'utf8');
@@ -210,7 +228,7 @@ export function setWindowTitleTheme(theme: Theme): void {
 }
 
 export function enforceDesktopWidth(): void {
-  const [window] = BrowserWindow.getAllWindows();
+  const window = mainWindow;
   if (!window || window.isDestroyed()) return;
 
   const minimum = Math.ceil(MIN_WIDTH * window.webContents.getZoomFactor());
@@ -223,9 +241,15 @@ export function enforceDesktopWidth(): void {
 }
 
 export function focusExistingWindow(): void {
-  const [existing] = BrowserWindow.getAllWindows();
-  if (!existing) return;
+  const existing = mainWindow;
+  if (!existing || existing.isDestroyed()) return;
+
   if (existing.isMinimized()) existing.restore();
   existing.show();
+  existing.moveTop();
   existing.focus();
+}
+
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
 }
