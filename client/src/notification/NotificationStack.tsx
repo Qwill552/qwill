@@ -13,7 +13,7 @@ import { avatarGradientFor, avatarGradientForColor } from '../ui/tint';
 import styles from './NotificationStack.module.css';
 
 const VISIBLE_LIMIT = 3;
-const LIFETIME_MS = 6000;
+const LIFETIME_MS = 3000;
 const TICK_MS = 250;
 /** Длительность медленного затухания по бездействию — как `notifySlowHide` у Telegram
  *  Desktop. Должна совпадать с `--dur-notify-hide`, иначе карточка исчезнет раньше, чем
@@ -113,6 +113,10 @@ export function NotificationStack() {
           className={`${styles.card} ${item.fading ? styles.fading : ''}`}
           role="button"
           tabIndex={-1}
+          onAnimationEnd={() => {
+            if (!item.fading) return;
+            setItems((current) => current.filter((candidate) => candidate.id !== item.id));
+          }}
           onClick={() => {
             openNotificationPopup(item.chatId);
             setItems((current) => current.filter((candidate) => candidate.chatId !== item.chatId));

@@ -15,9 +15,15 @@ import {
 import { pickScreenSource, registerScreenSourcePicker } from './screenSources';
 import { createTray, installCloseToTray } from './tray';
 import { registerUpdater, startUpdater } from './updater';
-import { createMainWindow, enforceDesktopWidth, focusExistingWindow, setWindowTitleTheme } from './window';
+import {
+  createMainWindow,
+  enforceDesktopWidth,
+  focusExistingWindow,
+  registerWindowControls,
+  setWindowTitleTheme,
+} from './window';
 
-app.setAppUserModelId(APP_USER_MODEL_ID);
+if (app.isPackaged) app.setAppUserModelId(APP_USER_MODEL_ID);
 registerAppScheme();
 registerDeepLinkProtocol();
 
@@ -55,6 +61,7 @@ if (!app.requestSingleInstanceLock()) {
     setPopupTheme(theme);
   });
 
+  registerWindowControls();
   registerUpdater();
   registerNotifications();
   registerNotificationPopup();

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { BrowserWindow, app, screen, shell } from 'electron';
+import { BrowserWindow, app, ipcMain, screen, shell } from 'electron';
 
 import { appIcon } from './appIcon';
 import { APP_ORIGIN } from './protocol';
@@ -28,25 +28,16 @@ const DEFAULT_STATE: WindowState = {
 const MIN_WIDTH = 900;
 const MIN_HEIGHT = 560;
 const SAVE_DEBOUNCE_MS = 400;
-const TITLEBAR_HEIGHT = 32;
+
+const MINIMIZE_CHANNEL = 'qwill:window-minimize';
+const TOGGLE_MAXIMIZE_CHANNEL = 'qwill:window-toggle-maximize';
+const CLOSE_CHANNEL = 'qwill:window-close';
+const MAXIMIZED_CHANNEL = 'qwill:window-maximized';
+const MAXIMIZED_CHANGED_CHANNEL = 'qwill:window-maximized-changed';
 
 const BACKGROUND_BY_THEME: Record<Theme, string> = {
   light: '#eef1f6',
   dark: '#0a0c12',
-};
-
-const TITLEBAR_SYMBOL_BY_THEME: Record<Theme, string> = {
-  light: '#1c202d',
-  dark: '#eef1f7',
-};
-
-/** Фон кнопок окна равен полосе перетаскивания (`--surface` у DesktopTitleBar). Прозрачным
- *  его оставлять нельзя: Windows рисует подсветку наведения поверх этого цвета, и на
- *  «свернуть»/«развернуть» её просто не видно — подсвечивается только крестик, у которого
- *  свой красный фон. */
-const TITLEBAR_BACKGROUND_BY_THEME: Record<Theme, string> = {
-  light: '#ffffff',
-  dark: '#141a2b',
 };
 
 let activeTheme: Theme = DEFAULT_STATE.theme;
@@ -175,11 +166,6 @@ export async function createMainWindow(
     icon: appIcon(),
     backgroundColor: BACKGROUND_BY_THEME[state.theme],
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: TITLEBAR_BACKGROUND_BY_THEME[state.theme],
-      symbolColor: TITLEBAR_SYMBOL_BY_THEME[state.theme],
-      height: TITLEBAR_HEIGHT,
-    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -193,6 +179,13 @@ export async function createMainWindow(
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
   });
+
+  const reportMaximized = (): void => {
+    if (window.isDestroyed()) return;
+    window.webContents.send(MAXIMIZED_CHANGED_CHANNEL, window.isMaximized());
+  };
+  window.on('maximize', reportMaximized);
+  window.on('unmaximize', reportMaximized);
 
   if (state.maximized) window.maximize();
 
@@ -213,11 +206,6 @@ export function windowTheme(): Theme {
 export function setWindowTitleTheme(theme: Theme): void {
   activeTheme = theme;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setTitleBarOverlay({
-      color: TITLEBAR_BACKGROUND_BY_THEME[theme],
-      symbolColor: TITLEBAR_SYMBOL_BY_THEME[theme],
-      height: TITLEBAR_HEIGHT,
-    });
     mainWindow.setBackgroundColor(BACKGROUND_BY_THEME[theme]);
   }
   try {
@@ -252,4 +240,23 @@ export function focusExistingWindow(): void {
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+}
+
+export function registerWindowControls(): void {
+  ipcMain.on(MINIMIZE_CHANNEL, () => {
+    getMainWindow()?.minimize();
+  });
+
+  ipcMain.on(TOGGLE_MAXIMIZE_CHANNEL, () => {
+    const window = getMainWindow();
+    if (!window) return;
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
+  });
+
+  ipcMain.on(CLOSE_CHANNEL, () => {
+    getMainWindow()?.close();
+  });
+
+  ipcMain.handle(MAXIMIZED_CHANNEL, () => getMainWindow()?.isMaximized() ?? false);
 }

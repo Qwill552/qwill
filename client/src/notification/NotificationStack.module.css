@@ -140,7 +140,7 @@
 /* Единственное, что анимируется, — прозрачность: её ведёт композитор, раскладка не
    пересчитывается ни разу (ux-ui/motion-cost.md). */
 .fading {
-  animation: fadeOut var(--dur-notify-hide) linear forwards;
+  animation: fadeOut var(--dur-notify-hide) cubic-bezier(0.55, 0, 1, 0.45) forwards;
 }
 
 @keyframes fadeOut {

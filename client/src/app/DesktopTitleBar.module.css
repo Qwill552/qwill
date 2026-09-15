@@ -3,8 +3,49 @@
   top: 0;
   left: 0;
   right: 0;
+  display: flex;
   height: var(--titlebar-h);
+  justify-content: flex-end;
   background: var(--surface);
   -webkit-app-region: drag;
   z-index: 2147483001;
+}
+
+.controls {
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+
+.button {
+  display: grid;
+  width: 46px;
+  height: var(--titlebar-h);
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    background var(--dur-tab) var(--ease-screen),
+    color var(--dur-tab) var(--ease-screen);
+}
+
+.button:hover {
+  background: var(--hover-row);
+}
+
+.button:active {
+  background: var(--hover-row);
+  color: var(--text-secondary);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.close:hover,
+.close:active {
+  background: var(--danger);
+  color: var(--text-on-primary);
 }

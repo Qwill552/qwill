@@ -19,6 +19,11 @@ const AUTOSTART_GET_CHANNEL = 'qwill:autostart-get';
 const AUTOSTART_SET_CHANNEL = 'qwill:autostart-set';
 const DEEP_LINK_CHANNEL = 'qwill:deep-link';
 const DEEP_LINK_PENDING_CHANNEL = 'qwill:deep-link-pending';
+const WINDOW_MINIMIZE_CHANNEL = 'qwill:window-minimize';
+const WINDOW_TOGGLE_MAXIMIZE_CHANNEL = 'qwill:window-toggle-maximize';
+const WINDOW_CLOSE_CHANNEL = 'qwill:window-close';
+const WINDOW_MAXIMIZED_CHANNEL = 'qwill:window-maximized';
+const WINDOW_MAXIMIZED_CHANGED_CHANNEL = 'qwill:window-maximized-changed';
 
 contextBridge.exposeInMainWorld('qwill', {
   isDesktop: true,
@@ -75,6 +80,25 @@ contextBridge.exposeInMainWorld('qwill', {
     };
   },
   getPendingDeepLink: (): Promise<unknown> => ipcRenderer.invoke(DEEP_LINK_PENDING_CHANNEL),
+  windowControls: {
+    minimize: (): void => {
+      ipcRenderer.send(WINDOW_MINIMIZE_CHANNEL);
+    },
+    toggleMaximize: (): void => {
+      ipcRenderer.send(WINDOW_TOGGLE_MAXIMIZE_CHANNEL);
+    },
+    close: (): void => {
+      ipcRenderer.send(WINDOW_CLOSE_CHANNEL);
+    },
+    isMaximized: (): Promise<boolean> => ipcRenderer.invoke(WINDOW_MAXIMIZED_CHANNEL) as Promise<boolean>,
+    onMaximizedChange: (handler: (maximized: unknown) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, maximized: unknown): void => handler(maximized);
+      ipcRenderer.on(WINDOW_MAXIMIZED_CHANGED_CHANNEL, listener);
+      return () => {
+        ipcRenderer.removeListener(WINDOW_MAXIMIZED_CHANGED_CHANNEL, listener);
+      };
+    },
+  },
 });
 
 function subscribe(channel: string, handler: (payload: unknown) => void): () => void {

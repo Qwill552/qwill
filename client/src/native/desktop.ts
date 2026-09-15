@@ -48,6 +48,14 @@ export interface DesktopDeepLinkTarget {
   id: string;
 }
 
+export interface DesktopWindowControls {
+  minimize(): void;
+  toggleMaximize(): void;
+  close(): void;
+  isMaximized(): Promise<boolean>;
+  onMaximizedChange(handler: (maximized: unknown) => void): () => void;
+}
+
 export interface DesktopBridge {
   isDesktop: true;
   getVersion(): Promise<string>;
@@ -62,6 +70,7 @@ export interface DesktopBridge {
   autostart?: DesktopAutostartBridge;
   onDeepLink?(handler: (target: unknown) => void): () => void;
   getPendingDeepLink?(): Promise<unknown>;
+  windowControls?: DesktopWindowControls;
 }
 
 declare global {
@@ -248,6 +257,34 @@ export function subscribeToDesktopDeepLinks(handler: (target: DesktopDeepLinkTar
     const target = parseDeepLinkTarget(raw);
     if (target) handler(target);
   });
+}
+
+export function hasDesktopWindowControls(): boolean {
+  return desktopBridge()?.windowControls !== undefined;
+}
+
+export function minimizeDesktopWindow(): void {
+  desktopBridge()?.windowControls?.minimize();
+}
+
+export function toggleDesktopWindowMaximized(): void {
+  desktopBridge()?.windowControls?.toggleMaximize();
+}
+
+export function closeDesktopWindow(): void {
+  desktopBridge()?.windowControls?.close();
+}
+
+export function getDesktopWindowMaximized(): Promise<boolean> {
+  const controls = desktopBridge()?.windowControls;
+  if (!controls) return Promise.resolve(false);
+  return controls.isMaximized().catch(() => false);
+}
+
+export function subscribeToDesktopWindowMaximized(handler: (maximized: boolean) => void): () => void {
+  const controls = desktopBridge()?.windowControls;
+  if (!controls) return () => undefined;
+  return controls.onMaximizedChange((raw) => handler(raw === true));
 }
 
 export function getPendingDesktopDeepLink(): Promise<DesktopDeepLinkTarget | null> {
