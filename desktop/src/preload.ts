@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 const SCREEN_SOURCES_CHANNEL = 'qwill:screen-sources';
 const SCREEN_SOURCE_CHOSEN_CHANNEL = 'qwill:screen-source-chosen';
+const UPDATER_STATE_CHANNEL = 'qwill:updater-state';
+const UPDATER_CHECK_CHANNEL = 'qwill:updater-check';
+const UPDATER_INSTALL_CHANNEL = 'qwill:updater-install';
 
 contextBridge.exposeInMainWorld('qwill', {
   isDesktop: true,
@@ -19,5 +22,19 @@ contextBridge.exposeInMainWorld('qwill', {
   },
   chooseScreenSource: (requestId: number, sourceId: string | null): void => {
     ipcRenderer.send(SCREEN_SOURCE_CHOSEN_CHANNEL, { requestId, sourceId });
+  },
+  updater: {
+    getState: (): Promise<unknown> => ipcRenderer.invoke(UPDATER_STATE_CHANNEL) as Promise<unknown>,
+    check: (): Promise<void> => ipcRenderer.invoke(UPDATER_CHECK_CHANNEL) as Promise<void>,
+    quitAndInstall: (): void => {
+      ipcRenderer.send(UPDATER_INSTALL_CHANNEL);
+    },
+    onState: (handler: (state: unknown) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, state: unknown): void => handler(state);
+      ipcRenderer.on(UPDATER_STATE_CHANNEL, listener);
+      return () => {
+        ipcRenderer.removeListener(UPDATER_STATE_CHANNEL, listener);
+      };
+    },
   },
 });

@@ -11,6 +11,8 @@ const repoRoot = path.resolve(desktopDir, '..');
 const clientDist = path.join(repoRoot, 'client', 'dist');
 const rendererDir = path.join(desktopDir, 'renderer');
 const apiConfigFile = path.join(desktopDir, 'api-origin.json');
+const devUpdateConfigFile = path.join(desktopDir, 'dev-app-update.yml');
+const UPDATER_CACHE_DIR_NAME = 'qwill-updater';
 
 const MKCERT_DIR = path.join(homedir(), '.vite-plugin-mkcert');
 
@@ -47,6 +49,11 @@ await rm(rendererDir, { recursive: true, force: true });
 await mkdir(path.dirname(rendererDir), { recursive: true });
 await cp(clientDist, rendererDir, { recursive: true });
 await writeFile(apiConfigFile, `${JSON.stringify({ apiUrl }, null, 2)}\n`, 'utf8');
+await writeFile(
+  devUpdateConfigFile,
+  ['provider: generic', `url: ${apiUrl}/api/app/win`, `updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`, ''].join('\n'),
+  'utf8',
+);
 
 run('npm', ['run', 'build', '-w', '@messenger/desktop'], repoRoot, process.env);
 

@@ -7,12 +7,14 @@ import { ApiError } from '../api/client';
 import { uploadFile } from '../api/files';
 import { isApkUpdateSupported, selectUpdateAvailable, useAppUpdateStore } from '../app/appUpdate';
 import card from '../app/desktopCard.module.css';
+import { useDesktopUpdateStore } from '../app/desktopUpdate';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { countPendingOutbox } from '../cache/outbox';
 import { formatBytes } from '../features/messages/Attachment';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { Modal } from '../features/groups/Modal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
+import { DesktopUpdateRow } from '../features/updates/DesktopUpdateRow';
 import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { Avatar } from '../ui/Avatar';
@@ -69,6 +71,8 @@ export function SettingsScreen() {
   const updateAvailable = useAppUpdateStore(selectUpdateAvailable);
   const currentVersionName = useAppUpdateStore((s) => s.currentVersionName);
   const openUpdateModal = useAppUpdateStore((s) => s.openModal);
+  const desktopVersion = useDesktopUpdateStore((s) => s.currentVersion);
+  const shownVersionName = desktopVersion ?? (isApkUpdateSupported() ? currentVersionName : null);
 
   async function uploadAvatar(file: File): Promise<void> {
     setAvatarUploading(true);
@@ -220,6 +224,8 @@ export function SettingsScreen() {
           />
         </Card>
 
+        <DesktopUpdateRow className={styles.cardReset} />
+
         {updateAvailable && updateInfo && (
           <Card className={styles.cardReset}>
             <Card.Row
@@ -261,9 +267,9 @@ export function SettingsScreen() {
         </Card>
 
         <p className={styles.version}>
-          {isApkUpdateSupported() && currentVersionName && (
+          {shownVersionName && (
             <>
-              <span>Qwill {currentVersionName}</span>
+              <span>Qwill {shownVersionName}</span>
               <span aria-hidden="true">·</span>
             </>
           )}

@@ -10,6 +10,7 @@ import { keepDesktopWidth } from '../native/desktop';
 import { applyDesktopListWidth, useDesktopColumnsStore } from '../stores/desktopColumnsStore';
 import { AmbientBlobs } from './AmbientBlobs';
 import { useAppUpdateStore } from './appUpdate';
+import { useDesktopUpdateStore } from './desktopUpdate';
 import { ScreenStack } from './ScreenStack';
 import styles from './AppShell.module.css';
 import { TabBar } from './TabBar';
@@ -23,6 +24,7 @@ export function AppShell() {
   const checkAppUpdate = useAppUpdateStore((s) => s.check);
   const updateModalOpen = useAppUpdateStore((s) => s.modalOpen);
   const closeUpdateModal = useAppUpdateStore((s) => s.closeModal);
+  const initDesktopUpdate = useDesktopUpdateStore((s) => s.init);
   const layout = useLayoutMode();
   const listWidth = useDesktopColumnsStore((s) => s.listWidth);
 
@@ -35,6 +37,8 @@ export function AppShell() {
   }, [checkAppUpdate]);
 
   useEffect(() => keepDesktopWidth(DESKTOP_MIN_WIDTH), []);
+
+  useEffect(() => initDesktopUpdate(), [initDesktopUpdate]);
 
   return (
     <div className={`${styles.shell} ${layout === 'desktop' ? styles.desktop : ''}`}>

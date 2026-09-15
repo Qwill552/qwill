@@ -11,17 +11,17 @@ docs/
 .design-sync/
 .claude/
 
-repair/
+/repair/
 repair.md
-profile-media/
+/profile-media/
 profile-media.md
-ux-ui/
+/ux-ui/
 ux-ui.md
-cache/
+/cache/
 cache.md
-calls/
+/calls/
 calls.md
-updates/
+/updates/
 updates.md
 native.md
 STAGES.md
@@ -81,6 +81,7 @@ release.tar.gz
 
 desktop/renderer/
 desktop/api-origin.json
+desktop/dev-app-update.yml
 
 client/android/.gradle/
 client/android/local.properties

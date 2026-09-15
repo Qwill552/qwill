@@ -11,6 +11,22 @@ export interface DesktopScreenSourceRequest {
   sources: DesktopScreenSource[];
 }
 
+export type DesktopUpdaterState =
+  | { phase: 'disabled' }
+  | { phase: 'idle' }
+  | { phase: 'checking' }
+  | { phase: 'latest' }
+  | { phase: 'downloading'; version: string; percent: number }
+  | { phase: 'ready'; version: string }
+  | { phase: 'error'; message: string };
+
+export interface DesktopUpdaterBridge {
+  getState(): Promise<unknown>;
+  check(): Promise<void>;
+  quitAndInstall(): void;
+  onState(handler: (state: unknown) => void): () => void;
+}
+
 export interface DesktopBridge {
   isDesktop: true;
   getVersion(): Promise<string>;
@@ -18,6 +34,7 @@ export interface DesktopBridge {
   ensureDesktopWidth?(): Promise<void>;
   onScreenSourceRequest?(handler: (request: unknown) => void): () => void;
   chooseScreenSource?(requestId: number, sourceId: string | null): void;
+  updater?: DesktopUpdaterBridge;
 }
 
 declare global {
@@ -92,4 +109,64 @@ export function subscribeToScreenSourceRequests(handler: (request: DesktopScreen
 
 export function chooseDesktopScreenSource(requestId: number, sourceId: string | null): void {
   desktopBridge()?.chooseScreenSource?.(requestId, sourceId);
+}
+
+function parseUpdaterState(raw: unknown): DesktopUpdaterState | null {
+  const candidate = raw as { phase?: unknown; version?: unknown; percent?: unknown; message?: unknown } | null;
+  if (!candidate || typeof candidate.phase !== 'string') return null;
+
+  switch (candidate.phase) {
+    case 'disabled':
+    case 'idle':
+    case 'checking':
+    case 'latest':
+      return { phase: candidate.phase };
+    case 'ready':
+      return typeof candidate.version === 'string' ? { phase: 'ready', version: candidate.version } : null;
+    case 'downloading':
+      return typeof candidate.version === 'string'
+        ? {
+            phase: 'downloading',
+            version: candidate.version,
+            percent: typeof candidate.percent === 'number' ? candidate.percent : 0,
+          }
+        : null;
+    case 'error':
+      return {
+        phase: 'error',
+        message: typeof candidate.message === 'string' ? candidate.message : 'Не удалось проверить обновление',
+      };
+    default:
+      return null;
+  }
+}
+
+export function isDesktopUpdaterAvailable(): boolean {
+  return desktopBridge()?.updater !== undefined;
+}
+
+export function getDesktopUpdaterState(): Promise<DesktopUpdaterState | null> {
+  const updater = desktopBridge()?.updater;
+  if (!updater) return Promise.resolve(null);
+  return updater
+    .getState()
+    .then(parseUpdaterState)
+    .catch(() => null);
+}
+
+export function subscribeToDesktopUpdater(handler: (state: DesktopUpdaterState) => void): () => void {
+  const updater = desktopBridge()?.updater;
+  if (!updater) return () => undefined;
+  return updater.onState((raw) => {
+    const state = parseUpdaterState(raw);
+    if (state) handler(state);
+  });
+}
+
+export function checkDesktopUpdate(): void {
+  void desktopBridge()?.updater?.check().catch(() => undefined);
+}
+
+export function installDesktopUpdate(): void {
+  desktopBridge()?.updater?.quitAndInstall();
 }
