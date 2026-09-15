@@ -28,3 +28,7 @@ export function appIcon(): NativeImage {
 export function trayIcon(): NativeImage {
   return appIcon().resize({ width: TRAY_SIZE, height: TRAY_SIZE });
 }
+
+export function windowIcon(): NativeImage {
+  return appIcon().resize({ width: 32, height: 32 });
+}

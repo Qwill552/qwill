@@ -113,8 +113,8 @@ export function NotificationStack() {
           className={`${styles.card} ${item.fading ? styles.fading : ''}`}
           role="button"
           tabIndex={-1}
-          onAnimationEnd={() => {
-            if (!item.fading) return;
+          onTransitionEnd={(event) => {
+            if (event.target !== event.currentTarget || !item.fading) return;
             setItems((current) => current.filter((candidate) => candidate.id !== item.id));
           }}
           onClick={() => {

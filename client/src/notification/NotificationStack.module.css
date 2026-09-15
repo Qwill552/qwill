@@ -22,12 +22,12 @@
   padding: var(--space-3) var(--space-4);
   gap: var(--space-3);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-card);
   /* Окно плашки прозрачное: размывать под собой нечего, поэтому фон сплошной, а не стекло. */
   background: var(--card-bg);
   box-shadow: var(--card-shadow);
   cursor: pointer;
   animation: slideIn var(--dur-menu) var(--ease-spring);
+  transition: opacity var(--dur-tab) var(--ease-screen);
 }
 
 .card:focus-visible {
@@ -140,17 +140,8 @@
 /* Единственное, что анимируется, — прозрачность: её ведёт композитор, раскладка не
    пересчитывается ни разу (ux-ui/motion-cost.md). */
 .fading {
-  animation: fadeOut var(--dur-notify-hide) cubic-bezier(0.55, 0, 1, 0.45) forwards;
-}
-
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
+  opacity: 0;
+  transition: opacity var(--dur-notify-hide) cubic-bezier(0.55, 0, 1, 0.45);
 }
 
 @keyframes slideIn {

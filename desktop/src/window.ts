@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { BrowserWindow, app, ipcMain, screen, shell } from 'electron';
 
-import { appIcon } from './appIcon';
+import { windowIcon } from './appIcon';
 import { APP_ORIGIN } from './protocol';
 
 type Theme = 'light' | 'dark';
@@ -163,7 +163,7 @@ export async function createMainWindow(
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     show: false,
-    icon: appIcon(),
+    icon: windowIcon(),
     backgroundColor: BACKGROUND_BY_THEME[state.theme],
     titleBarStyle: 'hidden',
     webPreferences: {

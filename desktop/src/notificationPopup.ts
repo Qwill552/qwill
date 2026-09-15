@@ -54,6 +54,7 @@ function createPopup(): BrowserWindow {
     skipTaskbar: true,
     focusable: false,
     hasShadow: false,
+    roundedCorners: false,
     alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
