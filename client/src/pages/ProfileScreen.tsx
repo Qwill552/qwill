@@ -10,11 +10,13 @@ import { useLayoutMode } from '../app/useLayoutMode';
 import { AvatarCropSheet } from '../features/media/AvatarCropSheet';
 import { openAvatarViewer } from '../features/media/avatarViewerStore';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
+import { openQrInvite } from '../features/profile/qrInviteStore';
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfileStore } from '../stores/userProfileStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { Icon, type IconName } from '../ui/Icon';
+import { IconButton } from '../ui/IconButton';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import { formatBirthday } from '../utils/presence';
 import styles from './ProfileScreen.module.css';
@@ -80,6 +82,14 @@ export function ProfileScreen() {
 
   return (
     <div className={styles.screen}>
+      {!isDesktop && (
+        <IconButton
+          className={styles.qrButton}
+          icon="qrcode"
+          label="Мой QR-код"
+          onClick={openQrInvite}
+        />
+      )}
       <div
         ref={scrollerRef}
         className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}

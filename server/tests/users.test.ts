@@ -136,6 +136,37 @@ describe('users profile/settings (этап 8)', () => {
     });
   });
 
+  describe('GET /users/by-username/:username/profile (D-10)', () => {
+    it('отдаёт профиль по нику, без разницы в регистре', async () => {
+      const owner = await registerUser('byname', 'Ссылочный');
+      const guest = await registerUser('bynameg', 'Гость');
+      const username = `stage8_${RUN_ID}_byname`;
+
+      const res = await request
+        .get(`/api/users/by-username/${username.toUpperCase()}/profile`)
+        .set('Authorization', `Bearer ${guest.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(owner.userId);
+      expect(res.body.username).toBe(username);
+    });
+
+    it('отвечает 404 на несуществующий ник', async () => {
+      const { token } = await registerUser('byname404', 'Искатель');
+
+      const res = await request
+        .get(`/api/users/by-username/nobody_${RUN_ID}/profile`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it('не пускает без токена', async () => {
+      const res = await request.get(`/api/users/by-username/stage8_${RUN_ID}_byname/profile`);
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe('POST /users/me/avatar', () => {
     it('сохраняет файл, avatarUrl меняется', async () => {
       const { token, userId } = await registerUser('avatar', 'Аватарный');

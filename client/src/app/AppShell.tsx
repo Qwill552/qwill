@@ -5,6 +5,7 @@ import { CallOverlay } from '../features/calls/CallOverlay';
 import { ScreenSourcePicker } from '../features/calls/ScreenSourcePicker';
 import { AvatarViewer } from '../features/media/AvatarViewer';
 import { MediaViewer } from '../features/media/MediaViewer';
+import { QrInviteModal } from '../features/profile/QrInviteModal';
 import { RequiredUpdateModal, UpdateModal } from '../features/updates/UpdateModal';
 import { keepDesktopWidth } from '../native/desktop';
 import { applyDesktopListWidth, useDesktopColumnsStore } from '../stores/desktopColumnsStore';
@@ -55,6 +56,7 @@ export function AppShell() {
       <ScreenSourcePicker />
       <MediaViewer />
       <AvatarViewer />
+      <QrInviteModal />
       <AdminReauthGate />
       {updateModalOpen && <UpdateModal onClose={closeUpdateModal} />}
       <RequiredUpdateModal />

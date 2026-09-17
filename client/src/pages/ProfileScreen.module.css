@@ -138,3 +138,10 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.qrButton {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--safe-top) + 6px);
+  right: calc(var(--safe-right) + 6px);
+}

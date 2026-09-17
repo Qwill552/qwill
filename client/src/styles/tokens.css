@@ -218,6 +218,11 @@
 }
 
 :root {
+  --qr-paper: #ffffff;
+  --qr-ink: #10131c;
+}
+
+:root {
   --code-bg: #10131c;
   --code-ink: #d7dcea;
   --code-ink-dim: #7b8399;

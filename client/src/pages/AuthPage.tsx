@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ApiError } from '../api/client';
 import { getCurrentLegalVersionsRequest } from '../api/legal';
+import { takePendingInvite } from '../app/pendingInvite';
 import { ConsentDialog } from '../features/auth/ConsentDialog';
 import { SkyScene } from '../features/auth/SkyScene';
 import { useAuthStore } from '../stores/authStore';
@@ -45,7 +46,7 @@ export function AuthPage() {
   const [consentPending, setConsentPending] = useState(false);
 
   useEffect(() => {
-    if (status === 'authenticated') navigate('/chats', { replace: true });
+    if (status === 'authenticated') navigate(takePendingInvite() ?? '/chats', { replace: true });
   }, [status, navigate]);
 
   useEffect(() => {

@@ -129,6 +129,12 @@ export async function getUserProfile(id: string): Promise<UserProfileDto> {
   return toUserProfile(user, await cardUrlForProfile(user));
 }
 
+export async function getUserProfileByUsername(username: string): Promise<UserProfileDto> {
+  const user = await prisma.user.findUnique({ where: { username: username.trim().toLowerCase() } });
+  if (!user || user.isService) throw notFound(ErrorCode.NOT_FOUND, 'Пользователь не найден');
+  return toUserProfile(user, await cardUrlForProfile(user));
+}
+
 function emptyToNull(value: string | null | undefined): string | null | undefined {
   return value === '' ? null : value;
 }

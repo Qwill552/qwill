@@ -576,7 +576,6 @@ export function ProfileEditScreen() {
         <ChromeBar>
           <GlassButton icon="back" label="Назад в профиль" onClick={() => navigate('/profile')} />
           <GlassPill title="Изменить профиль" />
-          <GlassButton icon="qrcode" label="QR-код профиля" disabled aria-disabled="true" />
         </ChromeBar>
       )}
     </div>

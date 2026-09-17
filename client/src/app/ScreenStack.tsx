@@ -37,7 +37,7 @@ import { ProfileEditScreen } from '../pages/ProfileEditScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StorageScreen } from '../pages/StorageScreen';
-import { StubScreen } from '../pages/StubScreen';
+import { UserLinkScreen } from '../pages/UserLinkScreen';
 import { UserProfileScreen } from '../pages/UserProfileScreen';
 import {
   applyDesktopListWidth,
@@ -48,6 +48,7 @@ import {
 import { AdminChatView } from '../features/admin/AdminChatView';
 import { IpBansScreen } from '../features/admin/IpBansScreen';
 import { ChatInfoCard } from '../features/chat/ChatInfoCard';
+import { openQrInvite } from '../features/profile/qrInviteStore';
 import { IconButton } from '../ui/IconButton';
 import { DesktopScreenModal } from './DesktopScreenModal';
 import { EmptyChatColumn } from './EmptyChatColumn';
@@ -115,10 +116,12 @@ const OVERLAY_SUBROUTE_TITLE: Record<string, string> = {
 };
 
 const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
-  '/profile/edit': <IconButton icon="qrcode" label="QR-код профиля" disabled aria-disabled="true" />,
+  '/profile': <IconButton icon="qrcode" label="Мой QR-код" onClick={openQrInvite} />,
 };
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
+  if (matchPath('/u/:username', pathname)) return { title: 'Профиль', backTo: null };
+  if (matchPath('/contacts/:userId', pathname)) return { title: 'Профиль', backTo: '/contacts' };
   if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
   if (matchPath('/admin/ip-bans', pathname)) return { title: 'Блокировки IP', backTo: '/admin' };
   if (matchPath('/admin/chats/:chatId', pathname)) return { title: 'Режим чтения', backTo: '/admin' };
@@ -145,7 +148,7 @@ const RouteSwitch = memo(
         <Route path="/contacts" element={<ContactsScreen />} />
         <Route
           path="/contacts/:userId"
-          element={<StubScreen title="Контакт" backTo="/contacts" />}
+          element={<UserProfileScreen backTo="/contacts" backLabel="Назад в контакты" canMessage />}
         />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/settings/appearance" element={<AppearanceScreen />} />
@@ -154,11 +157,15 @@ const RouteSwitch = memo(
         <Route path="/settings/advanced" element={<AdvancedScreen />} />
         <Route path="/settings/developer" element={<DeveloperScreen />} />
         <Route path="/settings/developer/call-trace" element={<CallTraceScreen />} />
+        <Route path="/u/:username" element={<UserLinkScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="/profile/edit" element={<ProfileEditScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/users/:id" element={<AdminUserScreen />} />
-        <Route path="/admin/users/:id/profile" element={<UserProfileScreen />} />
+        <Route
+          path="/admin/users/:id/profile"
+          element={<UserProfileScreen backTo="/admin" backLabel="Назад в админ-панель" />}
+        />
         <Route path="/admin/log" element={<AdminLogScreen />} />
         <Route path="/admin/ip-bans" element={<IpBansScreen />} />
         <Route path="/admin/chats/:chatId" element={<AdminChatView />} />
