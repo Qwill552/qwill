@@ -16,7 +16,7 @@ const DIRECTORY_ENTRY_BYTES = 16;
 const MAX_BYTE_SIZE = 256;
 
 const TARGETS = [
-  { source: 'qwill-black.png', file: 'icon.ico', what: 'exe, установщик, ярлык' },
+  { source: 'qwill.png', file: 'icon.ico', what: 'exe, установщик, ярлык, меню Пуск' },
   { source: 'qwill-no-background.png', file: 'window.ico', what: 'окно, панель задач, трей' },
 ];
 
