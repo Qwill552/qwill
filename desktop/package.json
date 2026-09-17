@@ -3,7 +3,7 @@
   "productName": "Qwill",
   "description": "Qwill — мессенджер для Windows",
   "author": "Qwill",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "commonjs",
   "main": "dist/main.js",
