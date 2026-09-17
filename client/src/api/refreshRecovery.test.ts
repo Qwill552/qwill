@@ -23,13 +23,12 @@ function authBody(csrfToken: string) {
 
 function recordingFetch(statuses: number[]): { calls: Call[]; fetch: typeof fetch } {
   const calls: Call[] = [];
-  let index = 0;
+  const queue = [...statuses];
 
   const impl = (_input: unknown, init?: RequestInit): Promise<Response> => {
     const headers = (init?.headers ?? {}) as Record<string, string>;
     calls.push({ csrf: headers['X-CSRF-Token'] ?? null });
-    const status = statuses[Math.min(index, statuses.length - 1)];
-    index += 1;
+    const status = queue.length > 1 ? (queue.shift() as number) : (queue[0] as number);
     if (status === 200) return Promise.resolve(jsonResponse(200, authBody('csrf-new')));
     return Promise.resolve(
       jsonResponse(status, { error: { code: 'FORBIDDEN', message: 'Проверка запроса не пройдена' } }),
@@ -37,6 +36,12 @@ function recordingFetch(statuses: number[]): { calls: Call[]; fetch: typeof fetc
   };
 
   return { calls, fetch: impl as unknown as typeof fetch };
+}
+
+function csrfOf(calls: Call[], index: number): string | null {
+  const call = calls[index];
+  if (!call) throw new Error(`нет запроса №${index}`);
+  return call.csrf;
 }
 
 describe('восстановление после расхождения CSRF', () => {
@@ -52,8 +57,8 @@ describe('восстановление после расхождения CSRF', 
     const response = await refreshRequest();
 
     expect(calls).toHaveLength(2);
-    expect(calls[0].csrf).toBe('csrf-stale');
-    expect(calls[1].csrf).toBeNull();
+    expect(csrfOf(calls, 0)).toBe('csrf-stale');
+    expect(csrfOf(calls, 1)).toBeNull();
     expect(response.csrfToken).toBe('csrf-new');
     expect(localStorage.getItem(CSRF_KEY)).toBeNull();
   });
@@ -73,6 +78,6 @@ describe('восстановление после расхождения CSRF', 
     await refreshRequest();
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].csrf).toBe('csrf-stale');
+    expect(csrfOf(calls, 0)).toBe('csrf-stale');
   });
 });
