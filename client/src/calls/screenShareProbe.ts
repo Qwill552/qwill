@@ -6,7 +6,7 @@ const PROBE_DELAYS_MS = [2000, 5000, 10000];
 
 const MODE_LABEL: Record<ScreenShareChangeMode, string> = {
   replace: 'подмена трека',
-  republish: 'переиздание трека',
+  republish: 'гашение прежнего захвата',
 };
 
 let changeCount = 0;

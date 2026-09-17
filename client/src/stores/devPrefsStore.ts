@@ -23,9 +23,9 @@ function writeStored(enabled: boolean): void {
 
 function readStoredScreenShareChangeMode(): ScreenShareChangeMode {
   try {
-    return localStorage.getItem(SCREEN_SHARE_MODE_KEY) === 'republish' ? 'republish' : 'replace';
+    return localStorage.getItem(SCREEN_SHARE_MODE_KEY) === 'replace' ? 'replace' : 'republish';
   } catch {
-    return 'replace';
+    return 'republish';
   }
 }
 

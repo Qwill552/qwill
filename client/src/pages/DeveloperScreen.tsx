@@ -47,13 +47,13 @@ export function DeveloperScreen() {
           <Card.Row
             icon="retry"
             tint="orange"
-            title="Переиздавать трек при смене источника"
-            subtitle="Вместо подмены — снять демонстрацию и включить заново"
+            title="Гасить прежний захват при смене источника"
+            subtitle="Выключено — старая подмена трека, с перекрытием двух захватов"
             trailing={
               <Switch
                 checked={screenShareChangeMode === 'republish'}
                 onChange={(checked) => setScreenShareChangeMode(checked ? 'republish' : 'replace')}
-                label="Переиздавать трек при смене источника"
+                label="Гасить прежний захват при смене источника"
               />
             }
           />
