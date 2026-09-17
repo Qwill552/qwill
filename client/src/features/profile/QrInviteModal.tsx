@@ -74,7 +74,7 @@ function QrInviteCard({ displayName, username, avatarUrl, avatarColor, onClose }
   }
 
   return (
-    <Modal title="Мой QR-код" onClose={onClose}>
+    <Modal title="Мой QR-код" onClose={onClose} className={styles.overlay}>
       <div className={styles.body}>
         <Avatar label={displayName} avatarUrl={avatarUrl} size={64} color={avatarColor} />
         <span className={styles.name}>{displayName}</span>

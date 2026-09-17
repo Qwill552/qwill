@@ -30,11 +30,13 @@ android {
     productFlavors {
         prod {
             dimension "channel"
+            manifestPlaceholders = [appLinkHost: "qwill.mooo.com"]
         }
         dev {
             dimension "channel"
             applicationIdSuffix ".dev"
             versionNameSuffix "-dev"
+            manifestPlaceholders = [appLinkHost: "dev.qwill.mooo.com"]
         }
     }
     signingConfigs {

@@ -14,6 +14,7 @@ import { useAppUpdateStore } from './appUpdate';
 import { useDesktopBadgeSync } from './desktopBadge';
 import { useDesktopDeepLinks } from './desktopDeepLinks';
 import { useDesktopUpdateStore } from './desktopUpdate';
+import { useNativeDeepLinks } from './nativeDeepLinks';
 import { ScreenStack } from './ScreenStack';
 import styles from './AppShell.module.css';
 import { TabBar } from './TabBar';
@@ -45,6 +46,7 @@ export function AppShell() {
 
   useDesktopBadgeSync();
   useDesktopDeepLinks();
+  useNativeDeepLinks();
 
   return (
     <div className={`${styles.shell} ${layout === 'desktop' ? styles.desktop : ''}`}>

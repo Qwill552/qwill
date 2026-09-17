@@ -1,0 +1,23 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.qwill.app",
+      "sha256_cert_fingerprints": [
+        "1D:D2:DD:42:EA:8C:81:7E:33:28:15:00:B0:72:28:B4:84:BF:0D:8F:C6:8F:19:B0:6C:B2:3E:69:86:52:78:0B"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.qwill.app.dev",
+      "sha256_cert_fingerprints": [
+        "1D:D2:DD:42:EA:8C:81:7E:33:28:15:00:B0:72:28:B4:84:BF:0D:8F:C6:8F:19:B0:6C:B2:3E:69:86:52:78:0B",
+        "E4:6A:D9:2F:13:0C:56:93:65:B8:38:07:2A:D0:0D:F0:FE:F0:8D:AC:83:6D:E1:ED:A9:27:AD:5B:16:75:F9:FF"
+      ]
+    }
+  }
+]

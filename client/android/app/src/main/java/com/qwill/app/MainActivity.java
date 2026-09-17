@@ -43,10 +43,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(FileDownloadPlugin.class);
         registerPlugin(KeyboardInsetsPlugin.class);
         registerPlugin(BackGesturePlugin.class);
+        registerPlugin(DeepLinkPlugin.class);
         super.onCreate(savedInstanceState);
 
         current = new WeakReference<>(this);
         consumeCallIntent(getIntent());
+        consumeLinkIntent(getIntent());
         acceptDownloads();
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -96,6 +98,7 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         consumeCallIntent(intent);
+        consumeLinkIntent(intent);
     }
 
     @Override
@@ -169,6 +172,21 @@ public class MainActivity extends BridgeActivity {
             return URLUtil.guessFileName(url, contentDisposition, mimeType);
         }
         return named.trim().replaceAll("[\\\\/:*?\"<>|\\u0000-\\u001f]", "_");
+    }
+
+    private void consumeLinkIntent(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return;
+        }
+        Uri data = intent.getData();
+        String path = data == null ? null : data.getPath();
+        if (path == null || path.isEmpty()) {
+            return;
+        }
+        intent.setData(null);
+
+        String query = data.getQuery();
+        DeepLinkRegistry.INSTANCE.publish(query == null || query.isEmpty() ? path : path + "?" + query);
     }
 
     private void consumeCallIntent(Intent intent) {

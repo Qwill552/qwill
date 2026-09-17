@@ -1,3 +1,7 @@
+.overlay {
+  z-index: 350;
+}
+
 .body {
   display: flex;
   flex-direction: column;
