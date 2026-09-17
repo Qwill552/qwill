@@ -126,6 +126,7 @@ export async function startUpdater(): Promise<void> {
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = autoUpdate;
+  autoUpdater.disableWebInstaller = true;
   autoUpdater.forceDevUpdateConfig = !app.isPackaged;
   autoUpdater.setFeedURL({ provider: 'generic', url: `${API_ORIGIN}${FEED_PATH}` });
 

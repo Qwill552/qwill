@@ -13,6 +13,8 @@ export function useDesktopUpdateStatus(): string | null {
       return `загружается ${state.version} · ${Math.round(state.percent * 100)}%`;
     case 'ready':
       return `обновление до ${state.version} готово`;
+    case 'error':
+      return 'обновление не проверилось';
     default:
       return null;
   }

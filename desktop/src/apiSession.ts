@@ -4,21 +4,28 @@ import path from 'node:path';
 import { app, session } from 'electron';
 
 const DEFAULT_API_URL = 'https://localhost:3000';
+const API_CONFIG_FILE = 'api-origin.json';
+
+function configFileCandidates(): string[] {
+  if (!app.isPackaged) return [path.resolve(__dirname, '..', API_CONFIG_FILE)];
+  return [
+    path.join(app.getAppPath(), API_CONFIG_FILE),
+    path.join(process.resourcesPath, API_CONFIG_FILE),
+  ];
+}
 
 function configuredApiUrl(): string {
   const fromEnv = process.env.QWILL_API_URL;
   if (fromEnv) return fromEnv;
 
-  const configFile = app.isPackaged
-    ? path.join(process.resourcesPath, 'api-origin.json')
-    : path.resolve(__dirname, '..', 'api-origin.json');
-
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(configFile, 'utf8'));
-    const apiUrl = (parsed as { apiUrl?: unknown }).apiUrl;
-    if (typeof apiUrl === 'string' && apiUrl !== '') return apiUrl;
-  } catch {
-    return DEFAULT_API_URL;
+  for (const configFile of configFileCandidates()) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(configFile, 'utf8'));
+      const apiUrl = (parsed as { apiUrl?: unknown }).apiUrl;
+      if (typeof apiUrl === 'string' && apiUrl !== '') return apiUrl;
+    } catch {
+      continue;
+    }
   }
 
   return DEFAULT_API_URL;
