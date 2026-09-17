@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { AmbientBlobs } from '../app/AmbientBlobs';
+import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { clearCallTrace, formatCallTrace } from '../calls/callTrace';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
+import { Icon } from '../ui/Icon';
 import styles from './CallTraceScreen.module.css';
 
 const COPIED_MS = 1500;
@@ -35,7 +37,19 @@ export function CallTraceScreen() {
   return (
     <div className={styles.screen}>
       {!isDesktop && <AmbientBlobs />}
-      <div className={`${styles.scroller} hide-native-scrollbar`}>
+      <div className={`${styles.scroller} ${isDesktop ? card.root : ''} hide-native-scrollbar`}>
+        {isDesktop && (
+          <div className={`${card.actionRow} ${styles.actions}`}>
+            <button type="button" className={card.actionTile} onClick={() => void handleCopy()}>
+              <Icon name="copy" size={23} className={card.actionTileIcon} />
+              {copied ? 'Скопировано' : 'Скопировать журнал'}
+            </button>
+            <button type="button" className={card.actionTile} onClick={handleClear} disabled={text.length === 0}>
+              <Icon name="trash" size={23} className={card.actionTileIcon} />
+              Очистить журнал
+            </button>
+          </div>
+        )}
         {text.length === 0 ? <p className={styles.empty}>Журнал пуст</p> : <pre className={styles.log}>{text}</pre>}
       </div>
 
