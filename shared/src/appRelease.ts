@@ -61,3 +61,11 @@ export interface WindowsVersionInfo {
   sha256: string;
   changelog: string[];
 }
+
+export const ANNOUNCE_PLATFORMS = ['android', 'windows'] as const;
+
+export type AnnouncePlatform = (typeof ANNOUNCE_PLATFORMS)[number];
+
+export const announceSchema = z.object({
+  platforms: z.array(z.enum(ANNOUNCE_PLATFORMS)).min(1),
+});

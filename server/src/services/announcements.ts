@@ -16,8 +16,8 @@ export const SERVICE_USERNAME = 'qwill.service';
 const SERVICE_DISPLAY_NAME = 'Qwill';
 
 const WELCOME_TEXT =
-  'Привет! Это официальный чат Qwill. Сюда будут приходить объявления о новых версиях приложения: ' +
-  'что изменилось и кнопка, чтобы обновиться.';
+  'Привет! Это официальный чат Qwill. Сюда будут приходить объявления о новых версиях приложения — ' +
+  'что изменилось и что для этого сделать.';
 
 /** Пароль сервисного аккаунта не знает никто: он генерируется случайным и сразу забывается —
  *  войти этим аккаунтом нельзя, он существует только чтобы быть автором объявлений. */
@@ -89,8 +89,9 @@ export async function ensureServiceChat(userId: string): Promise<ServiceChatResu
 }
 
 export interface AnnouncementInput {
-  versionCode: number;
-  versionName: string;
+  androidVersionCode: number | null;
+  androidVersionName: string | null;
+  windowsVersionName: string | null;
   changelog: string[];
 }
 
@@ -102,50 +103,68 @@ export interface AnnouncementDelivery {
 }
 
 export interface AnnouncementResult {
-  versionCode: number;
-  versionName: string;
+  androidVersionName: string | null;
+  windowsVersionName: string | null;
   /** Выпуск уже рассылался: доставки в этом запуске — только те, у кого чата тогда не было. */
   alreadyPublished: boolean;
   deliveries: AnnouncementDelivery[];
   failed: number;
 }
 
+async function findPublished(input: AnnouncementInput) {
+  if (input.androidVersionCode !== null) {
+    const byAndroid = await prisma.announcement.findUnique({
+      where: { androidVersionCode: input.androidVersionCode },
+    });
+    if (byAndroid) return byAndroid;
+  }
+  if (input.windowsVersionName !== null) {
+    const byWindows = await prisma.announcement.findUnique({
+      where: { windowsVersionName: input.windowsVersionName },
+    });
+    if (byWindows) return byWindows;
+  }
+  return null;
+}
+
 async function getOrCreateAnnouncement(input: AnnouncementInput) {
-  const existing = await prisma.announcement.findUnique({ where: { versionCode: input.versionCode } });
+  const existing = await findPublished(input);
   if (existing) return { announcement: existing, alreadyPublished: true };
 
   try {
     const created = await prisma.announcement.create({
       data: {
-        versionCode: input.versionCode,
-        versionName: input.versionName,
+        androidVersionCode: input.androidVersionCode,
+        androidVersionName: input.androidVersionName,
+        windowsVersionName: input.windowsVersionName,
         changelog: input.changelog,
       },
     });
     return { announcement: created, alreadyPublished: false };
   } catch {
-    const afterRace = await prisma.announcement.findUniqueOrThrow({ where: { versionCode: input.versionCode } });
+    const afterRace = await findPublished(input);
+    if (!afterRace) throw new Error('Не удалось создать объявление');
     return { announcement: afterRace, alreadyPublished: true };
   }
 }
 
-/** Объявление получают только владельцы FCM-подписок: у веб-подписчиков (сайт, iOS-PWA)
- *  сервисного чата нет вовсе. Ошибка на одном получателе не прерывает остальных, а повторный
- *  запуск с той же версией ничего не дублирует — clientId сообщения детерминированный. */
+/** Объявление получают все живые люди, а не владельцы FCM-подписок: список изменений один на
+ *  все платформы, а чем человек пользуется, решается уже в пузыре (D-12). Ошибка на одном
+ *  получателе не прерывает остальных, а повторный запуск с той же версией ничего не дублирует —
+ *  clientId сообщения детерминированный. */
 export async function publishAnnouncement(input: AnnouncementInput): Promise<AnnouncementResult> {
   const { announcement, alreadyPublished } = await getOrCreateAnnouncement(input);
   const service = await getServiceUser();
 
-  const subscribers = await prisma.pushSubscription.findMany({
-    where: { provider: 'fcm', userId: { not: service.id } },
-    select: { userId: true },
-    distinct: ['userId'],
+  const recipients = await prisma.user.findMany({
+    where: { isService: false, bannedAt: null, id: { not: service.id } },
+    select: { id: true },
   });
 
   const deliveries: AnnouncementDelivery[] = [];
   let failed = 0;
 
-  for (const { userId } of subscribers) {
+  for (const { id: userId } of recipients) {
     try {
       const chat = await ensureServiceChat(userId);
       if (!chat) continue;
@@ -164,8 +183,8 @@ export async function publishAnnouncement(input: AnnouncementInput): Promise<Ann
   }
 
   return {
-    versionCode: announcement.versionCode,
-    versionName: announcement.versionName,
+    androidVersionName: announcement.androidVersionName,
+    windowsVersionName: announcement.windowsVersionName,
     alreadyPublished,
     deliveries,
     failed,

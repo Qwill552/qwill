@@ -1,5 +1,10 @@
 import type { ChatSearchResult, SearchResultsDto, UserSearchResult } from '@messenger/shared';
-import { isPlayableVideoMimeType, layoutVariants, SEARCH_PAGE_SIZE } from '@messenger/shared';
+import {
+  ANNOUNCEMENT_PREVIEW_TEXT,
+  isPlayableVideoMimeType,
+  layoutVariants,
+  SEARCH_PAGE_SIZE,
+} from '@messenger/shared';
 
 import { prisma } from '../db/prisma.js';
 import { toAvatarColor } from '../lib/avatarColor.js';
@@ -25,13 +30,13 @@ type LastMessage = {
   deletedAt: Date | null;
   attachments: { peaks: number[]; file: { mimeType: string } }[];
   call: unknown | null;
-  announcement: { versionName: string } | null;
+  announcement: { id: string } | null;
 };
 
 function previewOf(message: LastMessage | undefined): string | null {
   if (!message) return null;
   if (message.deletedAt) return 'Сообщение удалено';
-  if (message.announcement) return `Новое обновление (${message.announcement.versionName})`;
+  if (message.announcement) return ANNOUNCEMENT_PREVIEW_TEXT;
   if (message.call) return 'Звонок';
   if (message.content) return message.content;
 

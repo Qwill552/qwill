@@ -545,14 +545,15 @@ model AdminAction {
 }
 
 /// Один выпуск приложения — одна запись; сообщения в чатах всех получателей ссылаются на неё.
-/// Уникальный versionCode и есть защита от повторной рассылки той же версии
-/// (updates/03-announcements-chat.md, шаг 5).
+/// Версии по платформам необязательны и обе уникальны: выпуск бывает асимметричным (только APK
+/// или только .exe), а уникальность и есть защита от повторной рассылки той же версии (D-12).
 model Announcement {
   id String @id @default(cuid(2))
 
-  versionCode Int    @unique
-  versionName String
-  changelog   String[]
+  androidVersionCode Int?    @unique
+  androidVersionName String?
+  windowsVersionName String? @unique
+  changelog          String[]
 
   createdAt DateTime @default(now())
 

@@ -1,4 +1,9 @@
-import { isPlayableVideoMimeType, type ChatListItemDto, type MessageDto } from '@messenger/shared';
+import {
+  ANNOUNCEMENT_PREVIEW_TEXT,
+  isPlayableVideoMimeType,
+  type ChatListItemDto,
+  type MessageDto,
+} from '@messenger/shared';
 
 import { acquireObjectUrl, releaseObjectUrl } from '../cache/objectUrls';
 import { isDesktopShell, notifyDesktop } from '../native/desktop';
@@ -9,7 +14,7 @@ const avatarCache = new Map<string, string>();
 
 function previewOf(message: MessageDto): string {
   if (message.call) return message.call.status === 'DECLINED' ? 'Отклонённый звонок' : 'Звонок';
-  if (message.announcement) return `Новое обновление (${message.announcement.versionName})`;
+  if (message.announcement) return ANNOUNCEMENT_PREVIEW_TEXT;
   if (message.content) return message.content;
 
   if (message.attachment) {

@@ -36,6 +36,21 @@ const createdUserIds: string[] = [];
 const createdVersionCodes: number[] = [];
 /** Своя полка versionCode на прогон: они уникальны в БД, а прогонов в одной dev-базе много. */
 const versionCodeBase = 900_000 + (Date.now() % 90_000) * 10;
+const BROADCAST_TIMEOUT_MS = 180_000;
+
+async function forgetAnnouncements(): Promise<void> {
+  const announcements = await prisma.announcement.findMany({
+    where: {
+      OR: [{ androidVersionCode: { in: createdVersionCodes } }, { windowsVersionName: { contains: RUN_ID } }],
+    },
+    select: { id: true },
+  });
+  const ids = announcements.map((a) => a.id);
+  if (ids.length === 0) return;
+
+  await prisma.message.deleteMany({ where: { announcementId: { in: ids } } });
+  await prisma.announcement.deleteMany({ where: { id: { in: ids } } });
+}
 
 let serviceUserId = '';
 let serviceUsername = '';
@@ -73,12 +88,12 @@ describe('чат Qwill с объявлениями об обновлениях (
   });
 
   afterAll(async () => {
+    await forgetAnnouncements();
     await prisma.chat.deleteMany({ where: { members: { some: { userId: { in: createdUserIds } } } } });
-    await prisma.announcement.deleteMany({ where: { versionCode: { in: createdVersionCodes } } });
     await prisma.pushSubscription.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await prisma.$disconnect();
-  });
+  }, BROADCAST_TIMEOUT_MS);
 
   describe('сервисный аккаунт', () => {
     it('заводится один и помечен isService', async () => {
@@ -162,44 +177,78 @@ describe('чат Qwill с объявлениями об обновлениях (
   });
 
   describe('рассылка объявления', () => {
-    it('доходит только владельцам FCM-подписок и не дублируется при повторе', async () => {
+    it('доходит и до тех, у кого нет FCM-подписки, и не дублируется при повторе (D-12)', async () => {
       const android = await registerUser('publish_fcm');
       const web = await registerUser('publish_web');
 
       expect(await subscribeFcm(android.token, `fcm-${RUN_ID}-publish`)).toBe(201);
-      await prisma.pushSubscription.create({
-        data: {
-          userId: web.userId,
-          provider: 'webpush',
-          endpoint: `https://push.example.test/${RUN_ID}_publish`,
-          p256dh: 'p',
-          auth: 'a',
-        },
-      });
+      expect(await serviceChatsOf(web.userId)).toHaveLength(0);
 
-      const versionCode = versionCodeBase + 1;
-      createdVersionCodes.push(versionCode);
-      const input = { versionCode, versionName: '9.9.1', changelog: ['стало быстрее', 'починили звук'] };
+      const androidVersionCode = versionCodeBase + 1;
+      createdVersionCodes.push(androidVersionCode);
+      const input = {
+        androidVersionCode,
+        androidVersionName: '9.9.1',
+        windowsVersionName: `9.9.1-win-${RUN_ID}`,
+        changelog: ['стало быстрее', 'починили звук'],
+      };
 
       const first = await publishAnnouncement(input);
       expect(first.alreadyPublished).toBe(false);
       expect(first.failed).toBe(0);
       expect(first.deliveries.some((d) => d.userId === android.userId)).toBe(true);
-      expect(first.deliveries.some((d) => d.userId === web.userId)).toBe(false);
+      expect(first.deliveries.some((d) => d.userId === web.userId)).toBe(true);
 
       const androidChats = await serviceChatsOf(android.userId);
       const announcements = androidChats[0]!.messages.filter((m) => m.type === 'ANNOUNCEMENT');
       expect(announcements).toHaveLength(1);
-      expect(announcements[0]!.announcement?.versionName).toBe('9.9.1');
+      expect(announcements[0]!.announcement?.androidVersionName).toBe('9.9.1');
+      expect(announcements[0]!.announcement?.windowsVersionName).toBe(`9.9.1-win-${RUN_ID}`);
       expect(announcements[0]!.announcement?.changelog).toEqual(['стало быстрее', 'починили звук']);
+
+      const webChats = await serviceChatsOf(web.userId);
+      expect(webChats).toHaveLength(1);
+      expect(webChats[0]!.messages.filter((m) => m.type === 'ANNOUNCEMENT')).toHaveLength(1);
 
       const second = await publishAnnouncement(input);
       expect(second.alreadyPublished).toBe(true);
 
       const afterRepeat = await serviceChatsOf(android.userId);
       expect(afterRepeat[0]!.messages.filter((m) => m.type === 'ANNOUNCEMENT')).toHaveLength(1);
-      expect(await serviceChatsOf(web.userId)).toHaveLength(0);
-    });
+    }, BROADCAST_TIMEOUT_MS);
+
+    it('выпуск только под одну платформу оставляет вторую версию пустой', async () => {
+      const user = await registerUser('publish_win_only');
+
+      const result = await publishAnnouncement({
+        androidVersionCode: null,
+        androidVersionName: null,
+        windowsVersionName: `1.0.9-win-${RUN_ID}`,
+        changelog: ['только десктоп'],
+      });
+
+      expect(result.androidVersionName).toBeNull();
+      expect(result.windowsVersionName).toBe(`1.0.9-win-${RUN_ID}`);
+
+      const chats = await serviceChatsOf(user.userId);
+      const announcement = chats[0]!.messages.filter((m) => m.type === 'ANNOUNCEMENT').at(-1);
+      expect(announcement!.announcement?.androidVersionCode).toBeNull();
+      expect(announcement!.announcement?.windowsVersionName).toBe(`1.0.9-win-${RUN_ID}`);
+    }, BROADCAST_TIMEOUT_MS);
+
+    it('забаненному не доставляется', async () => {
+      const banned = await registerUser('publish_banned');
+      await prisma.user.update({ where: { id: banned.userId }, data: { bannedAt: new Date() } });
+
+      const result = await publishAnnouncement({
+        androidVersionCode: null,
+        androidVersionName: null,
+        windowsVersionName: `1.0.10-win-${RUN_ID}`,
+        changelog: ['мимо забаненных'],
+      });
+
+      expect(result.deliveries.some((d) => d.userId === banned.userId)).toBe(false);
+    }, BROADCAST_TIMEOUT_MS);
 
     it('заглушённому чату пуш не уходит, незаглушённому уходит', async () => {
       const quiet = await registerUser('muted');
@@ -215,9 +264,14 @@ describe('чат Qwill с объявлениями об обновлениях (
       sendMock.mockClear();
       sendMock.mockResolvedValue('projects/test/messages/1');
 
-      const versionCode = versionCodeBase + 2;
-      createdVersionCodes.push(versionCode);
-      await publishAnnouncement({ versionCode, versionName: '9.9.2', changelog: ['тихо'] });
+      const androidVersionCode = versionCodeBase + 2;
+      createdVersionCodes.push(androidVersionCode);
+      await publishAnnouncement({
+        androidVersionCode,
+        androidVersionName: '9.9.2',
+        windowsVersionName: null,
+        changelog: ['тихо'],
+      });
 
       // notifyOfflineMembers не awaited внутри sendMessage — ждём, пока фоновая рассылка дойдёт
       // до незаглушённого получателя, и только потом проверяем, что заглушённого в ней нет.
@@ -226,7 +280,7 @@ describe('чат Qwill с объявлениями об обновлениях (
         expect(notifiedTokens()).toContain(`fcm-${RUN_ID}-loud`);
       });
       expect(notifiedTokens()).not.toContain(`fcm-${RUN_ID}-muted`);
-    });
+    }, BROADCAST_TIMEOUT_MS);
   });
 
   describe('запрет отправки в чат', () => {

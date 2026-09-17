@@ -1,4 +1,4 @@
-import { isPlayableVideoMimeType, type ChatListItemDto } from '@messenger/shared';
+import { ANNOUNCEMENT_PREVIEW_TEXT, isPlayableVideoMimeType, type ChatListItemDto } from '@messenger/shared';
 import { useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -58,7 +58,7 @@ function previewText(chat: ChatListItemDto, own: boolean): string {
   const last = chat.lastMessage;
   if (!last) return 'Нет сообщений';
   if (last.call) return callPreviewText(last.call, own);
-  if (last.announcement) return `Новое обновление (${last.announcement.versionName})`;
+  if (last.announcement) return ANNOUNCEMENT_PREVIEW_TEXT;
   if (last.content) return last.content;
   if (last.attachment) {
     if (isVoice(chat)) return 'Голосовое сообщение';

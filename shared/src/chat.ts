@@ -363,11 +363,16 @@ export interface MessageCallDto {
 }
 
 /** Объявление о выпуске приложения — структура, а не текст: пузырь рисует заголовок,
- *  список пунктов и кнопку «Обновить» сам (updates/03-announcements-chat.md). */
+ *  список пунктов и призыв к действию сам. Список изменений один на все платформы, версии —
+ *  свои у каждой и обе необязательны: выпуск бывает только под APK или только под .exe
+ *  (updates/03-announcements-chat.md, D-12). */
+export const ANNOUNCEMENT_PREVIEW_TEXT = 'Что нового в Qwill';
+
 export interface MessageAnnouncementDto {
   id: string;
-  versionCode: number;
-  versionName: string;
+  androidVersionCode: number | null;
+  androidVersionName: string | null;
+  windowsVersionName: string | null;
   changelog: string[];
 }
 

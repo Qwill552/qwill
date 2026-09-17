@@ -10,7 +10,7 @@ import type {
   MessageReplyPreviewDto,
   MessagesSyncResponse,
 } from '@messenger/shared';
-import { ErrorCode } from '@messenger/shared';
+import { ANNOUNCEMENT_PREVIEW_TEXT, ErrorCode } from '@messenger/shared';
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '../db/prisma.js';
@@ -103,8 +103,9 @@ function toMessageAnnouncementDto(announcement: Announcement | null): MessageAnn
 
   return {
     id: announcement.id,
-    versionCode: announcement.versionCode,
-    versionName: announcement.versionName,
+    androidVersionCode: announcement.androidVersionCode,
+    androidVersionName: announcement.androidVersionName,
+    windowsVersionName: announcement.windowsVersionName,
     changelog: announcement.changelog,
   };
 }
@@ -249,7 +250,7 @@ async function notifyOfflineMembers(chatId: string, senderId: string, message: M
   const senderName = message.sender?.displayName ?? 'Кто-то';
   const title = chat?.type === 'GROUP' ? `${senderName} · ${chat.title ?? 'Группа'}` : senderName;
   const body = message.announcement
-    ? `Новое обновление (${message.announcement.versionName})`
+    ? ANNOUNCEMENT_PREVIEW_TEXT
     : (message.content ?? (message.attachment ? 'Прислал(а) файл' : 'Новое сообщение'));
 
   await Promise.all(
