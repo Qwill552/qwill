@@ -6,6 +6,7 @@ import {
   VideoPresets,
   createLocalAudioTrack,
   type LocalAudioTrack,
+  type LocalParticipant,
   type LocalTrackPublication,
   type LocalVideoTrack,
   type Participant,
@@ -20,7 +21,20 @@ import {
 } from 'livekit-client';
 
 import { registerAudioTrack, resetAudioRouting, setAudioRoute, unregisterAudioTrack } from './audioRoute';
-import type { CallParticipantState, CallTransport, CallTransportCallbacks, CallVideoSource } from './types';
+import {
+  beginScreenShareChangeProbe,
+  describeCaptureTrack,
+  finishScreenShareChangeProbe,
+  resetScreenShareChangeProbe,
+  traceScreenShareChangeStep,
+} from './screenShareProbe';
+import type {
+  CallParticipantState,
+  CallTransport,
+  CallTransportCallbacks,
+  CallVideoSource,
+  ScreenShareChangeMode,
+} from './types';
 
 const CAMERA_MAX_BITRATE = 3_000_000;
 const CAMERA_MAX_FRAMERATE = 30;
@@ -195,6 +209,7 @@ async function connect(url: string, token: string, callbacks: CallTransportCallb
     },
   });
   attachRoomListeners(activeRoom, callbacks);
+  resetScreenShareChangeProbe();
 
   const micTrack = await captureMicrophoneTrack();
 
@@ -266,15 +281,42 @@ async function renegotiateCaptureRate(track: MediaStreamTrack): Promise<void> {
   }
 }
 
-async function changeScreenShareSource(): Promise<void> {
-  const participant = room?.localParticipant;
-  const screenTrack = participant?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
-  if (!participant || !screenTrack) return;
+async function replaceScreenShareSource(
+  participant: LocalParticipant,
+  screenTrack: LocalVideoTrack,
+  probeIndex: number,
+): Promise<void> {
   const captured = await participant.createScreenTracks(SCREEN_SHARE_CAPTURE_OPTIONS);
   const nextTrack = captured.find((track) => track.kind === Track.Kind.Video)?.mediaStreamTrack;
   if (!nextTrack) return;
-  await (screenTrack as LocalVideoTrack).replaceTrack(nextTrack, { userProvidedTrack: false });
+  traceScreenShareChangeStep(probeIndex, 'источник выбран', describeCaptureTrack(nextTrack));
+  await screenTrack.replaceTrack(nextTrack, { userProvidedTrack: false });
+  traceScreenShareChangeStep(probeIndex, 'после подмены', describeCaptureTrack(nextTrack));
   await renegotiateCaptureRate(nextTrack);
+  traceScreenShareChangeStep(probeIndex, 'после applyConstraints', describeCaptureTrack(nextTrack));
+}
+
+async function republishScreenShareSource(participant: LocalParticipant, probeIndex: number): Promise<void> {
+  await participant.setScreenShareEnabled(false);
+  traceScreenShareChangeStep(probeIndex, 'трек снят', 'setScreenShareEnabled(false)');
+  await participant.setScreenShareEnabled(true, SCREEN_SHARE_CAPTURE_OPTIONS, SCREEN_SHARE_PUBLISH_OPTIONS);
+  const nextTrack = participant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack?.mediaStreamTrack;
+  traceScreenShareChangeStep(probeIndex, 'трек переиздан', nextTrack ? describeCaptureTrack(nextTrack) : '—');
+}
+
+async function changeScreenShareSource(mode: ScreenShareChangeMode): Promise<void> {
+  const participant = room?.localParticipant;
+  const screenTrack = participant?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+  if (!participant || !screenTrack) return;
+  const probeIndex = await beginScreenShareChangeProbe(mode);
+  try {
+    if (mode === 'republish') await republishScreenShareSource(participant, probeIndex);
+    else await replaceScreenShareSource(participant, screenTrack as LocalVideoTrack, probeIndex);
+  } catch (error) {
+    traceScreenShareChangeStep(probeIndex, 'сорвалось', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+  finishScreenShareChangeProbe(probeIndex);
 }
 
 function findParticipant(userId: string): Participant | undefined {

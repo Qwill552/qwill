@@ -9,6 +9,8 @@ export type AudioRoute = 'earpiece' | 'speaker';
 
 export type CallVideoSource = 'camera' | 'screen';
 
+export type ScreenShareChangeMode = 'replace' | 'republish';
+
 export interface CallParticipantState {
   userId: string;
   displayName: string;
@@ -53,7 +55,7 @@ export interface CallTransport {
   flipCamera: () => Promise<void>;
   isScreenShareSupported: () => boolean;
   setScreenShareEnabled: (enabled: boolean) => Promise<void>;
-  changeScreenShareSource: () => Promise<void>;
+  changeScreenShareSource: (mode: ScreenShareChangeMode) => Promise<void>;
   setAudioRoute: (route: AudioRoute) => void;
   attachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;
   detachVideo: (userId: string, element: HTMLVideoElement, source: CallVideoSource) => void;

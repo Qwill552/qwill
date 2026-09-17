@@ -18,6 +18,8 @@ export function DeveloperScreen() {
   const isDesktop = useLayoutMode() === 'desktop';
   const callStatsOverlayEnabled = useDevPrefsStore((s) => s.callStatsOverlayEnabled);
   const setCallStatsOverlayEnabled = useDevPrefsStore((s) => s.setCallStatsOverlayEnabled);
+  const screenShareChangeMode = useDevPrefsStore((s) => s.screenShareChangeMode);
+  const setScreenShareChangeMode = useDevPrefsStore((s) => s.setScreenShareChangeMode);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -39,6 +41,19 @@ export function DeveloperScreen() {
                 checked={callStatsOverlayEnabled}
                 onChange={setCallStatsOverlayEnabled}
                 label="Статистика звонка"
+              />
+            }
+          />
+          <Card.Row
+            icon="retry"
+            tint="orange"
+            title="Переиздавать трек при смене источника"
+            subtitle="Вместо подмены — снять демонстрацию и включить заново"
+            trailing={
+              <Switch
+                checked={screenShareChangeMode === 'republish'}
+                onChange={(checked) => setScreenShareChangeMode(checked ? 'republish' : 'replace')}
+                label="Переиздавать трек при смене источника"
               />
             }
           />

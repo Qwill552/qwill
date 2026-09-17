@@ -16,6 +16,7 @@ import { traceCall } from '../calls/callTrace';
 import { liveKitTransport } from '../calls/transport';
 import type { CallParticipantState, CallState, CallTransport, CallVideoSource } from '../calls/types';
 import { getSocket, waitForConnectedSocket } from '../realtime/socket';
+import { useDevPrefsStore } from './devPrefsStore';
 
 const CALL_ENDED_RESET_DELAY_MS = 2000;
 const CAMERA_ERROR_DISPLAY_MS = 3000;
@@ -313,7 +314,7 @@ export const useCallStore = create<CallStoreState>((set, get) => {
 
     async changeScreenShareSource() {
       try {
-        await transport.changeScreenShareSource();
+        await transport.changeScreenShareSource(useDevPrefsStore.getState().screenShareChangeMode);
       } catch {
         return;
       }
