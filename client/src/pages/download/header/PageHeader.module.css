@@ -9,14 +9,14 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--header-brand-gap);
   min-width: 0;
 }
 
 .logo {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: var(--header-logo-size);
+  height: var(--header-logo-size);
   object-fit: contain;
 }
 
@@ -31,14 +31,15 @@
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: var(--header-title-size);
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .subtitle {
   margin: 0;
   color: var(--text-secondary);
-  font-size: var(--font-meta);
+  font-size: var(--header-subtitle-size);
 }
 
 .themeToggle {

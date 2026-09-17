@@ -6,6 +6,11 @@
   --page-padding-inline: var(--space-4);
   --page-padding-block: var(--space-6);
 
+  --header-logo-size: 48px;
+  --header-brand-gap: var(--space-3);
+  --header-title-size: 1.6em;
+  --header-subtitle-size: 1em;
+
   --device-metal: #c7ccda;
   --device-glass: rgb(255 255 255 / 35%);
   --device-shadow: 0 24px 48px rgb(20 24 35 / 18%);
@@ -22,6 +27,11 @@
   --page-max-width: 400px;
   --page-padding-inline: var(--space-4);
   --page-padding-block: var(--space-6);
+
+  --header-logo-size: 48px;
+  --header-brand-gap: var(--space-3);
+  --header-title-size: 1.6em;
+  --header-subtitle-size: 1em;
 
   --device-metal: #2a2f3d;
   --device-glass: rgb(255 255 255 / 8%);
@@ -41,6 +51,10 @@
   [data-theme='dark'] {
     --page-max-width: 480px;
     --demo-stub-max-width: 300px;
+    --header-logo-size: 64px;
+    --header-brand-gap: var(--space-4);
+    --header-title-size: 2em;
+    --header-subtitle-size: 1.06em;
   }
 }
 
@@ -50,7 +64,11 @@
   [data-theme='light'],
   :root[data-theme='dark'],
   [data-theme='dark'] {
-    --page-max-width: 560px;
+    --page-max-width: 640px;
     --demo-stub-max-width: 340px;
+    --header-logo-size: 88px;
+    --header-brand-gap: var(--space-5);
+    --header-title-size: 2.6em;
+    --header-subtitle-size: 1.2em;
   }
 }
