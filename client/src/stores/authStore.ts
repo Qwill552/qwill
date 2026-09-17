@@ -2,7 +2,7 @@ import type { AuthResponse, LoginInput, PublicUser, RegisterInput } from '@messe
 import { create } from 'zustand';
 
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from '../api/auth';
-import { ApiError, restoreAccessToken, setAccessToken, setCsrfToken, setRefreshHandler } from '../api/client';
+import { ApiError, NetworkError, restoreAccessToken, setAccessToken, setCsrfToken, setRefreshHandler } from '../api/client';
 import { getSettingsRequest } from '../api/users';
 import { clearAllCache } from '../cache/db';
 import { clearOfflineProfile, readOfflineProfile, saveOfflineProfile } from '../cache/offlineProfile';
@@ -32,7 +32,7 @@ interface AuthState {
 const cachedProfile = readOfflineProfile();
 
 function isSessionGone(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 401;
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -94,7 +94,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
           applyAuth(await refreshRequest());
           return true;
         } catch (error) {
-          if (!isSessionGone(error) && applyOfflineProfile()) return true;
+          if (error instanceof NetworkError && applyOfflineProfile()) return true;
+          if (!isSessionGone(error) && applyOfflineProfile()) return false;
           await clearAuth();
           return false;
         }

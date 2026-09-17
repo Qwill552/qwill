@@ -6,7 +6,7 @@ import type {
   RegisterInput,
 } from '@messenger/shared';
 
-import { apiRequest } from './client';
+import { ApiError, apiRequest, setCsrfToken } from './client';
 
 export function registerRequest(input: RegisterInput): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/api/auth/register', {
@@ -24,7 +24,7 @@ export function loginRequest(input: LoginInput): Promise<AuthResponse> {
   });
 }
 
-export function refreshRequest(): Promise<AuthResponse> {
+function postRefresh(): Promise<AuthResponse> {
   // body: {} — иначе Express не распарсит JSON без Content-Type и req.body будет undefined,
   // а refreshSchema.safeParse(undefined) не проходит (поле опционально, но объект обязателен).
   return apiRequest<AuthResponse>('/api/auth/refresh', {
@@ -32,6 +32,16 @@ export function refreshRequest(): Promise<AuthResponse> {
     body: {},
     skipAuthRetry: true,
   });
+}
+
+export async function refreshRequest(): Promise<AuthResponse> {
+  try {
+    return await postRefresh();
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 403) throw error;
+    setCsrfToken(null);
+    return postRefresh();
+  }
 }
 
 export function logoutRequest(): Promise<void> {
