@@ -5,6 +5,12 @@ copyright: Qwill
 extraMetadata:
   name: qwill
 
+electronLanguages:
+  - ru
+  - en-US
+
+afterPack: scripts/afterPack.mjs
+
 directories:
   output: dist-release
   buildResources: build
