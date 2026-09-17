@@ -2025,6 +2025,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket
       .off(SocketEvent.CallParticipantChanged)
       .on(SocketEvent.CallParticipantChanged, (event: CallParticipantChangedEvent) => {
+        const joinedElsewhere = useCallStore
+          .getState()
+          .dismissInviteJoinedElsewhere(event.call, get().myUserId);
+        if (joinedElsewhere) void reportCallEnded(event.call.id);
         useCallStore.getState().applyCallUpdate(event.call);
         set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
       });

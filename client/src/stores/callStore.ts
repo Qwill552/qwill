@@ -130,6 +130,7 @@ interface CallStoreState extends CallState {
   applyInvite: (call: CallDto) => void;
   applyEnded: (call: CallDto) => void;
   applyCallUpdate: (call: CallDto) => void;
+  dismissInviteJoinedElsewhere: (call: CallDto, selfUserId: string | null) => boolean;
   applyLiveCalls: (calls: CallDto[]) => void;
   rejoinCall: () => Promise<void>;
 }
@@ -369,6 +370,19 @@ export const useCallStore = create<CallStoreState>((set, get) => {
       const state = get();
       if (state.call?.id !== call.id) return;
       set({ call, participants: mergeParticipants(state.participants, call.participants) });
+    },
+
+    dismissInviteJoinedElsewhere(call, selfUserId) {
+      const state = get();
+      if (!selfUserId || state.phase !== 'incoming' || state.call?.id !== call.id) return false;
+      if (acceptInFlight === call.id) return false;
+      const joined = call.participants.some(
+        (participant) => participant.user.id === selfUserId && participant.leftAt === null,
+      );
+      if (!joined) return false;
+      traceCall('приглашение снято', `принято на другом устройстве: ${call.id}`);
+      set(initialState);
+      return true;
     },
   };
 });

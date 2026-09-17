@@ -1,4 +1,6 @@
-import { BrowserWindow, desktopCapturer, ipcMain, type DesktopCapturerSource } from 'electron';
+import { desktopCapturer, ipcMain, type DesktopCapturerSource } from 'electron';
+
+import { getMainWindow } from './window';
 
 const REQUEST_CHANNEL = 'qwill:screen-sources';
 const RESPONSE_CHANNEL = 'qwill:screen-source-chosen';
@@ -48,8 +50,8 @@ export function registerScreenSourcePicker(): void {
 }
 
 export async function pickScreenSource(): Promise<DesktopCapturerSource | null> {
-  const [window] = BrowserWindow.getAllWindows();
-  if (!window || window.isDestroyed()) return null;
+  const window = getMainWindow();
+  if (!window) return null;
 
   const sources = await desktopCapturer.getSources({
     types: ['screen', 'window'],

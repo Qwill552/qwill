@@ -77,6 +77,44 @@ describe('callStore', () => {
     expect(useCallStore.getState().call).toEqual(call);
   });
 
+  it('приглашение снимается, когда звонок принят на другом устройстве', () => {
+    useCallStore.getState().applyInvite(buildCall());
+    const accepted = buildCall({
+      status: 'ACTIVE',
+      participants: [
+        {
+          user: { id: 'me', displayName: 'Я', username: 'me', avatarUrl: null },
+          joinedAt: '2026-09-17T12:00:00.000Z',
+          leftAt: null,
+        },
+      ] as CallDto['participants'],
+    });
+
+    const dismissed = useCallStore.getState().dismissInviteJoinedElsewhere(accepted, 'me');
+
+    expect(dismissed).toBe(true);
+    expect(useCallStore.getState().phase).toBe('idle');
+    expect(useCallStore.getState().call).toBeNull();
+  });
+
+  it('приглашение не снимается, пока сам не значишься участником', () => {
+    useCallStore.getState().applyInvite(buildCall());
+    const other = buildCall({
+      participants: [
+        {
+          user: { id: 'other', displayName: 'Не я', username: 'other', avatarUrl: null },
+          joinedAt: '2026-09-17T12:00:00.000Z',
+          leftAt: null,
+        },
+      ] as CallDto['participants'],
+    });
+
+    const dismissed = useCallStore.getState().dismissInviteJoinedElsewhere(other, 'me');
+
+    expect(dismissed).toBe(false);
+    expect(useCallStore.getState().phase).toBe('incoming');
+  });
+
   it('отклонение возвращает phase в idle и очищает call', () => {
     const emit = vi.fn();
     vi.mocked(getSocket).mockReturnValue({ emit } as unknown as Socket);
