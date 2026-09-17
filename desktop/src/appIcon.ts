@@ -4,7 +4,7 @@ import { app, nativeImage, type NativeImage } from 'electron';
 
 import { resolveClientRoot } from './protocol';
 
-const WINDOW_ICON_FILE = 'window.ico';
+const WINDOW_ICON_FILE = 'icon.ico';
 const TRAY_SIZE = 16;
 
 let cached: NativeImage | null = null;

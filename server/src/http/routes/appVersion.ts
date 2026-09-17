@@ -9,6 +9,7 @@ import { emitToUser, subscribeUserToChat } from '../../realtime/index.js';
 import * as announcementService from '../../services/announcements.js';
 import * as appReleaseService from '../../services/appRelease.js';
 import * as chatService from '../../services/chat.js';
+import { multiRangeStatic } from '../middleware/multiRange.js';
 
 export const appVersionRouter: Router = Router();
 
@@ -26,6 +27,8 @@ appVersionRouter.get('/version', (_req, res, next) => {
     })
     .catch(next);
 });
+
+appVersionRouter.use('/win', multiRangeStatic(path.join(env.appReleaseDir, 'windows')));
 
 appVersionRouter.use(
   '/win',

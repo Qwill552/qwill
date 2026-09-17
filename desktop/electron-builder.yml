@@ -17,8 +17,8 @@ files:
 extraResources:
   - from: renderer
     to: client
-  - from: build/window.ico
-    to: window.ico
+  - from: build/icon.ico
+    to: icon.ico
 
 protocols:
   - name: Qwill
@@ -46,6 +46,8 @@ nsis:
   shortcutName: Qwill
   deleteAppDataOnUninstall: false
   artifactName: Qwill-Setup-${version}.${ext}
+  installerIcon: build/installer.ico
+  uninstallerIcon: build/installer.ico
 
 publish:
   provider: generic

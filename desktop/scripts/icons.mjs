@@ -16,8 +16,12 @@ const DIRECTORY_ENTRY_BYTES = 16;
 const MAX_BYTE_SIZE = 256;
 
 const TARGETS = [
-  { source: 'qwill.png', file: 'icon.ico', what: 'exe, установщик, ярлык, меню Пуск' },
-  { source: 'qwill-no-background.png', file: 'window.ico', what: 'окно, панель задач, трей' },
+  {
+    source: 'qwill-no-background.png',
+    file: 'icon.ico',
+    what: 'exe, ярлык, меню Пуск, панель задач, окно, трей',
+  },
+  { source: 'qwill.png', file: 'installer.ico', what: 'установщик' },
 ];
 
 async function renderLayers(sourceFile) {
