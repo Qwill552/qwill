@@ -119,7 +119,9 @@ async function buildUserCard(user: User): Promise<AdminUserCardDto> {
       user.bannedById
         ? prisma.user.findUnique({ where: { id: user.bannedById }, select: { username: true } })
         : Promise.resolve(null),
-      prisma.chatMember.count({ where: { userId: user.id } }),
+      prisma.chatMember.count({
+        where: { userId: user.id, chat: { members: { none: { user: { isService: true } } } } },
+      }),
       prisma.message.count({ where: { senderId: user.id } }),
       prisma.report.count({ where: { targetUserId: user.id } }),
       prisma.report.count({ where: { reporterId: user.id } }),

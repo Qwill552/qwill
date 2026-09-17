@@ -138,6 +138,30 @@ describe('чат Qwill с объявлениями об обновлениях (
     });
   });
 
+  describe('заведение чата на выдаче сессии (D-12)', () => {
+    it('регистрация сразу заводит чат с приветственным сообщением', async () => {
+      const user = await registerUser('register_chat');
+
+      const chats = await serviceChatsOf(user.userId);
+      expect(chats).toHaveLength(1);
+      expect(chats[0]!.messages).toHaveLength(1);
+      expect(chats[0]!.messages[0]!.senderId).toBe(serviceUserId);
+    });
+
+    it('вход старого аккаунта без чата заводит его', async () => {
+      const user = await registerUser('login_chat');
+      await prisma.chat.deleteMany({ where: { members: { some: { userId: user.userId } } } });
+      expect(await serviceChatsOf(user.userId)).toHaveLength(0);
+
+      const res = await request
+        .post('/api/auth/login')
+        .send({ username: user.username, password: 'password123' });
+      expect(res.status).toBe(200);
+
+      expect(await serviceChatsOf(user.userId)).toHaveLength(1);
+    });
+  });
+
   describe('заведение чата при первой FCM-подписке', () => {
     it('подписка fcm заводит чат с приветственным сообщением', async () => {
       const user = await registerUser('fcm_first');
@@ -160,7 +184,7 @@ describe('чат Qwill с объявлениями об обновлениях (
       expect(chats[0]!.messages).toHaveLength(1);
     });
 
-    it('подписка webpush не заводит ничего', async () => {
+    it('подписка webpush не заводит второго чата', async () => {
       const user = await registerUser('webpush_only');
       const res = await request
         .post('/api/push/subscribe')
@@ -172,7 +196,9 @@ describe('чат Qwill с объявлениями об обновлениях (
         });
       expect(res.status).toBe(201);
 
-      expect(await serviceChatsOf(user.userId)).toHaveLength(0);
+      const chats = await serviceChatsOf(user.userId);
+      expect(chats).toHaveLength(1);
+      expect(chats[0]!.messages).toHaveLength(1);
     });
   });
 
@@ -182,7 +208,8 @@ describe('чат Qwill с объявлениями об обновлениях (
       const web = await registerUser('publish_web');
 
       expect(await subscribeFcm(android.token, `fcm-${RUN_ID}-publish`)).toBe(201);
-      expect(await serviceChatsOf(web.userId)).toHaveLength(0);
+      const webBefore = await serviceChatsOf(web.userId);
+      expect(webBefore[0]!.messages.filter((m) => m.type === 'ANNOUNCEMENT')).toHaveLength(0);
 
       const androidVersionCode = versionCodeBase + 1;
       createdVersionCodes.push(androidVersionCode);

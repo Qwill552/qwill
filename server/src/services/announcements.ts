@@ -50,8 +50,9 @@ export interface ServiceChatResult {
   isNew: boolean;
 }
 
-/** Чат с сервисным аккаунтом заводится в момент первой FCM-подписки, а не при регистрации:
- *  на регистрации токена ещё нет, а человек мог прийти с сайта и поставить приложение позже.
+/** Чат с сервисным аккаунтом заводится на выдаче сессии — то есть на регистрации, входе и
+ *  обновлении токена, — и вдобавок при первой FCM-подписке. Так он есть у всех и не ждёт
+ *  ближайшей рассылки (D-12), а живые сессии подхватывают его без повторного входа.
  *  Уникальный pairKey делает повторный вызов безобидным — второго чата не появится. */
 export async function ensureServiceChat(userId: string): Promise<ServiceChatResult | null> {
   const service = await getServiceUser();
@@ -83,6 +84,7 @@ export async function ensureServiceChat(userId: string): Promise<ServiceChatResu
     senderId: service.id,
     clientId: `qwill-welcome:${chatId}`,
     content: WELCOME_TEXT,
+    silent: true,
   });
 
   return { chatId, isNew: true };

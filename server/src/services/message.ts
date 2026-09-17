@@ -178,6 +178,9 @@ export interface SendMessageInput {
   /** Заполняется только рассылкой объявлений (services/announcements.ts): сообщение получает
    *  тип ANNOUNCEMENT и ссылку на выпуск, из которой пузырь собирает себя сам. */
   announcementId?: string;
+  /** Сообщение не поднимает push. Нужно приветствию в сервисном чате: чат заводится на выдаче
+   *  сессии (D-12), и дёргать человека уведомлением в момент входа не за что. */
+  silent?: boolean;
 }
 
 /** Единственный способ создать сообщение — вызывается только из socket-хендлера (секция 3). */
@@ -220,10 +223,12 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
   await prisma.chat.update({ where: { id: input.chatId }, data: { updatedAt: new Date() } });
 
   const dto = toMessageDto(message);
-  // Не блокируем ack отправителю ожиданием push-провайдера — шлём в фоне (этап 9).
-  notifyOfflineMembers(input.chatId, input.senderId, dto).catch((error: unknown) => {
-    logger.error({ err: error, chatId: input.chatId }, 'Не удалось отправить push-уведомления о новом сообщении');
-  });
+  if (!input.silent) {
+    // Не блокируем ack отправителю ожиданием push-провайдера — шлём в фоне (этап 9).
+    notifyOfflineMembers(input.chatId, input.senderId, dto).catch((error: unknown) => {
+      logger.error({ err: error, chatId: input.chatId }, 'Не удалось отправить push-уведомления о новом сообщении');
+    });
+  }
 
   incomingSupportMessageAdminId(input.chatId, input.senderId)
     .then((adminId) => {

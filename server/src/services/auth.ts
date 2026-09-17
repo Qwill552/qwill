@@ -17,7 +17,9 @@ import {
   signAccessToken,
   verifyAccessToken,
 } from '../lib/tokens.js';
+import { logger } from '../lib/logger.js';
 import { notifyAdminLoginSuccess } from './adminNotify.js';
+import { ensureServiceChat } from './announcements.js';
 import { createUser, getUserById, toPublicUser, verifyCredentials } from './user.js';
 import type { User } from '../generated/prisma/client.js';
 
@@ -50,6 +52,12 @@ async function issueSession(
       lastSeenIp: client.ip ?? null,
     },
   });
+
+  try {
+    await ensureServiceChat(user.id);
+  } catch (error) {
+    logger.error({ err: error, userId: user.id }, 'Не удалось завести сервисный чат');
+  }
 
   return {
     accessToken: signAccessToken(user.id),
