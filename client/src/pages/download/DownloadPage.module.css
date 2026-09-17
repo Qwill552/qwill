@@ -1,0 +1,55 @@
+.page {
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: calc(var(--page-padding-block) + env(safe-area-inset-top)) var(--page-padding-inline)
+    calc(var(--page-padding-block) + env(safe-area-inset-bottom));
+  background: var(--page-bg);
+  transition: background var(--dur-theme) ease;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: var(--page-max-width);
+}
+
+.osSwitchStub {
+  width: 100%;
+  height: var(--tap-min);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+}
+
+.demoStub {
+  display: grid;
+  place-items: center;
+  width: min(100%, var(--demo-stub-max-width));
+  border: 1px solid var(--demo-border);
+  border-radius: var(--radius-card);
+  background: var(--demo-bg);
+  color: var(--text-secondary);
+  font-size: var(--font-meta);
+  text-align: center;
+}
+
+.downloadButtonStub {
+  width: 100%;
+  max-width: 320px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+}
+
+.versionStub {
+  width: 160px;
+  max-width: 100%;
+  height: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+}

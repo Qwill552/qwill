@@ -1,0 +1,56 @@
+:root,
+:root[data-theme='light'],
+[data-theme='light'] {
+  --page-bg: var(--bg);
+  --page-max-width: 400px;
+  --page-padding-inline: var(--space-4);
+  --page-padding-block: var(--space-6);
+
+  --device-metal: #c7ccda;
+  --device-glass: rgb(255 255 255 / 35%);
+  --device-shadow: 0 24px 48px rgb(20 24 35 / 18%);
+  --device-highlight: rgb(255 255 255 / 55%);
+
+  --demo-bg: var(--surface-2);
+  --demo-border: var(--border);
+  --demo-stub-max-width: 260px;
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --page-bg: var(--bg);
+  --page-max-width: 400px;
+  --page-padding-inline: var(--space-4);
+  --page-padding-block: var(--space-6);
+
+  --device-metal: #2a2f3d;
+  --device-glass: rgb(255 255 255 / 8%);
+  --device-shadow: 0 24px 48px rgb(0 0 0 / 45%);
+  --device-highlight: rgb(255 255 255 / 12%);
+
+  --demo-bg: var(--surface-2);
+  --demo-border: var(--border);
+  --demo-stub-max-width: 260px;
+}
+
+@media (min-width: 700px) {
+  :root,
+  :root[data-theme='light'],
+  [data-theme='light'],
+  :root[data-theme='dark'],
+  [data-theme='dark'] {
+    --page-max-width: 480px;
+    --demo-stub-max-width: 300px;
+  }
+}
+
+@media (min-width: 1000px) {
+  :root,
+  :root[data-theme='light'],
+  [data-theme='light'],
+  :root[data-theme='dark'],
+  [data-theme='dark'] {
+    --page-max-width: 560px;
+    --demo-stub-max-width: 340px;
+  }
+}
