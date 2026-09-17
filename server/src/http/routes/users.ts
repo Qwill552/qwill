@@ -28,7 +28,6 @@ import {
   getSettings,
   getUserById,
   getUserProfile,
-  getUserProfileByUsername,
   setAvatar,
   toPublicUser,
   updateProfile,
@@ -205,12 +204,6 @@ usersRouter.delete('/:id/block', (req, res, next) => {
       await broadcastBlockState(userId, otherId, state);
       res.json(state);
     })
-    .catch(next);
-});
-
-usersRouter.get('/by-username/:username/profile', (req, res, next) => {
-  getUserProfileByUsername(req.params.username)
-    .then((profile) => res.json(profile))
     .catch(next);
 });
 

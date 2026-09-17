@@ -24,10 +24,6 @@ export function getUserProfileRequest(userId: string): Promise<UserProfileDto> {
   return apiRequest<UserProfileDto>(`/api/users/${userId}/profile`);
 }
 
-export function getUserProfileByUsernameRequest(username: string): Promise<UserProfileDto> {
-  return apiRequest<UserProfileDto>(`/api/users/by-username/${encodeURIComponent(username)}/profile`);
-}
-
 /** Визитка ходит текстом, а не JSON: тело — сам HTML, и на домене приложения оно отдаётся
  *  как `text/plain` с `nosniff`, чтобы прямое открытие адреса ничего не исполняло (R-30). */
 async function throwCardError(res: Response): Promise<never> {

@@ -7,7 +7,6 @@ import { AmbientBlobs } from '../app/AmbientBlobs';
 import card from '../app/desktopCard.module.css';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { ProfileCardFrame } from '../features/profile/ProfileCardFrame';
-import { useChatStore } from '../stores/chatStore';
 import { formatBirthday, formatLastSeen } from '../utils/presence';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -16,27 +15,18 @@ import { GlassButton } from '../ui/chrome/GlassButton';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import styles from './UserProfileScreen.module.css';
 
-interface UserProfileScreenProps {
-  backTo: string;
-  backLabel: string;
-  canMessage?: boolean;
-}
-
-export function UserProfileScreen({ backTo, backLabel, canMessage }: UserProfileScreenProps) {
-  const { id, userId } = useParams<{ id: string; userId: string }>();
-  const profileId = id ?? userId;
+export function UserProfileScreen() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isDesktop = useLayoutMode() === 'desktop';
-  const startPrivateChat = useChatStore((s) => s.startPrivateChat);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<UserProfileDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
-    if (!profileId) return;
+    if (!id) return;
     let cancelled = false;
-    getUserProfileRequest(profileId)
+    getUserProfileRequest(id)
       .then((result) => {
         if (!cancelled) setProfile(result);
       })
@@ -46,19 +36,7 @@ export function UserProfileScreen({ backTo, backLabel, canMessage }: UserProfile
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
-
-  async function openChat(username: string): Promise<void> {
-    setOpening(true);
-    try {
-      const chat = await startPrivateChat(username);
-      navigate(`/chats/${chat.id}`);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Чат не открылся');
-    } finally {
-      setOpening(false);
-    }
-  }
+  }, [id]);
 
   return (
     <div className={styles.screen}>
@@ -88,17 +66,6 @@ export function UserProfileScreen({ backTo, backLabel, canMessage }: UserProfile
               <span className={styles.status}>{formatLastSeen(profile.lastSeenAt)}</span>
             </div>
 
-            {canMessage && (
-              <button
-                type="button"
-                className={styles.message}
-                disabled={opening}
-                onClick={() => void openChat(profile.username)}
-              >
-                Написать
-              </button>
-            )}
-
             {profile.cardUrl ? (
               <ProfileCardFrame
                 cardUrl={profile.cardUrl}
@@ -127,7 +94,7 @@ export function UserProfileScreen({ backTo, backLabel, canMessage }: UserProfile
 
       {!isDesktop && (
         <ChromeBar>
-          <GlassButton icon="back" label={backLabel} onClick={() => navigate(backTo)} />
+          <GlassButton icon="back" label="Назад в админ-панель" onClick={() => navigate('/admin')} />
         </ChromeBar>
       )}
     </div>

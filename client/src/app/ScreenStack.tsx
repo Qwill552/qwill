@@ -37,6 +37,7 @@ import { ProfileEditScreen } from '../pages/ProfileEditScreen';
 import { ProfileScreen } from '../pages/ProfileScreen';
 import { SettingsScreen } from '../pages/SettingsScreen';
 import { StorageScreen } from '../pages/StorageScreen';
+import { StubScreen } from '../pages/StubScreen';
 import { UserLinkScreen } from '../pages/UserLinkScreen';
 import { UserProfileScreen } from '../pages/UserProfileScreen';
 import {
@@ -121,7 +122,6 @@ const OVERLAY_SUBROUTE_ACTION: Record<string, ReactNode> = {
 
 function overlayCardMeta(pathname: string, tab: string): { title: string; backTo: string | null } {
   if (matchPath('/u/:username', pathname)) return { title: 'Профиль', backTo: null };
-  if (matchPath('/contacts/:userId', pathname)) return { title: 'Профиль', backTo: '/contacts' };
   if (matchPath('/admin/log', pathname)) return { title: 'Журнал', backTo: '/admin' };
   if (matchPath('/admin/ip-bans', pathname)) return { title: 'Блокировки IP', backTo: '/admin' };
   if (matchPath('/admin/chats/:chatId', pathname)) return { title: 'Режим чтения', backTo: '/admin' };
@@ -148,7 +148,7 @@ const RouteSwitch = memo(
         <Route path="/contacts" element={<ContactsScreen />} />
         <Route
           path="/contacts/:userId"
-          element={<UserProfileScreen backTo="/contacts" backLabel="Назад в контакты" canMessage />}
+          element={<StubScreen title="Контакт" backTo="/contacts" />}
         />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/settings/appearance" element={<AppearanceScreen />} />
@@ -162,10 +162,7 @@ const RouteSwitch = memo(
         <Route path="/profile/edit" element={<ProfileEditScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/users/:id" element={<AdminUserScreen />} />
-        <Route
-          path="/admin/users/:id/profile"
-          element={<UserProfileScreen backTo="/admin" backLabel="Назад в админ-панель" />}
-        />
+        <Route path="/admin/users/:id/profile" element={<UserProfileScreen />} />
         <Route path="/admin/log" element={<AdminLogScreen />} />
         <Route path="/admin/ip-bans" element={<IpBansScreen />} />
         <Route path="/admin/chats/:chatId" element={<AdminChatView />} />

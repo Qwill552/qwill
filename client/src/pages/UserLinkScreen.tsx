@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { getUserProfileByUsernameRequest } from '../api/users';
 import { useAuthStore } from '../stores/authStore';
+import { useChatStore } from '../stores/chatStore';
 import { Spinner } from '../ui/Spinner';
 import styles from './UserLinkScreen.module.css';
 
@@ -10,6 +10,7 @@ export function UserLinkScreen() {
   const { username = '' } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const myUsername = useAuthStore((s) => s.user?.username);
+  const startPrivateChat = useChatStore((s) => s.startPrivateChat);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -23,9 +24,9 @@ export function UserLinkScreen() {
     }
 
     let cancelled = false;
-    getUserProfileByUsernameRequest(username)
-      .then((profile) => {
-        if (!cancelled) navigate(`/contacts/${profile.id}`, { replace: true });
+    startPrivateChat(username)
+      .then((chat) => {
+        if (!cancelled) navigate(`/chats/${chat.id}/info`, { replace: true });
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -33,7 +34,7 @@ export function UserLinkScreen() {
     return () => {
       cancelled = true;
     };
-  }, [username, myUsername, navigate]);
+  }, [username, myUsername, navigate, startPrivateChat]);
 
   return (
     <main className={styles.screen}>

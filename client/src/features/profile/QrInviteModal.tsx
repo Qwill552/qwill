@@ -1,7 +1,6 @@
 import type { AvatarColor } from '@messenger/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { isDesktopShell } from '../../native/desktop';
 import { useAuthStore } from '../../stores/authStore';
 import { Avatar } from '../../ui/Avatar';
 import { Modal } from '../groups/Modal';
@@ -63,25 +62,15 @@ function QrInviteCard({ displayName, username, avatarUrl, avatarColor, onClose }
     [],
   );
 
-  const canShare = !isDesktopShell() && typeof navigator.share === 'function';
-
   async function copyLink(): Promise<void> {
-    await navigator.clipboard.writeText(link);
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      return;
+    }
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
-  }
-
-  async function handleShare(): Promise<void> {
-    if (canShare) {
-      try {
-        await navigator.share({ title: 'Qwill', text: `@${username}`, url: link });
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-      }
-    }
-    await copyLink().catch(() => setCopied(false));
   }
 
   return (
@@ -105,8 +94,8 @@ function QrInviteCard({ displayName, username, avatarUrl, avatarColor, onClose }
         <span className={styles.username}>{`@${username}`}</span>
         <span className={styles.hint}>Наведите камеру, чтобы открыть этот профиль в Qwill</span>
 
-        <button type="button" className={styles.share} onClick={() => void handleShare()}>
-          {copied ? 'Ссылка скопирована' : canShare ? 'Поделиться' : 'Скопировать ссылку'}
+        <button type="button" className={styles.share} onClick={() => void copyLink()}>
+          {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
         </button>
       </div>
     </Modal>
