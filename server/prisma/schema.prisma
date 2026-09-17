@@ -140,6 +140,7 @@ model Session {
 
   /// В БД только хэш refresh-токена; сам токен живёт лишь у клиента.
   refreshTokenHash String   @unique
+  previousTokenHash String?
   expiresAt        DateTime
   userAgent        String?
 
@@ -150,6 +151,7 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([previousTokenHash])
 }
 
 model Chat {

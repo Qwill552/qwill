@@ -13,6 +13,7 @@ import {
   clearSessionCookies,
   isCsrfTokenValid,
   issueCsrfToken,
+  readCsrfCookie,
   readRefreshToken,
   setSessionCookies,
 } from '../authCookies.js';
@@ -22,21 +23,25 @@ import { validateBody } from '../middleware/validate.js';
 
 export const authRouter: Router = Router();
 
-function requireCsrfToken(req: Request, res: Response, next: NextFunction): void {
+function requireCsrfToken(req: Request, _res: Response, next: NextFunction): void {
   if (isCsrfTokenValid(req)) {
     next();
     return;
   }
-  clearSessionCookies(res);
-  next(forbidden('Проверка запроса не пройдена, войдите заново'));
+  next(forbidden('Проверка запроса не пройдена, попробуйте ещё раз'));
 }
 
 function clientContext(req: Request): authService.ClientContext {
   return { userAgent: req.headers['user-agent'], ip: req.ip };
 }
 
-function respondWithSession(res: Response, tokens: authService.SessionTokens, status: number): void {
-  const csrfToken = issueCsrfToken();
+function respondWithSession(
+  res: Response,
+  tokens: authService.SessionTokens,
+  status: number,
+  keepCsrfToken?: string,
+): void {
+  const csrfToken = keepCsrfToken ?? issueCsrfToken();
   setSessionCookies(res, tokens.refreshToken, csrfToken);
   const body: AuthResponse = { accessToken: tokens.accessToken, user: tokens.user, csrfToken };
   res.status(status).json(body);
@@ -66,7 +71,7 @@ authRouter.post('/refresh', validateBody(refreshSchema), requireCsrfToken, (req,
 
   authService
     .refresh(token, clientContext(req))
-    .then((tokens) => respondWithSession(res, tokens, 200))
+    .then((tokens) => respondWithSession(res, tokens, 200, readCsrfCookie(req)))
     .catch(next);
 });
 

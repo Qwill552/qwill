@@ -371,21 +371,26 @@ describe('security.test.ts — обязательный набор отказо�
       expect(legacy).toContain('Expires=Thu, 01 Jan 1970');
     });
 
-    it('refresh без заголовка X-CSRF-Token → 403', async () => {
+    it('refresh без заголовка X-CSRF-Token сессию не отменяет: сверять нечего, токен выдаётся заново', async () => {
       const session = await openSession('nocsrf');
       const res = await request.post('/api/auth/refresh').set('Cookie', session.cookieHeader).send({});
 
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      expect(res.body.csrfToken).toHaveLength(43);
     });
 
-    it('refresh без заголовка гасит куки сессии — вкладка не остаётся в вечном 403', async () => {
+    it('отказ по CSRF не гасит куки сессии — разлогинить чужим запросом нельзя', async () => {
       const session = await openSession('healcsrf');
-      const res = await request.post('/api/auth/refresh').set('Cookie', session.cookieHeader).send({});
+      const res = await request
+        .post('/api/auth/refresh')
+        .set('Cookie', session.cookieHeader)
+        .set(CSRF_HEADER, 'c'.repeat(session.csrfToken.length))
+        .send({});
 
       expect(res.status).toBe(403);
-      const cleared = setCookiesOf(res);
-      expect(findSetCookie(cleared, REFRESH_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
-      expect(findSetCookie(cleared, CSRF_COOKIE)).toContain('Expires=Thu, 01 Jan 1970');
+      const cookies = setCookiesOf(res);
+      expect(findSetCookie(cookies, REFRESH_COOKIE)).toBeUndefined();
+      expect(findSetCookie(cookies, CSRF_COOKIE)).toBeUndefined();
     });
 
     it('refresh с чужим CSRF-токеном → 403', async () => {

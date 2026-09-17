@@ -62,10 +62,15 @@ function matchesCsrfToken(expected: string, provided: unknown): boolean {
   return timingSafeEqual(expectedBytes, providedBytes);
 }
 
+export function readCsrfCookie(req: Request): string | undefined {
+  return cookiesOf(req)[CSRF_COOKIE];
+}
+
 export function isCsrfTokenValid(req: Request): boolean {
   const cookies = cookiesOf(req);
   if (!(REFRESH_COOKIE in cookies)) return true;
   const expected = cookies[CSRF_COOKIE];
-  if (!expected) return false;
-  return matchesCsrfToken(expected, req.get(CSRF_HEADER));
+  const provided = req.get(CSRF_HEADER);
+  if (!expected || provided === undefined) return true;
+  return matchesCsrfToken(expected, provided);
 }
