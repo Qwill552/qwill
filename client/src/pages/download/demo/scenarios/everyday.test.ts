@@ -9,6 +9,8 @@ import {
   DIALOG_WITH_PUNCHLINE,
   DIALOG_WITH_VOICE,
   PRESS,
+  EMOJI_STRIP,
+  QUICK_REACTIONS,
   READ_AT_REST,
   READ_WITH_OWN_REPLY,
   REACTION_EMOJI,
@@ -85,6 +87,12 @@ describe('сценарий А', () => {
   it('реакция прилетает после того, как меню закрылось', () => {
     expect(at(sceneStart(8)).reactionMessageId).toBeNull();
     expect(at(sceneStart(9)).reactionMessageId).toBe('m5');
+  });
+
+  it('выбранный смайл есть в строке быстрых реакций, иначе подсвечивать нечего', () => {
+    expect(QUICK_REACTIONS).toContain(REACTION_EMOJI);
+    expect(EMOJI_STRIP).toContain(REACTION_EMOJI);
+    expect(new Set(EMOJI_STRIP).size).toBe(EMOJI_STRIP.length);
   });
 
   it('реакцию ставит пользователь: он держит пузырь, выбирает смайл, и чип появляется на нём', () => {

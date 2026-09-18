@@ -370,7 +370,7 @@ export const VOICE_PEAKS = [
 
 export const QUICK_REACTIONS: string[] = replicaEmoji.quick;
 
-export const EMOJI_STRIP: string[] = [...QUICK_REACTIONS, REACTION_EMOJI];
+export const EMOJI_STRIP: string[] = [...new Set([...QUICK_REACTIONS, REACTION_EMOJI])];
 
 export const EMOJI_STRIP_URL = '/download/emoji.webp';
 

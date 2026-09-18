@@ -26,7 +26,11 @@ export function PhoneDemo() {
   }, []);
 
   useEffect(() => {
-    for (const photo of ALBUM_PHOTOS) new Image().src = photo.src;
+    for (const photo of ALBUM_PHOTOS) {
+      const image = new Image();
+      image.src = photo.src;
+      void image.decode().catch(() => undefined);
+    }
     new Image().src = EMOJI_STRIP_URL;
   }, []);
 

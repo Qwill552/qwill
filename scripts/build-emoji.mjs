@@ -82,7 +82,7 @@ async function loadSynonyms() {
 
 async function buildReplicaStrip(imageDir, charToUnified) {
   const list = JSON.parse(await readFile(replicaStripListPath, 'utf8'));
-  const strip = [...list.quick, list.reaction];
+  const strip = [...new Set([...list.quick, list.reaction])];
 
   const composites = strip.map((char, i) => {
     const unified = charToUnified.get(char);

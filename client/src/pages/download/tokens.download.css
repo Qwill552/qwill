@@ -232,6 +232,7 @@
 
   --replica-bubble-media-max-w: 322px;
   --replica-bubble-media-max-h: 460px;
+  --replica-album-ratio: 8 / 9;
 
   --replica-push-dur: 440ms;
   --replica-push-ease: cubic-bezier(0.22, 1, 0.36, 1);
