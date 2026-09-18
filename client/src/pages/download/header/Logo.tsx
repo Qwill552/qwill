@@ -112,13 +112,26 @@ const FACETS: Facet[] = [
   },
 ];
 
+const SOFT_EDGE_DEVIATION = 0.65;
+
 export function Logo() {
   const instanceId = useId();
   const facetGradientId = (facet: Facet) => `${instanceId}${facet.name}`;
+  const softEdgeId = `${instanceId}soft-edge`;
 
   return (
     <svg className={styles.logo} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
       <defs>
+        <filter
+          id={softEdgeId}
+          x="-20%"
+          y="-20%"
+          width="140%"
+          height="140%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur stdDeviation={SOFT_EDGE_DEVIATION} />
+        </filter>
         {FACETS.map((facet) => (
           <linearGradient
             key={facet.name}
@@ -135,9 +148,11 @@ export function Logo() {
           </linearGradient>
         ))}
       </defs>
-      {FACETS.map((facet) => (
-        <path key={facet.name} d={facet.shape} fill={`url(#${facetGradientId(facet)})`} />
-      ))}
+      <g filter={`url(#${softEdgeId})`}>
+        {FACETS.map((facet) => (
+          <path key={facet.name} d={facet.shape} fill={`url(#${facetGradientId(facet)})`} />
+        ))}
+      </g>
     </svg>
   );
 }

@@ -13,8 +13,32 @@
   min-width: 0;
 }
 
-.logo {
+.logoMark {
+  position: relative;
+  display: grid;
   flex-shrink: 0;
+  place-items: center;
+  width: var(--header-logo-size);
+  height: var(--header-logo-size);
+}
+
+.logoMark::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--header-logo-size) * var(--logo-glow-spread) * -1);
+  border-radius: var(--radius-pill);
+  background: radial-gradient(
+    closest-side,
+    var(--logo-glow-core) 0%,
+    var(--logo-glow-mid) 22%,
+    var(--logo-glow-far) 52%,
+    var(--logo-glow-edge) 100%
+  );
+  pointer-events: none;
+}
+
+.logo {
+  position: relative;
   width: var(--header-logo-size);
   height: var(--header-logo-size);
 }

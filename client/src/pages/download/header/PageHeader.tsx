@@ -7,7 +7,9 @@ export function PageHeader() {
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
-        <Logo />
+        <span className={styles.logoMark}>
+          <Logo />
+        </span>
         <div className={styles.titles}>
           <h1 className={styles.title}>{CONTENT.title}</h1>
           <p className={styles.subtitle}>{CONTENT.subtitle}</p>

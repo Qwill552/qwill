@@ -11,6 +11,12 @@
   --header-title-size: 1.6em;
   --header-subtitle-size: 1em;
 
+  --logo-glow-spread: 0.75;
+  --logo-glow-core: rgb(255 226 240 / 46%);
+  --logo-glow-mid: rgb(255 190 222 / 22%);
+  --logo-glow-far: rgb(186 206 255 / 9%);
+  --logo-glow-edge: rgb(186 206 255 / 0%);
+
   --device-metal: #c7ccda;
   --device-glass: rgb(255 255 255 / 35%);
   --device-shadow: 0 24px 48px rgb(20 24 35 / 18%);
@@ -32,6 +38,12 @@
   --header-brand-gap: var(--space-3);
   --header-title-size: 1.6em;
   --header-subtitle-size: 1em;
+
+  --logo-glow-spread: 0.75;
+  --logo-glow-core: rgb(255 232 244 / 26%);
+  --logo-glow-mid: rgb(255 158 208 / 16%);
+  --logo-glow-far: rgb(138 176 255 / 8%);
+  --logo-glow-edge: rgb(138 176 255 / 0%);
 
   --device-metal: #2a2f3d;
   --device-glass: rgb(255 255 255 / 8%);
