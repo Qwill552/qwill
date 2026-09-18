@@ -164,6 +164,18 @@
   --reaction-mine-ink: var(--text-on-out);
 }
 
+.reactionMetaRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.reactionMetaHolder {
+  display: inline-flex;
+  padding-bottom: calc((var(--reaction-h) - var(--font-time)) / 2);
+}
+
 .bubbleReactedMedia .mediaBare {
   margin-bottom: 0;
 }

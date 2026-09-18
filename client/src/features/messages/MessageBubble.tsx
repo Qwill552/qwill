@@ -130,6 +130,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
   );
 
   const reactionsOutside = bareMedia && !hasHeader;
+  const metaInReactionRow = Boolean(hasReactions) && !bareMedia && !isVoice;
 
   const classes = [
     styles.bubble,
@@ -204,13 +205,17 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
                   onRetry={(clientId) => retryMessage(message.chatId, clientId)}
                 />
               ) : message.attachment ? (
-                <AttachmentView attachment={message.attachment} chatId={message.chatId} meta={fileOnly ? inlineMeta : undefined} />
+                <AttachmentView
+                  attachment={message.attachment}
+                  chatId={message.chatId}
+                  meta={fileOnly && !metaInReactionRow ? inlineMeta : undefined}
+                />
               ) : message.localAttachment ? (
                 <LocalAttachmentPreview
                   local={message.localAttachment}
                   onCancel={() => void cancelMessage(message.chatId, message.clientId!)}
                   onRetry={() => retryMessage(message.chatId, message.clientId!)}
-                  meta={fileOnly ? inlineMeta : undefined}
+                  meta={fileOnly && !metaInReactionRow ? inlineMeta : undefined}
                 />
               ) : null}
 
@@ -253,7 +258,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
                       ),
                     )
                   : null}
-                {!metaUnderCard && (
+                {!metaUnderCard && !metaInReactionRow && (
                   <span
                     className={styles.pad}
                     style={{ width: `var(--meta-w, ${own ? 68 : 46}px)` }}
@@ -261,7 +266,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
                   />
                 )}
               </span>
-              {!metaUnderCard && (
+              {!metaUnderCard && !metaInReactionRow && (
                 <MessageMeta
                   createdAt={message.createdAt}
                   own={own}
@@ -277,12 +282,21 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
               url={firstLink}
               own={own}
               onLinkClick={handleLinkClick}
-              meta={inlineMeta}
+              meta={metaInReactionRow ? undefined : inlineMeta}
             />
           )}
         </>
       )}
-      {reactionsOutside ? <span className={styles.reactionsOutside}>{children}</span> : children}
+      {metaInReactionRow ? (
+        <div className={styles.reactionMetaRow}>
+          {children}
+          <span className={styles.reactionMetaHolder}>{inlineMeta}</span>
+        </div>
+      ) : reactionsOutside ? (
+        <span className={styles.reactionsOutside}>{children}</span>
+      ) : (
+        children
+      )}
     </div>
   );
 }
