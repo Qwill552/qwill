@@ -158,11 +158,6 @@
 .reactionsOutside {
   display: block;
   margin: 0 calc(var(--bubble-pad-x) * -1);
-  --reaction-bg: var(--media-meta-bg);
-  --reaction-ink: var(--media-meta-ink);
-  --reaction-mine-bg: var(--primary);
-  --reaction-mine-border: transparent;
-  --reaction-mine-ink: var(--text-on-out);
 }
 
 .bubbleReactedMedia .mediaBare {

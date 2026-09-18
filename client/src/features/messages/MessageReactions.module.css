@@ -13,8 +13,8 @@
   padding: 0 var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
-  background: var(--reaction-bg, var(--surface-3));
-  color: var(--reaction-ink, var(--text-secondary));
+  background: var(--surface-3);
+  color: var(--text-secondary);
   font: inherit;
   font-size: var(--font-caption);
   line-height: 1;
@@ -23,9 +23,8 @@
 }
 
 .pillMine {
-  border-color: var(--reaction-mine-border, var(--primary));
-  background: var(--reaction-mine-bg, var(--reaction-bg, var(--surface-3)));
-  color: var(--reaction-mine-ink, var(--primary));
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .bump {
