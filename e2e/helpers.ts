@@ -40,10 +40,15 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
     await page.getByPlaceholder('Ваше имя').fill(user.displayName);
     await page.getByPlaceholder('Пароль').fill(user.password);
 
+    await page.getByRole('button', { name: 'Зарегистрироваться' }).first().click();
+
+    const consent = page.getByRole('dialog').getByRole('button', { name: 'Зарегистрироваться' });
+    await consent.waitFor({ state: 'visible', timeout: 10_000 });
+
     const answer = page
       .waitForResponse((response) => response.url().includes('/api/auth/register'), { timeout: 20_000 })
       .catch(() => null);
-    await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+    await consent.click();
     const response = await answer;
     if (response === null || response.status() !== 429) break;
 
@@ -59,7 +64,7 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
   }
 
   await page.waitForURL('**/chats');
-  await expect(page.getByText('Qwill')).toBeVisible();
+  await expect(page.getByText('Qwill').first()).toBeVisible();
 }
 
 /** Открывает приватный чат: строка поиска в шапке → единый поиск → клик по результату. */

@@ -5,6 +5,26 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}/
 
 let socket: Socket | null = null;
 
+interface PendingEmit {
+  event: string;
+  payload: unknown;
+}
+
+const pendingEmits: PendingEmit[] = [];
+
+function flushPendingEmits(target: Socket): void {
+  const queued = pendingEmits.splice(0, pendingEmits.length);
+  for (const item of queued) target.emit(item.event, item.payload);
+}
+
+export function emitWhenReady(event: string, payload: unknown): void {
+  if (socket) {
+    socket.emit(event, payload);
+    return;
+  }
+  pendingEmits.push({ event, payload });
+}
+
 /** Сообщает серверу текущую видимость вкладки — по ней сервер решает, слать ли push при новом сообщении. */
 function emitVisibility(): void {
   const payload: VisibilityPayload = { visible: document.visibilityState === 'visible' };
@@ -17,6 +37,7 @@ export function connectSocket(accessToken: string): Socket {
   if (socket) {
     socket.auth = { token: accessToken };
     if (!socket.connected) socket.connect();
+    flushPendingEmits(socket);
     return socket;
   }
 
@@ -26,10 +47,12 @@ export function connectSocket(accessToken: string): Socket {
   });
   socket.on('connect', emitVisibility);
   document.addEventListener('visibilitychange', emitVisibility);
+  flushPendingEmits(socket);
   return socket;
 }
 
 export function disconnectSocket(): void {
+  pendingEmits.length = 0;
   document.removeEventListener('visibilitychange', emitVisibility);
   socket?.disconnect();
   socket = null;

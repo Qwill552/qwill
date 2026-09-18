@@ -101,7 +101,7 @@ import {
   type FeedSide,
 } from '../features/messages/feedWindow';
 import { closeDesktopChatNotifications } from '../native/desktop';
-import { getSocket } from '../realtime/socket';
+import { emitWhenReady, getSocket } from '../realtime/socket';
 import { notifyDesktopOfMessage } from '../app/desktopNotify';
 import { useAuthStore } from './authStore';
 import { useCallStore } from './callStore';
@@ -1854,7 +1854,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   pinMessage(chatId, messageId) {
     // Итог приходит broadcast'ом chat:pinned — в комнату входит и сам закрепивший (bootstrapSocket).
-    getSocket()?.emit(SocketEvent.ChatPin, { chatId, messageId });
+    emitWhenReady(SocketEvent.ChatPin, { chatId, messageId });
   },
 
   forwardMessages(fromChatId, toChatId, messageIds) {
@@ -1877,7 +1877,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   toggleReaction(chatId, messageId, emoji) {
     // Итог приходит broadcast'ом message:reaction — в комнату входит и сам отправитель (bootstrapSocket).
-    getSocket()?.emit(SocketEvent.MessageReact, { chatId, messageId, emoji });
+    emitWhenReady(SocketEvent.MessageReact, { chatId, messageId, emoji });
   },
 
   markRead(chatId, messageId) {
@@ -2202,6 +2202,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Не часть публичного интерфейса стора — обновляет только набор реакций сообщения по id.
   applyReactionUpdate(event: MessageReactionEvent) {
+    const reacted = get().messagesByChat[event.chatId]?.find((m) => m.id === event.messageId);
+    if (reacted) void writeCachedMessages([{ ...reacted, reactions: event.reactions }]);
+
     set((state) => {
       const list = state.messagesByChat[event.chatId];
       const nextMessagesByChat = list

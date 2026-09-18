@@ -541,6 +541,8 @@ export async function reactToMessage(input: ReactToMessageInput): Promise<Messag
     await prisma.reaction.create({ data: { messageId: input.messageId, userId: input.userId, emoji: input.emoji } });
   }
 
+  await prisma.message.update({ where: { id: input.messageId }, data: { updatedAt: new Date() } });
+
   const reactions = await prisma.reaction.findMany({
     where: { messageId: input.messageId },
     orderBy: { createdAt: 'asc' },

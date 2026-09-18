@@ -2,6 +2,7 @@ import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';
+import { reactToMessage } from '../src/services/message.js';
 import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { prisma } from '../src/db/prisma.js';
 
@@ -81,6 +82,22 @@ describe('GET /api/chats/:chatId/sync', () => {
     expect(res.body.changed).toHaveLength(1);
     expect(res.body.changed[0].id).toBe(firstMessageId);
     expect(res.body.changed[0].content).toBe('исправленное');
+  });
+
+  it('реакция на старое сообщение приходит в changed вместе с набором реакций', async () => {
+    const before = await request.get(`/api/chats/${chatId}/sync?sinceId=0`).set('Authorization', `Bearer ${token}`);
+    const cursor = before.body.maxUpdatedAt as string;
+
+    await reactToMessage({ chatId, messageId: secondMessageId, userId: createdUserIds[0]!, emoji: '👍' });
+
+    const res = await request
+      .get(`/api/chats/${chatId}/sync?sinceId=${secondMessageId}&sinceUpdatedAt=${encodeURIComponent(cursor)}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const changed = res.body.changed as { id: number; reactions: { emoji: string }[] }[];
+    expect(changed.map((m) => m.id)).toContain(secondMessageId);
+    expect(changed.find((m) => m.id === secondMessageId)?.reactions.map((r) => r.emoji)).toEqual(['👍']);
   });
 
   it('чужому пользователю чат недоступен', async () => {

@@ -19,7 +19,7 @@ test('регистрация → вход → перезагрузка не вы
   await page.reload();
 
   await expect(page).toHaveURL(/\/chats/);
-  await expect(page.getByText('Qwill')).toBeVisible();
+  await expect(page.getByText('Qwill').first()).toBeVisible();
 });
 
 test('переписка двух пользователей в реальном времени', async ({ browser }) => {
