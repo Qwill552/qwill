@@ -4,14 +4,16 @@ export type ReplicaOverlay = 'none' | 'menu' | 'attach';
 
 export interface ReplicaState {
   screen: ReplicaScreen;
-  chatsScroll: number;
-  feedScroll: number;
   composerText: string;
   overlay: ReplicaOverlay;
   recording: boolean;
   menuMessageId: string | null;
-  menuAnchor: { top: number; left: number };
   visibleMessages: number;
+}
+
+export interface ScreenSurface {
+  viewport: (node: HTMLElement | null) => void;
+  inner: (node: HTMLElement | null) => void;
 }
 
 export interface ReplicaPerson {
@@ -159,6 +161,97 @@ export const CHAT_ROWS: ReplicaChatRow[] = [
     icon: 'camera',
     sent: true,
   },
+  {
+    id: 'garage',
+    title: 'Гаражи',
+    preview: 'Кто последний брал домкрат',
+    authorPrefix: 'Серёга: ',
+    time: 'Сб',
+    unread: 0,
+    online: false,
+    muted: false,
+    official: false,
+    icon: null,
+    sent: false,
+  },
+  {
+    id: 'lena',
+    title: 'Лена Астахова',
+    preview: 'Поздравляю!',
+    authorPrefix: '',
+    time: 'Пт',
+    unread: 0,
+    online: false,
+    muted: false,
+    official: false,
+    icon: null,
+    sent: false,
+  },
+  {
+    id: 'work',
+    title: 'Смена, вторая бригада',
+    preview: 'Голосовое сообщение',
+    authorPrefix: 'Игорь: ',
+    time: 'Пт',
+    unread: 0,
+    online: false,
+    muted: true,
+    official: false,
+    icon: 'mic',
+    sent: false,
+  },
+  {
+    id: 'oleg',
+    title: 'Олег Сенцов',
+    preview: 'Скинь адрес, подъеду',
+    authorPrefix: 'Вы: ',
+    time: 'Чт',
+    unread: 0,
+    online: false,
+    muted: false,
+    official: false,
+    icon: null,
+    sent: true,
+  },
+  {
+    id: 'garden',
+    title: 'Рассада и прочее',
+    preview: 'Фото',
+    authorPrefix: 'Тамара: ',
+    time: 'Чт',
+    unread: 0,
+    online: false,
+    muted: true,
+    official: false,
+    icon: 'camera',
+    sent: false,
+  },
+  {
+    id: 'vika',
+    title: 'Вика Дорн',
+    preview: 'Хорошо, до завтра',
+    authorPrefix: '',
+    time: '12 мая',
+    unread: 0,
+    online: false,
+    muted: false,
+    official: false,
+    icon: null,
+    sent: false,
+  },
+  {
+    id: 'saved',
+    title: 'Избранное',
+    preview: 'Пароль от роутера',
+    authorPrefix: 'Вы: ',
+    time: '11 мая',
+    unread: 0,
+    online: false,
+    muted: false,
+    official: false,
+    icon: null,
+    sent: true,
+  },
 ];
 
 export const CHAT_FILTERS = ['Все', 'Непрочитанные', 'Личные', 'Группы'] as const;
@@ -274,25 +367,31 @@ export const REPLICA_TEXT = {
   voiceSpeed: '1×',
 } as const;
 
-const BASE_STATE: ReplicaState = {
-  screen: 'chat',
-  chatsScroll: 0,
-  feedScroll: 0,
+export const MENU_ANCHOR_FALLBACK = { top: 360, left: 12 } as const;
+
+export const MENU_ANCHORS: Record<string, { top: number; left: number }> = {
+  m7: { top: 300, left: 12 },
+};
+
+export const REPLICA_REST: ReplicaState = {
+  screen: 'chats',
   composerText: '',
   overlay: 'none',
   recording: false,
   menuMessageId: null,
-  menuAnchor: { top: 360, left: 12 },
   visibleMessages: DIALOG.length,
 };
 
 export const REPLICA_PRESETS = {
-  chats: { ...BASE_STATE, screen: 'chats' },
-  chat: BASE_STATE,
-  menu: { ...BASE_STATE, overlay: 'menu', menuMessageId: 'm7', menuAnchor: { top: 300, left: 12 } },
-  attach: { ...BASE_STATE, overlay: 'attach' },
-  recording: { ...BASE_STATE, recording: true },
-  typing: { ...BASE_STATE, composerText: 'Соболезную. Чем помочь?', visibleMessages: 5 },
+  chats: REPLICA_REST,
+  chat: { ...REPLICA_REST, screen: 'chat' },
+  menu: { ...REPLICA_REST, screen: 'chat', overlay: 'menu', menuMessageId: 'm7' },
+  attach: { ...REPLICA_REST, screen: 'chat', overlay: 'attach' },
+  recording: { ...REPLICA_REST, screen: 'chat', recording: true },
+  typing: {
+    ...REPLICA_REST,
+    screen: 'chat',
+    composerText: 'Соболезную. Чем помочь?',
+    visibleMessages: 5,
+  },
 } as const satisfies Record<string, ReplicaState>;
-
-export const INITIAL_REPLICA_STATE: ReplicaState = REPLICA_PRESETS.chat;

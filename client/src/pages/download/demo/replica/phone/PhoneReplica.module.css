@@ -3,10 +3,58 @@
   overflow: hidden;
   height: 100%;
   font-family: var(--font-display);
+  user-select: none;
   --safe-top: 52px;
   --safe-bottom: 0px;
   --safe-left: 0px;
   --safe-right: 0px;
   --bubble-media-max-w: var(--replica-bubble-media-max-w);
   --bubble-media-max-h: var(--replica-bubble-media-max-h);
+}
+
+.layer {
+  position: absolute;
+  overflow: hidden;
+  inset: 0;
+  will-change: transform;
+}
+
+.root {
+  z-index: 1;
+  transform: none;
+  transition: transform var(--replica-pop-dur) var(--replica-pop-ease);
+}
+
+.rootPushed {
+  transform: translateX(-22%) scale(0.955);
+  transition: transform var(--replica-push-dur) var(--replica-push-ease);
+  pointer-events: none;
+}
+
+.pushed {
+  z-index: 2;
+  transform: translateX(100%);
+  transition: transform var(--replica-pop-dur) var(--replica-pop-ease);
+  pointer-events: none;
+}
+
+.pushedOpen {
+  transform: translateX(0);
+  transition: transform var(--replica-push-dur) var(--replica-push-ease);
+  pointer-events: auto;
+}
+
+.scrim {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  background: var(--replica-screen-scrim);
+  opacity: 0;
+  transition: opacity var(--replica-pop-dur) var(--replica-pop-ease);
+  pointer-events: none;
+}
+
+.scrimLit {
+  opacity: var(--replica-screen-scrim-opacity);
+  transition: opacity var(--replica-push-dur) var(--replica-push-ease);
 }

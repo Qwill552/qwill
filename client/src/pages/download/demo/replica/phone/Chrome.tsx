@@ -101,9 +101,9 @@ export function ChromeBar({ className, children }: ChromeBarProps) {
   return <div className={cx(styles.bar, className)}>{children}</div>;
 }
 
-export function GlassButton({ icon, size = 22 }: { icon: IconName; size?: number }) {
+export function GlassButton({ icon, size = 22, tap }: { icon: IconName; size?: number; tap?: string }) {
   return (
-    <span className={styles.glassButton}>
+    <span className={styles.glassButton} data-demo-tap={tap}>
       <Icon name={icon} size={size} />
     </span>
   );

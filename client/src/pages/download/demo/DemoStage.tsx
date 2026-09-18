@@ -1,12 +1,9 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import { DEMO_SCALE, PHONE_BODY } from '../config';
 import { PhoneShell } from '../devices/PhoneShell';
 import styles from './DemoStage.module.css';
-
-interface DemoStageProps {
-  children: ReactNode;
-}
+import { PhoneDemo } from './PhoneDemo';
 
 function fitScale(hostWidth: number, viewportHeight: number): number {
   const byWidth = hostWidth / PHONE_BODY.width;
@@ -15,7 +12,7 @@ function fitScale(hostWidth: number, viewportHeight: number): number {
   return Math.max(Math.round(fit * 1000) / 1000, DEMO_SCALE.min);
 }
 
-export function DemoStage({ children }: DemoStageProps) {
+export function DemoStage() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<number>(DEMO_SCALE.min);
 
@@ -43,7 +40,9 @@ export function DemoStage({ children }: DemoStageProps) {
         aria-hidden="true"
       >
         <div className={styles.scaled}>
-          <PhoneShell>{children}</PhoneShell>
+          <PhoneShell>
+            <PhoneDemo />
+          </PhoneShell>
         </div>
       </div>
     </div>

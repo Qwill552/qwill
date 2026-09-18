@@ -1,15 +1,16 @@
 import { Avatar, ChromeBar, GlassButton, HeaderPill } from './Chrome';
 import { DayDivider, MessageRow } from './Bubble';
 import { Composer } from './Composer';
-import { DIALOG, PEOPLE, REPLICA_TEXT, type ReplicaState } from './demoData';
+import { DIALOG, PEOPLE, REPLICA_TEXT, type ReplicaState, type ScreenSurface } from './demoData';
 import styles from './ChatScreen.module.css';
 
 interface ChatScreenProps {
   state: ReplicaState;
   hiddenMessageId: string | null;
+  surface?: ScreenSurface;
 }
 
-export function ChatScreen({ state, hiddenMessageId }: ChatScreenProps) {
+export function ChatScreen({ state, hiddenMessageId, surface }: ChatScreenProps) {
   const messages = DIALOG.slice(0, state.visibleMessages);
 
   return (
@@ -18,8 +19,8 @@ export function ChatScreen({ state, hiddenMessageId }: ChatScreenProps) {
         <div className={styles.pattern} />
       </div>
 
-      <div className={styles.feed}>
-        <div className={styles.feedInner} style={{ transform: `translateY(${-state.feedScroll}px)` }}>
+      <div className={styles.feed} ref={surface?.viewport}>
+        <div className={styles.feedInner} ref={surface?.inner}>
           {messages.map((message) => (
             <div key={message.id}>
               {message.day && <DayDivider label={message.day} />}
@@ -32,7 +33,7 @@ export function ChatScreen({ state, hiddenMessageId }: ChatScreenProps) {
       <div className={styles.headerFade} />
 
       <ChromeBar className={styles.header}>
-        <GlassButton icon="back" />
+        <GlassButton icon="back" tap="chats" />
         <HeaderPill
           title={PEOPLE.artem.name}
           subtitle={REPLICA_TEXT.chatSubtitle}

@@ -1,15 +1,15 @@
 import { Icon } from '../../../../../ui/Icon';
 import { Avatar, Badge, Chip, DotsGlyph, Fab, OfficialMark, SearchGlyph, TabBar } from './Chrome';
-import { CHAT_FILTERS, CHAT_ROWS, REPLICA_TEXT } from './demoData';
+import { CHAT_FILTERS, CHAT_ROWS, REPLICA_TEXT, type ScreenSurface } from './demoData';
 import styles from './ChatsScreen.module.css';
 
 interface ChatsScreenProps {
-  scroll: number;
+  surface?: ScreenSurface;
 }
 
 const UNREAD_TOTAL = CHAT_ROWS.reduce((sum, row) => sum + row.unread, 0);
 
-export function ChatsScreen({ scroll }: ChatsScreenProps) {
+export function ChatsScreen({ surface }: ChatsScreenProps) {
   return (
     <div className={styles.screen}>
       <div className={styles.top}>
@@ -39,10 +39,10 @@ export function ChatsScreen({ scroll }: ChatsScreenProps) {
         </div>
       </div>
 
-      <div className={styles.list}>
-        <div className={styles.listInner} style={{ transform: `translateY(${-scroll}px)` }}>
+      <div className={styles.list} ref={surface?.viewport}>
+        <div className={styles.listInner} ref={surface?.inner}>
           {CHAT_ROWS.map((row) => (
-            <div key={row.id} className={styles.row}>
+            <div key={row.id} className={styles.row} data-demo-tap="chat">
               <Avatar label={row.title} colorKey={row.id} size={52} online={row.online} shadow />
               <div className={styles.body}>
                 <div className={styles.rowTop}>

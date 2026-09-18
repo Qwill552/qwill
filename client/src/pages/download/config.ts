@@ -45,3 +45,32 @@ export const DEMO_SCALE = {
   min: 0.3,
   heightRatio: 0.78,
 } as const;
+
+export const DEMO_CLOCK = {
+  maxFrameMs: 50,
+} as const;
+
+export const DEMO_RETURN = {
+  idleMs: 900,
+  discreteIdleMs: 1600,
+  inertiaTauMs: 320,
+  springStiffness: 282,
+  springDamping: 34,
+  springStepMs: 4,
+  settleOffset: 0.4,
+  settleVelocity: 0.03,
+} as const;
+
+export const DEMO_GESTURE = {
+  velocityWindowMs: 90,
+  maxVelocity: 3.2,
+  rubberFactor: 0.55,
+  tapSlopPx: 9,
+  tapMaxMs: 500,
+} as const;
+
+export const DEMO_REDUCED_FRAME_MS = 7200;
+
+export const DEMO_HINT_VISIBLE_MS = 2000;
+
+export const DEMO_GLOW_SIZE = 280;

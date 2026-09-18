@@ -221,6 +221,32 @@
 
   --replica-bubble-media-max-w: 322px;
   --replica-bubble-media-max-h: 460px;
+
+  --replica-push-dur: 440ms;
+  --replica-push-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --replica-pop-dur: 340ms;
+  --replica-pop-ease: cubic-bezier(0.32, 0, 0.22, 1);
+  --replica-screen-scrim: #000;
+  --replica-screen-scrim-opacity: 0.45;
+
+  --demo-glow:
+    radial-gradient(
+      circle closest-side,
+      rgb(255 255 255 / 15%) 0%,
+      rgb(255 255 255 / 7%) 42%,
+      rgb(255 255 255 / 0%) 100%
+    );
+  --demo-hint-bg: rgba(var(--pulse-dock), 0.72);
+  --demo-hint-border: rgba(var(--pulse-glass), 0.14);
+  --demo-hint-blur: blur(14px) saturate(180%);
+  --demo-hint-ink: rgb(var(--pulse-ink));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --replica-push-dur: 1ms;
+    --replica-pop-dur: 1ms;
+  }
 }
 
 :root[data-theme='dark'],

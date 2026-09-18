@@ -3,6 +3,7 @@ export const CONTENT = {
   subtitle: 'Просто будь на связи.',
   themeToggleLabel: 'Сменить тему',
   demoPlaceholder: 'Здесь будет демо',
+  demoHint: 'Можно трогать',
   osSwitch: {
     label: 'Операционная система',
     android: 'Android',

@@ -1,8 +1,6 @@
 import { PHONE_LOGICAL } from './config';
 import { CONTENT } from './content';
 import { DemoStage } from './demo/DemoStage';
-import { INITIAL_REPLICA_STATE } from './demo/replica/phone/demoData';
-import { PhoneReplica } from './demo/replica/phone/PhoneReplica';
 import { DownloadButton } from './download-button/DownloadButton';
 import styles from './DownloadPage.module.css';
 import { PageHeader } from './header/PageHeader';
@@ -22,9 +20,7 @@ export function DownloadPage() {
         <PageHeader />
         <OsSwitch os={os} onChange={setOs} />
         {os === 'android' ? (
-          <DemoStage>
-            <PhoneReplica state={INITIAL_REPLICA_STATE} />
-          </DemoStage>
+          <DemoStage />
         ) : (
           <div
             className={styles.demoStub}
