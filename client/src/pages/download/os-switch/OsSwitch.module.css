@@ -18,7 +18,7 @@
   left: 3px;
   width: calc((100% - 6px - 2px) / 2);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
   box-shadow: var(--card-shadow);
   transform: translateX(calc(var(--os-index) * (100% + 2px)));
   transition: transform var(--dur-tab) var(--ease-screen);
@@ -45,7 +45,7 @@
 }
 
 .tabActive {
-  color: var(--text-primary);
+  color: var(--text-on-primary);
 }
 
 .tab:focus-visible {
