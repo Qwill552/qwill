@@ -22,7 +22,7 @@
   color: rgb(var(--pulse-ink));
 }
 
-:global(:root[data-theme='dark']) .in {
+:global(:root[data-theme='dark']) .in:not(.bubbleBare) {
   background: var(--message-in);
   backdrop-filter: none;
 }
