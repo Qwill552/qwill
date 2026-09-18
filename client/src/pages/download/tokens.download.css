@@ -18,10 +18,10 @@
   --logo-glow-edge: rgb(186 206 255 / 0%);
 
   --device-body:
-    linear-gradient(168deg, #9aa08e 0%, #7c8271 16%, #6d7362 48%, #767c6b 80%, #949a88 100%);
-  --device-edge: #5c6152;
+    linear-gradient(168deg, #b9bfae 0%, #9aa190 18%, #8d9483 50%, #99a08f 82%, #b3b9a8 100%);
+  --device-edge: #ccd1c1;
   --device-bezel: #0a0b0d;
-  --device-button: #5f6554;
+  --device-button: #7d8475;
   --device-glare:
     linear-gradient(
       176deg,
@@ -71,10 +71,10 @@
   --logo-glow-edge: rgb(138 176 255 / 0%);
 
   --device-body:
-    linear-gradient(168deg, #9aa08e 0%, #7c8271 16%, #6d7362 48%, #767c6b 80%, #949a88 100%);
-  --device-edge: #5c6152;
+    linear-gradient(168deg, #b9bfae 0%, #9aa190 18%, #8d9483 50%, #99a08f 82%, #b3b9a8 100%);
+  --device-edge: #ccd1c1;
   --device-bezel: #0a0b0d;
-  --device-button: #5f6554;
+  --device-button: #7d8475;
   --device-glare:
     linear-gradient(
       176deg,
