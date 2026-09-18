@@ -192,6 +192,18 @@
   --replica-bubble-out-shadow:
     0 12px 26px -16px rgb(90 120 255 / 95%),
     inset 0 1px 0 rgba(var(--pulse-glass), 0.25);
+  --replica-reaction-bg: var(--surface-3);
+  --replica-reaction-ink: var(--text-secondary);
+  --replica-reaction-mine-border: var(--primary);
+  --replica-reaction-mine-bg: var(--surface-3);
+  --replica-reaction-mine-ink: var(--primary);
+
+  --replica-voice-play-bg: var(--primary);
+  --replica-voice-play-ink: var(--text-on-out);
+  --replica-voice-play-own-bg: var(--text-on-out);
+  --replica-voice-play-own-ink: var(--primary);
+  --replica-voice-dot-bg: color-mix(in srgb, currentcolor 35%, transparent);
+
   --replica-meta-ink: rgba(var(--pulse-ink), 0.4);
   --replica-meta-on-out-ink: rgb(255 255 255 / 85%);
 

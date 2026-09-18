@@ -1,3 +1,5 @@
+import replicaEmoji from './replicaEmoji.json';
+
 export type ReplicaScreen = 'chats' | 'chat';
 
 export type ReplicaOverlay = 'none' | 'menu' | 'attach';
@@ -338,7 +340,7 @@ export const VOICE_RECORD_SECONDS = 3;
 
 export const TYPED_MESSAGE = 'Соболезную. Чем помочь?';
 
-export const REACTION_EMOJI = '😔';
+export const REACTION_EMOJI: string = replicaEmoji.reaction;
 
 export const DIALOG: ReplicaMessage[] = [
   message({ id: 'm1', own: false, time: '22:14', text: 'Она опять всю ночь шумела', day: 'Вчера' }),
@@ -349,7 +351,7 @@ export const DIALOG: ReplicaMessage[] = [
   message({ id: 'm6', own: true, time: '09:19', text: TYPED_MESSAGE }),
   message({ id: 'm7', own: false, time: '09:20', text: 'Приезжай с отвёрткой' }),
   message({ id: 'm8', own: false, time: '09:20', kind: 'album' }),
-  message({ id: 'm9', own: false, time: '09:21', kind: 'voice', voiceDuration: '0:03' }),
+  message({ id: 'm9', own: true, time: '09:21', kind: 'voice', voiceDuration: '0:03' }),
 ];
 
 export const DIALOG_BEFORE_REPLY = 5;
@@ -366,7 +368,16 @@ export const VOICE_PEAKS = [
   0.95, 0.68, 0.45, 0.31, 0.58, 0.83, 0.72, 0.5, 0.36, 0.62, 0.88, 0.59, 0.42, 0.26,
 ];
 
-export const QUICK_REACTIONS = ['❤️', '👍', '🔥', '😁', '😢', '🙏', '👏', '😱'];
+export const QUICK_REACTIONS: string[] = replicaEmoji.quick;
+
+export const EMOJI_STRIP: string[] = [...QUICK_REACTIONS, REACTION_EMOJI];
+
+export const EMOJI_STRIP_URL = '/download/emoji.webp';
+
+export const REPLICA_EMOJI_SIZE = {
+  menu: 22,
+  pill: 16,
+} as const;
 
 export const MESSAGE_MENU_ITEMS = [
   { id: 'reply', icon: 'reply', label: 'Ответить' },

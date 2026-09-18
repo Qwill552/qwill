@@ -48,6 +48,7 @@ export default defineConfig(() => {
           globIgnores: [
             '**/wallpaper/patterns/*.svg',
             '**/download/album/*.jpg',
+            '**/download/emoji.webp',
             'notification.html',
             'assets/notification-*.js',
             'assets/notification-*.css',

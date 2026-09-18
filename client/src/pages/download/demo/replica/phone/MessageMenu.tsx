@@ -9,9 +9,11 @@ import {
   MENU_GAP,
   MESSAGE_MENU_ITEMS,
   QUICK_REACTIONS,
+  REPLICA_EMOJI_SIZE,
   type MenuAnchor,
   type ReplicaMessage,
 } from './demoData';
+import { ReplicaEmoji } from './ReplicaEmoji';
 import styles from './MessageMenu.module.css';
 
 interface MessageMenuProps {
@@ -71,7 +73,7 @@ export function MessageMenu({ message, rootRef, open, picked }: MessageMenuProps
                   key={emoji}
                   className={cx(styles.reactionButton, emoji === picked && styles.reactionPicked)}
                 >
-                  {emoji}
+                  <ReplicaEmoji emoji={emoji} size={REPLICA_EMOJI_SIZE.menu} />
                 </span>
               ))}
             </div>

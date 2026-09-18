@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { discreteOf, scenarioDuration, targetAt, type DemoTarget } from '../engine/timeline';
 import {
+  DIALOG,
   DIALOG_BEFORE_REPLY,
   DIALOG_WITH_ALBUM,
   DIALOG_WITH_OWN_REPLY,
@@ -84,6 +85,21 @@ describe('сценарий А', () => {
   it('реакция прилетает после того, как меню закрылось', () => {
     expect(at(sceneStart(8)).reactionMessageId).toBeNull();
     expect(at(sceneStart(9)).reactionMessageId).toBe('m5');
+  });
+
+  it('реакцию ставит пользователь: он держит пузырь, выбирает смайл, и чип появляется на нём', () => {
+    expect(at(sceneStart(5)).pressed).toBe(PRESS.bubble);
+    expect(at(sceneStart(7)).menuPick).toBe(REACTION_EMOJI);
+    expect(at(sceneStart(9)).reactionMessageId).toBe(PRESS.bubble);
+    expect(DIALOG.find((message) => message.id === PRESS.bubble)?.own).toBe(false);
+  });
+
+  it('голосовое записывает и отправляет пользователь, поэтому оно своё', () => {
+    const voice = DIALOG[DIALOG_WITH_VOICE - 1];
+    expect(voice?.kind).toBe('voice');
+    expect(voice?.own).toBe(true);
+    expect(at(sceneStart(18)).pressed).toBe(PRESS.mic);
+    expect(at(sceneStart(19)).readUpTo).toBeLessThan(DIALOG_WITH_VOICE);
   });
 
   it('реакция стоит раньше набора текста', () => {

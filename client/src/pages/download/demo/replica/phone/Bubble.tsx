@@ -1,6 +1,13 @@
 import { Icon } from '../../../../../ui/Icon';
 import { cx } from './Chrome';
-import { ALBUM_PHOTOS, REPLICA_TEXT, VOICE_PEAKS, type ReplicaMessage } from './demoData';
+import {
+  ALBUM_PHOTOS,
+  REPLICA_EMOJI_SIZE,
+  REPLICA_TEXT,
+  VOICE_PEAKS,
+  type ReplicaMessage,
+} from './demoData';
+import { ReplicaEmoji } from './ReplicaEmoji';
 import styles from './Bubble.module.css';
 
 const META_PAD = { own: 68, other: 46 } as const;
@@ -14,7 +21,7 @@ export function DayDivider({ label }: { label: string }) {
   );
 }
 
-type MetaVariant = 'anchored' | 'overlay' | 'inBubble';
+type MetaVariant = 'anchored' | 'overlay' | 'inBubble' | 'inline';
 
 interface MetaProps {
   message: ReplicaMessage;
@@ -30,6 +37,7 @@ function Meta({ message, read, variant = 'anchored' }: MetaProps) {
         variant === 'overlay' && styles.metaOverlay,
         variant === 'anchored' && styles.metaAnchored,
         variant === 'inBubble' && styles.metaInBubble,
+        variant === 'inline' && styles.metaInline,
         message.own && styles.metaOnOut,
       )}
     >
@@ -63,7 +71,7 @@ function Album() {
 function Voice({ message, read }: { message: ReplicaMessage; read: boolean }) {
   return (
     <>
-      <div className={styles.voiceHead}>
+      <div className={cx(styles.voiceHead, message.own && styles.voiceHeadOwn)}>
         <span className={styles.voicePlay}>
           <Icon name="play" size={22} />
         </span>
@@ -77,7 +85,10 @@ function Voice({ message, read }: { message: ReplicaMessage; read: boolean }) {
           ))}
         </div>
       </div>
-      <div className={styles.voiceFoot} style={{ paddingRight: `${META_PAD.other}px` }}>
+      <div
+        className={styles.voiceFoot}
+        style={{ paddingRight: `${message.own ? META_PAD.own : META_PAD.other}px` }}
+      >
         <span className={styles.voiceDuration}>{message.voiceDuration}</span>
         <span className={styles.voiceDot} />
         <span className={styles.voiceSpeed}>{REPLICA_TEXT.voiceSpeed}</span>
@@ -87,8 +98,15 @@ function Voice({ message, read }: { message: ReplicaMessage; read: boolean }) {
   );
 }
 
-export function Bubble({ message, read = false }: { message: ReplicaMessage; read?: boolean }) {
+interface BubbleProps {
+  message: ReplicaMessage;
+  read?: boolean;
+  reaction?: string | null;
+}
+
+export function Bubble({ message, read = false, reaction = null }: BubbleProps) {
   const bare = message.kind === 'album';
+  const inlineReaction = message.kind === 'text' ? reaction : null;
 
   return (
     <div className={cx(styles.bubble, message.own ? styles.out : styles.in, bare && styles.bubbleMedia)}>
@@ -107,13 +125,24 @@ export function Bubble({ message, read = false }: { message: ReplicaMessage; rea
         <span className={styles.textRow}>
           <span className={styles.text}>
             {message.text}
-            <span
-              className={styles.pad}
-              style={{ width: `${message.own ? META_PAD.own : META_PAD.other}px` }}
-            />
+            {!inlineReaction && (
+              <span
+                className={styles.pad}
+                style={{ width: `${message.own ? META_PAD.own : META_PAD.other}px` }}
+              />
+            )}
           </span>
-          <Meta message={message} read={read} />
+          {!inlineReaction && <Meta message={message} read={read} />}
         </span>
+      )}
+
+      {inlineReaction && (
+        <div className={styles.reactionMetaRow}>
+          <Reactions emoji={inlineReaction} />
+          <span className={styles.reactionMetaHolder}>
+            <Meta message={message} read={read} variant="inline" />
+          </span>
+        </div>
       )}
     </div>
   );
@@ -122,9 +151,9 @@ export function Bubble({ message, read = false }: { message: ReplicaMessage; rea
 export function Reactions({ emoji }: { emoji: string }) {
   return (
     <div className={styles.reactionRow}>
-      <span className={cx(styles.reactionPill, styles.reactionLanding)}>
-        <span className={styles.reactionEmoji}>{emoji}</span>
-        <span className={styles.reactionCount}>1</span>
+      <span className={cx(styles.reactionPill, styles.reactionMine, styles.reactionBump)}>
+        <ReplicaEmoji emoji={emoji} size={REPLICA_EMOJI_SIZE.pill} />
+        <span className={cx(styles.reactionCount, styles.reactionCountRoll)}>1</span>
       </span>
     </div>
   );
@@ -139,6 +168,8 @@ interface MessageRowProps {
 }
 
 export function MessageRow({ message, read, reaction, held, hidden }: MessageRowProps) {
+  const outsideReaction = message.kind === 'text' ? null : reaction;
+
   return (
     <div className={cx(styles.row, message.own && styles.rowOwn)}>
       <div
@@ -151,8 +182,8 @@ export function MessageRow({ message, read, reaction, held, hidden }: MessageRow
         )}
         data-demo-message={message.id}
       >
-        <Bubble message={message} read={read} />
-        {reaction && <Reactions emoji={reaction} />}
+        <Bubble message={message} read={read} reaction={reaction} />
+        {outsideReaction && <Reactions emoji={outsideReaction} />}
       </div>
     </div>
   );

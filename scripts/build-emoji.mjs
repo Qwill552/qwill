@@ -27,6 +27,19 @@ const CATEGORY_LABELS = {
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(scriptDir, '..', 'client', 'public', 'emoji');
 const synonymsPath = path.join(scriptDir, 'emoji-synonyms.json');
+const replicaStripListPath = path.join(
+  scriptDir,
+  '..',
+  'client',
+  'src',
+  'pages',
+  'download',
+  'demo',
+  'replica',
+  'phone',
+  'replicaEmoji.json',
+);
+const replicaStripOutDir = path.join(scriptDir, '..', 'client', 'public', 'download');
 
 function resolvePackageRoot() {
   const packageJsonPath = require.resolve('emoji-datasource-apple/package.json');
@@ -65,6 +78,28 @@ async function loadRussianKeywords() {
 async function loadSynonyms() {
   const raw = JSON.parse(await readFile(synonymsPath, 'utf8'));
   return new Map(Object.entries(raw));
+}
+
+async function buildReplicaStrip(imageDir, charToUnified) {
+  const list = JSON.parse(await readFile(replicaStripListPath, 'utf8'));
+  const strip = [...list.quick, list.reaction];
+
+  const composites = strip.map((char, i) => {
+    const unified = charToUnified.get(char);
+    if (!unified) throw new Error(`Нет картинки для эмодзи страницы загрузки: ${char}`);
+    return { input: path.join(imageDir, `${unified.toLowerCase()}.png`), left: i * CELL, top: 0 };
+  });
+
+  await mkdir(replicaStripOutDir, { recursive: true });
+
+  await sharp({
+    create: { width: strip.length * CELL, height: CELL, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite(composites)
+    .webp({ quality: 92 })
+    .toFile(path.join(replicaStripOutDir, 'emoji.webp'));
+
+  console.log(`Лента эмодзи страницы загрузки: ${strip.length} шт. → ${replicaStripOutDir}`);
 }
 
 async function main() {
@@ -151,6 +186,11 @@ async function main() {
 
   const index = { cell: CELL, cols: COLS, rows, categories: categoryOrder, emoji: indexEmoji };
   await writeFile(path.join(outDir, 'index.json'), JSON.stringify(index));
+
+  await buildReplicaStrip(
+    imageDir,
+    new Map(entries.map((entry) => [codepointsToChar(entry.unified), entry.unified])),
+  );
 
   console.log(`Готово: ${entries.length} эмодзи, лист ${COLS}×${rows} ячеек по ${CELL}px → ${outDir}`);
 }

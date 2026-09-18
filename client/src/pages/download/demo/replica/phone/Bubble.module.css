@@ -127,6 +127,11 @@
   color: var(--replica-meta-on-out-ink);
 }
 
+.metaInline {
+  color: inherit;
+  opacity: 0.75;
+}
+
 .metaOverlay {
   padding: 3px var(--space-2);
   border-radius: var(--radius-pill);
@@ -214,8 +219,13 @@
   flex-shrink: 0;
   place-items: center;
   border-radius: 50%;
-  background: var(--primary);
-  color: var(--text-on-out);
+  background: var(--replica-voice-play-bg);
+  color: var(--replica-voice-play-ink);
+}
+
+.voiceHeadOwn .voicePlay {
+  background: var(--replica-voice-play-own-bg);
+  color: var(--replica-voice-play-own-ink);
 }
 
 .voiceWave {
@@ -255,7 +265,7 @@
   height: 5px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--primary);
+  background: var(--replica-voice-dot-bg);
 }
 
 .voiceSpeed {
@@ -265,6 +275,18 @@
   font-size: 0.72em;
   font-weight: 600;
   opacity: 0.75;
+}
+
+.reactionMetaRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.reactionMetaHolder {
+  display: inline-flex;
+  padding-bottom: calc((var(--reaction-h) - var(--font-time)) / 2);
 }
 
 .reactionRow {
@@ -282,15 +304,16 @@
   padding: 0 var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
-  background: var(--surface-3);
-  color: var(--text-secondary);
+  background: var(--replica-reaction-bg);
+  color: var(--replica-reaction-ink);
   font-size: var(--font-caption);
   line-height: 1;
 }
 
-.reactionEmoji {
-  font-size: 15px;
-  line-height: 1;
+.reactionMine {
+  border-color: var(--replica-reaction-mine-border);
+  background: var(--replica-reaction-mine-bg);
+  color: var(--replica-reaction-mine-ink);
 }
 
 .reactionCount {
@@ -303,9 +326,13 @@
   animation: arrive var(--replica-arrive-dur) var(--replica-arrive-ease);
 }
 
-.reactionLanding {
-  animation: land var(--dur-reaction) var(--ease-spring);
-  transform-origin: left center;
+.reactionBump {
+  animation: bump var(--dur-reaction) var(--ease-spring);
+}
+
+.reactionCountRoll {
+  display: inline-block;
+  animation: rollIn var(--dur-reaction) var(--ease-spring);
 }
 
 @keyframes arrive {
@@ -320,18 +347,23 @@
   }
 }
 
-@keyframes land {
-  from {
-    opacity: 0;
-    transform: scale(0.2) translateY(-18px);
+@keyframes bump {
+  0% {
+    transform: scale(0);
   }
 
   60% {
-    opacity: 1;
+    transform: scale(1.25);
   }
 
-  to {
-    opacity: 1;
-    transform: none;
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rollIn {
+  from {
+    opacity: 0;
+    transform: translateY(-40%);
   }
 }

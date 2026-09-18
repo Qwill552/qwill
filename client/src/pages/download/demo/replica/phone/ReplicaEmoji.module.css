@@ -1,0 +1,13 @@
+.glyph {
+  display: inline-block;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+}
+
+.fallback {
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 1;
+  vertical-align: middle;
+}

@@ -4,7 +4,7 @@ import { DEMO_GLOW_SIZE, DEMO_HINT_VISIBLE_MS } from '../config';
 import { CONTENT } from '../content';
 import { createDemoStore } from './engine/store';
 import styles from './PhoneDemo.module.css';
-import { ALBUM_PHOTOS } from './replica/phone/demoData';
+import { ALBUM_PHOTOS, EMOJI_STRIP_URL } from './replica/phone/demoData';
 import { PhoneReplica } from './replica/phone/PhoneReplica';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 
@@ -27,6 +27,7 @@ export function PhoneDemo() {
 
   useEffect(() => {
     for (const photo of ALBUM_PHOTOS) new Image().src = photo.src;
+    new Image().src = EMOJI_STRIP_URL;
   }, []);
 
   useEffect(() => {
