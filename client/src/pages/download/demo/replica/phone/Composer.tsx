@@ -1,12 +1,14 @@
 import { Icon } from '../../../../../ui/Icon';
 import type { DemoReadout } from '../../engine/store';
 import { cx } from './Chrome';
-import { REPLICA_TEXT } from './demoData';
+import { PRESS, REPLICA_TEXT } from './demoData';
 import styles from './Composer.module.css';
 
 interface ComposerProps {
   text: string;
+  focused: boolean;
   recording: boolean;
+  pressed?: string | null;
   typingReadout?: DemoReadout;
   voiceReadout?: DemoReadout;
 }
@@ -27,7 +29,14 @@ function Recorder({ voiceReadout }: { voiceReadout?: DemoReadout }) {
   );
 }
 
-export function Composer({ text, recording, typingReadout, voiceReadout }: ComposerProps) {
+export function Composer({
+  text,
+  focused,
+  recording,
+  pressed,
+  typingReadout,
+  voiceReadout,
+}: ComposerProps) {
   const hasText = text.length > 0;
 
   return (
@@ -35,19 +44,20 @@ export function Composer({ text, recording, typingReadout, voiceReadout }: Compo
       {recording ? (
         <Recorder voiceReadout={voiceReadout} />
       ) : (
-        <div className={styles.field}>
+        <div
+          className={cx(
+            styles.field,
+            focused && styles.fieldFocused,
+            pressed === PRESS.composer && styles.fieldPressed,
+          )}
+        >
           <span className={styles.round}>
             <Icon name="emoji" size={22} />
           </span>
           <span className={cx(styles.input, !hasText && styles.inputEmpty)}>
-            {hasText ? (
-              <>
-                <span ref={typingReadout} />
-                <span className={styles.caret} />
-              </>
-            ) : (
-              REPLICA_TEXT.composerPlaceholder
-            )}
+            {hasText && <span ref={typingReadout} />}
+            {!hasText && !focused && REPLICA_TEXT.composerPlaceholder}
+            {focused && <span className={styles.caret} />}
           </span>
           <span className={styles.round}>
             <Icon name="attach" size={21} />
@@ -55,7 +65,14 @@ export function Composer({ text, recording, typingReadout, voiceReadout }: Compo
         </div>
       )}
 
-      <span className={cx(styles.send, recording && styles.sendRecording)}>
+      <span
+        className={cx(
+          styles.send,
+          recording && styles.sendRecording,
+          pressed === PRESS.send && styles.sendPressed,
+          pressed === PRESS.mic && styles.sendHeld,
+        )}
+      >
         <Icon name={hasText ? 'send' : 'mic'} size={22} />
       </span>
     </div>

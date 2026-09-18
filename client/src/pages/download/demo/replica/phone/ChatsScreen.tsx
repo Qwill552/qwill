@@ -1,15 +1,17 @@
 import { Icon } from '../../../../../ui/Icon';
-import { Avatar, Badge, Chip, DotsGlyph, Fab, OfficialMark, SearchGlyph, TabBar } from './Chrome';
-import { CHAT_FILTERS, CHAT_ROWS, REPLICA_TEXT, type ScreenSurface } from './demoData';
+import { Avatar, Badge, Chip, cx, DotsGlyph, Fab, OfficialMark, SearchGlyph, TabBar } from './Chrome';
+import { CHAT_FILTERS, CHAT_ROWS, PRESS, REPLICA_TEXT, type ScreenSurface } from './demoData';
 import styles from './ChatsScreen.module.css';
 
 interface ChatsScreenProps {
   surface?: ScreenSurface;
+  pressed?: string | null;
 }
 
 const UNREAD_TOTAL = CHAT_ROWS.reduce((sum, row) => sum + row.unread, 0);
 
-export function ChatsScreen({ surface }: ChatsScreenProps) {
+export function ChatsScreen({ surface, pressed }: ChatsScreenProps) {
+  const pressedRowId = pressed === PRESS.row ? 'artem' : null;
   return (
     <div className={styles.screen}>
       <div className={styles.top}>
@@ -42,7 +44,11 @@ export function ChatsScreen({ surface }: ChatsScreenProps) {
       <div className={styles.list} ref={surface?.viewport}>
         <div className={styles.listInner} ref={surface?.inner}>
           {CHAT_ROWS.map((row) => (
-            <div key={row.id} className={styles.row} data-demo-tap="chat">
+            <div
+              key={row.id}
+              className={cx(styles.row, row.id === pressedRowId && styles.rowPressed)}
+              data-demo-tap="chat"
+            >
               <Avatar label={row.title} colorKey={row.id} size={52} online={row.online} shadow />
               <div className={styles.body}>
                 <div className={styles.rowTop}>

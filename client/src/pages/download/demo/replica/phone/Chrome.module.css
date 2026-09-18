@@ -109,6 +109,18 @@
   background: var(--replica-round-bg);
   backdrop-filter: var(--replica-round-blur);
   color: var(--replica-row-ink);
+  transform: none;
+  transition:
+    transform var(--replica-press-out) var(--ease-spring),
+    background-color var(--replica-press-out) var(--ease-close);
+}
+
+.glassButtonPressed {
+  transform: scale(0.88);
+  background-color: var(--replica-press-bg-on);
+  transition:
+    transform var(--replica-press-in) var(--ease-close),
+    background-color var(--replica-press-in) var(--ease-close);
 }
 
 .pill {

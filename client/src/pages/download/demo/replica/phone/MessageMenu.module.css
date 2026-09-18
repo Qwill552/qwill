@@ -95,12 +95,17 @@
   border-radius: var(--radius-pill);
   font-size: 22px;
   line-height: 1;
-  transition: transform var(--dur-close) var(--ease-spring);
+  transition:
+    transform var(--dur-close) var(--ease-spring),
+    background-color var(--replica-press-out) var(--ease-close);
 }
 
 .reactionPicked {
-  transform: scale(1.45);
-  transition: transform var(--dur-reaction) var(--ease-spring);
+  transform: scale(1.4);
+  background: var(--replica-pick-bg);
+  transition:
+    transform var(--dur-reaction) var(--ease-spring),
+    background-color var(--replica-press-in) var(--ease-close);
 }
 
 .reactionExpand {

@@ -122,7 +122,6 @@
 }
 
 :root {
-  --replica-row-active-bg: rgba(var(--pulse-glass), 0.09);
   --replica-row-ink: rgb(var(--pulse-ink));
   --replica-row-time-ink: rgba(var(--pulse-ink), 0.4);
   --replica-row-preview-ink: rgba(var(--pulse-ink), 0.45);
@@ -228,6 +227,14 @@
   --replica-pop-ease: cubic-bezier(0.32, 0, 0.22, 1);
   --replica-screen-scrim: #000;
   --replica-screen-scrim-opacity: 0.45;
+  --replica-press-in: 90ms;
+  --replica-press-out: 200ms;
+  --replica-hold-in: 340ms;
+  --replica-press-bg: transparent;
+  --replica-press-bg-on: rgba(var(--pulse-glass), 0.16);
+  --replica-pick-bg: rgba(var(--pulse-glass), 0.22);
+  --replica-hold-filter: brightness(0.9);
+  --replica-field-border-focus: var(--primary);
   --replica-arrive-dur: 260ms;
   --replica-arrive-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --replica-caret-dur: 1060ms;
@@ -251,6 +258,9 @@
     --replica-push-dur: 1ms;
     --replica-pop-dur: 1ms;
     --replica-arrive-dur: 1ms;
+    --replica-press-in: 1ms;
+    --replica-press-out: 1ms;
+    --replica-hold-in: 1ms;
   }
 }
 

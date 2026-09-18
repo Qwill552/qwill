@@ -105,6 +105,13 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 20px;
+  background: var(--replica-press-bg);
+  transition: background var(--replica-press-out) var(--ease-close);
+}
+
+.rowPressed {
+  background: var(--replica-press-bg-on);
+  transition: background var(--replica-press-in) var(--ease-close);
 }
 
 .body {

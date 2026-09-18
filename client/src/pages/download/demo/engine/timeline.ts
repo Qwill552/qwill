@@ -48,11 +48,13 @@ export function discreteOf(target: DemoTarget): ReplicaState {
   return {
     screen: target.screen,
     composerText: target.composerText,
+    composerFocused: target.composerFocused,
     overlay: target.overlay,
     recording: target.recording,
     menuMessageId: target.menuMessageId,
     menuPick: target.menuPick,
     reactionMessageId: target.reactionMessageId,
+    pressed: target.pressed,
     visibleMessages: target.visibleMessages,
     readUpTo: target.readUpTo,
   };

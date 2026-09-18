@@ -5,6 +5,7 @@ import { Composer } from './Composer';
 import {
   DIALOG,
   PEOPLE,
+  PRESS,
   REACTION_EMOJI,
   REPLICA_TEXT,
   type ReplicaState,
@@ -44,6 +45,7 @@ export function ChatScreen({
                 message={message}
                 read={index < state.readUpTo}
                 reaction={state.reactionMessageId === message.id ? REACTION_EMOJI : null}
+                held={state.pressed === message.id}
                 hidden={message.id === hiddenMessageId}
               />
             </div>
@@ -54,7 +56,7 @@ export function ChatScreen({
       <div className={styles.headerFade} />
 
       <ChromeBar className={styles.header}>
-        <GlassButton icon="back" tap="chats" />
+        <GlassButton icon="back" tap="chats" pressed={state.pressed === PRESS.back} />
         <HeaderPill
           title={PEOPLE.artem.name}
           subtitle={REPLICA_TEXT.chatSubtitle}
@@ -69,7 +71,9 @@ export function ChatScreen({
       <ChromeBar className={styles.composerBar}>
         <Composer
           text={state.composerText}
+          focused={state.composerFocused}
           recording={state.recording}
+          pressed={state.pressed}
           typingReadout={typingReadout}
           voiceReadout={voiceReadout}
         />

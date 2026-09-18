@@ -19,6 +19,20 @@
   background: var(--replica-field-bg);
   backdrop-filter: var(--replica-field-blur);
   box-shadow: var(--replica-field-shadow);
+  transform: none;
+  transition:
+    border-color var(--replica-press-out) var(--ease-close),
+    transform var(--replica-press-out) var(--ease-spring);
+}
+
+.fieldFocused {
+  border-color: var(--replica-field-border-focus);
+  transition: border-color var(--replica-press-in) var(--ease-close);
+}
+
+.fieldPressed {
+  transform: scale(0.985);
+  transition: transform var(--replica-press-in) var(--ease-close);
 }
 
 .round {
@@ -59,6 +73,18 @@
   background: var(--replica-send-bg);
   box-shadow: var(--replica-send-shadow);
   color: var(--replica-send-ink);
+  transform: none;
+  transition: transform var(--replica-press-out) var(--ease-spring);
+}
+
+.sendPressed {
+  transform: scale(0.86);
+  transition: transform var(--replica-press-in) var(--ease-close);
+}
+
+.sendHeld {
+  transform: scale(1.1);
+  transition: transform var(--replica-press-in) var(--ease-spring);
 }
 
 .sendRecording {

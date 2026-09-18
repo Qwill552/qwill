@@ -43,6 +43,15 @@
   visibility: hidden;
 }
 
+.held {
+  transform: scale(0.965);
+  transition: transform var(--replica-hold-in) var(--ease-close);
+}
+
+.held .bubble {
+  filter: var(--replica-hold-filter);
+}
+
 .bubble {
   position: relative;
   overflow: hidden;
@@ -291,11 +300,11 @@
 }
 
 .arriving {
-  animation: arrive var(--replica-arrive-dur) var(--replica-arrive-ease) both;
+  animation: arrive var(--replica-arrive-dur) var(--replica-arrive-ease);
 }
 
 .reactionLanding {
-  animation: land var(--dur-reaction) var(--ease-spring) both;
+  animation: land var(--dur-reaction) var(--ease-spring);
   transform-origin: left center;
 }
 

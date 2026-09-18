@@ -5,14 +5,25 @@ export type ReplicaOverlay = 'none' | 'menu' | 'attach';
 export interface ReplicaState {
   screen: ReplicaScreen;
   composerText: string;
+  composerFocused: boolean;
   overlay: ReplicaOverlay;
   recording: boolean;
   menuMessageId: string | null;
   menuPick: string | null;
   reactionMessageId: string | null;
+  pressed: string | null;
   visibleMessages: number;
   readUpTo: number;
 }
+
+export const PRESS = {
+  row: 'row-artem',
+  bubble: 'm5',
+  composer: 'composer',
+  send: 'send',
+  mic: 'mic',
+  back: 'back',
+} as const;
 
 export interface ScreenSurface {
   viewport: (node: HTMLElement | null) => void;
@@ -396,11 +407,13 @@ export const MENU_EDGE = 16;
 export const REPLICA_REST: ReplicaState = {
   screen: 'chats',
   composerText: '',
+  composerFocused: false,
   overlay: 'none',
   recording: false,
   menuMessageId: null,
   menuPick: null,
   reactionMessageId: null,
+  pressed: null,
   visibleMessages: DIALOG_BEFORE_REPLY,
   readUpTo: READ_AT_REST,
 };

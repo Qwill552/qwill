@@ -134,10 +134,11 @@ interface MessageRowProps {
   message: ReplicaMessage;
   read: boolean;
   reaction: string | null;
+  held?: boolean;
   hidden?: boolean;
 }
 
-export function MessageRow({ message, read, reaction, hidden }: MessageRowProps) {
+export function MessageRow({ message, read, reaction, held, hidden }: MessageRowProps) {
   return (
     <div className={cx(styles.row, message.own && styles.rowOwn)}>
       <div
@@ -145,6 +146,7 @@ export function MessageRow({ message, read, reaction, hidden }: MessageRowProps)
           styles.bubbleCol,
           styles.arriving,
           message.kind === 'album' && styles.bubbleColMedia,
+          held && styles.held,
           hidden && styles.hidden,
         )}
         data-demo-message={message.id}

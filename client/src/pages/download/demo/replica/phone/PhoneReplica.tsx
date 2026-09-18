@@ -31,7 +31,7 @@ export function PhoneReplica({
   return (
     <div className={styles.replica} ref={rootRef}>
       <div className={cx(styles.layer, styles.root, inChat && styles.rootPushed)}>
-        <ChatsScreen surface={chatsSurface} />
+        <ChatsScreen surface={chatsSurface} pressed={state.pressed} />
         <span className={cx(styles.scrim, inChat && styles.scrimLit)} />
       </div>
 
