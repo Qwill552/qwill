@@ -138,4 +138,15 @@ describe('шрифты визитки (R-30C)', () => {
     const traversal = await request.get('/fonts/..%2F..%2Fpackage.json').set('Host', env.cardHost);
     expect(traversal.status).toBe(404);
   });
+
+  /* Документ визитки живёт в песочнице без allow-same-origin, то есть его origin — «null»,
+     а шрифты из @font-face браузер грузит всегда в режиме CORS. Без этого заголовка ответ
+     отбрасывается уже после успешной проверки CSP, с невнятным «A network error occurred»
+     и без сообщения о нарушении политики. Картинкам заголовок не нужен: они идут no-CORS,
+     поэтому работали и до него. */
+  it('шрифт отдаётся с Access-Control-Allow-Origin — иначе песочница его не загрузит', async () => {
+    const served = await request.get('/fonts/QwillTest-Bold.woff2').set('Host', env.cardHost);
+    expect(served.status).toBe(200);
+    expect(served.headers['access-control-allow-origin']).toBe('*');
+  });
 });

@@ -99,6 +99,7 @@ function sendAsset(
   filePath: string,
   mime: string,
   cacheControl: string,
+  cors = false,
 ): void {
   const stream = createReadStream(filePath);
   stream.on('error', () => next());
@@ -108,6 +109,7 @@ function sendAsset(
     res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', cacheControl);
+    if (cors) res.setHeader('Access-Control-Allow-Origin', '*');
     stream.pipe(res);
   });
 }
@@ -151,13 +153,25 @@ cardHostRouter.get('/c/:userId/img/:name', cardAssetLimiter, (req, res, next) =>
     .catch(next);
 });
 
+/**
+ * Шрифт — единственный ресурс визитки, которому нужен CORS-заголовок. Документ живёт в
+ * песочнице без `allow-same-origin`, то есть его origin — «null», а браузер грузит шрифты
+ * из `@font-face` всегда в режиме CORS (в отличие от картинок, которые идут no-CORS и
+ * поэтому работали всегда). Запрос из «null» на этот же хост для браузера межсайтовый, и
+ * без заголовка он отбрасывается уже после успешной проверки CSP — с невнятным
+ * «A network error occurred» и без сообщения о нарушении политики.
+ *
+ * Звёздочка здесь безопасна: файлы шрифтов публичны, на домене песочницы нет ни API, ни
+ * куки (роутер подключается до cookie-parser), а `*` вдобавок запрещает запросы с
+ * учётными данными.
+ */
 cardHostRouter.get('/fonts/:file', cardAssetLimiter, (req, res, next) => {
   const filePath = resolveProfileFontPath(String(req.params.file ?? ''));
   if (!filePath) {
     next();
     return;
   }
-  sendAsset(res, next, filePath, 'font/woff2', 'public, max-age=86400');
+  sendAsset(res, next, filePath, 'font/woff2', 'public, max-age=86400', true);
 });
 
 /** Всё остальное на этом домене — не существует. Отдаём простой текст, а не JSON API:
