@@ -1,0 +1,21 @@
+.host {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.stage {
+  position: relative;
+  width: calc(var(--demo-body-width) * var(--demo-scale));
+  height: calc(var(--demo-body-height) * var(--demo-scale));
+}
+
+.scaled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--demo-body-width);
+  height: var(--demo-body-height);
+  transform: scale(var(--demo-scale));
+  transform-origin: top left;
+}

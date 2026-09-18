@@ -1,0 +1,93 @@
+.phone {
+  position: relative;
+  width: var(--phone-body-width);
+  height: var(--phone-body-height);
+}
+
+.shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--phone-radius-body);
+  box-shadow: var(--device-shadow);
+  pointer-events: none;
+}
+
+.power,
+.volume {
+  position: absolute;
+  left: calc(100% - var(--phone-button-protrusion));
+  width: calc(var(--phone-button-protrusion) * 2);
+  border-radius: 0 var(--phone-button-radius) var(--phone-button-radius) 0;
+  background: var(--device-button);
+}
+
+.power {
+  top: var(--phone-power-top);
+  height: var(--phone-power-height);
+}
+
+.volume {
+  top: var(--phone-volume-top);
+  height: var(--phone-volume-height);
+}
+
+.body {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--phone-radius-body);
+  background: var(--device-body);
+}
+
+.edge {
+  position: absolute;
+  inset: 0;
+  border: var(--phone-edge-width) solid var(--device-edge);
+  border-radius: var(--phone-radius-body);
+  pointer-events: none;
+}
+
+.bezel {
+  position: absolute;
+  inset: var(--phone-bezel-metal);
+  border-radius: var(--phone-radius-bezel);
+  background: var(--device-bezel);
+}
+
+.screen {
+  position: absolute;
+  inset: var(--phone-bezel-black);
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--phone-radius-screen);
+  background: var(--device-screen-bg);
+  font-size: var(--phone-screen-font-size);
+  contain: paint;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.screenContent {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.punch {
+  position: absolute;
+  top: var(--phone-punch-top);
+  left: 50%;
+  width: var(--phone-punch-size);
+  height: var(--phone-punch-size);
+  border-radius: var(--radius-pill);
+  background: var(--device-bezel);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.glare {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--phone-radius-screen);
+  background: var(--device-glare);
+  pointer-events: none;
+}

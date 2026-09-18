@@ -1,0 +1,29 @@
+.lock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding-top: var(--demo-clock-top);
+  background: var(--wallpaper-default);
+  font-family: var(--font-sans);
+}
+
+.time {
+  margin: 0;
+  color: var(--demo-clock-ink);
+  font-size: var(--demo-clock-size);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.date {
+  margin: var(--demo-clock-gap) 0 0;
+  color: var(--demo-clock-meta);
+  font-size: var(--demo-date-size);
+  font-weight: 500;
+}
+
+.date::first-letter {
+  text-transform: uppercase;
+}

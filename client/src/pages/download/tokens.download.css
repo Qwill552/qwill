@@ -17,10 +17,29 @@
   --logo-glow-far: rgb(186 206 255 / 9%);
   --logo-glow-edge: rgb(186 206 255 / 0%);
 
-  --device-metal: #c7ccda;
-  --device-glass: rgb(255 255 255 / 35%);
-  --device-shadow: 0 24px 48px rgb(20 24 35 / 18%);
-  --device-highlight: rgb(255 255 255 / 55%);
+  --device-body:
+    linear-gradient(168deg, #b9bfae 0%, #9aa190 18%, #8d9483 50%, #99a08f 82%, #b3b9a8 100%);
+  --device-edge: #ccd1c1;
+  --device-bezel: #0a0b0d;
+  --device-button: #7d8475;
+  --device-glare:
+    linear-gradient(
+      176deg,
+      rgb(255 255 255 / 30%) 0%,
+      rgb(255 255 255 / 7%) 2%,
+      rgb(255 255 255 / 0%) 8%,
+      rgb(255 255 255 / 0%) 92%,
+      rgb(255 255 255 / 6%) 100%
+    );
+  --device-shadow: 0 40px 80px -24px rgb(28 32 45 / 34%), 0 12px 28px -12px rgb(28 32 45 / 20%);
+  --device-screen-bg: var(--bg);
+
+  --demo-clock-top: 132px;
+  --demo-clock-size: 86px;
+  --demo-clock-gap: 14px;
+  --demo-date-size: 19px;
+  --demo-clock-ink: #16192a;
+  --demo-clock-meta: rgb(22 25 42 / 66%);
 
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
@@ -51,10 +70,29 @@
   --logo-glow-far: rgb(138 176 255 / 8%);
   --logo-glow-edge: rgb(138 176 255 / 0%);
 
-  --device-metal: #2a2f3d;
-  --device-glass: rgb(255 255 255 / 8%);
-  --device-shadow: 0 24px 48px rgb(0 0 0 / 45%);
-  --device-highlight: rgb(255 255 255 / 12%);
+  --device-body:
+    linear-gradient(168deg, #b9bfae 0%, #9aa190 18%, #8d9483 50%, #99a08f 82%, #b3b9a8 100%);
+  --device-edge: #ccd1c1;
+  --device-bezel: #0a0b0d;
+  --device-button: #7d8475;
+  --device-glare:
+    linear-gradient(
+      176deg,
+      rgb(255 255 255 / 30%) 0%,
+      rgb(255 255 255 / 7%) 2%,
+      rgb(255 255 255 / 0%) 8%,
+      rgb(255 255 255 / 0%) 92%,
+      rgb(255 255 255 / 6%) 100%
+    );
+  --device-shadow: 0 40px 80px -24px rgb(0 0 0 / 66%), 0 12px 28px -12px rgb(0 0 0 / 48%);
+  --device-screen-bg: var(--bg);
+
+  --demo-clock-top: 132px;
+  --demo-clock-size: 86px;
+  --demo-clock-gap: 14px;
+  --demo-date-size: 19px;
+  --demo-clock-ink: #f2f4fb;
+  --demo-clock-meta: rgb(242 244 251 / 70%);
 
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
