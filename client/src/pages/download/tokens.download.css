@@ -29,6 +29,8 @@
   --page-button-lift: var(--card-shadow);
   --page-press-translate: 4px;
   --page-press-scale: 0.97;
+
+  --release-info-content-delay: 60ms;
 }
 
 :root[data-theme='dark'],
@@ -61,6 +63,8 @@
   --page-button-lift: var(--card-shadow);
   --page-press-translate: 4px;
   --page-press-scale: 0.97;
+
+  --release-info-content-delay: 60ms;
 }
 
 @media (min-width: 700px) {

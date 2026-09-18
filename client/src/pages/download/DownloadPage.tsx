@@ -4,6 +4,7 @@ import { DownloadButton } from './download-button/DownloadButton';
 import styles from './DownloadPage.module.css';
 import { PageHeader } from './header/PageHeader';
 import { OsSwitch } from './os-switch/OsSwitch';
+import { ReleaseInfo } from './release-info/ReleaseInfo';
 import './tokens.download.css';
 import { useOsChoice } from './useOsChoice';
 import { useRelease } from './useRelease';
@@ -25,7 +26,7 @@ export function DownloadPage() {
           {CONTENT.demoPlaceholder}
         </div>
         <DownloadButton release={release} />
-        <div className={styles.versionStub} aria-hidden="true" />
+        <ReleaseInfo os={os} release={release} />
       </div>
     </div>
   );

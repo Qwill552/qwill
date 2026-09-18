@@ -14,4 +14,8 @@ export const CONTENT = {
     unavailable: 'Выпуск пока не опубликован',
     offlineNotice: 'Не удалось проверить версию',
   },
+  releaseInfo: {
+    versionPrefix: 'Версия',
+    whatsNew: 'что нового',
+  },
 } as const;

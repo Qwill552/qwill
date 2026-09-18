@@ -28,11 +28,3 @@
   font-size: var(--font-meta);
   text-align: center;
 }
-
-.versionStub {
-  width: 160px;
-  max-width: 100%;
-  height: var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--card-bg);
-}
