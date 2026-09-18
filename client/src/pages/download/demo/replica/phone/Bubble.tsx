@@ -16,7 +16,13 @@ export function DayDivider({ label }: { label: string }) {
 
 type MetaVariant = 'anchored' | 'overlay' | 'inBubble';
 
-function Meta({ message, variant = 'anchored' }: { message: ReplicaMessage; variant?: MetaVariant }) {
+interface MetaProps {
+  message: ReplicaMessage;
+  read: boolean;
+  variant?: MetaVariant;
+}
+
+function Meta({ message, read, variant = 'anchored' }: MetaProps) {
   return (
     <span
       className={cx(
@@ -29,7 +35,7 @@ function Meta({ message, variant = 'anchored' }: { message: ReplicaMessage; vari
     >
       {message.time}
       {message.own && (
-        <Icon name={message.read ? 'check-double' : 'check'} size={15} className={styles.check} />
+        <Icon name={read ? 'check-double' : 'check'} size={15} className={styles.check} />
       )}
     </span>
   );
@@ -54,7 +60,7 @@ function Album() {
   );
 }
 
-function Voice({ message }: { message: ReplicaMessage }) {
+function Voice({ message, read }: { message: ReplicaMessage; read: boolean }) {
   return (
     <>
       <div className={styles.voiceHead}>
@@ -76,23 +82,23 @@ function Voice({ message }: { message: ReplicaMessage }) {
         <span className={styles.voiceDot} />
         <span className={styles.voiceSpeed}>{REPLICA_TEXT.voiceSpeed}</span>
       </div>
-      <Meta message={message} variant="inBubble" />
+      <Meta message={message} read={read} variant="inBubble" />
     </>
   );
 }
 
-export function Bubble({ message }: { message: ReplicaMessage }) {
+export function Bubble({ message, read = false }: { message: ReplicaMessage; read?: boolean }) {
   const bare = message.kind === 'album';
 
   return (
     <div className={cx(styles.bubble, message.own ? styles.out : styles.in, bare && styles.bubbleMedia)}>
-      {message.kind === 'voice' && <Voice message={message} />}
+      {message.kind === 'voice' && <Voice message={message} read={read} />}
 
       {bare && (
         <div className={styles.media}>
           <Album />
           <span className={styles.mediaMeta}>
-            <Meta message={message} variant="overlay" />
+            <Meta message={message} read={read} variant="overlay" />
           </span>
         </div>
       )}
@@ -106,7 +112,7 @@ export function Bubble({ message }: { message: ReplicaMessage }) {
               style={{ width: `${message.own ? META_PAD.own : META_PAD.other}px` }}
             />
           </span>
-          <Meta message={message} />
+          <Meta message={message} read={read} />
         </span>
       )}
     </div>
@@ -116,7 +122,7 @@ export function Bubble({ message }: { message: ReplicaMessage }) {
 export function Reactions({ emoji }: { emoji: string }) {
   return (
     <div className={styles.reactionRow}>
-      <span className={styles.reactionPill}>
+      <span className={cx(styles.reactionPill, styles.reactionLanding)}>
         <span className={styles.reactionEmoji}>{emoji}</span>
         <span className={styles.reactionCount}>1</span>
       </span>
@@ -126,15 +132,25 @@ export function Reactions({ emoji }: { emoji: string }) {
 
 interface MessageRowProps {
   message: ReplicaMessage;
+  read: boolean;
+  reaction: string | null;
   hidden?: boolean;
 }
 
-export function MessageRow({ message, hidden }: MessageRowProps) {
+export function MessageRow({ message, read, reaction, hidden }: MessageRowProps) {
   return (
     <div className={cx(styles.row, message.own && styles.rowOwn)}>
-      <div className={cx(styles.bubbleCol, message.kind === 'album' && styles.bubbleColMedia, hidden && styles.hidden)}>
-        <Bubble message={message} />
-        {message.reaction && <Reactions emoji={message.reaction} />}
+      <div
+        className={cx(
+          styles.bubbleCol,
+          styles.arriving,
+          message.kind === 'album' && styles.bubbleColMedia,
+          hidden && styles.hidden,
+        )}
+        data-demo-message={message.id}
+      >
+        <Bubble message={message} read={read} />
+        {reaction && <Reactions emoji={reaction} />}
       </div>
     </div>
   );

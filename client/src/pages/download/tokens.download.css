@@ -228,6 +228,10 @@
   --replica-pop-ease: cubic-bezier(0.32, 0, 0.22, 1);
   --replica-screen-scrim: #000;
   --replica-screen-scrim-opacity: 0.45;
+  --replica-arrive-dur: 260ms;
+  --replica-arrive-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --replica-caret-dur: 1060ms;
+  --replica-caret-ink: var(--primary);
 
   --demo-glow:
     radial-gradient(
@@ -246,6 +250,7 @@
   :root {
     --replica-push-dur: 1ms;
     --replica-pop-dur: 1ms;
+    --replica-arrive-dur: 1ms;
   }
 }
 

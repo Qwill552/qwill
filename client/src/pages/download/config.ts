@@ -69,7 +69,7 @@ export const DEMO_GESTURE = {
   tapMaxMs: 500,
 } as const;
 
-export const DEMO_REDUCED_FRAME_MS = 7200;
+export const DEMO_REDUCED_FRAME_MS = 18000;
 
 export const DEMO_HINT_VISIBLE_MS = 2000;
 

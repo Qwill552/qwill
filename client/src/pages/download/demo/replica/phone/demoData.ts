@@ -8,7 +8,10 @@ export interface ReplicaState {
   overlay: ReplicaOverlay;
   recording: boolean;
   menuMessageId: string | null;
+  menuPick: string | null;
+  reactionMessageId: string | null;
   visibleMessages: number;
+  readUpTo: number;
 }
 
 export interface ScreenSurface {
@@ -306,9 +309,7 @@ export interface ReplicaMessage {
   own: boolean;
   text: string;
   time: string;
-  read: boolean;
   day: string | null;
-  reaction: string | null;
   voiceDuration: string;
 }
 
@@ -316,25 +317,38 @@ function message(part: Partial<ReplicaMessage> & Pick<ReplicaMessage, 'id' | 'ow
   return {
     kind: 'text',
     text: '',
-    read: false,
     day: null,
-    reaction: null,
     voiceDuration: '',
     ...part,
   };
 }
 
+export const VOICE_RECORD_SECONDS = 3;
+
+export const TYPED_MESSAGE = 'Соболезную. Чем помочь?';
+
+export const REACTION_EMOJI = '😔';
+
 export const DIALOG: ReplicaMessage[] = [
   message({ id: 'm1', own: false, time: '22:14', text: 'Она опять всю ночь шумела', day: 'Вчера' }),
   message({ id: 'm2', own: false, time: '22:15', text: 'Под утро вроде затихла' }),
-  message({ id: 'm3', own: true, time: '22:31', text: 'Может, врача вызвать?', read: true }),
+  message({ id: 'm3', own: true, time: '22:31', text: 'Может, врача вызвать?' }),
   message({ id: 'm4', own: false, time: '08:02', text: 'Мать ушла ночью', day: 'Сегодня' }),
-  message({ id: 'm5', own: false, time: '09:17', text: 'Тихо, без мучений', reaction: '😔' }),
-  message({ id: 'm6', own: true, time: '09:19', text: 'Соболезную. Чем помочь?', read: true }),
+  message({ id: 'm5', own: false, time: '09:17', text: 'Тихо, без мучений' }),
+  message({ id: 'm6', own: true, time: '09:19', text: TYPED_MESSAGE }),
   message({ id: 'm7', own: false, time: '09:20', text: 'Приезжай с отвёрткой' }),
   message({ id: 'm8', own: false, time: '09:20', kind: 'album' }),
-  message({ id: 'm9', own: false, time: '09:21', kind: 'voice', voiceDuration: '0:07' }),
+  message({ id: 'm9', own: false, time: '09:21', kind: 'voice', voiceDuration: '0:03' }),
 ];
+
+export const DIALOG_BEFORE_REPLY = 5;
+export const DIALOG_WITH_OWN_REPLY = 6;
+export const DIALOG_WITH_PUNCHLINE = 7;
+export const DIALOG_WITH_ALBUM = 8;
+export const DIALOG_WITH_VOICE = 9;
+
+export const READ_AT_REST = 3;
+export const READ_WITH_OWN_REPLY = 6;
 
 export const VOICE_PEAKS = [
   0.22, 0.38, 0.61, 0.44, 0.79, 0.92, 0.55, 0.33, 0.48, 0.71, 0.86, 0.64, 0.41, 0.29, 0.52, 0.77,
@@ -362,16 +376,22 @@ export const REPLICA_TEXT = {
   composerPlaceholder: 'Сообщение',
   chatSubtitle: 'в сети',
   attachTitle: 'Отправить',
-  recordingTimer: '0:04',
   recordingHint: 'Отмена',
   voiceSpeed: '1×',
 } as const;
 
-export const MENU_ANCHOR_FALLBACK = { top: 360, left: 12 } as const;
+export interface MenuAnchor {
+  top: number;
+  left: number;
+  height: number;
+  dropUp: boolean;
+}
 
-export const MENU_ANCHORS: Record<string, { top: number; left: number }> = {
-  m7: { top: 300, left: 12 },
-};
+export const MENU_FALLBACK_ANCHOR: MenuAnchor = { top: 320, left: 12, height: 44, dropUp: false };
+
+export const MENU_GAP = 8;
+
+export const MENU_EDGE = 16;
 
 export const REPLICA_REST: ReplicaState = {
   screen: 'chats',
@@ -379,19 +399,19 @@ export const REPLICA_REST: ReplicaState = {
   overlay: 'none',
   recording: false,
   menuMessageId: null,
-  visibleMessages: DIALOG.length,
+  menuPick: null,
+  reactionMessageId: null,
+  visibleMessages: DIALOG_BEFORE_REPLY,
+  readUpTo: READ_AT_REST,
 };
 
-export const REPLICA_PRESETS = {
-  chats: REPLICA_REST,
-  chat: { ...REPLICA_REST, screen: 'chat' },
-  menu: { ...REPLICA_REST, screen: 'chat', overlay: 'menu', menuMessageId: 'm7' },
-  attach: { ...REPLICA_REST, screen: 'chat', overlay: 'attach' },
-  recording: { ...REPLICA_REST, screen: 'chat', recording: true },
-  typing: {
-    ...REPLICA_REST,
-    screen: 'chat',
-    composerText: 'Соболезную. Чем помочь?',
-    visibleMessages: 5,
-  },
-} as const satisfies Record<string, ReplicaState>;
+export function typedPrefix(progress: number, state: ReplicaState): string {
+  const clamped = Math.min(1, Math.max(0, progress));
+  return state.composerText.slice(0, Math.round(clamped * state.composerText.length));
+}
+
+export function recordedTime(progress: number): string {
+  const clamped = Math.min(1, Math.max(0, progress));
+  const seconds = Math.floor(clamped * VOICE_RECORD_SECONDS);
+  return `0:0${seconds}`;
+}

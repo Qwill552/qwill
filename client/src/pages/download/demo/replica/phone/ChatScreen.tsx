@@ -1,16 +1,32 @@
+import type { DemoReadout } from '../../engine/store';
 import { Avatar, ChromeBar, GlassButton, HeaderPill } from './Chrome';
 import { DayDivider, MessageRow } from './Bubble';
 import { Composer } from './Composer';
-import { DIALOG, PEOPLE, REPLICA_TEXT, type ReplicaState, type ScreenSurface } from './demoData';
+import {
+  DIALOG,
+  PEOPLE,
+  REACTION_EMOJI,
+  REPLICA_TEXT,
+  type ReplicaState,
+  type ScreenSurface,
+} from './demoData';
 import styles from './ChatScreen.module.css';
 
 interface ChatScreenProps {
   state: ReplicaState;
   hiddenMessageId: string | null;
   surface?: ScreenSurface;
+  typingReadout?: DemoReadout;
+  voiceReadout?: DemoReadout;
 }
 
-export function ChatScreen({ state, hiddenMessageId, surface }: ChatScreenProps) {
+export function ChatScreen({
+  state,
+  hiddenMessageId,
+  surface,
+  typingReadout,
+  voiceReadout,
+}: ChatScreenProps) {
   const messages = DIALOG.slice(0, state.visibleMessages);
 
   return (
@@ -21,10 +37,15 @@ export function ChatScreen({ state, hiddenMessageId, surface }: ChatScreenProps)
 
       <div className={styles.feed} ref={surface?.viewport}>
         <div className={styles.feedInner} ref={surface?.inner}>
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <div key={message.id}>
               {message.day && <DayDivider label={message.day} />}
-              <MessageRow message={message} hidden={message.id === hiddenMessageId} />
+              <MessageRow
+                message={message}
+                read={index < state.readUpTo}
+                reaction={state.reactionMessageId === message.id ? REACTION_EMOJI : null}
+                hidden={message.id === hiddenMessageId}
+              />
             </div>
           ))}
         </div>
@@ -46,7 +67,12 @@ export function ChatScreen({ state, hiddenMessageId, surface }: ChatScreenProps)
       <div className={styles.composerFade} />
 
       <ChromeBar className={styles.composerBar}>
-        <Composer text={state.composerText} recording={state.recording} />
+        <Composer
+          text={state.composerText}
+          recording={state.recording}
+          typingReadout={typingReadout}
+          voiceReadout={voiceReadout}
+        />
       </ChromeBar>
     </div>
   );

@@ -4,6 +4,7 @@ import { DEMO_GLOW_SIZE, DEMO_HINT_VISIBLE_MS } from '../config';
 import { CONTENT } from '../content';
 import { createDemoStore } from './engine/store';
 import styles from './PhoneDemo.module.css';
+import { ALBUM_PHOTOS } from './replica/phone/demoData';
 import { PhoneReplica } from './replica/phone/PhoneReplica';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 
@@ -22,6 +23,10 @@ export function PhoneDemo() {
     const root = rootRef.current;
     if (!root) return;
     return store.mount(root);
+  }, []);
+
+  useEffect(() => {
+    for (const photo of ALBUM_PHOTOS) new Image().src = photo.src;
   }, []);
 
   useEffect(() => {
@@ -63,6 +68,8 @@ export function PhoneDemo() {
         state={state}
         chatsSurface={store.surfaceOf('chatsScroll', 'top')}
         feedSurface={store.surfaceOf('feedScroll', 'bottom')}
+        typingReadout={store.readoutOf('typing')}
+        voiceReadout={store.readoutOf('voice')}
       />
 
       <span ref={glowRef} className={glowing ? `${styles.glow} ${styles.glowLit}` : styles.glow} />

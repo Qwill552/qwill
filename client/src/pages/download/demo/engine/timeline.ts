@@ -1,8 +1,19 @@
 import { REPLICA_REST, type ReplicaState } from '../replica/phone/demoData';
 
-export type ContinuousChannel = 'chatsScroll' | 'feedScroll';
+export type ScrollChannel = 'chatsScroll' | 'feedScroll';
 
-export const CONTINUOUS_CHANNELS: readonly ContinuousChannel[] = ['chatsScroll', 'feedScroll'];
+export type ReadoutChannel = 'typing' | 'voice';
+
+export type ContinuousChannel = ScrollChannel | ReadoutChannel;
+
+export const SCROLL_CHANNELS: readonly ScrollChannel[] = ['chatsScroll', 'feedScroll'];
+
+export const READOUT_CHANNELS: readonly ReadoutChannel[] = ['typing', 'voice'];
+
+export const CONTINUOUS_CHANNELS: readonly ContinuousChannel[] = [
+  ...SCROLL_CHANNELS,
+  ...READOUT_CHANNELS,
+];
 
 export type DemoTarget = Record<ContinuousChannel, number> & ReplicaState;
 
@@ -22,6 +33,8 @@ export interface Scenario {
 export const DEMO_REST: DemoTarget = {
   chatsScroll: 0,
   feedScroll: 0,
+  typing: 0,
+  voice: 0,
   ...REPLICA_REST,
 };
 
@@ -38,7 +51,10 @@ export function discreteOf(target: DemoTarget): ReplicaState {
     overlay: target.overlay,
     recording: target.recording,
     menuMessageId: target.menuMessageId,
+    menuPick: target.menuPick,
+    reactionMessageId: target.reactionMessageId,
     visibleMessages: target.visibleMessages,
+    readUpTo: target.readUpTo,
   };
 }
 

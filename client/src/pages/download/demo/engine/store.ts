@@ -1,5 +1,11 @@
 import { DEMO_REDUCED_FRAME_MS, DEMO_RETURN } from '../../config';
-import type { ReplicaScreen, ReplicaState, ScreenSurface } from '../replica/phone/demoData';
+import {
+  recordedTime,
+  typedPrefix,
+  type ReplicaScreen,
+  type ReplicaState,
+  type ScreenSurface,
+} from '../replica/phone/demoData';
 import { onFrame, whileOnScreen } from './clock';
 import {
   advanceDeviation,
@@ -21,12 +27,14 @@ import {
   type ScrollRange,
 } from './scroller';
 import {
-  CONTINUOUS_CHANNELS,
   discreteOf,
+  READOUT_CHANNELS,
+  SCROLL_CHANNELS,
   targetAt,
-  type ContinuousChannel,
   type DemoTarget,
+  type ReadoutChannel,
   type Scenario,
+  type ScrollChannel,
 } from './timeline';
 
 type DiscreteChannel = keyof ReplicaState;
@@ -39,12 +47,20 @@ interface BoundSurface {
   detach: () => void;
 }
 
+export type DemoReadout = (node: HTMLElement | null) => void;
+
 export interface DemoStore {
   subscribe(listener: () => void): () => void;
   snapshot(): ReplicaState;
-  surfaceOf(channel: ContinuousChannel, anchor: ScrollAnchor): ScreenSurface;
+  surfaceOf(channel: ScrollChannel, anchor: ScrollAnchor): ScreenSurface;
+  readoutOf(channel: ReadoutChannel): DemoReadout;
   mount(root: HTMLElement): () => void;
 }
+
+const READOUT_TEXT: Record<ReadoutChannel, (value: number, state: ReplicaState) => string> = {
+  typing: typedPrefix,
+  voice: recordedTime,
+};
 
 const TAPPABLE_SCREENS: Record<string, ReplicaScreen> = {
   chat: 'chat',
@@ -71,19 +87,22 @@ export function createDemoStore(scenario: Scenario): DemoStore {
   let target: DemoTarget = targetAt(scenario, scenarioMs);
   let discrete: ReplicaState = discreteOf(target);
 
-  const deviations = new Map<ContinuousChannel, ContinuousDeviation>();
+  const deviations = new Map<ScrollChannel, ContinuousDeviation>();
   const overrides = new Map<DiscreteChannel, DiscreteOverride<ReplicaState[DiscreteChannel]>>();
-  const surfaces = new Map<ContinuousChannel, BoundSurface>();
-  const handles = new Map<ContinuousChannel, ScreenSurface>();
-  const painted = new Map<ContinuousChannel, number>();
-  const heldValues = new Map<ContinuousChannel, number>();
+  const surfaces = new Map<ScrollChannel, BoundSurface>();
+  const handles = new Map<ScrollChannel, ScreenSurface>();
+  const painted = new Map<ScrollChannel, number>();
+  const readouts = new Map<ReadoutChannel, HTMLElement>();
+  const readoutHandles = new Map<ReadoutChannel, DemoReadout>();
+  const spelled = new Map<ReadoutChannel, string>();
+  const heldValues = new Map<ScrollChannel, number>();
   const listeners = new Set<() => void>();
 
-  function deviationOf(channel: ContinuousChannel): ContinuousDeviation {
+  function deviationOf(channel: ScrollChannel): ContinuousDeviation {
     return deviations.get(channel) ?? REST_DEVIATION;
   }
 
-  function rangeOf(channel: ContinuousChannel): ScrollRange {
+  function rangeOf(channel: ScrollChannel): ScrollRange {
     const surface = surfaces.get(channel);
     if (!surface) return EMPTY_RANGE;
     if (surface.range) return surface.range;
@@ -96,15 +115,39 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     return surface.range;
   }
 
-  function anchoredTarget(channel: ContinuousChannel): number {
+  function anchoredTarget(channel: ScrollChannel): number {
     return clampToRange(target[channel], rangeOf(channel));
   }
 
-  function valueOf(channel: ContinuousChannel): number {
+  function valueOf(channel: ScrollChannel): number {
     return anchoredTarget(channel) + deviationOf(channel).offset;
   }
 
-  function paint(channel: ContinuousChannel): void {
+  function spell(channel: ReadoutChannel): void {
+    const node = readouts.get(channel);
+    if (!node) return;
+    const text = READOUT_TEXT[channel](target[channel], discrete);
+    if (spelled.get(channel) === text) return;
+    spelled.set(channel, text);
+    node.textContent = text;
+  }
+
+  function readoutOf(channel: ReadoutChannel): DemoReadout {
+    const existing = readoutHandles.get(channel);
+    if (existing) return existing;
+
+    const handle: DemoReadout = (node) => {
+      if (node) readouts.set(channel, node);
+      else readouts.delete(channel);
+      spelled.delete(channel);
+      spell(channel);
+    };
+
+    readoutHandles.set(channel, handle);
+    return handle;
+  }
+
+  function paint(channel: ScrollChannel): void {
     const surface = surfaces.get(channel);
     if (!surface) return;
     const value = Math.round(valueOf(channel) * 100) / 100;
@@ -136,7 +179,7 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     if (!reduced) scenarioMs += dtMs;
     target = targetAt(scenario, scenarioMs);
 
-    for (const channel of CONTINUOUS_CHANNELS) {
+    for (const channel of SCROLL_CHANNELS) {
       const current = deviations.get(channel);
       if (current?.holding) {
         deviations.set(channel, holdDeviation(current, heldOffset(channel, current.offset)));
@@ -149,14 +192,16 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     }
 
     publish(nowMs);
+
+    for (const channel of READOUT_CHANNELS) spell(channel);
   }
 
-  function heldOffset(channel: ContinuousChannel, fallback: number): number {
+  function heldOffset(channel: ScrollChannel, fallback: number): number {
     const held = heldValues.get(channel);
     return held === undefined ? fallback : held - anchoredTarget(channel);
   }
 
-  function stopAtEdge(channel: ContinuousChannel, state: ContinuousDeviation): ContinuousDeviation {
+  function stopAtEdge(channel: ScrollChannel, state: ContinuousDeviation): ContinuousDeviation {
     const range = rangeOf(channel);
     const anchored = anchoredTarget(channel);
     const value = anchored + state.offset;
@@ -169,7 +214,7 @@ export function createDemoStore(scenario: Scenario): DemoStore {
   }
 
   function bind(
-    channel: ContinuousChannel,
+    channel: ScrollChannel,
     viewport: HTMLElement,
     inner: HTMLElement,
     anchor: ScrollAnchor,
@@ -211,14 +256,14 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     paint(channel);
   }
 
-  function unbind(channel: ContinuousChannel): void {
+  function unbind(channel: ScrollChannel): void {
     surfaces.get(channel)?.detach();
     surfaces.delete(channel);
     painted.delete(channel);
     heldValues.delete(channel);
   }
 
-  function surfaceOf(channel: ContinuousChannel, anchor: ScrollAnchor): ScreenSurface {
+  function surfaceOf(channel: ScrollChannel, anchor: ScrollAnchor): ScreenSurface {
     const existing = handles.get(channel);
     if (existing) return existing;
 
@@ -270,6 +315,7 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     },
     snapshot: () => discrete,
     surfaceOf,
+    readoutOf,
     mount,
   };
 }
