@@ -1,0 +1,111 @@
+.layer {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--menu-scrim-bg);
+  backdrop-filter: var(--menu-scrim-blur);
+}
+
+.stack {
+  position: absolute;
+  display: flex;
+  width: min(280px, calc(100% - 2 * var(--space-4)));
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.clone {
+  transform: scale(1.03);
+  transform-origin: top left;
+}
+
+.panel {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reactions {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--menu-border);
+  border-radius: var(--radius-pill);
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+}
+
+.reactionScroll {
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.reactionButton {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.reactionExpand {
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  place-items: center;
+  margin-left: 4px;
+  border-left: 1px solid var(--menu-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-tertiary);
+}
+
+.list {
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 18px;
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+}
+
+.item {
+  display: flex;
+  width: 100%;
+  min-height: var(--tap-min);
+  align-items: center;
+  gap: 13px;
+  padding: 11px 14px;
+  color: var(--text-primary);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.itemDanger {
+  color: var(--danger);
+}
+
+.glyph {
+  flex-shrink: 0;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

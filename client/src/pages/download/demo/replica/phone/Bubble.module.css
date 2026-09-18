@@ -1,0 +1,291 @@
+.dayWrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-1);
+}
+
+.day {
+  padding: 5px 13px;
+  border-radius: 15px;
+  background: var(--replica-day-bg);
+  backdrop-filter: var(--replica-day-blur);
+  box-shadow: var(--replica-day-shadow);
+  color: var(--replica-day-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.rowOwn {
+  justify-content: flex-end;
+}
+
+.bubbleCol {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: var(--bubble-max-w);
+  flex-direction: column;
+}
+
+.bubbleColMedia {
+  max-width: var(--replica-bubble-media-max-w);
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.bubble {
+  position: relative;
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--bubble-pad-y) var(--bubble-pad-x) 7px;
+  font-size: 15px;
+  line-height: 1.34;
+}
+
+.in {
+  border: 1px solid var(--replica-bubble-in-border);
+  border-radius: 20px 20px 20px 7px;
+  background: var(--replica-bubble-in-bg);
+  box-shadow: var(--replica-bubble-in-shadow);
+  color: var(--replica-row-ink);
+}
+
+.out {
+  border: 1px solid var(--replica-bubble-out-border);
+  border-radius: 20px 20px 7px 20px;
+  background: var(--replica-bubble-out-bg);
+  box-shadow: var(--replica-bubble-out-shadow);
+  color: var(--text-on-out);
+}
+
+.bubbleMedia {
+  width: 100%;
+}
+
+.textRow {
+  position: relative;
+  display: block;
+}
+
+.text {
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pad {
+  display: inline-block;
+  height: 1px;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--font-time);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.metaAnchored {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: var(--replica-meta-ink);
+}
+
+.metaInBubble {
+  position: absolute;
+  right: var(--bubble-pad-x);
+  bottom: 7px;
+  color: var(--replica-meta-ink);
+}
+
+.metaOnOut.metaAnchored,
+.metaOnOut.metaInBubble {
+  color: var(--replica-meta-on-out-ink);
+}
+
+.metaOverlay {
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--media-meta-bg);
+  color: var(--media-meta-ink);
+  font-weight: 500;
+}
+
+.check {
+  margin-left: 1px;
+}
+
+.media {
+  position: relative;
+  overflow: hidden;
+  margin: calc(var(--bubble-pad-y) * -1) calc(var(--bubble-pad-x) * -1) -7px;
+  border-radius: var(--radius-bubble);
+}
+
+.mediaMeta {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.album {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: calc(var(--radius-bubble) - 4px);
+  aspect-ratio: 8 / 9;
+}
+
+.albumLead {
+  display: flex;
+  min-height: 0;
+  flex-basis: 0;
+  flex-grow: 2;
+}
+
+.albumRest {
+  display: flex;
+  min-height: 0;
+  flex-basis: 0;
+  flex-grow: 1;
+  gap: 2px;
+}
+
+.albumCell {
+  display: flex;
+  min-width: 0;
+  flex-basis: 0;
+  flex-grow: 1;
+}
+
+.albumTile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--media-placeholder);
+  object-fit: cover;
+}
+
+.voiceHead {
+  position: relative;
+  display: flex;
+  min-width: 220px;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  margin: -8px -12px 4px;
+  padding: 10px 14px;
+  border-radius: 20px 20px 0 0;
+}
+
+.voicePlay {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--text-on-out);
+}
+
+.voiceWave {
+  display: flex;
+  overflow: hidden;
+  height: 40px;
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+}
+
+.voiceBar {
+  min-width: 2px;
+  max-width: 3px;
+  flex: 1;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+  opacity: 0.35;
+}
+
+.voiceFoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voiceDuration {
+  flex-shrink: 0;
+  color: inherit;
+  font-feature-settings: 'tnum' 1;
+  font-size: 0.78em;
+  opacity: 0.75;
+}
+
+.voiceDot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.voiceSpeed {
+  flex-shrink: 0;
+  padding: 4px 2px;
+  color: inherit;
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.reactionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.reactionPill {
+  display: flex;
+  height: var(--reaction-h);
+  align-items: center;
+  gap: 3px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  line-height: 1;
+}
+
+.reactionEmoji {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.reactionCount {
+  font-size: var(--font-time);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

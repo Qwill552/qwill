@@ -47,6 +47,7 @@ export default defineConfig(() => {
           // выключен вовсе (D-1), — в прекэше браузера ему делать нечего.
           globIgnores: [
             '**/wallpaper/patterns/*.svg',
+            '**/download/album/*.jpg',
             'notification.html',
             'assets/notification-*.js',
             'assets/notification-*.css',

@@ -1,0 +1,84 @@
+.screen {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  background: var(--chat-bg);
+  --chat-header-h: calc(6px + var(--safe-top) + 40px + 10px);
+  --composer-inset-bottom: calc(20px + var(--safe-bottom));
+}
+
+.wallpaper {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  isolation: isolate;
+  background: var(--wallpaper-default);
+}
+
+.pattern {
+  position: absolute;
+  inset: 0;
+  background-color: var(--chat-pattern-ink);
+  mask-image: url('/wallpaper/patterns/cats.svg');
+  mask-size: 375px 812px;
+  mask-repeat: repeat;
+  mix-blend-mode: var(--chat-pattern-blend);
+}
+
+.feed {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  inset: 0;
+}
+
+.feedInner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--chat-header-h) 12px calc(var(--composer-min-h) + var(--composer-inset-bottom) + 40px);
+  will-change: transform;
+}
+
+.headerFade {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--chat-header-h);
+  background: var(--replica-fade-bg);
+  backdrop-filter: var(--replica-fade-blur);
+  mask-image: linear-gradient(to bottom, black 0%, black 20%, transparent 100%);
+}
+
+.header {
+  top: 0;
+  right: 0;
+  left: 0;
+  padding: calc(6px + var(--safe-top)) 12px 10px;
+  gap: 9px;
+}
+
+.composerFade {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: calc(var(--composer-min-h) + var(--composer-inset-bottom));
+  background: var(--replica-fade-bg);
+  backdrop-filter: var(--replica-fade-blur);
+  mask-image: linear-gradient(to top, black 0%, black 20%, transparent 100%);
+}
+
+.composerBar {
+  right: 14px;
+  bottom: var(--composer-inset-bottom);
+  left: 14px;
+  gap: 10px;
+}

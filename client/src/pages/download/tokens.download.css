@@ -34,13 +34,6 @@
   --device-shadow: 0 40px 80px -24px rgb(28 32 45 / 34%), 0 12px 28px -12px rgb(28 32 45 / 20%);
   --device-screen-bg: var(--bg);
 
-  --demo-clock-top: 132px;
-  --demo-clock-size: 86px;
-  --demo-clock-gap: 14px;
-  --demo-date-size: 19px;
-  --demo-clock-ink: #16192a;
-  --demo-clock-meta: rgb(22 25 42 / 66%);
-
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
   --demo-stub-max-width: 260px;
@@ -87,13 +80,6 @@
   --device-shadow: 0 40px 80px -24px rgb(0 0 0 / 66%), 0 12px 28px -12px rgb(0 0 0 / 48%);
   --device-screen-bg: var(--bg);
 
-  --demo-clock-top: 132px;
-  --demo-clock-size: 86px;
-  --demo-clock-gap: 14px;
-  --demo-date-size: 19px;
-  --demo-clock-ink: #f2f4fb;
-  --demo-clock-meta: rgb(242 244 251 / 70%);
-
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
   --demo-stub-max-width: 260px;
@@ -133,4 +119,111 @@
     --header-title-size: 2.6em;
     --header-subtitle-size: 1.2em;
   }
+}
+
+:root {
+  --replica-row-active-bg: rgba(var(--pulse-glass), 0.09);
+  --replica-row-ink: rgb(var(--pulse-ink));
+  --replica-row-time-ink: rgba(var(--pulse-ink), 0.4);
+  --replica-row-preview-ink: rgba(var(--pulse-ink), 0.45);
+  --replica-row-author-ink: rgba(var(--pulse-ink), 0.55);
+
+  --replica-glass-btn-bg: rgba(var(--pulse-glass), 0.06);
+  --replica-glass-btn-border: rgba(var(--pulse-glass), 0.08);
+  --replica-glass-btn-blur: blur(8px);
+
+  --replica-search-bg: rgba(var(--pulse-glass), 0.07);
+  --replica-search-border: rgba(var(--pulse-glass), 0.09);
+  --replica-search-blur: blur(12px) saturate(180%);
+  --replica-search-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.12);
+  --replica-search-ink: rgba(var(--pulse-ink), 0.42);
+
+  --replica-chip-bg: rgba(var(--pulse-glass), 0.05);
+  --replica-chip-border: rgba(var(--pulse-glass), 0.07);
+  --replica-chip-ink: rgba(var(--pulse-ink), 0.55);
+  --replica-chip-active-bg: linear-gradient(140deg, rgb(77 141 255 / 92%), rgb(160 90 255 / 88%));
+  --replica-chip-active-border: rgb(150 180 255 / 45%);
+  --replica-chip-active-shadow: 0 8px 22px -12px rgb(90 120 255 / 90%);
+  --replica-chip-active-ink: #fff;
+
+  --replica-badge-bg: linear-gradient(140deg, #4d8dff, #8b5cf6);
+  --replica-badge-ink: #fff;
+  --replica-badge-muted-bg: rgba(var(--pulse-ink), 0.35);
+  --replica-badge-ring: rgb(var(--pulse-dock));
+
+  --replica-avatar-shadow: 0 8px 20px -10px rgb(0 0 0 / 90%);
+  --replica-online-dot: #3ddc84;
+
+  --replica-dock-bg: rgba(var(--pulse-dock), 0.5);
+  --replica-dock-border: rgba(var(--pulse-glass), 0.12);
+  --replica-dock-blur: blur(16px) saturate(200%);
+  --replica-dock-shadow:
+    0 22px 50px -20px rgb(0 0 0 / 95%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.18),
+    inset 0 -1px 0 rgba(var(--pulse-glass), 0.05);
+  --replica-tab-ink: rgba(var(--pulse-ink), 0.42);
+  --replica-tab-active-ink: #4faaff;
+
+  --replica-fab-bg: linear-gradient(140deg, #4d8dff, #a05aff);
+  --replica-fab-shadow:
+    0 16px 34px -12px rgb(90 120 255 / 95%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.4);
+
+  --replica-cap-bg: var(--pulse-cap);
+  --replica-cap-border: var(--pulse-capbd);
+  --replica-cap-blur: blur(12px) saturate(180%);
+  --replica-cap-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.16);
+  --replica-cap-title-ink: rgb(var(--pulse-ink));
+  --replica-cap-subtitle-ink: rgba(var(--pulse-ink), 0.45);
+
+  --replica-round-bg: rgba(var(--pulse-glass), 0.08);
+  --replica-round-border: rgba(var(--pulse-glass), 0.1);
+  --replica-round-blur: blur(10px);
+
+  --replica-fade-bg: rgba(var(--pulse-dock), 0.5);
+  --replica-fade-blur: blur(6px) saturate(150%);
+
+  --replica-bubble-in-bg: var(--pulse-bub);
+  --replica-bubble-in-border: var(--pulse-bubbd);
+  --replica-bubble-in-shadow:
+    0 6px 16px -11px rgb(0 0 0 / 34%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.1);
+  --replica-bubble-out-bg: linear-gradient(140deg, rgb(77 141 255 / 85%), rgb(150 88 255 / 80%));
+  --replica-bubble-out-border: rgb(180 200 255 / 35%);
+  --replica-bubble-out-shadow:
+    0 12px 26px -16px rgb(90 120 255 / 95%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.25);
+  --replica-meta-ink: rgba(var(--pulse-ink), 0.4);
+  --replica-meta-on-out-ink: rgb(255 255 255 / 85%);
+
+  --replica-day-bg: rgba(var(--pulse-dock), 0.5);
+  --replica-day-blur: blur(8px) saturate(160%);
+  --replica-day-shadow: inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
+  --replica-day-ink: rgba(var(--pulse-ink), 0.72);
+
+  --replica-field-bg: rgba(var(--pulse-dock), 0.62);
+  --replica-field-border: rgba(var(--pulse-glass), 0.12);
+  --replica-field-blur: blur(14px) saturate(180%);
+  --replica-field-shadow:
+    0 18px 40px -16px rgb(0 0 0 / 50%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
+  --replica-field-ink: rgb(var(--pulse-ink));
+  --replica-field-hint-ink: rgba(var(--pulse-ink), 0.45);
+
+  --replica-send-bg: linear-gradient(140deg, var(--accent-from), var(--accent-to));
+  --replica-send-shadow:
+    0 12px 26px -12px rgb(90 120 255 / 95%),
+    inset 0 1px 0 rgba(var(--pulse-glass), 0.4);
+  --replica-send-ink: #fff;
+  --replica-record-ring: 0 0 0 10px color-mix(in srgb, var(--danger) 22%, transparent);
+
+  --replica-tile-bg: linear-gradient(140deg, var(--accent-from), var(--accent-to));
+
+  --replica-bubble-media-max-w: 322px;
+  --replica-bubble-media-max-h: 460px;
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] {
+  --replica-bubble-in-bg: var(--message-in);
 }

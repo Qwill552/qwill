@@ -1,0 +1,101 @@
+.composer {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--replica-field-border);
+  border-radius: 24px;
+  background: var(--replica-field-bg);
+  backdrop-filter: var(--replica-field-blur);
+  box-shadow: var(--replica-field-shadow);
+}
+
+.round {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--replica-field-hint-ink);
+}
+
+.input {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  padding: 5px 0;
+  color: var(--replica-field-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+  font-size: 15.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inputEmpty {
+  color: var(--replica-field-hint-ink);
+}
+
+.send {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--replica-send-bg);
+  box-shadow: var(--replica-send-shadow);
+  color: var(--replica-send-ink);
+}
+
+.sendRecording {
+  background: var(--danger);
+  box-shadow: var(--replica-record-ring);
+}
+
+.recordDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.recordTimer {
+  flex-shrink: 0;
+  color: var(--replica-field-ink);
+  font-feature-settings: 'tnum' 1;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.recordLock {
+  display: grid;
+  flex-shrink: 0;
+  margin-left: auto;
+  place-items: center;
+  color: var(--replica-row-time-ink);
+}
+
+.recordHint {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--replica-field-hint-ink);
+  font-size: var(--font-caption);
+}

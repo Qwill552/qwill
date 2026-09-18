@@ -1,0 +1,12 @@
+.replica {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  font-family: var(--font-display);
+  --safe-top: 52px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+  --safe-right: 0px;
+  --bubble-media-max-w: var(--replica-bubble-media-max-w);
+  --bubble-media-max-h: var(--replica-bubble-media-max-h);
+}
