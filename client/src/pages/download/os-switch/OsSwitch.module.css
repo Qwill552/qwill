@@ -1,0 +1,54 @@
+.switch {
+  position: relative;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+  width: 100%;
+  padding: 3px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px - 2px) / 2);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  transform: translateX(calc(var(--os-index) * (100% + 2px)));
+  transition: transform var(--dur-tab) var(--ease-screen);
+}
+
+.tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--font-meta);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur-tab) ease;
+}
+
+.tabActive {
+  color: var(--text-primary);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}

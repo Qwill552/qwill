@@ -17,14 +17,6 @@
   max-width: var(--page-max-width);
 }
 
-.osSwitchStub {
-  width: 100%;
-  height: var(--tap-min);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-pill);
-  background: var(--card-bg);
-}
-
 .demoStub {
   display: grid;
   place-items: center;
@@ -35,15 +27,6 @@
   color: var(--text-secondary);
   font-size: var(--font-meta);
   text-align: center;
-}
-
-.downloadButtonStub {
-  width: 100%;
-  max-width: 320px;
-  height: 56px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--card-border);
-  background: var(--card-bg);
 }
 
 .versionStub {

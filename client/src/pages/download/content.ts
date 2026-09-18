@@ -3,4 +3,15 @@ export const CONTENT = {
   subtitle: 'Просто будь на связи.',
   themeToggleLabel: 'Сменить тему',
   demoPlaceholder: 'Здесь будет демо',
+  osSwitch: {
+    label: 'Операционная система',
+    android: 'Android',
+    windows: 'Windows',
+  },
+  downloadButton: {
+    cta: 'Скачать',
+    versionPrefix: 'версия',
+    unavailable: 'Выпуск пока не опубликован',
+    offlineNotice: 'Не удалось проверить версию',
+  },
 } as const;

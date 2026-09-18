@@ -266,6 +266,13 @@ export const ICON_PATHS = {
     'M20.5 14.5v3h-2.3',
     'M14.5 20.5h3v-2',
   ],
+  android: [
+    'M9.6 1.6h.8v2.6h-.8Z',
+    'M13.6 1.6h.8v2.6h-.8Z',
+    'M7.4 8C7.4 5 9.4 3 12 3c2.6 0 4.6 2 4.6 5Z',
+    'M6.5 8h11v5.5a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2Z',
+  ],
+  'windows-logo': ['M2 2h9v9H2Z', 'M13 2h9v9h-9Z', 'M2 13h9v9H2Z', 'M13 13h9v9h-9Z'],
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
