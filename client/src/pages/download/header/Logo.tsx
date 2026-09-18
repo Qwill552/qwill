@@ -112,26 +112,44 @@ const FACETS: Facet[] = [
   },
 ];
 
-const SOFT_EDGE_DEVIATION = 0.65;
+const STAR_OUTLINE =
+  'M32 2 C33.58 3.41 38.81 23.59 39.61 24.39 C40.41 25.19 60.59 30.42 62 32 ' +
+  'C60.59 33.58 40.41 38.81 39.61 39.61 C38.81 40.41 33.58 60.59 32 62 ' +
+  'C30.42 60.59 25.19 40.41 24.39 39.61 C23.59 38.81 3.41 33.58 2 32 ' +
+  'C3.41 30.42 23.59 25.19 24.39 24.39 C25.19 23.59 30.42 3.41 32 2Z';
+
+const EDGE_BLUR_DEVIATION = 0.7;
+const EDGE_DILATION = 1.4;
 
 export function Logo() {
   const instanceId = useId();
   const facetGradientId = (facet: Facet) => `${instanceId}${facet.name}`;
-  const softEdgeId = `${instanceId}soft-edge`;
+  const edgeBlurId = `${instanceId}edge-blur`;
+  const edgeMaskId = `${instanceId}edge-mask`;
 
   return (
     <svg className={styles.logo} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
       <defs>
         <filter
-          id={softEdgeId}
+          id={edgeBlurId}
           x="-20%"
           y="-20%"
           width="140%"
           height="140%"
           colorInterpolationFilters="sRGB"
         >
-          <feGaussianBlur stdDeviation={SOFT_EDGE_DEVIATION} />
+          <feGaussianBlur stdDeviation={EDGE_BLUR_DEVIATION} />
         </filter>
+        <mask id={edgeMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+          <path
+            d={STAR_OUTLINE}
+            fill="#fff"
+            stroke="#fff"
+            strokeWidth={EDGE_DILATION}
+            strokeLinejoin="round"
+            filter={`url(#${edgeBlurId})`}
+          />
+        </mask>
         {FACETS.map((facet) => (
           <linearGradient
             key={facet.name}
@@ -148,7 +166,7 @@ export function Logo() {
           </linearGradient>
         ))}
       </defs>
-      <g filter={`url(#${softEdgeId})`}>
+      <g mask={`url(#${edgeMaskId})`}>
         {FACETS.map((facet) => (
           <path key={facet.name} d={facet.shape} fill={`url(#${facetGradientId(facet)})`} />
         ))}
