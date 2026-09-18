@@ -1421,6 +1421,7 @@ const MessageListRow = memo(function MessageListRow({
             read={read}
             showAuthor={isGroup && !own && !sameAuthorAsPrev}
             album={album ?? undefined}
+            hasReactions={isReal && reactions.length > 0}
           >
             {isReal && (
               <MessageReactions

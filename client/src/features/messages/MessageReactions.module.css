@@ -23,8 +23,9 @@
 }
 
 .pillMine {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--reaction-mine-border, var(--primary));
+  background: var(--reaction-mine-bg, var(--reaction-bg, var(--surface-3)));
+  color: var(--reaction-mine-ink, var(--primary));
 }
 
 .bump {

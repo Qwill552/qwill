@@ -54,13 +54,14 @@ interface MessageBubbleProps {
   album?: LocalMessage[];
   /** Чипы реакций и прочее, что рисуется под текстом внутри пузыря. */
   children?: ReactNode;
+  hasReactions?: boolean;
 }
 
 /** Буквально из референса (строка 332): фиксированный радиус 20/20/7/20 (свои) или
  *  20/20/20/7 (чужие) — без поджатия углов в сериях, без хвостиков. Метаданные —
  *  абсолютом в правом нижнем углу (строка 333), текст резервирует под них место
  *  невидимой распоркой после себя (строка 339: `{{ m.pad }}`), а не float. */
-export function MessageBubble({ message, own, read, showAuthor, album, children }: MessageBubbleProps) {
+export function MessageBubble({ message, own, read, showAuthor, album, children, hasReactions }: MessageBubbleProps) {
   const status: 'sending' | 'sent' | 'failed' =
     message.status === 'sending' ? 'sending' : message.status === 'failed' ? 'failed' : 'sent';
   const isVoice = message.attachment !== null && isVoiceAttachment(message.attachment);
@@ -128,11 +129,14 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
     />
   );
 
+  const reactionsOutside = bareMedia && !hasHeader;
+
   const classes = [
     styles.bubble,
     own ? styles.out : styles.in,
     message.status === 'failed' ? styles.failed : '',
-    bareMedia && !hasHeader ? styles.bubbleBare : '',
+    reactionsOutside ? styles.bubbleBare : '',
+    bareMedia && hasReactions ? styles.bubbleReactedMedia : '',
   ].join(' ');
 
   if (message.announcement && !message.deletedAt) {
@@ -212,7 +216,6 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
 
               {bareMedia && (
                 <span className={styles.mediaMeta}>
-                  {children}
                   <span className={styles.metaHolder}>
                     <MessageMeta
                       createdAt={message.createdAt}
@@ -279,7 +282,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children 
           )}
         </>
       )}
-      {!bareMedia && children}
+      {reactionsOutside ? <span className={styles.reactionsOutside}>{children}</span> : children}
     </div>
   );
 }
