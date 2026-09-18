@@ -253,6 +253,11 @@
   --replica-caret-dur: 1060ms;
   --replica-caret-ink: var(--primary);
 
+  --replica-card-bg: #16262e;
+  --replica-card-bubble-bg: #28353e;
+  --replica-card-bubble-ink: #ffffff;
+  --replica-card-font: 'Courier New', ui-monospace, SFMono-Regular, monospace;
+
   --demo-glow:
     radial-gradient(
       circle closest-side,

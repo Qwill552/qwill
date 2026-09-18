@@ -1,6 +1,6 @@
 import replicaEmoji from './replicaEmoji.json';
 
-export type ReplicaScreen = 'chats' | 'chat';
+export type ReplicaScreen = 'chats' | 'chat' | 'profile' | 'wallpaper' | 'call' | 'qr' | 'settings';
 
 export type ReplicaOverlay = 'none' | 'menu' | 'attach';
 
@@ -41,7 +41,7 @@ export interface ReplicaPerson {
 export const PEOPLE = {
   artem: { id: 'artem', name: 'Артём Лисицын', username: '@artem' },
   nina: { id: 'nina', name: 'Нина Ковалёва', username: '@nina' },
-  mark: { id: 'mark', name: 'Марк Ерохин', username: '@mark' },
+  grisha: { id: 'grisha', name: 'Гриша', username: '@grisha' },
   me: { id: 'me', name: 'Вы', username: '@you' },
 } as const satisfies Record<string, ReplicaPerson>;
 
@@ -90,7 +90,7 @@ export const CHAT_ROWS: ReplicaChatRow[] = [
     id: 'dacha',
     title: 'Дача на выходных',
     preview: 'Мангал беру на себя',
-    authorPrefix: 'Марк: ',
+    authorPrefix: 'Гриша: ',
     time: 'Вчера',
     unread: 5,
     online: false,
@@ -113,8 +113,8 @@ export const CHAT_ROWS: ReplicaChatRow[] = [
     sent: false,
   },
   {
-    id: 'mark',
-    title: PEOPLE.mark.name,
+    id: 'grisha',
+    title: PEOPLE.grisha.name,
     preview: 'Договорились',
     authorPrefix: 'Вы: ',
     time: 'Пн',
@@ -439,3 +439,140 @@ export function recordedTime(progress: number): string {
   const seconds = Math.floor(clamped * VOICE_RECORD_SECONDS);
   return `0:0${seconds}`;
 }
+
+export const PROFILE_ACTIONS = [
+  { id: 'chat', icon: 'chat-filled', label: 'Чат', solid: true },
+  { id: 'sound', icon: 'bell-filled', label: 'Звук', solid: true },
+  { id: 'call', icon: 'phone-filled', label: 'Звонок', solid: true },
+  { id: 'more', icon: 'more-horizontal', label: 'Ещё', solid: false },
+] as const;
+
+export const PROFILE_TEXT = {
+  status: 'не в сети',
+  usernameLabel: 'Имя пользователя',
+} as const;
+
+export const MEDIA_TABS = ['Медиа', 'Файлы', 'Ссылки', 'Голосовые'] as const;
+
+export const CARD_BUBBLE_TEXT = 'погладь меня';
+
+export const CARD_PALETTE: Record<string, string> = {
+  '#': '#28353e',
+  T: '#2eb4ad',
+  t: '#276571',
+  c: '#fdedb9',
+  e: '#28353e',
+  i: '#276571',
+  g: '#c4d78b',
+  p: '#ec5986',
+  o: '#f9ab97',
+};
+
+export const CARD_SPRITE: string[] = [
+  '.....#.........#.....',
+  '....#p#.......#p#....',
+  '....##p#######p##....',
+  '...#T#p#TTTTT#p#T#...',
+  '...#Tt#TTTTTTT#tT#...',
+  '..##TtTTTTTTTTTtTT#..',
+  '..#TtTTTtTTTtTTTtT#..',
+  '..#tTTTTcTTTcTTTtT#..',
+  '..#TtTtTctTtcTtTtT#..',
+  '..#TtTtcecTcectTtT#..',
+  '.#TTtTTcicTcicTTtTT#.',
+  '.#TTTtTcgcccgcTtTTT#.',
+  '.#TTTt#occccco#tTTT#.',
+  '#TTTT#.#######.#TTTT#',
+  '#TtTT#.........#TTtT#',
+  '#TTtTT#.......#TTtTT#',
+  '.#TT##.........##TT#.',
+  '..##.............##..',
+];
+
+export const CARD_SPRITE_COLS = 21;
+
+export interface ReplicaWallpaperOption {
+  id: string;
+  title: string;
+  kind: 'gradient' | 'pattern';
+  value: string;
+  current: boolean;
+}
+
+export const WALLPAPER_OPTIONS: ReplicaWallpaperOption[] = [
+  { id: 'default', title: 'По теме', kind: 'gradient', value: 'var(--wallpaper-default)', current: true },
+  { id: 'summer', title: 'Лето', kind: 'gradient', value: 'var(--wallpaper-summer)', current: false },
+  { id: 'cats', title: 'Коты', kind: 'pattern', value: 'var(--wallpaper-default)', current: false },
+];
+
+export const WALLPAPER_TEXT = {
+  title: 'Обои чата',
+  previewName: PEOPLE.grisha.name,
+  previewMessages: ['Мангал беру на себя', 'Погнали часам к пяти'] as const,
+} as const;
+
+export const CALL_TEXT = {
+  status: '02:14',
+} as const;
+
+export const QR_TEXT = {
+  title: 'Мой QR-код',
+  hint: 'Наведите камеру, чтобы открыть этот профиль в Qwill',
+  button: 'Скопировать ссылку',
+} as const;
+
+export const QR_PATTERN: readonly (readonly boolean[])[] = buildQrPattern();
+
+function buildQrPattern(): boolean[][] {
+  const size = 21;
+  const grid: boolean[][] = Array.from({ length: size }, () => Array<boolean>(size).fill(false));
+
+  function paintFinder(top: number, left: number): void {
+    for (let r = 0; r < 7; r += 1) {
+      for (let c = 0; c < 7; c += 1) {
+        const onRing = r === 0 || r === 6 || c === 0 || c === 6;
+        const onCore = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+        grid[top + r]![left + c] = onRing || onCore;
+      }
+    }
+  }
+
+  paintFinder(0, 0);
+  paintFinder(0, size - 7);
+  paintFinder(size - 7, 0);
+
+  let seed = 42;
+  function next(): number {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  }
+
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) {
+      const inFinder =
+        (r < 8 && c < 8) || (r < 8 && c > size - 9) || (r > size - 9 && c < 8);
+      if (inFinder) continue;
+      grid[r]![c] = next() > 0.56;
+    }
+  }
+
+  return grid;
+}
+
+export const SETTINGS_SECTIONS = [
+  [
+    { id: 'account', icon: 'user', tint: 'blue', title: 'Аккаунт', subtitle: 'Номер, имя пользователя, «О себе»' },
+    { id: 'appearance', icon: 'chats', tint: 'orange', title: 'Настройки чатов', subtitle: 'Обои, ночной режим, анимации' },
+    { id: 'password', icon: 'lock', tint: 'green', title: 'Пароль', subtitle: 'Смена пароля от аккаунта' },
+    { id: 'notifications', icon: 'bell', tint: 'pink', title: 'Уведомления', subtitle: 'Звуки, звонки, счётчик сообщений' },
+  ],
+  [
+    { id: 'storage', icon: 'database', tint: 'teal', title: 'Данные и память', subtitle: 'Место на устройстве, очистка, автозагрузка' },
+    { id: 'devices', icon: 'monitor', tint: 'violet', title: 'Устройства', subtitle: 'Управление активными сеансами' },
+  ],
+] as const;
+
+export const SETTINGS_TEXT = {
+  version: 'Qwill 1.3',
+  license: 'AGPL-3.0',
+} as const;
