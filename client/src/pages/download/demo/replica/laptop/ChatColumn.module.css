@@ -47,7 +47,7 @@
 .wallpaper {
   position: absolute;
   z-index: 0;
-  inset: 64px 0 90px;
+  inset: 64px 0 0;
   isolation: isolate;
   background: var(--wallpaper-default);
 }

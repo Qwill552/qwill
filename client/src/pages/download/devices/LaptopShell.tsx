@@ -8,7 +8,6 @@ import {
   LAPTOP_FINGER_NOTCH,
   LAPTOP_KEYS,
   LAPTOP_LID,
-  LAPTOP_NOTCH,
   LAPTOP_RADIUS_BEZEL,
   LAPTOP_RADIUS_LID,
   LAPTOP_RADIUS_SCREEN,
@@ -37,9 +36,6 @@ export function LaptopShell({ children }: LaptopShellProps) {
         ['--laptop-radius-bezel' as string]: `${LAPTOP_RADIUS_BEZEL}px`,
         ['--laptop-radius-screen' as string]: `${LAPTOP_RADIUS_SCREEN}px`,
         ['--laptop-edge-width' as string]: `${LAPTOP_EDGE_WIDTH}px`,
-        ['--laptop-notch-width' as string]: `${LAPTOP_NOTCH.width}px`,
-        ['--laptop-notch-height' as string]: `${LAPTOP_NOTCH.height}px`,
-        ['--laptop-notch-radius' as string]: `${LAPTOP_NOTCH.radius}px`,
         ['--laptop-base-width' as string]: `${LAPTOP_BASE.width}px`,
         ['--laptop-base-depth' as string]: `${LAPTOP_BASE.depth}px`,
         ['--laptop-base-radius' as string]: `${LAPTOP_BASE.radius}px`,
@@ -83,7 +79,6 @@ export function LaptopShell({ children }: LaptopShellProps) {
         <div className={styles.bezel}>
           <div className={styles.screen}>
             <div className={styles.screenContent}>{children}</div>
-            <span className={styles.notch} />
             <span className={styles.glare} />
           </div>
           <span className={styles.bezelRing} />

@@ -103,12 +103,6 @@ export const LAPTOP_RADIUS_LID = LAPTOP_RADIUS_BEZEL + LAPTOP_BEZEL.metal;
 
 export const LAPTOP_EDGE_WIDTH = 1.5;
 
-export const LAPTOP_NOTCH = {
-  width: 150,
-  height: 32,
-  radius: 14,
-} as const;
-
 const LAPTOP_TILT_DEG = 76;
 const LAPTOP_PERSPECTIVE = 11000;
 const LAPTOP_BASE_DEPTH = 900;

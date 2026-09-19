@@ -152,18 +152,6 @@
   will-change: transform;
 }
 
-.notch {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: var(--laptop-notch-width);
-  height: var(--laptop-notch-height);
-  margin-left: calc(var(--laptop-notch-width) / -2);
-  border-radius: 0 0 var(--laptop-notch-radius) var(--laptop-notch-radius);
-  background: var(--device-bezel);
-  pointer-events: none;
-}
-
 .glare {
   position: absolute;
   inset: 0;
