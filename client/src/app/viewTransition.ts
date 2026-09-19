@@ -53,9 +53,19 @@ function syncLiveState(source: Element, clone: Element): void {
       dst.scrollLeft = src.scrollLeft;
     }
 
-    const srcAnim = src.getAnimations()[0];
-    const dstAnim = dst.getAnimations()[0];
-    if (srcAnim && dstAnim && srcAnim.currentTime !== null) dstAnim.currentTime = srcAnim.currentTime;
+    if (src instanceof HTMLCanvasElement && dst instanceof HTMLCanvasElement && src.width > 0 && src.height > 0) {
+      dst.getContext('2d')?.drawImage(src, 0, 0);
+    }
+
+    const srcAnimations = src.getAnimations();
+    const dstAnimations = dst.getAnimations();
+    for (let a = 0; a < dstAnimations.length; a += 1) {
+      const dstAnim = dstAnimations[a];
+      if (!dstAnim) continue;
+      const srcAnim = srcAnimations[a];
+      if (srcAnim && srcAnim.currentTime !== null) dstAnim.currentTime = srcAnim.currentTime;
+      dstAnim.pause();
+    }
   }
 }
 

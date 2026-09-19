@@ -131,6 +131,15 @@ describe('хранилище настроек автозагрузки', () => {
     expect(await readAutoDownloadSettings()).toEqual(custom);
   });
 
+  it('параллельные читатели делят одно чтение хранилища', async () => {
+    const first = readAutoDownloadSettings();
+    const second = readAutoDownloadSettings();
+
+    expect(second).toBe(first);
+    expect(await second).toBe(await first);
+    expect(await readAutoDownloadSettings()).toBe(await first);
+  });
+
   it('дополняет частично сохранённые настройки умолчаниями', async () => {
     await writeAutoDownloadSettings({
       cellular: { ...DEFAULT_AUTO_DOWNLOAD_SETTINGS.cellular, video: true },

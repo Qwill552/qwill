@@ -5,7 +5,12 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useFileSrc } from '../../api/useFileSrc';
 import type { MediaKind } from '../../cache/db';
 import { cancelMediaDownload, hasCachedMedia } from '../../cache/mediaCache';
-import { readAutoDownloadSettings, shouldAutoDownload, type AutoDownloadKind } from '../../cache/settings';
+import {
+  readAutoDownloadSettings,
+  shouldAutoDownload,
+  type AutoDownloadKind,
+  type NetworkKind,
+} from '../../cache/settings';
 import { getNetworkKind, getSaveData } from '../../net/connection';
 import { scrollParentOf } from '../../ui/scrollParent';
 import { feedFileIdOf, feedUsesDownscaled } from './feedQuality';
@@ -82,10 +87,20 @@ export function useDecodedSrc(src: string | undefined): string | undefined {
 
 export const BLURHASH_CANVAS_SIDE = 32;
 
+const BLURHASH_CACHE_LIMIT = 150;
+const blurhashPixelCache = new Map<string, Uint8ClampedArray>();
+
 export function decodeBlurhashPixels(blurhash: string | null | undefined): Uint8ClampedArray | null {
   if (!isBlurhash(blurhash)) return null;
+
+  const cached = blurhashPixelCache.get(blurhash);
+  if (cached) return cached;
+
   try {
-    return decodeBlurhash(blurhash, BLURHASH_CANVAS_SIDE, BLURHASH_CANVAS_SIDE);
+    const pixels = decodeBlurhash(blurhash, BLURHASH_CANVAS_SIDE, BLURHASH_CANVAS_SIDE);
+    if (blurhashPixelCache.size >= BLURHASH_CACHE_LIMIT) blurhashPixelCache.clear();
+    blurhashPixelCache.set(blurhash, pixels);
+    return pixels;
   } catch {
     return null;
   }
@@ -145,20 +160,28 @@ function useAutoDownloadGate(attachment: AttachmentDto, previewFileId: string): 
 
     const cacheCheckId = kind === 'gif' ? attachment.file.id : previewFileId;
 
-    void Promise.all([hasCachedMedia(cacheCheckId), readAutoDownloadSettings()]).then(([cached, settings]) => {
+    void readAutoDownloadSettings().then(async (settings) => {
       if (cancelled) return;
 
       const network = getNetworkKind();
-      setAllowed(
-        shouldAutoDownload({
-          kind,
-          network: network === 'cellular' ? 'cellular' : 'wifi',
-          sizeBytes: attachment.file.size,
-          cached,
-          saveData: getSaveData(),
-          settings,
-        }),
-      );
+      const decision = {
+        kind,
+        network: (network === 'cellular' ? 'cellular' : 'wifi') as NetworkKind,
+        sizeBytes: attachment.file.size,
+        saveData: getSaveData(),
+        settings,
+      };
+
+      if (shouldAutoDownload({ ...decision, cached: false })) {
+        setAllowed(true);
+        setReady(true);
+        return;
+      }
+
+      const cached = await hasCachedMedia(cacheCheckId);
+      if (cancelled) return;
+
+      setAllowed(shouldAutoDownload({ ...decision, cached }));
       setReady(true);
     });
 
@@ -188,9 +211,17 @@ function useBoxCssWidth(ref: RefObject<Element | null> | undefined): number | un
 
   useEffect(() => {
     const node = ref?.current;
-    if (!node) return;
-    const measured = Math.round(node.getBoundingClientRect().width);
-    if (measured > 0) setWidth(measured);
+    if (!node || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver((entries) => {
+      const measured = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (measured <= 0) return;
+      observer.disconnect();
+      setWidth(measured);
+    });
+    observer.observe(node);
+
+    return () => observer.disconnect();
   }, [ref]);
 
   return width;

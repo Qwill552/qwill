@@ -28,6 +28,7 @@ export const DEFAULT_AUTO_DOWNLOAD_SETTINGS: AutoDownloadSettings = {
 const SETTINGS_KEY = 'autoDownload';
 
 let cache: AutoDownloadSettings | null = null;
+let inFlight: Promise<AutoDownloadSettings> | null = null;
 
 function mergeWithDefaults(stored: Partial<AutoDownloadSettings> | undefined): AutoDownloadSettings {
   return {
@@ -36,23 +37,30 @@ function mergeWithDefaults(stored: Partial<AutoDownloadSettings> | undefined): A
   };
 }
 
-export async function readAutoDownloadSettings(): Promise<AutoDownloadSettings> {
-  if (cache) return cache;
-
+async function loadAutoDownloadSettings(): Promise<AutoDownloadSettings> {
   const db = await openCacheDb();
   if (!db) return DEFAULT_AUTO_DOWNLOAD_SETTINGS;
 
   try {
     const entry = await db.get('settings', SETTINGS_KEY);
-    cache = mergeWithDefaults(entry?.value as Partial<AutoDownloadSettings> | undefined);
+    cache ??= mergeWithDefaults(entry?.value as Partial<AutoDownloadSettings> | undefined);
     return cache;
   } catch {
     return DEFAULT_AUTO_DOWNLOAD_SETTINGS;
   }
 }
 
+export function readAutoDownloadSettings(): Promise<AutoDownloadSettings> {
+  if (cache) return Promise.resolve(cache);
+  inFlight ??= loadAutoDownloadSettings().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
 export async function writeAutoDownloadSettings(settings: AutoDownloadSettings): Promise<void> {
   cache = settings;
+  inFlight = null;
   const db = await openCacheDb();
   if (!db) return;
 
@@ -65,6 +73,7 @@ export async function writeAutoDownloadSettings(settings: AutoDownloadSettings):
 
 export function resetAutoDownloadSettingsCache(): void {
   cache = null;
+  inFlight = null;
 }
 
 export interface AutoDownloadDecisionInput {

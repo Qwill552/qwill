@@ -11,6 +11,10 @@ describe('decodeBlurhashPixels (КЭШ-12)', () => {
     expect(pixels?.length).toBe(BLURHASH_CANVAS_SIDE * BLURHASH_CANVAS_SIDE * 4);
   });
 
+  it('повторный разбор той же строки отдаёт те же пиксели, а не считает заново', () => {
+    expect(decodeBlurhashPixels(VALID)).toBe(decodeBlurhashPixels(VALID));
+  });
+
   it('мусор, пустота и null отдают null, а не исключение', () => {
     expect(decodeBlurhashPixels(null)).toBeNull();
     expect(decodeBlurhashPixels(undefined)).toBeNull();
