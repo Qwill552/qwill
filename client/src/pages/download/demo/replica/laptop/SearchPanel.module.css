@@ -1,0 +1,66 @@
+.panel {
+  position: absolute;
+  z-index: 15;
+  overflow: hidden;
+  inset: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--replica-search-border);
+  border-radius: 20px;
+  background: var(--replica-search-bg);
+  backdrop-filter: var(--replica-search-blur);
+  box-shadow: var(--replica-search-shadow);
+  color: var(--replica-search-ink);
+  font-size: 14px;
+}
+
+.placeholder {
+  flex: 1;
+}
+
+.hotkey {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.label {
+  display: block;
+  margin: 18px 4px 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 8px;
+  border-radius: 12px;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+  font-weight: 600;
+}

@@ -13,6 +13,7 @@ import { PhoneShell } from '../devices/PhoneShell';
 import type { OsChoice } from '../useOsChoice';
 import { createDemoStore } from './engine/store';
 import { PhoneDemo } from './PhoneDemo';
+import { LaptopReplica } from './replica/laptop/LaptopReplica';
 import styles from './DemoStage.module.css';
 import { ScenarioSwitch } from './ScenarioSwitch';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
@@ -152,7 +153,7 @@ export function DemoStage({ os }: { os: OsChoice }) {
     if (target === 'windows') {
       return (
         <LaptopShell>
-          <div className={styles.laptopWallpaper} />
+          <LaptopReplica />
         </LaptopShell>
       );
     }

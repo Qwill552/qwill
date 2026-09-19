@@ -284,6 +284,9 @@
   --replica-caret-dur: 1060ms;
   --replica-caret-ink: var(--primary);
 
+  --replica-cursor-fill: rgb(var(--pulse-ink));
+  --replica-cursor-stroke: var(--surface);
+
   --replica-card-bg: #16262e;
   --replica-card-bubble-bg: #28353e;
   --replica-card-bubble-ink: #ffffff;

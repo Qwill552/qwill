@@ -586,3 +586,22 @@ export const SETTINGS_TEXT = {
   version: 'Qwill 1.3',
   license: 'AGPL-3.0',
 } as const;
+
+export const DESKTOP_MENU_ITEMS = [
+  { id: 'profile', icon: 'user', label: 'Мой профиль' },
+  { id: 'contacts', icon: 'users', label: 'Контакты' },
+  { id: 'settings', icon: 'settings', label: 'Настройки' },
+  { id: 'theme', icon: 'moon', label: 'Тёмная тема' },
+] as const;
+
+export const DESKTOP_TEXT = {
+  searchPlaceholder: 'Поиск в Qwill',
+  searchHotkey: 'Ctrl + K',
+  recentLabel: 'Недавнее',
+  emptyTitle: 'Выберите чат',
+  emptySubtitle: 'Откройте переписку из списка слева',
+  profileCardTitle: 'Профиль',
+  settingsCardTitle: 'Настройки',
+} as const;
+
+export const DESKTOP_RECENT_IDS = ['nina', 'grisha', 'katya'] as const;

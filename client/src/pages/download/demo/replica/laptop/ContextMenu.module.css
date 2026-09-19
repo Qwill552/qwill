@@ -1,0 +1,63 @@
+.panel {
+  position: absolute;
+  z-index: 25;
+  display: flex;
+  width: 220px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: var(--radius-card);
+  background: var(--menu-bg);
+  backdrop-filter: var(--menu-blur);
+  box-shadow: var(--menu-shadow);
+}
+
+.reactions {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reactionButton {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.reactionPicked {
+  background: var(--surface-3);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: var(--font-meta);
+}
+
+.itemDanger {
+  color: var(--danger);
+}
+
+.glyph {
+  flex-shrink: 0;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

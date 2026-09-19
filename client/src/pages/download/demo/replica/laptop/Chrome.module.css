@@ -1,0 +1,38 @@
+.iconBtn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+
+@media (hover: hover) {
+  .iconBtn:hover {
+    background: var(--hover-row);
+    color: var(--text-primary);
+  }
+}
+
+.fab {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: 26px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--replica-fab-bg);
+  box-shadow: var(--replica-fab-shadow);
+  color: var(--text-on-primary);
+}
+
+.cursor {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+}

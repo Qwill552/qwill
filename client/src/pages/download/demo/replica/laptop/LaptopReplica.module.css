@@ -1,0 +1,18 @@
+.replica {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+.columns {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.callLayer {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+}

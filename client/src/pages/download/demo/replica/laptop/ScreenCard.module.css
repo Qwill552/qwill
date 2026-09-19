@@ -1,0 +1,83 @@
+.scrim {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 0;
+  padding: 24px;
+  background: var(--scrim-bg);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  width: min(420px, 100%);
+  height: min(560px, 100%);
+  flex-direction: column;
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-card);
+  background: var(--sheet-bg);
+  backdrop-filter: var(--sheet-blur);
+  box-shadow: var(--sheet-shadow);
+}
+
+.cardWide {
+  width: min(480px, 100%);
+}
+
+.cardCompact {
+  width: min(340px, 100%);
+  height: min(420px, 100%);
+}
+
+.cardChromeless {
+  height: auto;
+  max-height: 100%;
+}
+
+.closeFloating {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+}
+
+.header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--font-screen-title);
+  font-weight: 700;
+}
+
+.closeButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+}
+
+.body {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
