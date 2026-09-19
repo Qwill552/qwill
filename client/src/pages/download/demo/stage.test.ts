@@ -10,10 +10,12 @@ import {
 } from '../config';
 import {
   bodyOf,
+  crossfades,
   deviceFor,
   fitStage,
   reachableDevices,
   reserveHeight,
+  sameMetrics,
   scaleOf,
   stageWidth,
   type StageMetrics,
@@ -142,5 +144,23 @@ describe('нижний предел масштаба', () => {
     expect(bodyOf('phone')).toBe(PHONE_BODY);
     expect(bodyOf('laptop')).toBe(LAPTOP_BODY);
     expect(scaleOf({ phone: 0.5, laptop: 0.2, screen: 0.3 }, 'laptop')).toBe(0.2);
+  });
+});
+
+describe('смена устройства', () => {
+  it('на широком экране идёт кроссфейдом, на узком — сразу', () => {
+    expect(crossfades(1024)).toBe(true);
+    expect(crossfades(700)).toBe(true);
+    expect(crossfades(699)).toBe(false);
+    expect(crossfades(360)).toBe(false);
+  });
+});
+
+describe('измерения сцены', () => {
+  it('одинаковые размеры не считаются изменением', () => {
+    const one: StageMetrics = { hostWidth: 328, viewportWidth: 360, viewportHeight: 800 };
+    expect(sameMetrics(one, { ...one })).toBe(true);
+    expect(sameMetrics(one, { ...one, viewportHeight: 801 })).toBe(false);
+    expect(sameMetrics(one, { ...one, hostWidth: 327 })).toBe(false);
   });
 });

@@ -163,7 +163,7 @@
   margin: 0 auto;
   flex-direction: column;
   padding: 24px 24px 16px;
-  will-change: var(--demo-will-change);
+  will-change: transform;
 }
 
 .composerBar {

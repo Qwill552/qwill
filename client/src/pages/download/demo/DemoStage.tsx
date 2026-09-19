@@ -14,10 +14,12 @@ import { DESKTOP_EVERYDAY_SCENARIO } from './scenarios/desktopEveryday';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 import {
   bodyOf,
+  crossfades,
   deviceFor,
   fitStage,
   INITIAL_FIT,
   reserveHeight,
+  sameMetrics,
   scaleOf,
   stageWidth,
   type DemoDevice,
@@ -95,17 +97,29 @@ export function DemoStage({ os }: { os: OsChoice }) {
     const host = hostRef.current;
     if (!host) return;
     const root = document.documentElement;
-    const update = () =>
-      setMetrics({
+    let pending = 0;
+
+    const measure = () => {
+      pending = 0;
+      const next: StageMetrics = {
         hostWidth: host.clientWidth,
         viewportWidth: root.clientWidth,
         viewportHeight: root.clientHeight,
-      });
-    update();
-    const observer = new ResizeObserver(update);
+      };
+      setMetrics((current) => (sameMetrics(current, next) ? current : next));
+    };
+
+    measure();
+    const observer = new ResizeObserver(() => {
+      if (pending !== 0) return;
+      pending = requestAnimationFrame(measure);
+    });
     observer.observe(host);
     observer.observe(root);
-    return () => observer.disconnect();
+    return () => {
+      if (pending !== 0) cancelAnimationFrame(pending);
+      observer.disconnect();
+    };
   }, []);
 
   const fit = metrics.hostWidth > 0 ? fitStage(metrics, RESERVED_WIDTH) : INITIAL_FIT;
@@ -113,10 +127,11 @@ export function DemoStage({ os }: { os: OsChoice }) {
 
   useEffect(() => {
     if (device === shownDevice) return;
-    setLeavingDevice(shownDevice);
+    const smooth = crossfades(metrics.viewportWidth);
+    setLeavingDevice(smooth ? shownDevice : null);
     setShownDevice(device);
-    setEntering(true);
-  }, [device, shownDevice]);
+    setEntering(smooth);
+  }, [device, shownDevice, metrics.viewportWidth]);
 
   function handleSwitch(): void {
     if (scrimPhase !== 'idle') return;

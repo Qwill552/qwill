@@ -1,13 +1,7 @@
 .demo {
-  --demo-will-change: auto;
-
   position: relative;
   overflow: hidden;
   height: 100%;
-}
-
-.demoMoving {
-  --demo-will-change: transform;
 }
 
 .glow {

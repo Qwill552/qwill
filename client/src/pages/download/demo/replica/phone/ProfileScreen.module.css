@@ -17,7 +17,7 @@
   right: 0;
   left: 0;
   padding: calc(var(--safe-top) + 52px) 0 var(--space-6);
-  will-change: var(--demo-will-change);
+  will-change: transform;
 }
 
 .header {

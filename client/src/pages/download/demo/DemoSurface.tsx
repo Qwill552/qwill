@@ -10,7 +10,6 @@ import {
 import { DEMO_GLOW_SIZE, DEMO_HINT_VISIBLE_MS } from '../config';
 import { CONTENT } from '../content';
 import styles from './DemoSurface.module.css';
-import { whileRunning } from './engine/clock';
 import type { DemoStore } from './engine/store';
 import { ALBUM_PHOTOS, EMOJI_STRIP_URL } from './replica/phone/demoData';
 
@@ -29,15 +28,12 @@ export function DemoSurface({ store, children, onPointerActivity, rootRef }: Dem
   const glowRef = useRef<HTMLSpanElement>(null);
   const [hinting, setHinting] = useState(false);
   const [glowing, setGlowing] = useState(false);
-  const [moving, setMoving] = useState(false);
 
   useEffect(() => {
     const root = hostRef.current;
     if (!root) return;
     return store.mount(root);
   }, [store]);
-
-  useEffect(() => whileRunning(setMoving), []);
 
   useEffect(() => {
     for (const photo of ALBUM_PHOTOS) {
@@ -83,7 +79,7 @@ export function DemoSurface({ store, children, onPointerActivity, rootRef }: Dem
   return (
     <div
       ref={hostRef}
-      className={moving ? `${styles.demo} ${styles.demoMoving}` : styles.demo}
+      className={styles.demo}
       style={{ ['--demo-glow-size' as string]: `${DEMO_GLOW_SIZE}px` }}
       onPointerEnter={enter}
       onPointerMove={follow}

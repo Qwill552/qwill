@@ -62,6 +62,18 @@ export function deviceFor(os: OsChoice, viewportWidth: number): DemoDevice {
   return viewportWidth >= DOWNLOAD_BREAKPOINTS.tablet ? 'laptop' : 'screen';
 }
 
+export function sameMetrics(left: StageMetrics, right: StageMetrics): boolean {
+  return (
+    left.hostWidth === right.hostWidth &&
+    left.viewportWidth === right.viewportWidth &&
+    left.viewportHeight === right.viewportHeight
+  );
+}
+
+export function crossfades(viewportWidth: number): boolean {
+  return viewportWidth >= DOWNLOAD_BREAKPOINTS.tablet;
+}
+
 export function reachableDevices(viewportWidth: number): DemoDevice[] {
   return viewportWidth >= DOWNLOAD_BREAKPOINTS.tablet ? ['phone', 'laptop'] : ['phone', 'screen'];
 }
