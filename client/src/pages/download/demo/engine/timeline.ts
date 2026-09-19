@@ -4,7 +4,9 @@ export type ScrollChannel = 'chatsScroll' | 'feedScroll' | 'profileScroll' | 'se
 
 export type ReadoutChannel = 'typing' | 'voice' | 'callSeconds';
 
-export type ContinuousChannel = ScrollChannel | ReadoutChannel;
+export type PointChannel = 'cursorX' | 'cursorY';
+
+export type ContinuousChannel = ScrollChannel | ReadoutChannel | PointChannel;
 
 export const SCROLL_CHANNELS: readonly ScrollChannel[] = [
   'chatsScroll',
@@ -15,9 +17,12 @@ export const SCROLL_CHANNELS: readonly ScrollChannel[] = [
 
 export const READOUT_CHANNELS: readonly ReadoutChannel[] = ['typing', 'voice', 'callSeconds'];
 
+export const POINT_CHANNELS: readonly PointChannel[] = ['cursorX', 'cursorY'];
+
 export const CONTINUOUS_CHANNELS: readonly ContinuousChannel[] = [
   ...SCROLL_CHANNELS,
   ...READOUT_CHANNELS,
+  ...POINT_CHANNELS,
 ];
 
 export type DemoTarget = Record<ContinuousChannel, number> & ReplicaState;
@@ -43,6 +48,8 @@ export const DEMO_REST: DemoTarget = {
   typing: 0,
   voice: 0,
   callSeconds: 0,
+  cursorX: 0,
+  cursorY: 0,
   ...REPLICA_REST,
 };
 
@@ -67,6 +74,8 @@ export function discreteOf(target: DemoTarget): ReplicaState {
     readUpTo: target.readUpTo,
     wallpaperIndex: target.wallpaperIndex,
     callConnected: target.callConnected,
+    hoverRow: target.hoverRow,
+    search: target.search,
   };
 }
 

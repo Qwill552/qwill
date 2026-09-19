@@ -2,7 +2,6 @@
   position: absolute;
   z-index: 25;
   display: flex;
-  width: 220px;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--menu-border);
@@ -15,14 +14,15 @@
 .reactions {
   display: flex;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: var(--menu-pad-y) var(--menu-pad-x);
   border-bottom: 1px solid var(--border);
 }
 
 .reactionButton {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: var(--menu-reaction-size);
+  height: var(--menu-reaction-size);
+  flex-shrink: 0;
   place-items: center;
   border-radius: 50%;
 }
@@ -34,14 +34,14 @@
 .list {
   display: flex;
   flex-direction: column;
-  padding: 6px;
+  padding: var(--menu-list-pad);
 }
 
 .item {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 36px;
+  height: var(--menu-item-height);
   padding: 0 10px;
   border-radius: 9px;
   color: var(--text-primary);

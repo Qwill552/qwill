@@ -55,6 +55,8 @@ export interface DemoStore {
   snapshot(): ReplicaState;
   surfaceOf(channel: ScrollChannel, anchor: ScrollAnchor): ScreenSurface;
   readoutOf(channel: ReadoutChannel): DemoReadout;
+  pointerOf(): DemoReadout;
+  override<K extends DiscreteChannel>(channel: K, value: ReplicaState[K]): void;
   setScenario(scenario: Scenario): void;
   mount(root: HTMLElement): () => void;
 }
@@ -101,6 +103,10 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
   const spelled = new Map<ReadoutChannel, string>();
   const heldValues = new Map<ScrollChannel, number>();
   const listeners = new Set<() => void>();
+
+  let pointerNode: HTMLElement | null = null;
+  let pointedAt = '';
+  let pointerHandle: DemoReadout | null = null;
 
   function deviationOf(channel: ScrollChannel): ContinuousDeviation {
     return deviations.get(channel) ?? REST_DEVIATION;
@@ -151,6 +157,26 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     return handle;
   }
 
+  function pointerOf(): DemoReadout {
+    if (pointerHandle) return pointerHandle;
+    pointerHandle = (node) => {
+      pointerNode = node;
+      pointedAt = '';
+      movePointer();
+    };
+    return pointerHandle;
+  }
+
+  function movePointer(): void {
+    if (!pointerNode) return;
+    const spot = `translate3d(${Math.round(target.cursorX * 100) / 100}px, ${
+      Math.round(target.cursorY * 100) / 100
+    }px, 0)`;
+    if (pointedAt === spot) return;
+    pointedAt = spot;
+    pointerNode.style.transform = spot;
+  }
+
   function paint(channel: ScrollChannel): void {
     const surface = surfaces.get(channel);
     if (!surface) return;
@@ -196,8 +222,15 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     }
 
     publish(nowMs);
+    movePointer();
 
     for (const channel of READOUT_CHANNELS) spell(channel);
+  }
+
+  function override<K extends DiscreteChannel>(channel: K, value: ReplicaState[K]): void {
+    const nowMs = performance.now();
+    overrides.set(channel, { value, atMs: nowMs });
+    publish(nowMs);
   }
 
   function heldOffset(channel: ScrollChannel, fallback: number): number {
@@ -306,6 +339,8 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     discrete = discreteOf(target);
     for (const channel of SCROLL_CHANNELS) paint(channel);
     for (const channel of READOUT_CHANNELS) spell(channel);
+    pointedAt = '';
+    movePointer();
     for (const listener of listeners) listener();
   }
 
@@ -313,9 +348,7 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     const detachTap = attachTap(root, (node) => {
       const screen = TAPPABLE_SCREENS[node.dataset.demoTap ?? ''];
       if (!screen) return;
-      const nowMs = performance.now();
-      overrides.set('screen', { value: screen, atMs: nowMs });
-      publish(nowMs);
+      override('screen', screen);
     });
     const stopTicking = onFrame(tick);
     const stopWatching = whileOnScreen(root);
@@ -335,6 +368,8 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     snapshot: () => discrete,
     surfaceOf,
     readoutOf,
+    pointerOf,
+    override,
     setScenario,
     mount,
   };

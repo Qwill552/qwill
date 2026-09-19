@@ -12,15 +12,20 @@ import { LaptopShell } from '../devices/LaptopShell';
 import { PhoneShell } from '../devices/PhoneShell';
 import type { OsChoice } from '../useOsChoice';
 import { createDemoStore } from './engine/store';
+import { LaptopDemo } from './LaptopDemo';
 import { PhoneDemo } from './PhoneDemo';
-import { LaptopReplica } from './replica/laptop/LaptopReplica';
 import styles from './DemoStage.module.css';
 import { ScenarioSwitch } from './ScenarioSwitch';
+import { DESKTOP_EVERYDAY_SCENARIO } from './scenarios/desktopEveryday';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 
 const SCENARIOS = [EVERYDAY_SCENARIO];
 
+const DESKTOP_SCENARIOS = [DESKTOP_EVERYDAY_SCENARIO];
+
 const store = createDemoStore(SCENARIOS[0]!);
+
+const laptopStore = createDemoStore(DESKTOP_SCENARIOS[0]!);
 
 const SWITCHABLE = SCENARIOS.length > 1;
 
@@ -153,7 +158,7 @@ export function DemoStage({ os }: { os: OsChoice }) {
     if (target === 'windows') {
       return (
         <LaptopShell>
-          <LaptopReplica />
+          <LaptopDemo store={laptopStore} />
         </LaptopShell>
       );
     }

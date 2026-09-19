@@ -202,3 +202,103 @@ export const LAPTOP_SCALE = {
   min: 0.16,
   heightRatio: 0.86,
 } as const;
+
+const LAPTOP_MENU_BORDER = 1;
+const LAPTOP_MENU_PAD_X = 10;
+const LAPTOP_MENU_REACTION_SIZE = 30;
+const LAPTOP_MENU_REACTION_PAD_Y = 8;
+const LAPTOP_MENU_ITEM_HEIGHT = 36;
+const LAPTOP_MENU_LIST_PAD = 6;
+const LAPTOP_MENU_REACTION_COUNT = 8;
+const LAPTOP_MENU_ITEM_COUNT = 5;
+const LAPTOP_MENU_WIDTH = 280;
+
+const laptopMenuReactionsHeight =
+  LAPTOP_MENU_REACTION_PAD_Y * 2 + LAPTOP_MENU_REACTION_SIZE + LAPTOP_MENU_BORDER;
+
+const laptopMenuListHeight =
+  LAPTOP_MENU_LIST_PAD * 2 + LAPTOP_MENU_ITEM_COUNT * LAPTOP_MENU_ITEM_HEIGHT;
+
+const laptopMenuReactionSpan =
+  LAPTOP_MENU_WIDTH - LAPTOP_MENU_BORDER * 2 - LAPTOP_MENU_PAD_X * 2;
+
+export const LAPTOP_MENU = {
+  width: LAPTOP_MENU_WIDTH,
+  border: LAPTOP_MENU_BORDER,
+  padX: LAPTOP_MENU_PAD_X,
+  reactionSize: LAPTOP_MENU_REACTION_SIZE,
+  reactionPadY: LAPTOP_MENU_REACTION_PAD_Y,
+  reactionCount: LAPTOP_MENU_REACTION_COUNT,
+  itemHeight: LAPTOP_MENU_ITEM_HEIGHT,
+  itemCount: LAPTOP_MENU_ITEM_COUNT,
+  listPad: LAPTOP_MENU_LIST_PAD,
+  height: LAPTOP_MENU_BORDER * 2 + laptopMenuReactionsHeight + laptopMenuListHeight,
+  reactionPitch:
+    (laptopMenuReactionSpan - LAPTOP_MENU_REACTION_COUNT * LAPTOP_MENU_REACTION_SIZE) /
+      (LAPTOP_MENU_REACTION_COUNT - 1) +
+    LAPTOP_MENU_REACTION_SIZE,
+} as const;
+
+export function laptopMenuOrigin(x: number, y: number): { top: number; left: number } {
+  return {
+    top: y + LAPTOP_MENU.height <= LAPTOP_LOGICAL.height ? y : y - LAPTOP_MENU.height,
+    left: x + LAPTOP_MENU.width <= LAPTOP_LOGICAL.width ? x : x - LAPTOP_MENU.width,
+  };
+}
+
+export const LAPTOP_CURSOR_SIZE = { width: 20, height: 24 } as const;
+
+const LAPTOP_BUBBLE_POINT = { x: 520, y: 682 } as const;
+
+const laptopMenuAnchor = laptopMenuOrigin(LAPTOP_BUBBLE_POINT.x, LAPTOP_BUBBLE_POINT.y);
+
+const LAPTOP_REACTION_INDEX = 4;
+
+export const LAPTOP_CURSOR = {
+  listRest: { x: 190, y: 470 },
+  chatRow: { x: 150, y: 149 },
+  bubble: LAPTOP_BUBBLE_POINT,
+  reaction: {
+    x:
+      laptopMenuAnchor.left +
+      LAPTOP_MENU.border +
+      LAPTOP_MENU.padX +
+      LAPTOP_REACTION_INDEX * LAPTOP_MENU.reactionPitch +
+      LAPTOP_MENU.reactionSize / 2,
+    y:
+      laptopMenuAnchor.top +
+      LAPTOP_MENU.border +
+      LAPTOP_MENU.reactionPadY +
+      LAPTOP_MENU.reactionSize / 2,
+  },
+  composer: { x: 700, y: 760 },
+  send: { x: 1158, y: 760 },
+  search: { x: 150, y: 34 },
+} as const;
+
+export const LAPTOP_SCENE_MS = {
+  listGlide: 1800,
+  listSettle: 900,
+  rowPress: 320,
+  chatOpen: 600,
+  toBubble: 1000,
+  bubblePress: 320,
+  menuOpen: 780,
+  menuPick: 1100,
+  menuClose: 500,
+  reactionArrive: 1200,
+  composerPress: 320,
+  typing: 2400,
+  beforeSend: 700,
+  sendPress: 300,
+  sent: 600,
+  read: 500,
+  punchline: 1700,
+  album: 2000,
+  recording: 3000,
+  voiceSent: 800,
+  toSearch: 900,
+  searchPress: 320,
+  searchOpen: 1060,
+  searchClose: 880,
+} as const;

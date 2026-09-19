@@ -1,11 +1,67 @@
 .column {
   position: relative;
-  display: flex;
   overflow: hidden;
   flex: 1;
-  flex-direction: column;
   height: 100%;
   min-width: 0;
+  background: var(--bg);
+}
+
+.emptyLayer {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 1;
+  transition: opacity var(--dur-screen) var(--ease-screen);
+}
+
+.emptyLayerGone {
+  opacity: 0;
+}
+
+.empty {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.emptyArt {
+  display: block;
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.emptySubtitle {
+  margin: 0;
+  max-width: 260px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  inset: 0;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-screen) var(--ease-screen);
+}
+
+.chatOpen {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .header {
@@ -71,13 +127,16 @@
 }
 
 .feedInner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   max-width: 760px;
-  height: 100%;
   margin: 0 auto;
   flex-direction: column;
-  justify-content: flex-end;
   padding: 24px 24px 16px;
+  will-change: transform;
 }
 
 .composerBar {

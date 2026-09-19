@@ -33,6 +33,28 @@
 
 .cursor {
   position: absolute;
-  z-index: 30;
+  z-index: 40;
+  top: 0;
+  left: 0;
+  display: block;
+  opacity: 1;
   pointer-events: none;
+  transition: opacity var(--dur-close) var(--ease-screen);
+  will-change: transform;
+}
+
+.cursorAway {
+  opacity: 0;
+}
+
+.arrow {
+  display: block;
+  transform: none;
+  transform-origin: 2px 2px;
+  transition: transform var(--replica-press-out) var(--ease-spring);
+}
+
+.arrowDown {
+  transform: scale(0.84);
+  transition: transform var(--replica-press-in) var(--ease-close);
 }

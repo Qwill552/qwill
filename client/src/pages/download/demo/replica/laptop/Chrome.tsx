@@ -1,4 +1,6 @@
 import { Icon, type IconName } from '../../../../../ui/Icon';
+import { LAPTOP_CURSOR_SIZE } from '../../../config';
+import type { DemoReadout } from '../../engine/store';
 import { cx } from '../phone/Chrome';
 import styles from './Chrome.module.css';
 
@@ -25,27 +27,32 @@ export function Fab() {
 }
 
 interface CursorProps {
-  top: number;
-  left: number;
+  pointer?: DemoReadout;
+  down?: boolean;
+  hidden?: boolean;
 }
 
-export function Cursor({ top, left }: CursorProps) {
+export function Cursor({ pointer, down, hidden }: CursorProps) {
   return (
-    <svg
-      className={styles.cursor}
-      style={{ top, left }}
-      width="20"
-      height="24"
-      viewBox="0 0 20 24"
+    <span
+      ref={pointer}
+      className={cx(styles.cursor, hidden && styles.cursorAway)}
       aria-hidden="true"
     >
-      <path
-        d="M1.5 1.2 17.8 15.4l-6.9.6 3.6 7.4-3 1.4-3.6-7.4-4.7 4.9Z"
-        fill="var(--replica-cursor-fill)"
-        stroke="var(--replica-cursor-stroke)"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
+      <svg
+        className={cx(styles.arrow, down && styles.arrowDown)}
+        width={LAPTOP_CURSOR_SIZE.width}
+        height={LAPTOP_CURSOR_SIZE.height}
+        viewBox="0 0 20 24"
+      >
+        <path
+          d="M1.5 1.2 17.8 15.4l-6.9.6 3.6 7.4-3 1.4-3.6-7.4-4.7 4.9Z"
+          fill="var(--replica-cursor-fill)"
+          stroke="var(--replica-cursor-stroke)"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }

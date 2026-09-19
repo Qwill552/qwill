@@ -8,25 +8,32 @@ import {
   type ReplicaState,
   type ScreenSurface,
 } from '../phone/demoData';
-import { Cursor, Fab, IconBtn } from './Chrome';
+import { Fab, IconBtn } from './Chrome';
+import { SearchPanel } from './SearchPanel';
 import styles from './ChatList.module.css';
 
 interface ChatListProps {
-  pressed: ReplicaState['pressed'];
+  state: ReplicaState;
   surface?: ScreenSurface;
 }
 
-const HOVER_ROW_ID = 'artem';
+const OPEN_ROW_ID = 'artem';
 
-export function ChatList({ pressed, surface }: ChatListProps) {
-  const pressedRowId = pressed === PRESS.row ? 'artem' : null;
+export function ChatList({ state, surface }: ChatListProps) {
+  const pressedRowId = state.pressed === PRESS.row ? OPEN_ROW_ID : null;
+  const openRowId = state.screen === 'chats' ? null : OPEN_ROW_ID;
 
   return (
     <div className={styles.column}>
       <div className={styles.top}>
         <div className={styles.headerRow}>
           <IconBtn icon="menu" />
-          <span className={styles.searchTrigger}>
+          <span
+            className={cx(
+              styles.searchTrigger,
+              state.pressed === PRESS.search && styles.searchTriggerPressed,
+            )}
+          >
             <SearchGlyph />
             <span className={styles.searchLabel}>{DESKTOP_TEXT.searchPlaceholder}</span>
             <span className={styles.hotkey}>{DESKTOP_TEXT.searchHotkey}</span>
@@ -47,10 +54,12 @@ export function ChatList({ pressed, surface }: ChatListProps) {
           {CHAT_ROWS.map((row) => (
             <div
               key={row.id}
+              data-demo-tap="chat"
               className={cx(
                 styles.row,
-                row.id === pressedRowId && styles.rowActive,
-                row.id === HOVER_ROW_ID && styles.rowHovered,
+                row.id === state.hoverRow && styles.rowHovered,
+                row.id === pressedRowId && styles.rowPressed,
+                row.id === openRowId && styles.rowOpen,
               )}
             >
               <Avatar label={row.title} colorKey={row.id} size={54} online={row.online} />
@@ -72,13 +81,16 @@ export function ChatList({ pressed, surface }: ChatListProps) {
                   <Badge count={row.unread} muted={row.muted} />
                 </div>
               </div>
-              {row.id === HOVER_ROW_ID && <Cursor top={38} left={64} />}
             </div>
           ))}
         </div>
       </div>
 
       <Fab />
+
+      <div className={cx(styles.searchLayer, state.search && styles.searchLayerOpen)}>
+        <SearchPanel />
+      </div>
     </div>
   );
 }

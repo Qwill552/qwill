@@ -18,6 +18,8 @@ export interface ReplicaState {
   readUpTo: number;
   wallpaperIndex: number;
   callConnected: boolean;
+  hoverRow: string | null;
+  search: boolean;
 }
 
 export const PRESS = {
@@ -27,6 +29,7 @@ export const PRESS = {
   send: 'send',
   mic: 'mic',
   back: 'back',
+  search: 'search',
 } as const;
 
 export interface ScreenSurface {
@@ -431,6 +434,8 @@ export const REPLICA_REST: ReplicaState = {
   readUpTo: READ_AT_REST,
   wallpaperIndex: 0,
   callConnected: false,
+  hoverRow: null,
+  search: false,
 };
 
 export function typedPrefix(progress: number, state: ReplicaState): string {
