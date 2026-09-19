@@ -152,6 +152,13 @@
 }
 
 :root {
+  --replica-blob-blue: radial-gradient(circle, rgb(77 141 255 / 55%), transparent 70%);
+  --replica-blob-blue-blur: blur(31px);
+  --replica-blob-violet: radial-gradient(circle, rgb(160 90 255 / 45%), transparent 70%);
+  --replica-blob-violet-blur: blur(36px);
+  --replica-blob-teal: radial-gradient(circle, rgb(0 190 190 / 32%), transparent 70%);
+  --replica-blob-teal-blur: blur(39px);
+
   --replica-row-ink: rgb(var(--pulse-ink));
   --replica-row-time-ink: rgba(var(--pulse-ink), 0.4);
   --replica-row-preview-ink: rgba(var(--pulse-ink), 0.45);

@@ -1,5 +1,5 @@
 import { Icon } from '../../../../../ui/Icon';
-import { Avatar, ChromeBar, GlassButton, cx } from './Chrome';
+import { AmbientBlobs, Avatar, ChromeBar, GlassButton, cx } from './Chrome';
 import { WALLPAPER_OPTIONS, WALLPAPER_TEXT } from './demoData';
 import styles from './WallpaperScreen.module.css';
 
@@ -12,6 +12,8 @@ export function WallpaperScreen({ selectedIndex }: WallpaperScreenProps) {
 
   return (
     <div className={styles.screen}>
+      <AmbientBlobs />
+
       <div className={styles.grid}>
         {WALLPAPER_OPTIONS.map((option, index) => (
           <span key={option.id} className={styles.swatch}>

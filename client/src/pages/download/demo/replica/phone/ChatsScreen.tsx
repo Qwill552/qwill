@@ -1,5 +1,16 @@
 import { Icon } from '../../../../../ui/Icon';
-import { Avatar, Badge, Chip, cx, DotsGlyph, Fab, OfficialMark, SearchGlyph, TabBar } from './Chrome';
+import {
+  AmbientBlobs,
+  Avatar,
+  Badge,
+  Chip,
+  cx,
+  DotsGlyph,
+  Fab,
+  OfficialMark,
+  SearchGlyph,
+  TabBar,
+} from './Chrome';
 import { CHAT_FILTERS, CHAT_ROWS, PRESS, REPLICA_TEXT, type ScreenSurface } from './demoData';
 import styles from './ChatsScreen.module.css';
 
@@ -14,6 +25,8 @@ export function ChatsScreen({ surface, pressed }: ChatsScreenProps) {
   const pressedRowId = pressed === PRESS.row ? 'artem' : null;
   return (
     <div className={styles.screen}>
+      <AmbientBlobs />
+
       <div className={styles.top}>
         <div className={styles.headerRow}>
           <div className={styles.brand}>

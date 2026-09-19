@@ -8,6 +8,8 @@
 }
 
 .top {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
@@ -85,6 +87,7 @@
 
 .list {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   min-height: 0;
   flex: 1;

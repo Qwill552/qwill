@@ -25,6 +25,8 @@
 }
 
 .grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-3);
@@ -82,6 +84,7 @@
 
 .preview {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   margin-top: var(--space-5);
   padding: var(--space-3);

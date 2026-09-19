@@ -9,6 +9,16 @@ export function cx(...classes: Array<string | false | undefined>): string {
   return classes.filter(Boolean).join(' ');
 }
 
+export function AmbientBlobs() {
+  return (
+    <span className={styles.blobLayer}>
+      <span className={cx(styles.blob, styles.blobBlue)} />
+      <span className={cx(styles.blob, styles.blobViolet)} />
+      <span className={cx(styles.blob, styles.blobTeal)} />
+    </span>
+  );
+}
+
 interface AvatarProps {
   label: string;
   colorKey: string;

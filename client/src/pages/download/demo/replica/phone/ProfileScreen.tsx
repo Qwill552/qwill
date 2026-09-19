@@ -1,5 +1,5 @@
 import { Icon } from '../../../../../ui/Icon';
-import { Avatar, ChromeBar, GlassButton } from './Chrome';
+import { AmbientBlobs, Avatar, ChromeBar, GlassButton } from './Chrome';
 import { CardWindow } from './CardWindow';
 import { MEDIA_TABS, PEOPLE, PROFILE_ACTIONS, PROFILE_TEXT, type ScreenSurface } from './demoData';
 import styles from './ProfileScreen.module.css';
@@ -13,6 +13,7 @@ export function ProfileScreen({ surface }: ProfileScreenProps) {
 
   return (
     <div className={styles.screen}>
+      <AmbientBlobs />
       <div className={styles.scroller} ref={surface?.viewport}>
         <div className={styles.scrollerInner} ref={surface?.inner}>
           <div className={styles.hero}>

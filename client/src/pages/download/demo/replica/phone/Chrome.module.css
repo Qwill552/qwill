@@ -1,3 +1,43 @@
+.blobLayer {
+  position: absolute;
+  z-index: 0;
+  overflow: hidden;
+  inset: 0;
+  opacity: var(--blob-opacity);
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.blobBlue {
+  top: calc(-8 * var(--replica-screen-vh));
+  left: calc(-12 * var(--replica-screen-vh));
+  width: calc(45 * var(--replica-screen-vh));
+  height: calc(45 * var(--replica-screen-vh));
+  background: var(--replica-blob-blue);
+  filter: var(--replica-blob-blue-blur);
+}
+
+.blobViolet {
+  top: calc(24 * var(--replica-screen-vh));
+  right: calc(-13 * var(--replica-screen-vh));
+  width: calc(40 * var(--replica-screen-vh));
+  height: calc(40 * var(--replica-screen-vh));
+  background: var(--replica-blob-violet);
+  filter: var(--replica-blob-violet-blur);
+}
+
+.blobTeal {
+  bottom: calc(-12 * var(--replica-screen-vh));
+  left: calc(-5 * var(--replica-screen-vh));
+  width: calc(42 * var(--replica-screen-vh));
+  height: calc(42 * var(--replica-screen-vh));
+  background: var(--replica-blob-teal);
+  filter: var(--replica-blob-teal-blur);
+}
+
 .avatarWrap {
   position: relative;
   flex-shrink: 0;

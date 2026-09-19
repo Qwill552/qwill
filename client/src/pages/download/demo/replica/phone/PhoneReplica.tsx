@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 
+import { PHONE_LOGICAL } from '../../../config';
 import type { DemoReadout } from '../../engine/store';
 import { AttachSheet } from './AttachSheet';
 import { CallScreen } from './CallScreen';
@@ -44,7 +45,11 @@ export function PhoneReplica({
   const pushed = state.screen !== 'chats';
 
   return (
-    <div className={styles.replica} ref={rootRef}>
+    <div
+      className={styles.replica}
+      ref={rootRef}
+      style={{ ['--replica-screen-vh' as string]: `${PHONE_LOGICAL.height / 100}px` }}
+    >
       <div className={cx(styles.layer, styles.root, pushed && styles.rootPushed)}>
         <ChatsScreen surface={chatsSurface} pressed={state.pressed} />
         <span className={cx(styles.scrim, pushed && styles.scrimLit)} />

@@ -1,5 +1,5 @@
 import { IconTile } from '../../../../../ui/IconTile';
-import { Avatar } from './Chrome';
+import { AmbientBlobs, Avatar } from './Chrome';
 import { PEOPLE, SETTINGS_SECTIONS, SETTINGS_TEXT, type ScreenSurface } from './demoData';
 import styles from './SettingsScreen.module.css';
 
@@ -12,6 +12,7 @@ export function SettingsScreen({ surface }: SettingsScreenProps) {
 
   return (
     <div className={styles.screen}>
+      <AmbientBlobs />
       <div className={styles.scroller} ref={surface?.viewport}>
         <div className={styles.scrollerInner} ref={surface?.inner}>
           <div className={styles.hero}>
