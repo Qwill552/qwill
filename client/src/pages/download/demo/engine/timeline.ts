@@ -1,14 +1,19 @@
 import { REPLICA_REST, type ReplicaState } from '../replica/phone/demoData';
 
-export type ScrollChannel = 'chatsScroll' | 'feedScroll';
+export type ScrollChannel = 'chatsScroll' | 'feedScroll' | 'profileScroll' | 'settingsScroll';
 
-export type ReadoutChannel = 'typing' | 'voice';
+export type ReadoutChannel = 'typing' | 'voice' | 'callSeconds';
 
 export type ContinuousChannel = ScrollChannel | ReadoutChannel;
 
-export const SCROLL_CHANNELS: readonly ScrollChannel[] = ['chatsScroll', 'feedScroll'];
+export const SCROLL_CHANNELS: readonly ScrollChannel[] = [
+  'chatsScroll',
+  'feedScroll',
+  'profileScroll',
+  'settingsScroll',
+];
 
-export const READOUT_CHANNELS: readonly ReadoutChannel[] = ['typing', 'voice'];
+export const READOUT_CHANNELS: readonly ReadoutChannel[] = ['typing', 'voice', 'callSeconds'];
 
 export const CONTINUOUS_CHANNELS: readonly ContinuousChannel[] = [
   ...SCROLL_CHANNELS,
@@ -33,8 +38,11 @@ export interface Scenario {
 export const DEMO_REST: DemoTarget = {
   chatsScroll: 0,
   feedScroll: 0,
+  profileScroll: 0,
+  settingsScroll: 0,
   typing: 0,
   voice: 0,
+  callSeconds: 0,
   ...REPLICA_REST,
 };
 
@@ -57,6 +65,8 @@ export function discreteOf(target: DemoTarget): ReplicaState {
     pressed: target.pressed,
     visibleMessages: target.visibleMessages,
     readUpTo: target.readUpTo,
+    wallpaperIndex: target.wallpaperIndex,
+    callConnected: target.callConnected,
   };
 }
 

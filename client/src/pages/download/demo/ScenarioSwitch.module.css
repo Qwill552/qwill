@@ -1,0 +1,80 @@
+.arrow {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  z-index: 1;
+  display: grid;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-left: var(--space-4);
+  place-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  color: var(--text-primary);
+  cursor: pointer;
+  --arrow-press-scale: 1;
+  transform: translateY(-50%) scale(var(--arrow-press-scale));
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+
+.arrow:active:not(:disabled) {
+  --arrow-press-scale: var(--page-press-scale);
+  transition: transform var(--dur-press) var(--ease-close);
+}
+
+.arrow:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.arrow:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.dots {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  align-items: center;
+  gap: 10px;
+  margin-top: var(--space-4);
+  padding: 4px;
+  transform: translateX(-50%);
+}
+
+.dotFill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 50%;
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  transform: translateX(calc(var(--scenario-index) * 26px));
+  transition: transform var(--dur-tab) var(--ease-screen);
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  margin: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  opacity: 0.5;
+  transition: opacity var(--dur-tab) ease;
+}
+
+.dotActive {
+  background: var(--primary);
+  opacity: 1;
+}

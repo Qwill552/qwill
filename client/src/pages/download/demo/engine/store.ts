@@ -1,5 +1,6 @@
 import { DEMO_REDUCED_FRAME_MS, DEMO_RETURN } from '../../config';
 import {
+  callDuration,
   recordedTime,
   typedPrefix,
   type ReplicaScreen,
@@ -54,12 +55,14 @@ export interface DemoStore {
   snapshot(): ReplicaState;
   surfaceOf(channel: ScrollChannel, anchor: ScrollAnchor): ScreenSurface;
   readoutOf(channel: ReadoutChannel): DemoReadout;
+  setScenario(scenario: Scenario): void;
   mount(root: HTMLElement): () => void;
 }
 
 const READOUT_TEXT: Record<ReadoutChannel, (value: number, state: ReplicaState) => string> = {
   typing: typedPrefix,
   voice: recordedTime,
+  callSeconds: (value) => callDuration(value),
 };
 
 const TAPPABLE_SCREENS: Record<string, ReplicaScreen> = {
@@ -76,13 +79,14 @@ function sameDiscrete(left: ReplicaState, right: ReplicaState): boolean {
   return (Object.keys(left) as DiscreteChannel[]).every((key) => left[key] === right[key]);
 }
 
-export function createDemoStore(scenario: Scenario): DemoStore {
+export function createDemoStore(initialScenario: Scenario): DemoStore {
   const reduced = prefersReducedMotion();
   const returnConfig: ReturnConfig = reduced
     ? { ...DEMO_RETURN, idleMs: Number.POSITIVE_INFINITY }
     : DEMO_RETURN;
   const discreteIdleMs = reduced ? Number.POSITIVE_INFINITY : DEMO_RETURN.discreteIdleMs;
 
+  let scenario = initialScenario;
   let scenarioMs = reduced ? DEMO_REDUCED_FRAME_MS : 0;
   let target: DemoTarget = targetAt(scenario, scenarioMs);
   let discrete: ReplicaState = discreteOf(target);
@@ -290,6 +294,21 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     return handle;
   }
 
+  function setScenario(next: Scenario): void {
+    scenario = next;
+    scenarioMs = reduced ? DEMO_REDUCED_FRAME_MS : 0;
+    deviations.clear();
+    overrides.clear();
+    heldValues.clear();
+    painted.clear();
+    spelled.clear();
+    target = targetAt(scenario, scenarioMs);
+    discrete = discreteOf(target);
+    for (const channel of SCROLL_CHANNELS) paint(channel);
+    for (const channel of READOUT_CHANNELS) spell(channel);
+    for (const listener of listeners) listener();
+  }
+
   function mount(root: HTMLElement): () => void {
     const detachTap = attachTap(root, (node) => {
       const screen = TAPPABLE_SCREENS[node.dataset.demoTap ?? ''];
@@ -316,6 +335,7 @@ export function createDemoStore(scenario: Scenario): DemoStore {
     snapshot: () => discrete,
     surfaceOf,
     readoutOf,
+    setScenario,
     mount,
   };
 }

@@ -3,21 +3,27 @@ import { Avatar, ChromeBar, GlassButton, cx } from './Chrome';
 import { WALLPAPER_OPTIONS, WALLPAPER_TEXT } from './demoData';
 import styles from './WallpaperScreen.module.css';
 
-export function WallpaperScreen() {
+interface WallpaperScreenProps {
+  selectedIndex: number;
+}
+
+export function WallpaperScreen({ selectedIndex }: WallpaperScreenProps) {
+  const selected = WALLPAPER_OPTIONS[selectedIndex] ?? WALLPAPER_OPTIONS[0]!;
+
   return (
     <div className={styles.screen}>
       <div className={styles.grid}>
-        {WALLPAPER_OPTIONS.map((option) => (
+        {WALLPAPER_OPTIONS.map((option, index) => (
           <span key={option.id} className={styles.swatch}>
             <span
               className={cx(
                 styles.tile,
                 option.kind === 'pattern' && styles.tilePattern,
-                option.current && styles.tileCurrent,
+                index === selectedIndex && styles.tileCurrent,
               )}
               style={{ background: option.value }}
             >
-              {option.current && (
+              {index === selectedIndex && (
                 <span className={styles.check}>
                   <Icon name="check" size={16} />
                 </span>
@@ -29,7 +35,10 @@ export function WallpaperScreen() {
       </div>
 
       <div className={styles.preview}>
-        <div className={styles.previewWallpaper} />
+        <div
+          className={cx(styles.previewWallpaper, selected.kind === 'pattern' && styles.previewWallpaperPattern)}
+          style={{ background: selected.value }}
+        />
         <div className={styles.previewBubbleIn}>{WALLPAPER_TEXT.previewMessages[0]}</div>
         <div className={styles.previewBubbleOut}>{WALLPAPER_TEXT.previewMessages[1]}</div>
       </div>

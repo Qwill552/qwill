@@ -6,9 +6,18 @@
 }
 
 .scroller {
-  overflow-y: auto;
+  position: relative;
+  overflow: hidden;
   height: 100%;
+}
+
+.scrollerInner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
   padding: calc(var(--safe-top) + 24px) 0 var(--space-6);
+  will-change: transform;
 }
 
 .hero {

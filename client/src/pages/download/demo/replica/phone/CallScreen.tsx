@@ -1,9 +1,15 @@
 import { Icon } from '../../../../../ui/Icon';
+import type { DemoReadout } from '../../engine/store';
 import { Avatar, cx } from './Chrome';
 import { CALL_TEXT, PEOPLE } from './demoData';
 import styles from './CallScreen.module.css';
 
-export function CallScreen() {
+interface CallScreenProps {
+  connected: boolean;
+  secondsReadout?: DemoReadout;
+}
+
+export function CallScreen({ connected, secondsReadout }: CallScreenProps) {
   const person = PEOPLE.grisha;
 
   return (
@@ -19,7 +25,9 @@ export function CallScreen() {
           <Avatar label={person.name} colorKey={person.id} size={128} />
         </span>
         <span className={styles.name}>{person.name}</span>
-        <span className={styles.status}>{CALL_TEXT.status}</span>
+        <span className={styles.status}>
+          {connected ? <span ref={secondsReadout} /> : CALL_TEXT.incoming}
+        </span>
       </div>
 
       <div className={styles.controls}>

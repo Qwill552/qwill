@@ -16,6 +16,8 @@ export interface ReplicaState {
   pressed: string | null;
   visibleMessages: number;
   readUpTo: number;
+  wallpaperIndex: number;
+  callConnected: boolean;
 }
 
 export const PRESS = {
@@ -427,6 +429,8 @@ export const REPLICA_REST: ReplicaState = {
   pressed: null,
   visibleMessages: DIALOG_BEFORE_REPLY,
   readUpTo: READ_AT_REST,
+  wallpaperIndex: 0,
+  callConnected: false,
 };
 
 export function typedPrefix(progress: number, state: ReplicaState): string {
@@ -438,6 +442,13 @@ export function recordedTime(progress: number): string {
   const clamped = Math.min(1, Math.max(0, progress));
   const seconds = Math.floor(clamped * VOICE_RECORD_SECONDS);
   return `0:0${seconds}`;
+}
+
+export function callDuration(seconds: number): string {
+  const clamped = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(clamped / 60);
+  const rest = clamped % 60;
+  return `${minutes}:${rest.toString().padStart(2, '0')}`;
 }
 
 export const PROFILE_ACTIONS = [
@@ -496,13 +507,12 @@ export interface ReplicaWallpaperOption {
   title: string;
   kind: 'gradient' | 'pattern';
   value: string;
-  current: boolean;
 }
 
 export const WALLPAPER_OPTIONS: ReplicaWallpaperOption[] = [
-  { id: 'default', title: 'По теме', kind: 'gradient', value: 'var(--wallpaper-default)', current: true },
-  { id: 'summer', title: 'Лето', kind: 'gradient', value: 'var(--wallpaper-summer)', current: false },
-  { id: 'cats', title: 'Коты', kind: 'pattern', value: 'var(--wallpaper-default)', current: false },
+  { id: 'default', title: 'По теме', kind: 'gradient', value: 'var(--wallpaper-default)' },
+  { id: 'summer', title: 'Лето', kind: 'gradient', value: 'var(--wallpaper-summer)' },
+  { id: 'cats', title: 'Коты', kind: 'pattern', value: 'var(--wallpaper-default)' },
 ];
 
 export const WALLPAPER_TEXT = {
@@ -512,7 +522,7 @@ export const WALLPAPER_TEXT = {
 } as const;
 
 export const CALL_TEXT = {
-  status: '02:14',
+  incoming: 'Входящий вызов…',
 } as const;
 
 export const QR_TEXT = {

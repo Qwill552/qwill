@@ -4,6 +4,10 @@
   width: 100%;
 }
 
+.frame {
+  position: relative;
+}
+
 .stage {
   position: relative;
   width: calc(var(--demo-body-width) * var(--demo-scale));

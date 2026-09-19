@@ -240,6 +240,7 @@
   --replica-pop-ease: cubic-bezier(0.32, 0, 0.22, 1);
   --replica-screen-scrim: #000;
   --replica-screen-scrim-opacity: 0.45;
+  --replica-scenario-scrim-opacity: 0.94;
   --replica-press-in: 90ms;
   --replica-press-out: 200ms;
   --replica-hold-in: 340ms;

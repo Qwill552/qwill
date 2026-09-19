@@ -74,3 +74,8 @@ export const DEMO_REDUCED_FRAME_MS = 18000;
 export const DEMO_HINT_VISIBLE_MS = 2000;
 
 export const DEMO_GLOW_SIZE = 280;
+
+export const SCENARIO_SWITCH = {
+  buttonSize: 44,
+  gap: 16,
+} as const;

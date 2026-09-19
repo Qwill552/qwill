@@ -2,17 +2,20 @@ import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } 
 
 import { DEMO_GLOW_SIZE, DEMO_HINT_VISIBLE_MS } from '../config';
 import { CONTENT } from '../content';
-import { createDemoStore } from './engine/store';
+import type { DemoStore } from './engine/store';
 import styles from './PhoneDemo.module.css';
 import { ALBUM_PHOTOS, EMOJI_STRIP_URL } from './replica/phone/demoData';
 import { PhoneReplica } from './replica/phone/PhoneReplica';
-import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 
 let hintSpent = false;
 
-const store = createDemoStore(EVERYDAY_SCENARIO);
+interface PhoneDemoProps {
+  store: DemoStore;
+  scenarioScrimLit: boolean;
+  onScenarioScrimTransitionEnd: () => void;
+}
 
-export function PhoneDemo() {
+export function PhoneDemo({ store, scenarioScrimLit, onScenarioScrimTransitionEnd }: PhoneDemoProps) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot);
   const rootRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLSpanElement>(null);
@@ -73,8 +76,13 @@ export function PhoneDemo() {
         state={state}
         chatsSurface={store.surfaceOf('chatsScroll', 'top')}
         feedSurface={store.surfaceOf('feedScroll', 'bottom')}
+        profileSurface={store.surfaceOf('profileScroll', 'top')}
+        settingsSurface={store.surfaceOf('settingsScroll', 'top')}
         typingReadout={store.readoutOf('typing')}
         voiceReadout={store.readoutOf('voice')}
+        callSecondsReadout={store.readoutOf('callSeconds')}
+        scenarioScrimLit={scenarioScrimLit}
+        onScenarioScrimTransitionEnd={onScenarioScrimTransitionEnd}
       />
 
       <span ref={glowRef} className={glowing ? `${styles.glow} ${styles.glowLit}` : styles.glow} />

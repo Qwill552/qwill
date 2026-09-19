@@ -18,16 +18,26 @@ interface PhoneReplicaProps {
   state: ReplicaState;
   chatsSurface?: ScreenSurface;
   feedSurface?: ScreenSurface;
+  profileSurface?: ScreenSurface;
+  settingsSurface?: ScreenSurface;
   typingReadout?: DemoReadout;
   voiceReadout?: DemoReadout;
+  callSecondsReadout?: DemoReadout;
+  scenarioScrimLit?: boolean;
+  onScenarioScrimTransitionEnd?: () => void;
 }
 
 export function PhoneReplica({
   state,
   chatsSurface,
   feedSurface,
+  profileSurface,
+  settingsSurface,
   typingReadout,
   voiceReadout,
+  callSecondsReadout,
+  scenarioScrimLit,
+  onScenarioScrimTransitionEnd,
 }: PhoneReplicaProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const menuMessage = DIALOG.find((message) => message.id === state.menuMessageId) ?? null;
@@ -50,11 +60,13 @@ export function PhoneReplica({
             voiceReadout={voiceReadout}
           />
         )}
-        {state.screen === 'profile' && <ProfileScreen />}
-        {state.screen === 'wallpaper' && <WallpaperScreen />}
-        {state.screen === 'call' && <CallScreen />}
+        {state.screen === 'profile' && <ProfileScreen surface={profileSurface} />}
+        {state.screen === 'wallpaper' && <WallpaperScreen selectedIndex={state.wallpaperIndex} />}
+        {state.screen === 'call' && (
+          <CallScreen connected={state.callConnected} secondsReadout={callSecondsReadout} />
+        )}
         {state.screen === 'qr' && <QrCard />}
-        {state.screen === 'settings' && <SettingsScreen />}
+        {state.screen === 'settings' && <SettingsScreen surface={settingsSurface} />}
       </div>
 
       {menuMessage && (
@@ -67,6 +79,11 @@ export function PhoneReplica({
       )}
 
       {state.overlay === 'attach' && <AttachSheet />}
+
+      <span
+        className={cx(styles.scenarioScrim, scenarioScrimLit && styles.scenarioScrimLit)}
+        onTransitionEnd={onScenarioScrimTransitionEnd}
+      />
     </div>
   );
 }

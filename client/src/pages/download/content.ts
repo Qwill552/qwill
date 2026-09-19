@@ -19,4 +19,7 @@ export const CONTENT = {
     versionPrefix: 'Версия',
     whatsNew: 'что нового',
   },
+  scenarioSwitch: {
+    label: 'Другой сценарий демонстрации',
+  },
 } as const;

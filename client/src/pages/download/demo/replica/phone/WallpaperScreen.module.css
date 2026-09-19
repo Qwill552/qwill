@@ -96,6 +96,17 @@
   background: var(--wallpaper-default);
 }
 
+.previewWallpaperPattern::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--chat-pattern-ink);
+  mask-image: url('/wallpaper/patterns/cats.svg');
+  mask-size: 96px 96px;
+  mask-repeat: repeat;
+  mix-blend-mode: var(--chat-pattern-blend);
+}
+
 .previewBubbleIn,
 .previewBubbleOut {
   position: relative;

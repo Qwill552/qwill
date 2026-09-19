@@ -58,3 +58,17 @@
   opacity: var(--replica-screen-scrim-opacity);
   transition: opacity var(--replica-push-dur) var(--replica-push-ease);
 }
+
+.scenarioScrim {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  background: var(--replica-screen-scrim);
+  opacity: 0;
+  transition: opacity var(--dur-screen) var(--ease-screen);
+  pointer-events: none;
+}
+
+.scenarioScrimLit {
+  opacity: var(--replica-scenario-scrim-opacity);
+}
