@@ -41,27 +41,37 @@
 
 .keys {
   position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--laptop-key-gap);
   inset: var(--laptop-keys-padding);
-  background:
-    repeating-linear-gradient(
-      to right,
-      var(--device-key-gap-clear) 0,
-      var(--device-key-gap-clear)
-        calc(var(--laptop-key-pitch-x) - var(--laptop-key-gap) - var(--laptop-key-feather)),
-      var(--device-key-gap-ink)
-        calc(var(--laptop-key-pitch-x) - var(--laptop-key-gap) + var(--laptop-key-feather)),
-      var(--device-key-gap-ink) var(--laptop-key-pitch-x)
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      var(--device-key-gap-clear) 0,
-      var(--device-key-gap-clear)
-        calc(var(--laptop-key-pitch-y) - var(--laptop-key-gap) - var(--laptop-key-feather)),
-      var(--device-key-gap-ink)
-        calc(var(--laptop-key-pitch-y) - var(--laptop-key-gap) + var(--laptop-key-feather)),
-      var(--device-key-gap-ink) var(--laptop-key-pitch-y)
-    ),
-    var(--device-key-face);
+}
+
+.keyRow {
+  display: flex;
+  gap: var(--laptop-key-gap);
+  height: calc(var(--laptop-key-rows) * var(--laptop-key-pitch-y) - var(--laptop-key-gap));
+}
+
+.key {
+  width: calc(var(--laptop-key-units, 1) * var(--laptop-key-pitch-x) - var(--laptop-key-gap));
+  height: 100%;
+  border-radius: var(--laptop-key-radius);
+  background: var(--device-key-face);
+}
+
+.keyStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--laptop-key-gap);
+  width: calc(var(--laptop-key-pitch-x) - var(--laptop-key-gap));
+  height: 100%;
+}
+
+.keyStack .key {
+  flex: 1 1 0;
+  width: 100%;
+  height: auto;
 }
 
 .trackpad {

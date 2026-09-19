@@ -103,9 +103,29 @@ export const LAPTOP_RADIUS_LID = LAPTOP_RADIUS_BEZEL + LAPTOP_BEZEL.metal;
 
 export const LAPTOP_EDGE_WIDTH = 1.5;
 
+const LAPTOP_MM = {
+  bodyWidth: 312.6,
+  bodyDepth: 221.2,
+  keyPitchX: 19.05,
+  keyPitchY: 18.51,
+  keyGap: 1.6,
+  keyRadius: 2.6,
+  wellPadding: 5.2,
+  wellTop: 4,
+  wellRadius: 4.4,
+  trackpadWidth: 129.5,
+  trackpadHeight: 81.5,
+  trackpadBottom: 6.6,
+  trackpadRadius: 6,
+} as const;
+
+const laptopPxPerMm = LAPTOP_LID.width / LAPTOP_MM.bodyWidth;
+const laptopRound = (value: number) => Math.round(value * 10) / 10;
+const laptopPx = (mm: number) => laptopRound(mm * laptopPxPerMm);
+
 const LAPTOP_TILT_DEG = 76;
 const LAPTOP_PERSPECTIVE = 11000;
-const LAPTOP_BASE_DEPTH = 900;
+const LAPTOP_BASE_DEPTH = laptopPx(LAPTOP_MM.bodyDepth);
 
 const laptopTiltRad = (LAPTOP_TILT_DEG * Math.PI) / 180;
 const laptopFrontScale =
@@ -128,23 +148,41 @@ export const LAPTOP_FINGER_NOTCH = {
   height: 13,
 } as const;
 
+export const LAPTOP_KEY_ROWS = [
+  { height: 1, keys: [1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+  { height: 1, keys: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5] },
+  { height: 1, keys: [1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+  { height: 1, keys: [1.75, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.75] },
+  { height: 1, keys: [2.25, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2.25] },
+  { height: 1.13, keys: [1, 1, 1, 1.25, 5, 1.25, 1, 1, 'stack', 1] },
+] as const satisfies readonly { height: number; keys: readonly (number | 'stack')[] }[];
+
+const LAPTOP_KEY_COLUMNS = 14.5;
+const laptopKeyRows = LAPTOP_KEY_ROWS.reduce((total, row) => total + row.height, 0);
+const laptopKeyPitchX = laptopPx(LAPTOP_MM.keyPitchX);
+const laptopKeyPitchY = laptopPx(LAPTOP_MM.keyPitchY);
+const laptopKeyGap = laptopPx(LAPTOP_MM.keyGap);
+const laptopWellPadding = laptopPx(LAPTOP_MM.wellPadding);
+const laptopKeyFieldWidth = laptopRound(LAPTOP_KEY_COLUMNS * laptopKeyPitchX - laptopKeyGap);
+const laptopKeyFieldHeight = laptopRound(laptopKeyRows * laptopKeyPitchY - laptopKeyGap);
+
 export const LAPTOP_KEYS = {
-  inset: 133,
-  top: 70,
-  height: 400,
-  radius: 18,
-  padding: 14,
-  pitchX: 68.4,
-  pitchY: 62,
-  gap: 9,
-  feather: 2,
+  inset: laptopRound((LAPTOP_BASE.width - laptopKeyFieldWidth - laptopWellPadding * 2) / 2),
+  top: laptopPx(LAPTOP_MM.wellTop),
+  height: laptopRound(laptopKeyFieldHeight + laptopWellPadding * 2),
+  radius: laptopPx(LAPTOP_MM.wellRadius),
+  padding: laptopWellPadding,
+  pitchX: laptopKeyPitchX,
+  pitchY: laptopKeyPitchY,
+  gap: laptopKeyGap,
+  keyRadius: laptopPx(LAPTOP_MM.keyRadius),
 } as const;
 
 export const LAPTOP_TRACKPAD = {
-  width: 520,
-  height: 330,
-  top: 510,
-  radius: 14,
+  width: laptopPx(LAPTOP_MM.trackpadWidth),
+  height: laptopPx(LAPTOP_MM.trackpadHeight),
+  top: LAPTOP_BASE.depth - laptopPx(LAPTOP_MM.trackpadBottom) - laptopPx(LAPTOP_MM.trackpadHeight),
+  radius: laptopPx(LAPTOP_MM.trackpadRadius),
 } as const;
 
 export const LAPTOP_BODY = {

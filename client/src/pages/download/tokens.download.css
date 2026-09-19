@@ -40,8 +40,6 @@
   --device-deck: linear-gradient(#a7aab2 0%, #bbbec5 20%, #c6c9cf 58%, #cacdd3 100%);
   --device-well: #1b1d22;
   --device-key-face: linear-gradient(#41454d, #35383f);
-  --device-key-gap-clear: rgb(14 15 18 / 0%);
-  --device-key-gap-ink: rgb(14 15 18 / 72%);
   --device-trackpad: linear-gradient(#cfd2d8, #c3c6cc);
   --device-trackpad-edge: #a7aab2;
   --device-front: linear-gradient(#d2d5db 0%, #c1c4cb 52%, #9ea1a9 100%);
@@ -102,8 +100,6 @@
   --device-deck: linear-gradient(#a7aab2 0%, #bbbec5 20%, #c6c9cf 58%, #cacdd3 100%);
   --device-well: #1b1d22;
   --device-key-face: linear-gradient(#41454d, #35383f);
-  --device-key-gap-clear: rgb(14 15 18 / 0%);
-  --device-key-gap-ink: rgb(14 15 18 / 72%);
   --device-trackpad: linear-gradient(#cfd2d8, #c3c6cc);
   --device-trackpad-edge: #a7aab2;
   --device-front: linear-gradient(#d2d5db 0%, #c1c4cb 52%, #9ea1a9 100%);

@@ -6,6 +6,7 @@ import {
   LAPTOP_BODY,
   LAPTOP_EDGE_WIDTH,
   LAPTOP_FINGER_NOTCH,
+  LAPTOP_KEY_ROWS,
   LAPTOP_KEYS,
   LAPTOP_LID,
   LAPTOP_RADIUS_BEZEL,
@@ -55,7 +56,7 @@ export function LaptopShell({ children }: LaptopShellProps) {
         ['--laptop-key-pitch-x' as string]: `${LAPTOP_KEYS.pitchX}px`,
         ['--laptop-key-pitch-y' as string]: `${LAPTOP_KEYS.pitchY}px`,
         ['--laptop-key-gap' as string]: `${LAPTOP_KEYS.gap}px`,
-        ['--laptop-key-feather' as string]: `${LAPTOP_KEYS.feather}px`,
+        ['--laptop-key-radius' as string]: `${LAPTOP_KEYS.keyRadius}px`,
         ['--laptop-trackpad-width' as string]: `${LAPTOP_TRACKPAD.width}px`,
         ['--laptop-trackpad-height' as string]: `${LAPTOP_TRACKPAD.height}px`,
         ['--laptop-trackpad-top' as string]: `${LAPTOP_TRACKPAD.top}px`,
@@ -68,7 +69,30 @@ export function LaptopShell({ children }: LaptopShellProps) {
       <span className={styles.shadow} />
       <div className={styles.base}>
         <span className={styles.well}>
-          <span className={styles.keys} />
+          <span className={styles.keys}>
+            {LAPTOP_KEY_ROWS.map((row, rowIndex) => (
+              <span
+                key={rowIndex}
+                className={styles.keyRow}
+                style={{ ['--laptop-key-rows' as string]: row.height }}
+              >
+                {row.keys.map((units, keyIndex) =>
+                  units === 'stack' ? (
+                    <span key={keyIndex} className={styles.keyStack}>
+                      <span className={styles.key} />
+                      <span className={styles.key} />
+                    </span>
+                  ) : (
+                    <span
+                      key={keyIndex}
+                      className={styles.key}
+                      style={{ ['--laptop-key-units' as string]: units }}
+                    />
+                  ),
+                )}
+              </span>
+            ))}
+          </span>
         </span>
         <span className={styles.trackpad} />
       </div>
