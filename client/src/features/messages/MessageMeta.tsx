@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { Icon } from '../../ui/Icon';
+import { formatHourMinute } from '../../utils/dateFormats';
 import styles from './MessageMeta.module.css';
 
 interface MessageMetaProps {
@@ -19,7 +20,7 @@ const GAP_BEFORE_META = 12;
 const CHECK_SIZE = 15;
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return formatHourMinute(new Date(iso));
 }
 
 /** Метаданные внутри пузыря — буквально строка 333 референса: абсолютом в правом нижнем

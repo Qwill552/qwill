@@ -1,3 +1,14 @@
+import {
+  formatDayMonthLong,
+  formatDayMonthLongYear,
+  formatDayMonthShort,
+  formatDayMonthShortYear,
+  formatDayMonthYearDigits,
+  formatHourMinute,
+  formatWeekdayLong,
+  formatWeekdayShort,
+} from '../../utils/dateFormats';
+
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
@@ -16,20 +27,20 @@ export function formatDayLabel(iso: string, now: Date = new Date()): string {
 
   if (diff === 0) return 'Сегодня';
   if (diff === 1) return 'Вчера';
-  if (diff >= 2 && diff < 7) return capitalize(date.toLocaleDateString('ru-RU', { weekday: 'long' }));
+  if (diff >= 2 && diff < 7) return capitalize(formatWeekdayLong(date));
   if (date.getFullYear() === now.getFullYear())
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    return formatDayMonthLong(date);
+  return formatDayMonthLongYear(date);
 }
 
 export function formatAttachmentDateTime(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
-  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const time = formatHourMinute(date);
   if (daysBetween(now, date) === 0) return `сегодня в ${time}`;
   const day =
     date.getFullYear() === now.getFullYear()
-      ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-      : date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+      ? formatDayMonthShort(date)
+      : formatDayMonthShortYear(date);
   return `${day} в ${time}`;
 }
 
@@ -37,10 +48,10 @@ export function formatChatRowWhen(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
   const diff = daysBetween(now, date);
 
-  if (diff === 0) return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (diff === 0) return formatHourMinute(date);
   if (diff === 1) return 'вчера';
-  if (diff >= 2 && diff < 7) return date.toLocaleDateString('ru-RU', { weekday: 'short' });
+  if (diff >= 2 && diff < 7) return formatWeekdayShort(date);
   if (date.getFullYear() === now.getFullYear())
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    return formatDayMonthShort(date);
+  return formatDayMonthYearDigits(date);
 }

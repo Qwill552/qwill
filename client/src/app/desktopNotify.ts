@@ -8,6 +8,7 @@ import {
 import { acquireObjectUrl, releaseObjectUrl } from '../cache/objectUrls';
 import { isDesktopShell, notifyDesktop } from '../native/desktop';
 import { playNotificationSound } from '../ui/notificationSound';
+import { formatHourMinute } from '../utils/dateFormats';
 
 const FILE_ID_PATTERN = /\/api\/files\/([^/?]+)/;
 const avatarCache = new Map<string, string>();
@@ -71,7 +72,7 @@ export function notifyDesktopOfMessage(message: MessageDto, chat: ChatListItemDt
       title: chat.title,
       body,
       chatId: message.chatId,
-      time: new Date(message.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      time: formatHourMinute(new Date(message.createdAt)),
       avatarColor: chat.otherMember?.avatarColor ?? null,
       avatarUrl,
     });

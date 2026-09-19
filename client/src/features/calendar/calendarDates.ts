@@ -1,3 +1,5 @@
+import { formatDayMonthLongYear } from '../../utils/dateFormats';
+
 export const MONTH_NAMES = [
   'Январь',
   'Февраль',
@@ -70,5 +72,5 @@ export function dayKeyIn(month: string, day: number): string {
 
 export function dayTitle(dayKey: string): string {
   const date = new Date(Number(dayKey.slice(0, 4)), Number(dayKey.slice(5, 7)) - 1, Number(dayKey.slice(8, 10)));
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formatDayMonthLongYear(date);
 }

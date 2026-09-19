@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { useReactionPrefsStore } from '../../stores/reactionPrefsStore';
 import { Avatar } from '../../ui/Avatar';
+import { formatHourMinute } from '../../utils/dateFormats';
 import { currentScrollEpoch, exceedsMoveThreshold, LONG_PRESS_MS } from '../../ui/gestures/gestureReducer';
 import { useLongPress } from '../../ui/gestures/useLongPress';
 import { useSwipeAction } from '../../ui/gestures/useSwipeAction';
@@ -58,7 +59,7 @@ interface MessageRowProps {
 const LINK_SELECTOR = 'a[href]:not([download])';
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return formatHourMinute(new Date(iso));
 }
 
 /** Заголовок контекстного меню — статус прочтения (ux-ui/06, секция 2: «✓✓ прочитано в 20:10»). */

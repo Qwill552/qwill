@@ -11,6 +11,7 @@ import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
 import { ScrollIndicator } from '../ui/ScrollIndicator';
 import { SearchField } from '../ui/SearchField';
+import { formatDayMonthShort, formatHourMinute } from '../utils/dateFormats';
 import styles from './ContactsScreen.module.css';
 
 interface Contact {
@@ -29,9 +30,9 @@ function formatStatus(contact: Contact): string {
   if (contact.online) return 'в сети';
   const date = new Date(contact.lastSeenAt);
   const today = new Date().toDateString() === date.toDateString();
-  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const time = formatHourMinute(date);
   if (today) return `был(а) в ${time}`;
-  return `был(а) ${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`;
+  return `был(а) ${formatDayMonthShort(date)}`;
 }
 
 /** Буквально из референса (строка 154): иконка «пригласить» — человек + плюс. */

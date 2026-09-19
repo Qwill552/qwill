@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
 import { Icon } from '../../ui/Icon';
+import { formatMonthLong } from '../../utils/dateFormats';
 import styles from './FastScroller.module.css';
 
 const HIDE_DELAY_MS = 1500;
@@ -52,7 +53,7 @@ function monthKey(iso: string): string {
 
 function monthLabel(iso: string): string {
   const date = new Date(iso);
-  const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+  const month = formatMonthLong(date);
   return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${date.getFullYear()}`;
 }
 

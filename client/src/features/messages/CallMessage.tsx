@@ -2,6 +2,7 @@ import type { MessageCallDto } from '@messenger/shared';
 
 import { callDurationText, callStatusLabel, callSymbolIcon, isUnansweredCall } from '../calls/callLog';
 import { Icon } from '../../ui/Icon';
+import { formatHourMinute } from '../../utils/dateFormats';
 import styles from './CallMessage.module.css';
 
 interface CallMessageProps {
@@ -11,7 +12,7 @@ interface CallMessageProps {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return formatHourMinute(new Date(iso));
 }
 
 export function CallMessage({ call, own, createdAt }: CallMessageProps) {
