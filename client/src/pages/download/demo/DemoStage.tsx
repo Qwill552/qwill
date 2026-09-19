@@ -6,14 +6,15 @@ import { createDemoStore } from './engine/store';
 import { PhoneDemo } from './PhoneDemo';
 import styles from './DemoStage.module.css';
 import { ScenarioSwitch } from './ScenarioSwitch';
-import { DISTINCT_SCENARIO } from './scenarios/distinct';
 import { EVERYDAY_SCENARIO } from './scenarios/everyday';
 
-const SCENARIOS = [EVERYDAY_SCENARIO, DISTINCT_SCENARIO];
+const SCENARIOS = [EVERYDAY_SCENARIO];
 
 const store = createDemoStore(SCENARIOS[0]!);
 
-const RESERVED_WIDTH = SCENARIO_SWITCH.buttonSize + SCENARIO_SWITCH.gap;
+const SWITCHABLE = SCENARIOS.length > 1;
+
+const RESERVED_WIDTH = SWITCHABLE ? SCENARIO_SWITCH.buttonSize + SCENARIO_SWITCH.gap : 0;
 
 function fitScale(hostWidth: number, viewportHeight: number): number {
   const byWidth = (hostWidth - RESERVED_WIDTH * 2) / PHONE_BODY.width;
@@ -81,12 +82,14 @@ export function DemoStage() {
           </div>
         </div>
 
-        <ScenarioSwitch
-          activeIndex={scenarioIndex}
-          count={SCENARIOS.length}
-          disabled={scrimPhase !== 'idle'}
-          onSwitch={handleSwitch}
-        />
+        {SWITCHABLE && (
+          <ScenarioSwitch
+            activeIndex={scenarioIndex}
+            count={SCENARIOS.length}
+            disabled={scrimPhase !== 'idle'}
+            onSwitch={handleSwitch}
+          />
+        )}
       </div>
     </div>
   );
