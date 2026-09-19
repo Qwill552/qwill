@@ -1,9 +1,21 @@
 import { formatDayLabel } from './dayLabel';
 import styles from './Dividers.module.css';
 
-export function DateDivider({ iso, onOpenCalendar }: { iso: string; onOpenCalendar?: (iso: string) => void }) {
+export function DateDivider({
+  iso,
+  covered,
+  onOpenCalendar,
+}: {
+  iso: string;
+  covered?: boolean;
+  onOpenCalendar?: (iso: string) => void;
+}) {
   return (
-    <div className={styles.dayWrap} data-day-divider="true">
+    <div
+      className={`${styles.dayWrap} ${covered ? styles.dayCovered : ''}`}
+      data-day-divider="true"
+      aria-hidden={covered ? 'true' : undefined}
+    >
       {onOpenCalendar ? (
         <button
           type="button"
@@ -21,28 +33,32 @@ export function DateDivider({ iso, onOpenCalendar }: { iso: string; onOpenCalend
 }
 
 export function FloatingDate({
+  ref,
   iso,
-  offset,
+  hidden,
   onJumpToDay,
 }: {
+  ref: React.Ref<HTMLDivElement>;
   iso: string | null;
-  offset: number;
+  hidden: boolean;
   onJumpToDay?: (iso: string) => void;
 }) {
   const label = iso === null ? '' : formatDayLabel(iso);
   const interactive = onJumpToDay !== undefined && iso !== null;
+  const away = iso === null || hidden;
 
   return (
     <div
-      className={`${styles.floating} ${iso === null ? styles.floatingHidden : ''}`}
-      style={{ transform: `translateY(${offset}px)` }}
-      aria-hidden={interactive ? undefined : 'true'}
+      ref={ref}
+      className={`${styles.floating} ${away ? styles.floatingHidden : ''}`}
+      aria-hidden={interactive && !away ? undefined : 'true'}
     >
       {interactive ? (
         <button
           type="button"
           className={`${styles.day} ${styles.dayButton}`}
           aria-label={`К началу дня, ${label}`}
+          tabIndex={away ? -1 : 0}
           onClick={() => onJumpToDay(iso)}
         >
           {label}

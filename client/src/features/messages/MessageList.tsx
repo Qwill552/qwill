@@ -37,7 +37,6 @@ import {
 import {
   buildHeightTable,
   heightsOf,
-  indexAtOffset,
   rowHeight,
   rowTop,
   sameWindow,
@@ -53,6 +52,7 @@ import { attachFlingTakeover, flingDistance, MAX_FLING_VELOCITY, type FlingTakeo
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
+import { stickyDate } from './stickyDate';
 import styles from './MessageList.module.css';
 
 /** Сообщения одного автора ближе этого интервала визуально группируются в серию. */
@@ -287,7 +287,9 @@ export function MessageList({
   const geometry = useRef({ contentTop: 0, padTop: 0 });
   const dayDividerHeight = useRef(DAY_DIVIDER_ESTIMATE);
   const floatingDateIdle = useRef(0);
-  const [floatingDate, setFloatingDate] = useState<{ iso: string; offset: number } | null>(null);
+  const floatingDateRef = useRef<HTMLDivElement>(null);
+  const floatingDateOffset = useRef(0);
+  const [floatingDate, setFloatingDate] = useState<{ iso: string; hidden: boolean } | null>(null);
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const loadingUp = useRef(false);
   const loadingDown = useRef(false);
@@ -1051,6 +1053,13 @@ export function MessageList({
     checkEdgesRef.current();
   }, [geometrySignature, hasMore, hasMoreAfter]);
 
+  function moveFloatingDate(offset: number): void {
+    if (floatingDateOffset.current === offset) return;
+    floatingDateOffset.current = offset;
+    const node = floatingDateRef.current;
+    if (node) node.style.transform = `translateY(${offset}px)`;
+  }
+
   function updateFloatingDate(): void {
     const el = listRef.current;
     const entries = displayEntriesRef.current;
@@ -1061,39 +1070,37 @@ export function MessageList({
     }
 
     const clip = el.scrollTop + geometry.current.padTop - geometry.current.contentTop;
-    const topIndex = indexAtOffset(heights, clip);
-    const entry = entries[topIndex];
-    if (!entry) {
+    const stuck = stickyDate(
+      heights,
+      (index) => entries[index]?.row.showDay === true,
+      clip,
+      dayDividerHeight.current,
+    );
+    const entry = stuck === null ? undefined : entries[stuck.topIndex];
+    if (!stuck || !entry) {
       setFloatingDate(null);
       return;
-    }
-
-    let dayIndex = topIndex;
-    while (dayIndex > 0 && !entries[dayIndex]!.row.showDay) dayIndex -= 1;
-    if (rowTop(heights, dayIndex) + dayDividerHeight.current > clip) {
-      setFloatingDate(null);
-      return;
-    }
-
-    let offset = 0;
-    for (let next = topIndex + 1; next < entries.length; next += 1) {
-      if (!entries[next]!.row.showDay) continue;
-      const edge = rowTop(heights, next) + dayDividerHeight.current - clip;
-      if (edge > dayDividerHeight.current && edge < dayDividerHeight.current * 2) {
-        offset = edge - dayDividerHeight.current * 2;
-      }
-      break;
     }
 
     const iso = entry.row.message.createdAt;
+    moveFloatingDate(stuck.offset);
     setFloatingDate((current) =>
-      current !== null && current.iso === iso && current.offset === offset ? current : { iso, offset },
+      current !== null && current.iso === iso && !current.hidden ? current : { iso, hidden: false },
     );
     window.clearTimeout(floatingDateIdle.current);
-    floatingDateIdle.current = window.setTimeout(() => setFloatingDate(null), FLOATING_DATE_HIDE_MS);
+    floatingDateIdle.current = window.setTimeout(
+      () => setFloatingDate((current) => (current === null || current.hidden ? current : { ...current, hidden: true })),
+      FLOATING_DATE_HIDE_MS,
+    );
   }
 
-  useEffect(() => () => window.clearTimeout(floatingDateIdle.current), [chatId]);
+  useEffect(() => {
+    setFloatingDate(null);
+    floatingDateOffset.current = 0;
+    const node = floatingDateRef.current;
+    if (node) node.style.transform = 'translateY(0px)';
+    return () => window.clearTimeout(floatingDateIdle.current);
+  }, [chatId]);
 
   useEffect(() => () => window.clearTimeout(flashTimer.current), [chatId]);
 
@@ -1223,6 +1230,11 @@ export function MessageList({
             onToggleReaction={toggleReaction}
             onLeaveDone={handleLeaveDone}
             flash={flashId !== null && entry.row.groupIds.includes(flashId)}
+            dayCovered={
+              floatingDate !== null &&
+              entry.row.showDay &&
+              isSameDay(entry.row.message.createdAt, floatingDate.iso)
+            }
             listRef={listRef}
             atBottomRef={atVeryBottom}
             onOpenCalendar={openCalendarAt}
@@ -1252,8 +1264,9 @@ export function MessageList({
       </div>
 
       <FloatingDate
+        ref={floatingDateRef}
         iso={floatingDate?.iso ?? null}
-        offset={floatingDate?.offset ?? 0}
+        hidden={floatingDate?.hidden ?? true}
         onJumpToDay={jumpToDayStart}
       />
 
@@ -1302,6 +1315,7 @@ const MessageListRow = memo(function MessageListRow({
   onToggleReaction,
   onLeaveDone,
   flash,
+  dayCovered,
   listRef,
   atBottomRef,
   onOpenCalendar,
@@ -1319,6 +1333,7 @@ const MessageListRow = memo(function MessageListRow({
   onToggleReaction: (chatId: string, messageId: number, emoji: string) => void;
   onLeaveDone: (key: RowKey) => void;
   flash: boolean;
+  dayCovered: boolean;
   listRef: React.RefObject<HTMLDivElement | null>;
   atBottomRef: React.RefObject<boolean>;
   onOpenCalendar: (iso: string) => void;
@@ -1386,7 +1401,9 @@ const MessageListRow = memo(function MessageListRow({
 
   return (
     <div className={`${styles.row} ${collapsing ? styles.rowCollapsing : ''}`} data-row-index={index}>
-      {row.showDay && <DateDivider iso={message.createdAt} onOpenCalendar={onOpenCalendar} />}
+      {row.showDay && (
+        <DateDivider iso={message.createdAt} covered={dayCovered} onOpenCalendar={onOpenCalendar} />
+      )}
       {showUnread && <UnreadDivider count={unreadCount} />}
 
       <div
