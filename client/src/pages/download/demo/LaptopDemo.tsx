@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DEMO_RETURN, LAPTOP_LOGICAL } from '../config';
 import { DemoSurface } from './DemoSurface';
 import type { DemoStore } from './engine/store';
-import { DIALOG } from './replica/phone/demoData';
+import { dialogOf } from './replica/phone/demoData';
 import { LaptopReplica, type MenuPoint } from './replica/laptop/LaptopReplica';
 
 function pointInScreen(event: MouseEvent, screen: HTMLElement): MenuPoint {
@@ -33,7 +33,8 @@ export function LaptopDemo({ store }: { store: DemoStore }) {
       const target = event.target;
       const marked = target instanceof Element ? target.closest('[data-demo-message]') : null;
       const messageId = marked instanceof HTMLElement ? marked.dataset.demoMessage : undefined;
-      if (!messageId || !DIALOG.some((message) => message.id === messageId)) return;
+      const open = dialogOf(store.snapshot().chatPeer);
+      if (!messageId || !open.some((message) => message.id === messageId)) return;
       setMenuPoint(pointInScreen(event, host));
       store.override('menuMessageId', messageId);
       store.override('overlay', 'menu');
@@ -67,6 +68,7 @@ export function LaptopDemo({ store }: { store: DemoStore }) {
         typingReadout={store.readoutOf('typing')}
         voiceReadout={store.readoutOf('voice')}
         callSecondsReadout={store.readoutOf('callSeconds')}
+        queryReadout={store.readoutOf('searchTyping')}
         pointer={store.pointerOf()}
         pointerAway={pointerAway}
         menuPoint={menuPoint}

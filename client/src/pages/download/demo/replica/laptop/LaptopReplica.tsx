@@ -21,6 +21,7 @@ interface LaptopReplicaProps {
   typingReadout?: DemoReadout;
   voiceReadout?: DemoReadout;
   callSecondsReadout?: DemoReadout;
+  queryReadout?: DemoReadout;
   pointer?: DemoReadout;
   pointerAway?: boolean;
   menuPoint?: MenuPoint | null;
@@ -33,6 +34,7 @@ export function LaptopReplica({
   typingReadout,
   voiceReadout,
   callSecondsReadout,
+  queryReadout,
   pointer,
   pointerAway,
   menuPoint,
@@ -44,7 +46,7 @@ export function LaptopReplica({
   return (
     <div className={styles.replica}>
       <div className={styles.columns}>
-        <ChatList state={state} surface={listSurface} />
+        <ChatList state={state} surface={listSurface} queryReadout={queryReadout} />
         <ChatColumn
           state={state}
           feedSurface={feedSurface}

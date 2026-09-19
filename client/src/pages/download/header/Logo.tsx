@@ -122,7 +122,7 @@ const EDGE_SOFTNESS = 0.3;
 const CRISP_INSET = 0.5;
 const CRISP_FEATHER = 0.2;
 
-export function Logo() {
+export function Logo({ size }: { size?: number }) {
   const instanceId = useId();
   const facetGradientId = (facet: Facet) => `${instanceId}${facet.name}`;
   const softEdgeId = `${instanceId}soft-edge`;
@@ -134,7 +134,13 @@ export function Logo() {
   ));
 
   return (
-    <svg className={styles.logo} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <svg
+      className={styles.logo}
+      style={size === undefined ? undefined : { ['--header-logo-size' as string]: `${size}px` }}
+      viewBox="0 0 64 64"
+      aria-hidden="true"
+      focusable="false"
+    >
       <defs>
         <filter
           id={softEdgeId}

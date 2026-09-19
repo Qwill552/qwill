@@ -20,6 +20,8 @@ export interface ReplicaState {
   callConnected: boolean;
   hoverRow: string | null;
   search: boolean;
+  searchQuery: string;
+  chatPeer: ChatPeerId;
 }
 
 export const PRESS = {
@@ -30,6 +32,7 @@ export const PRESS = {
   mic: 'mic',
   back: 'back',
   search: 'search',
+  result: 'result',
 } as const;
 
 export interface ScreenSurface {
@@ -359,6 +362,34 @@ export const DIALOG: ReplicaMessage[] = [
   message({ id: 'm9', own: true, time: '09:21', kind: 'voice', voiceDuration: '0:03' }),
 ];
 
+export const DIALOG_NINA: ReplicaMessage[] = [
+  message({ id: 'n1', own: false, time: '18:40', text: 'Ключи у соседки, она до восьми', day: 'Сегодня' }),
+  message({ id: 'n2', own: true, time: '18:41', text: 'Успею' }),
+  message({ id: 'n3', own: false, time: '18:41', text: 'Заберу ключи после шести' }),
+];
+
+export type ChatPeerId = 'artem' | 'nina';
+
+export interface ReplicaChatPeer {
+  id: ChatPeerId;
+  name: string;
+  status: string;
+  online: boolean;
+}
+
+export const CHAT_PEERS = {
+  artem: { id: 'artem', name: PEOPLE.artem.name, status: 'в сети', online: true },
+  nina: { id: 'nina', name: PEOPLE.nina.name, status: 'была недавно', online: false },
+} as const satisfies Record<ChatPeerId, ReplicaChatPeer>;
+
+export function dialogOf(peer: ChatPeerId): ReplicaMessage[] {
+  return peer === 'nina' ? DIALOG_NINA : DIALOG;
+}
+
+export const DIALOG_NINA_FULL = DIALOG_NINA.length;
+
+export const SEARCH_QUERY = 'Нина';
+
 export const DIALOG_BEFORE_REPLY = 5;
 export const DIALOG_WITH_OWN_REPLY = 6;
 export const DIALOG_WITH_PUNCHLINE = 7;
@@ -436,11 +467,21 @@ export const REPLICA_REST: ReplicaState = {
   callConnected: false,
   hoverRow: null,
   search: false,
+  searchQuery: '',
+  chatPeer: 'artem',
 };
 
 export function typedPrefix(progress: number, state: ReplicaState): string {
+  return prefixOf(state.composerText, progress);
+}
+
+export function searchedPrefix(progress: number, state: ReplicaState): string {
+  return prefixOf(state.searchQuery, progress);
+}
+
+function prefixOf(text: string, progress: number): string {
   const clamped = Math.min(1, Math.max(0, progress));
-  return state.composerText.slice(0, Math.round(clamped * state.composerText.length));
+  return text.slice(0, Math.round(clamped * text.length));
 }
 
 export function recordedTime(progress: number): string {
@@ -603,6 +644,7 @@ export const DESKTOP_TEXT = {
   searchPlaceholder: 'Поиск в Qwill',
   searchHotkey: 'Ctrl + K',
   recentLabel: 'Недавнее',
+  foundLabel: 'Найдено',
   emptyTitle: 'Выберите чат',
   emptySubtitle: 'Откройте переписку из списка слева',
   profileCardTitle: 'Профиль',

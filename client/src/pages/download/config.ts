@@ -274,7 +274,10 @@ export const LAPTOP_CURSOR = {
   composer: { x: 700, y: 760 },
   send: { x: 1158, y: 760 },
   search: { x: 150, y: 34 },
+  searchResult: { x: 150, y: 120 },
 } as const;
+
+export const REPLICA_LOGO_MARK_SIZE = 104;
 
 export const LAPTOP_SCENE_MS = {
   listGlide: 1800,
@@ -297,8 +300,14 @@ export const LAPTOP_SCENE_MS = {
   album: 2000,
   recording: 3000,
   voiceSent: 800,
+  chatClose: 700,
   toSearch: 900,
   searchPress: 320,
-  searchOpen: 1060,
-  searchClose: 880,
+  searchOpen: 900,
+  searchTyped: 1400,
+  searchHold: 820,
+  resultPress: 320,
+  foundOpen: 900,
+  foundRead: 2400,
+  foundClose: 500,
 } as const;

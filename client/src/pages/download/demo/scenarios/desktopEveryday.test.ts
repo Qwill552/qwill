@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { LAPTOP_CURSOR, LAPTOP_LOGICAL, LAPTOP_MENU, laptopMenuOrigin } from '../../config';
 import { discreteOf, scenarioDuration, targetAt, type DemoTarget } from '../engine/timeline';
 import {
+  CHAT_ROWS,
   DIALOG_BEFORE_REPLY,
+  DIALOG_NINA_FULL,
   DIALOG_WITH_ALBUM,
   DIALOG_WITH_OWN_REPLY,
   DIALOG_WITH_PUNCHLINE,
@@ -12,11 +14,13 @@ import {
   PRESS,
   QUICK_REACTIONS,
   REACTION_EMOJI,
+  SEARCH_QUERY,
   TYPED_MESSAGE,
+  dialogOf,
 } from '../replica/phone/demoData';
 import { DESKTOP_EVERYDAY_SCENARIO } from './desktopEveryday';
 
-const CYCLE_MS = 24000;
+const CYCLE_MS = 30000;
 
 function at(timeMs: number): DemoTarget {
   return targetAt(DESKTOP_EVERYDAY_SCENARIO, timeMs);
@@ -75,7 +79,7 @@ describe('геометрия десктопного меню', () => {
 });
 
 describe('десктопный сценарий А', () => {
-  it('круг длится ровно 24 секунды', () => {
+  it('круг длится ровно 30 секунд', () => {
     expect(scenarioDuration(DESKTOP_EVERYDAY_SCENARIO)).toBe(CYCLE_MS);
   });
 
@@ -102,10 +106,13 @@ describe('десктопный сценарий А', () => {
     expect(seam.hoverRow).toBe(start.hoverRow);
   });
 
-  it('переписка обнуляется только под закрытой колонкой чата', () => {
-    expect(at(CYCLE_MS - 1).visibleMessages).toBe(DIALOG_WITH_VOICE);
+  it('собеседник и переписка обнуляются только под закрытой колонкой чата', () => {
+    const seam = at(CYCLE_MS - 1);
+    expect(seam.chatPeer).toBe('nina');
+    expect(seam.visibleMessages).toBe(DIALOG_NINA_FULL);
+    expect(seam.screen).toBe('chats');
+    expect(at(0).chatPeer).toBe('artem');
     expect(at(0).visibleMessages).toBe(DIALOG_BEFORE_REPLY);
-    expect(at(CYCLE_MS - 1).screen).toBe('chats');
     expect(discreteOf(at(0)).screen).toBe('chats');
   });
 
@@ -187,13 +194,58 @@ describe('десктопный сценарий А', () => {
     expect(at(sceneStart(19)).recording).toBe(false);
   });
 
-  it('вместо возврата в список курсор идёт к поиску и открывает панель', () => {
-    const arrived = at(sceneStart(21));
+  it('первая половина заканчивается закрытием чата, а не возвратом в список', () => {
+    expect(at(sceneStart(19)).visibleMessages).toBe(DIALOG_WITH_VOICE);
+    expect(at(sceneStart(20)).screen).toBe('chats');
+    expect(at(sceneStart(20)).chatPeer).toBe('artem');
+  });
+
+  it('вторая половина открывает чат поиском: курсор, запрос, результат', () => {
+    const arrived = at(sceneStart(22));
     expect(arrived.cursorX).toBeCloseTo(LAPTOP_CURSOR.search.x, 1);
     expect(arrived.cursorY).toBeCloseTo(LAPTOP_CURSOR.search.y, 1);
     expect(arrived.pressed).toBe(PRESS.search);
-    expect(at(sceneStart(22)).search).toBe(true);
-    expect(at(sceneStart(23) - 1).search).toBe(true);
+
+    expect(at(sceneStart(23)).search).toBe(true);
+    expect(at(sceneStart(23)).searchQuery).toBe('');
+
+    const typed = at(sceneStart(25) - 1);
+    expect(typed.searchQuery).toBe(SEARCH_QUERY);
+    expect(typed.searchTyping).toBeCloseTo(1);
+    expect(typed.cursorX).toBeCloseTo(LAPTOP_CURSOR.searchResult.x, 1);
+    expect(typed.cursorY).toBeCloseTo(LAPTOP_CURSOR.searchResult.y, 1);
+
+    expect(at(sceneStart(26)).pressed).toBe(PRESS.result);
+  });
+
+  it('запрос находит ровно один чат — тот, который открывается', () => {
+    const found = CHAT_ROWS.filter((row) =>
+      row.title.toLowerCase().includes(SEARCH_QUERY.toLowerCase()),
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]?.id).toBe(at(sceneStart(27)).chatPeer);
+  });
+
+  it('щелчок по результату открывает чат Нины и закрывает поиск', () => {
+    const opened = at(sceneStart(27));
+    expect(opened.screen).toBe('chat');
+    expect(opened.chatPeer).toBe('nina');
+    expect(opened.search).toBe(false);
+    expect(opened.searchQuery).toBe('');
+    expect(opened.pressed).toBeNull();
+    expect(opened.visibleMessages).toBe(DIALOG_NINA_FULL);
+    expect(dialogOf('nina')).toHaveLength(DIALOG_NINA_FULL);
+  });
+
+  it('в чат заходят дважды за круг — щелчком по строке и через поиск', () => {
+    const entries: string[] = [];
+    let wasOpen = at(CYCLE_MS - 1).screen !== 'chats';
+    for (let timeMs = 0; timeMs < CYCLE_MS; timeMs += 20) {
+      const open = at(timeMs).screen !== 'chats';
+      if (open && !wasOpen) entries.push(at(timeMs).chatPeer);
+      wasOpen = open;
+    }
+    expect(entries).toEqual(['artem', 'nina']);
   });
 
   it('поиск закрывается, колонка чата пустеет, список возвращается к нулю', () => {

@@ -283,6 +283,15 @@
   --replica-cursor-fill: rgb(var(--pulse-ink));
   --replica-cursor-stroke: var(--surface);
 
+  --replica-logo-tile-size: 112px;
+  --replica-logo-tile-base: #c9d3f0;
+  --replica-logo-tile-tl: #edbdf8;
+  --replica-logo-tile-tr: #b5daf8;
+  --replica-logo-tile-bl: #a0b0fd;
+  --replica-logo-tile-br: #e8eabf;
+  --replica-logo-tile-spread: 78%;
+  --replica-logo-tile-inset: 0%;
+
   --replica-card-bg: #16262e;
   --replica-card-bubble-bg: #28353e;
   --replica-card-bubble-ink: #ffffff;
@@ -315,4 +324,12 @@
 :root[data-theme='dark'],
 [data-theme='dark'] {
   --replica-bubble-in-bg: var(--message-in);
+
+  --replica-logo-tile-base: #090c19;
+  --replica-logo-tile-tl: #162444;
+  --replica-logo-tile-tr: #251845;
+  --replica-logo-tile-bl: #0b575a;
+  --replica-logo-tile-br: #101124;
+  --replica-logo-tile-spread: 62%;
+  --replica-logo-tile-inset: 18%;
 }

@@ -2,6 +2,7 @@ import { DEMO_REDUCED_FRAME_MS, DEMO_RETURN } from '../../config';
 import {
   callDuration,
   recordedTime,
+  searchedPrefix,
   typedPrefix,
   type ReplicaScreen,
   type ReplicaState,
@@ -65,6 +66,7 @@ const READOUT_TEXT: Record<ReadoutChannel, (value: number, state: ReplicaState) 
   typing: typedPrefix,
   voice: recordedTime,
   callSeconds: (value) => callDuration(value),
+  searchTyping: searchedPrefix,
 };
 
 const TAPPABLE_SCREENS: Record<string, ReplicaScreen> = {

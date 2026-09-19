@@ -1,4 +1,5 @@
 import { Icon } from '../../../../../ui/Icon';
+import type { DemoReadout } from '../../engine/store';
 import { Avatar, Badge, cx, OfficialMark, SearchGlyph } from '../phone/Chrome';
 import {
   CHAT_FILTERS,
@@ -15,13 +16,12 @@ import styles from './ChatList.module.css';
 interface ChatListProps {
   state: ReplicaState;
   surface?: ScreenSurface;
+  queryReadout?: DemoReadout;
 }
 
-const OPEN_ROW_ID = 'artem';
-
-export function ChatList({ state, surface }: ChatListProps) {
-  const pressedRowId = state.pressed === PRESS.row ? OPEN_ROW_ID : null;
-  const openRowId = state.screen === 'chats' ? null : OPEN_ROW_ID;
+export function ChatList({ state, surface, queryReadout }: ChatListProps) {
+  const pressedRowId = state.pressed === PRESS.row ? 'artem' : null;
+  const openRowId = state.screen === 'chats' ? null : state.chatPeer;
 
   return (
     <div className={styles.column}>
@@ -89,7 +89,7 @@ export function ChatList({ state, surface }: ChatListProps) {
       <Fab />
 
       <div className={cx(styles.searchLayer, state.search && styles.searchLayerOpen)}>
-        <SearchPanel />
+        <SearchPanel state={state} queryReadout={queryReadout} />
       </div>
     </div>
   );

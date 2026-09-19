@@ -1,6 +1,7 @@
 import { LAPTOP_CURSOR, LAPTOP_SCENE_MS } from '../../config';
 import {
   DIALOG_BEFORE_REPLY,
+  DIALOG_NINA_FULL,
   DIALOG_WITH_ALBUM,
   DIALOG_WITH_OWN_REPLY,
   DIALOG_WITH_PUNCHLINE,
@@ -9,6 +10,7 @@ import {
   READ_AT_REST,
   READ_WITH_OWN_REPLY,
   REACTION_EMOJI,
+  SEARCH_QUERY,
   TYPED_MESSAGE,
 } from '../replica/phone/demoData';
 import type { Scenario } from '../engine/timeline';
@@ -30,6 +32,7 @@ export const DESKTOP_EVERYDAY_SCENARIO: Scenario = {
       set: {
         ...at(LAPTOP_CURSOR.listRest),
         screen: 'chats',
+        chatPeer: 'artem',
         chatsScroll: LIST_PEEK,
         feedScroll: 0,
         visibleMessages: DIALOG_BEFORE_REPLY,
@@ -40,6 +43,8 @@ export const DESKTOP_EVERYDAY_SCENARIO: Scenario = {
         pressed: null,
         hoverRow: null,
         search: false,
+        searchQuery: '',
+        searchTyping: 0,
         typing: 0,
         voice: 0,
       },
@@ -127,6 +132,12 @@ export const DESKTOP_EVERYDAY_SCENARIO: Scenario = {
         visibleMessages: DIALOG_WITH_VOICE,
       },
     },
+    {
+      durationMs: LAPTOP_SCENE_MS.chatClose,
+      ease: 'inOut',
+      set: { ...at(LAPTOP_CURSOR.listRest), screen: 'chats' },
+    },
+
     { durationMs: LAPTOP_SCENE_MS.toSearch, ease: 'inOut', set: at(LAPTOP_CURSOR.search) },
     { durationMs: LAPTOP_SCENE_MS.searchPress, ease: 'linear', set: { pressed: PRESS.search } },
     {
@@ -135,9 +146,27 @@ export const DESKTOP_EVERYDAY_SCENARIO: Scenario = {
       set: { search: true, pressed: null },
     },
     {
-      durationMs: LAPTOP_SCENE_MS.searchClose,
+      durationMs: LAPTOP_SCENE_MS.searchTyped,
       ease: 'inOut',
-      set: { ...at(LAPTOP_CURSOR.listRest), search: false, screen: 'chats', chatsScroll: 0 },
+      set: { ...at(LAPTOP_CURSOR.searchResult), searchQuery: SEARCH_QUERY, searchTyping: 1 },
     },
+    { durationMs: LAPTOP_SCENE_MS.searchHold, ease: 'linear' },
+    { durationMs: LAPTOP_SCENE_MS.resultPress, ease: 'linear', set: { pressed: PRESS.result } },
+    {
+      durationMs: LAPTOP_SCENE_MS.foundOpen,
+      ease: 'linear',
+      set: {
+        screen: 'chat',
+        chatPeer: 'nina',
+        visibleMessages: DIALOG_NINA_FULL,
+        readUpTo: DIALOG_NINA_FULL,
+        search: false,
+        searchQuery: '',
+        searchTyping: 0,
+        pressed: null,
+      },
+    },
+    { durationMs: LAPTOP_SCENE_MS.foundRead, ease: 'inOut', set: at(LAPTOP_CURSOR.listRest) },
+    { durationMs: LAPTOP_SCENE_MS.foundClose, ease: 'linear', set: { screen: 'chats' } },
   ],
 };

@@ -2,7 +2,7 @@ import { REPLICA_REST, type ReplicaState } from '../replica/phone/demoData';
 
 export type ScrollChannel = 'chatsScroll' | 'feedScroll' | 'profileScroll' | 'settingsScroll';
 
-export type ReadoutChannel = 'typing' | 'voice' | 'callSeconds';
+export type ReadoutChannel = 'typing' | 'voice' | 'callSeconds' | 'searchTyping';
 
 export type PointChannel = 'cursorX' | 'cursorY';
 
@@ -15,7 +15,12 @@ export const SCROLL_CHANNELS: readonly ScrollChannel[] = [
   'settingsScroll',
 ];
 
-export const READOUT_CHANNELS: readonly ReadoutChannel[] = ['typing', 'voice', 'callSeconds'];
+export const READOUT_CHANNELS: readonly ReadoutChannel[] = [
+  'typing',
+  'voice',
+  'callSeconds',
+  'searchTyping',
+];
 
 export const POINT_CHANNELS: readonly PointChannel[] = ['cursorX', 'cursorY'];
 
@@ -48,6 +53,7 @@ export const DEMO_REST: DemoTarget = {
   typing: 0,
   voice: 0,
   callSeconds: 0,
+  searchTyping: 0,
   cursorX: 0,
   cursorY: 0,
   ...REPLICA_REST,
@@ -76,6 +82,8 @@ export function discreteOf(target: DemoTarget): ReplicaState {
     callConnected: target.callConnected,
     hoverRow: target.hoverRow,
     search: target.search,
+    searchQuery: target.searchQuery,
+    chatPeer: target.chatPeer,
   };
 }
 
