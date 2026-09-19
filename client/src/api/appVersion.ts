@@ -17,3 +17,7 @@ export function fetchWindowsVersion(): Promise<WindowsVersionInfo> {
 export function exeDownloadUrl(info: WindowsVersionInfo): string {
   return `${API_URL}${info.exeUrl}`;
 }
+
+export function windowsDownloadUrl(info: WindowsVersionInfo): string {
+  return `${API_URL}${info.zipUrl ?? info.exeUrl}`;
+}

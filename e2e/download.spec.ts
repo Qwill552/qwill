@@ -72,10 +72,12 @@ test('кнопка скачивания ведёт на настоящий APK',
   await expect(link).toHaveAttribute('href', /\/api\/app\/apk/);
 });
 
-test('кнопка скачивания ведёт на настоящий EXE', async ({ page }) => {
+test('кнопка скачивания ведёт на установщик: архив, если он выпущен, иначе EXE', async ({ page, request }) => {
   await page.goto('/download?os=windows');
+  const api = await request.get('https://127.0.0.1:3000/api/app/win/version');
+  const data = (await api.json()) as { zipUrl: string | null };
   const link = page.locator('a[download]');
-  await expect(link).toHaveAttribute('href', /\.exe$/);
+  await expect(link).toHaveAttribute('href', data.zipUrl === null ? /\.exe$/ : /\.zip$/);
 });
 
 test('версия на кнопке живая', async ({ page, request }) => {

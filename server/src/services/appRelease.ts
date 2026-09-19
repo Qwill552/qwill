@@ -34,6 +34,7 @@ interface CachedWindowsRelease {
   mtimeMs: number;
   manifest: WindowsReleaseManifest;
   sizeBytes: number;
+  zipSizeBytes: number | null;
 }
 
 let windowsCache: CachedWindowsRelease | null = null;
@@ -136,7 +137,17 @@ async function readWindowsRelease(): Promise<CachedWindowsRelease | null> {
     return null;
   }
 
-  windowsCache = { mtimeMs: stat.mtimeMs, manifest: parsed, sizeBytes: exeStat.size };
+  let zipSizeBytes: number | null = null;
+  if (parsed.zipFile) {
+    const zipPath = path.join(env.appReleaseDir, 'windows', parsed.zipFile);
+    try {
+      zipSizeBytes = (await fs.stat(zipPath)).size;
+    } catch {
+      logger.warn({ zipPath }, 'Манифест выпуска Windows ссылается на отсутствующий архив — раздаётся только .exe');
+    }
+  }
+
+  windowsCache = { mtimeMs: stat.mtimeMs, manifest: parsed, sizeBytes: exeStat.size, zipSizeBytes };
   return windowsCache;
 }
 
@@ -144,10 +155,14 @@ export async function getWindowsRelease(): Promise<WindowsVersionInfo | null> {
   const release = await readWindowsRelease();
   if (!release) return null;
 
+  const hasZip = release.manifest.zipFile !== undefined && release.zipSizeBytes !== null;
+
   return {
     versionName: release.manifest.versionName,
     exeUrl: `${WINDOWS_RELEASE_BASE_PATH}/${release.manifest.exeFile}`,
     sizeBytes: release.sizeBytes,
+    zipUrl: hasZip ? `${WINDOWS_RELEASE_BASE_PATH}/${release.manifest.zipFile}` : null,
+    zipSizeBytes: release.zipSizeBytes,
     sha256: release.manifest.sha256,
     changelog: release.manifest.changelog,
   };

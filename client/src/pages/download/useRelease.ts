@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react';
 
-import { apkDownloadUrl, exeDownloadUrl, fetchAppVersion, fetchWindowsVersion } from '../../api/appVersion';
+import { apkDownloadUrl, fetchAppVersion, fetchWindowsVersion, windowsDownloadUrl } from '../../api/appVersion';
 import { ApiError } from '../../api/client';
 import { formatBytes } from '../../features/messages/Attachment';
 import type { OsChoice } from './useOsChoice';
 
 export type ReleaseState = 'loading' | 'ready' | 'unavailable' | 'offline';
 
+export type ReleaseFormat = 'APK' | 'EXE' | 'ZIP';
+
 export interface ReleaseInfo {
   state: ReleaseState;
-  format: 'APK' | 'EXE';
+  format: ReleaseFormat;
   versionName: string | null;
   sizeLabel: string | null;
   fileUrl: string | null;
   changelog: string[];
 }
 
-function formatFor(os: OsChoice): 'APK' | 'EXE' {
+function formatFor(os: OsChoice): ReleaseFormat {
   return os === 'android' ? 'APK' : 'EXE';
 }
 
@@ -34,22 +36,24 @@ export function useRelease(os: OsChoice): ReleaseInfo {
     const request =
       os === 'android'
         ? fetchAppVersion().then((info) => ({
+            format: 'APK' as const,
             versionName: info.versionName,
             sizeLabel: formatBytes(info.sizeBytes),
             fileUrl: apkDownloadUrl(info),
             changelog: info.changelog,
           }))
         : fetchWindowsVersion().then((info) => ({
+            format: info.zipUrl === null ? ('EXE' as const) : ('ZIP' as const),
             versionName: info.versionName,
-            sizeLabel: formatBytes(info.sizeBytes),
-            fileUrl: exeDownloadUrl(info),
+            sizeLabel: formatBytes(info.zipSizeBytes ?? info.sizeBytes),
+            fileUrl: windowsDownloadUrl(info),
             changelog: info.changelog,
           }));
 
     request
       .then((data) => {
         if (cancelled) return;
-        setRelease({ state: 'ready', format: formatFor(os), ...data });
+        setRelease({ state: 'ready', ...data });
       })
       .catch((error: unknown) => {
         if (cancelled) return;

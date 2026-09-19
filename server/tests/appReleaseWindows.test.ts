@@ -16,9 +16,13 @@ const EXE_BODY = Buffer.from('MZ не настоящий exe, но байты т
 const EXE_SHA256 = createHash('sha256').update(EXE_BODY).digest('hex');
 const EXE_FILE = 'Qwill-Setup-test.exe';
 
+const ZIP_BODY = Buffer.from('PK не настоящий архив, но длина своя');
+const ZIP_FILE = 'Qwill-Setup-test.zip';
+
 const windowsDir = path.join(env.appReleaseDir, 'windows');
 const manifestFile = path.join(env.appReleaseDir, APP_RELEASE_WINDOWS_MANIFEST_FILE);
 const exeFile = path.join(windowsDir, EXE_FILE);
+const zipFile = path.join(windowsDir, ZIP_FILE);
 
 let hadManifest = false;
 let previousManifest: Buffer | null = null;
@@ -38,6 +42,7 @@ beforeAll(async () => {
   previousManifest = await fs.readFile(manifestFile).catch(() => null);
   hadManifest = previousManifest !== null;
   await fs.writeFile(exeFile, EXE_BODY);
+  await fs.writeFile(zipFile, ZIP_BODY);
 });
 
 afterEach(async () => {
@@ -46,6 +51,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await fs.rm(exeFile, { force: true });
+  await fs.rm(zipFile, { force: true });
   resetWindowsReleaseCache();
   if (hadManifest && previousManifest) {
     await fs.writeFile(manifestFile, previousManifest);
@@ -68,14 +74,49 @@ describe('GET /api/app/win/version', () => {
     const res = await request.get('/api/app/win/version');
 
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body).sort()).toEqual(['changelog', 'exeUrl', 'sha256', 'sizeBytes', 'versionName'].sort());
+    expect(Object.keys(res.body).sort()).toEqual(
+      ['changelog', 'exeUrl', 'sha256', 'sizeBytes', 'versionName', 'zipSizeBytes', 'zipUrl'].sort(),
+    );
     expect(res.body).toMatchObject({
       versionName: '1.0.0',
       exeUrl: `${WINDOWS_RELEASE_BASE_PATH}/${EXE_FILE}`,
       sizeBytes: EXE_BODY.length,
+      zipUrl: null,
+      zipSizeBytes: null,
       sha256: EXE_SHA256,
       changelog: ['Первый выпуск десктопного приложения'],
     });
+  });
+
+  it('отдаёт адрес и размер архива, когда он назван в манифесте', async () => {
+    await writeManifest({ ...VALID_MANIFEST, zipFile: ZIP_FILE });
+
+    const res = await request.get('/api/app/win/version');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      exeUrl: `${WINDOWS_RELEASE_BASE_PATH}/${EXE_FILE}`,
+      sizeBytes: EXE_BODY.length,
+      zipUrl: `${WINDOWS_RELEASE_BASE_PATH}/${ZIP_FILE}`,
+      zipSizeBytes: ZIP_BODY.length,
+    });
+  });
+
+  it('продолжает раздавать .exe, если архив назван, но его нет на диске', async () => {
+    await writeManifest({ ...VALID_MANIFEST, zipFile: 'Qwill-Setup-missing.zip' });
+
+    const res = await request.get('/api/app/win/version');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ zipUrl: null, zipSizeBytes: null });
+  });
+
+  it('отвечает 404 на архив с путём внутри имени', async () => {
+    await writeManifest({ ...VALID_MANIFEST, zipFile: '../windows.json' });
+
+    const res = await request.get('/api/app/win/version');
+
+    expect(res.status).toBe(404);
   });
 
   it('отдаёт заголовок no-store', async () => {

@@ -44,6 +44,12 @@ export const windowsReleaseManifestSchema = z.object({
     .trim()
     .min(1)
     .regex(/^[\w.-]+\.exe$/, 'exeFile — имя файла рядом с манифестом, без путей'),
+  zipFile: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[\w.-]+\.zip$/, 'zipFile — имя файла рядом с манифестом, без путей')
+    .optional(),
   sha256: z
     .string()
     .trim()
@@ -58,6 +64,8 @@ export interface WindowsVersionInfo {
   versionName: string;
   exeUrl: string;
   sizeBytes: number;
+  zipUrl: string | null;
+  zipSizeBytes: number | null;
   sha256: string;
   changelog: string[];
 }
