@@ -86,6 +86,7 @@ export function LaptopShell({ children }: LaptopShellProps) {
             <span className={styles.notch} />
             <span className={styles.glare} />
           </div>
+          <span className={styles.bezelRing} />
         </div>
         <span className={styles.edge} />
       </div>

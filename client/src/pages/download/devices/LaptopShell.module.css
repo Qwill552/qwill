@@ -124,6 +124,14 @@
   background: var(--device-bezel);
 }
 
+.bezelRing {
+  position: absolute;
+  inset: 0;
+  border: var(--laptop-bezel-black) solid var(--device-bezel);
+  border-radius: var(--laptop-radius-bezel);
+  pointer-events: none;
+}
+
 .screen {
   position: absolute;
   inset: var(--laptop-bezel-black);
@@ -131,6 +139,7 @@
   overflow: hidden;
   border-radius: var(--laptop-radius-screen);
   background: var(--device-screen-bg);
+  clip-path: inset(0 round var(--laptop-radius-screen));
   font-size: var(--laptop-screen-font-size);
   contain: paint;
   touch-action: none;

@@ -51,6 +51,7 @@ export function PhoneShell({ children }: PhoneShellProps) {
             <span className={styles.punch} />
             <span className={styles.glare} />
           </div>
+          <span className={styles.bezelRing} />
         </div>
         <span className={styles.edge} />
       </div>

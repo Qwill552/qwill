@@ -53,6 +53,14 @@
   background: var(--device-bezel);
 }
 
+.bezelRing {
+  position: absolute;
+  inset: 0;
+  border: var(--phone-bezel-black) solid var(--device-bezel);
+  border-radius: var(--phone-radius-bezel);
+  pointer-events: none;
+}
+
 .screen {
   position: absolute;
   inset: var(--phone-bezel-black);
@@ -60,6 +68,7 @@
   overflow: hidden;
   border-radius: var(--phone-radius-screen);
   background: var(--device-screen-bg);
+  clip-path: inset(0 round var(--phone-radius-screen));
   font-size: var(--phone-screen-font-size);
   contain: paint;
   touch-action: none;
