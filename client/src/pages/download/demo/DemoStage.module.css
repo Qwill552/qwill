@@ -4,22 +4,72 @@
   width: 100%;
 }
 
+.reserve {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
 .frame {
   position: relative;
 }
 
-.stage {
-  position: relative;
-  width: calc(var(--demo-body-width) * var(--demo-scale));
-  height: calc(var(--demo-body-height) * var(--demo-scale));
+.slots {
+  position: absolute;
+  inset: 0;
 }
 
-.scaled {
+.slot {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--demo-body-width);
-  height: var(--demo-body-height);
-  transform: scale(var(--demo-scale));
-  transform-origin: top left;
+  top: 50%;
+  left: 50%;
+  width: var(--slot-width);
+  height: var(--slot-height);
+  transform: translate(-50%, -50%) scale(var(--slot-scale));
+}
+
+.fade {
+  width: 100%;
+  height: 100%;
+}
+
+.enter {
+  animation: deviceEnter var(--dur-screen) var(--ease-screen) both;
+  will-change: transform, opacity;
+}
+
+.leave {
+  animation: deviceLeave var(--dur-screen) var(--ease-close) both;
+  will-change: transform, opacity;
+}
+
+@keyframes deviceEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes deviceLeave {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.laptopWallpaper {
+  width: 100%;
+  height: 100%;
+  background: var(--wallpaper-default);
 }

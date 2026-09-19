@@ -14,17 +14,18 @@
   align-items: center;
   gap: var(--space-6);
   width: 100%;
+}
+
+.narrow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
   max-width: var(--page-max-width);
 }
 
-.demoStub {
-  display: grid;
-  place-items: center;
-  width: min(100%, var(--demo-stub-max-width));
-  border: 1px solid var(--demo-border);
-  border-radius: var(--radius-card);
-  background: var(--demo-bg);
-  color: var(--text-secondary);
-  font-size: var(--font-meta);
-  text-align: center;
+.demo {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: var(--demo-max-width);
 }

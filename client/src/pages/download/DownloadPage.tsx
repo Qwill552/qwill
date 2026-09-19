@@ -1,5 +1,3 @@
-import { PHONE_LOGICAL } from './config';
-import { CONTENT } from './content';
 import { DemoStage } from './demo/DemoStage';
 import { DownloadButton } from './download-button/DownloadButton';
 import styles from './DownloadPage.module.css';
@@ -17,21 +15,21 @@ export function DownloadPage() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        <PageHeader />
-        <OsSwitch os={os} onChange={setOs} />
-        {os === 'android' ? (
-          <DemoStage />
-        ) : (
-          <div
-            className={styles.demoStub}
-            style={{ aspectRatio: `${PHONE_LOGICAL.width} / ${PHONE_LOGICAL.height}` }}
-            aria-hidden="true"
-          >
-            {CONTENT.demoPlaceholder}
-          </div>
-        )}
-        <DownloadButton release={release} />
-        <ReleaseInfo os={os} release={release} />
+        <div className={styles.narrow}>
+          <PageHeader />
+        </div>
+        <div className={styles.narrow}>
+          <OsSwitch os={os} onChange={setOs} />
+        </div>
+        <div className={styles.demo}>
+          <DemoStage os={os} />
+        </div>
+        <div className={styles.narrow}>
+          <DownloadButton release={release} />
+        </div>
+        <div className={styles.narrow}>
+          <ReleaseInfo os={os} release={release} />
+        </div>
       </div>
     </div>
   );

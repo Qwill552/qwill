@@ -34,9 +34,25 @@
   --device-shadow: 0 40px 80px -24px rgb(28 32 45 / 34%), 0 12px 28px -12px rgb(28 32 45 / 20%);
   --device-screen-bg: var(--bg);
 
+  --device-lid:
+    linear-gradient(168deg, #e4e6ea 0%, #cdd0d6 20%, #bdc0c8 52%, #c7cad0 84%, #dee0e5 100%);
+  --device-lid-edge: #eef0f3;
+  --device-deck: linear-gradient(#a7aab2 0%, #bbbec5 20%, #c6c9cf 58%, #cacdd3 100%);
+  --device-well: #1b1d22;
+  --device-key-face: linear-gradient(#41454d, #35383f);
+  --device-key-gap-clear: rgb(14 15 18 / 0%);
+  --device-key-gap-ink: rgb(14 15 18 / 72%);
+  --device-trackpad: linear-gradient(#cfd2d8, #c3c6cc);
+  --device-trackpad-edge: #a7aab2;
+  --device-front: linear-gradient(#d2d5db 0%, #c1c4cb 52%, #9ea1a9 100%);
+  --device-recess: #7e818a;
+  --device-shadow-laptop:
+    0 30px 70px -22px rgb(28 32 45 / 34%), 0 10px 26px -12px rgb(28 32 45 / 22%);
+
+  --demo-max-width: 1200px;
+
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
-  --demo-stub-max-width: 260px;
 
   --page-button-lift: var(--card-shadow);
   --page-press-translate: 4px;
@@ -80,9 +96,25 @@
   --device-shadow: 0 40px 80px -24px rgb(0 0 0 / 66%), 0 12px 28px -12px rgb(0 0 0 / 48%);
   --device-screen-bg: var(--bg);
 
+  --device-lid:
+    linear-gradient(168deg, #e4e6ea 0%, #cdd0d6 20%, #bdc0c8 52%, #c7cad0 84%, #dee0e5 100%);
+  --device-lid-edge: #eef0f3;
+  --device-deck: linear-gradient(#a7aab2 0%, #bbbec5 20%, #c6c9cf 58%, #cacdd3 100%);
+  --device-well: #1b1d22;
+  --device-key-face: linear-gradient(#41454d, #35383f);
+  --device-key-gap-clear: rgb(14 15 18 / 0%);
+  --device-key-gap-ink: rgb(14 15 18 / 72%);
+  --device-trackpad: linear-gradient(#cfd2d8, #c3c6cc);
+  --device-trackpad-edge: #a7aab2;
+  --device-front: linear-gradient(#d2d5db 0%, #c1c4cb 52%, #9ea1a9 100%);
+  --device-recess: #7e818a;
+  --device-shadow-laptop:
+    0 30px 70px -22px rgb(0 0 0 / 66%), 0 10px 26px -12px rgb(0 0 0 / 48%);
+
+  --demo-max-width: 1200px;
+
   --demo-bg: var(--surface-2);
   --demo-border: var(--border);
-  --demo-stub-max-width: 260px;
 
   --page-button-lift: var(--card-shadow);
   --page-press-translate: 4px;
@@ -98,8 +130,7 @@
   :root[data-theme='dark'],
   [data-theme='dark'] {
     --page-max-width: 480px;
-    --demo-stub-max-width: 300px;
-    --header-logo-size: 64px;
+      --header-logo-size: 64px;
     --header-brand-gap: var(--space-4);
     --header-title-size: 2em;
     --header-subtitle-size: 1.06em;
@@ -113,7 +144,6 @@
   :root[data-theme='dark'],
   [data-theme='dark'] {
     --page-max-width: 640px;
-    --demo-stub-max-width: 340px;
     --header-logo-size: 88px;
     --header-brand-gap: var(--space-5);
     --header-title-size: 2.6em;

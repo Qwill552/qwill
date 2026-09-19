@@ -1,0 +1,164 @@
+.laptop {
+  position: relative;
+  width: var(--laptop-body-width);
+  height: var(--laptop-body-height);
+}
+
+.shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: var(--laptop-shadow-width);
+  height: var(--laptop-shadow-height);
+  margin-left: calc(var(--laptop-shadow-width) / -2);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--device-shadow-laptop);
+  pointer-events: none;
+}
+
+.base {
+  position: absolute;
+  top: var(--laptop-lid-height);
+  left: 50%;
+  width: var(--laptop-base-width);
+  height: var(--laptop-base-depth);
+  margin-left: calc(var(--laptop-base-width) / -2);
+  border-radius: var(--laptop-base-radius);
+  background: var(--device-deck);
+  transform: perspective(var(--laptop-perspective)) rotateX(var(--laptop-tilt));
+  transform-origin: top center;
+}
+
+.well {
+  position: absolute;
+  top: var(--laptop-keys-top);
+  right: var(--laptop-keys-inset);
+  left: var(--laptop-keys-inset);
+  height: var(--laptop-keys-height);
+  border-radius: var(--laptop-keys-radius);
+  background: var(--device-well);
+}
+
+.keys {
+  position: absolute;
+  inset: var(--laptop-keys-padding);
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--device-key-gap-clear) 0,
+      var(--device-key-gap-clear)
+        calc(var(--laptop-key-pitch-x) - var(--laptop-key-gap) - var(--laptop-key-feather)),
+      var(--device-key-gap-ink)
+        calc(var(--laptop-key-pitch-x) - var(--laptop-key-gap) + var(--laptop-key-feather)),
+      var(--device-key-gap-ink) var(--laptop-key-pitch-x)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--device-key-gap-clear) 0,
+      var(--device-key-gap-clear)
+        calc(var(--laptop-key-pitch-y) - var(--laptop-key-gap) - var(--laptop-key-feather)),
+      var(--device-key-gap-ink)
+        calc(var(--laptop-key-pitch-y) - var(--laptop-key-gap) + var(--laptop-key-feather)),
+      var(--device-key-gap-ink) var(--laptop-key-pitch-y)
+    ),
+    var(--device-key-face);
+}
+
+.trackpad {
+  position: absolute;
+  top: var(--laptop-trackpad-top);
+  left: 50%;
+  width: var(--laptop-trackpad-width);
+  height: var(--laptop-trackpad-height);
+  margin-left: calc(var(--laptop-trackpad-width) / -2);
+  border: 1px solid var(--device-trackpad-edge);
+  border-radius: var(--laptop-trackpad-radius);
+  background: var(--device-trackpad);
+}
+
+.front {
+  position: absolute;
+  top: calc(var(--laptop-lid-height) + var(--laptop-base-visible-depth));
+  left: 50%;
+  width: var(--laptop-front-width);
+  height: var(--laptop-front-height);
+  margin-left: calc(var(--laptop-front-width) / -2);
+  border-radius: 0 0 var(--laptop-front-radius) var(--laptop-front-radius);
+  background: var(--device-front);
+}
+
+.finger {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--laptop-finger-width);
+  height: var(--laptop-finger-height);
+  margin-left: calc(var(--laptop-finger-width) / -2);
+  border-radius: 0 0 var(--radius-pill) var(--radius-pill);
+  background: var(--device-recess);
+}
+
+.lid {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--laptop-lid-width);
+  height: var(--laptop-lid-height);
+  margin-left: calc(var(--laptop-lid-width) / -2);
+  border-radius: var(--laptop-radius-lid);
+  background: var(--device-lid);
+}
+
+.edge {
+  position: absolute;
+  inset: 0;
+  border: var(--laptop-edge-width) solid var(--device-lid-edge);
+  border-radius: var(--laptop-radius-lid);
+  pointer-events: none;
+}
+
+.bezel {
+  position: absolute;
+  inset: var(--laptop-bezel-metal);
+  border-radius: var(--laptop-radius-bezel);
+  background: var(--device-bezel);
+}
+
+.screen {
+  position: absolute;
+  inset: var(--laptop-bezel-black);
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--laptop-radius-screen);
+  background: var(--device-screen-bg);
+  font-size: var(--laptop-screen-font-size);
+  contain: paint;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.screenContent {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--laptop-notch-width);
+  height: var(--laptop-notch-height);
+  margin-left: calc(var(--laptop-notch-width) / -2);
+  border-radius: 0 0 var(--laptop-notch-radius) var(--laptop-notch-radius);
+  background: var(--device-bezel);
+  pointer-events: none;
+}
+
+.glare {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--laptop-radius-screen);
+  background: var(--device-glare);
+  pointer-events: none;
+}

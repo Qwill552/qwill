@@ -79,3 +79,94 @@ export const SCENARIO_SWITCH = {
   buttonSize: 44,
   gap: 16,
 } as const;
+
+export const LAPTOP_LOGICAL = {
+  width: 1280,
+  height: 800,
+} as const;
+
+export const LAPTOP_BEZEL = {
+  metal: 6,
+  black: 14,
+} as const;
+
+const LAPTOP_FRAME = LAPTOP_BEZEL.metal + LAPTOP_BEZEL.black;
+
+export const LAPTOP_LID = {
+  width: LAPTOP_LOGICAL.width + LAPTOP_FRAME * 2,
+  height: LAPTOP_LOGICAL.height + LAPTOP_FRAME * 2,
+} as const;
+
+export const LAPTOP_RADIUS_SCREEN = 28;
+export const LAPTOP_RADIUS_BEZEL = LAPTOP_RADIUS_SCREEN + LAPTOP_BEZEL.black;
+export const LAPTOP_RADIUS_LID = LAPTOP_RADIUS_BEZEL + LAPTOP_BEZEL.metal;
+
+export const LAPTOP_EDGE_WIDTH = 1.5;
+
+export const LAPTOP_NOTCH = {
+  width: 150,
+  height: 32,
+  radius: 14,
+} as const;
+
+const LAPTOP_TILT_DEG = 76;
+const LAPTOP_PERSPECTIVE = 11000;
+const LAPTOP_BASE_DEPTH = 900;
+
+const laptopTiltRad = (LAPTOP_TILT_DEG * Math.PI) / 180;
+const laptopFrontScale =
+  LAPTOP_PERSPECTIVE / (LAPTOP_PERSPECTIVE - LAPTOP_BASE_DEPTH * Math.sin(laptopTiltRad));
+
+export const LAPTOP_BASE = {
+  width: LAPTOP_LID.width,
+  depth: LAPTOP_BASE_DEPTH,
+  tiltDeg: LAPTOP_TILT_DEG,
+  perspective: LAPTOP_PERSPECTIVE,
+  radius: 14,
+  visibleDepth: Math.round(LAPTOP_BASE_DEPTH * Math.cos(laptopTiltRad) * laptopFrontScale),
+  frontWidth: Math.round(LAPTOP_LID.width * laptopFrontScale),
+  frontHeight: 24,
+  frontRadius: 12,
+} as const;
+
+export const LAPTOP_FINGER_NOTCH = {
+  width: 190,
+  height: 13,
+} as const;
+
+export const LAPTOP_KEYS = {
+  inset: 133,
+  top: 70,
+  height: 400,
+  radius: 18,
+  padding: 14,
+  pitchX: 68.4,
+  pitchY: 62,
+  gap: 9,
+  feather: 2,
+} as const;
+
+export const LAPTOP_TRACKPAD = {
+  width: 520,
+  height: 330,
+  top: 510,
+  radius: 14,
+} as const;
+
+export const LAPTOP_BODY = {
+  width: LAPTOP_BASE.frontWidth,
+  height: LAPTOP_LID.height + LAPTOP_BASE.visibleDepth + LAPTOP_BASE.frontHeight,
+} as const;
+
+export const LAPTOP_SHADOW = {
+  width: Math.round(LAPTOP_BASE.frontWidth * 0.88),
+  height: 56,
+} as const;
+
+export const LAPTOP_SCREEN_FONT_SIZE = 16;
+
+export const LAPTOP_SCALE = {
+  max: 1,
+  min: 0.16,
+  heightRatio: 0.86,
+} as const;
