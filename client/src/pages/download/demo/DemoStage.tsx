@@ -33,6 +33,10 @@ const DESKTOP_SCENARIOS = [DESKTOP_EVERYDAY_SCENARIO];
 
 const store = createDemoStore(SCENARIOS[0]!);
 
+if (typeof window !== 'undefined') {
+  Object.assign(window, { __downloadDemoTest: store.readForTests });
+}
+
 const laptopStore = createDemoStore(DESKTOP_SCENARIOS[0]!);
 
 const screenStore = createDemoStore(DESKTOP_SCENARIOS[0]!);

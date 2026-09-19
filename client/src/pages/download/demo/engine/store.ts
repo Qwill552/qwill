@@ -51,6 +51,11 @@ interface BoundSurface {
 
 export type DemoReadout = (node: HTMLElement | null) => void;
 
+export interface DemoTestSnapshot {
+  scenarioMs: number;
+  deviation: number;
+}
+
 export interface DemoStore {
   subscribe(listener: () => void): () => void;
   snapshot(): ReplicaState;
@@ -60,6 +65,7 @@ export interface DemoStore {
   override<K extends DiscreteChannel>(channel: K, value: ReplicaState[K]): void;
   setScenario(scenario: Scenario): void;
   mount(root: HTMLElement): () => void;
+  readForTests(channel: ScrollChannel): DemoTestSnapshot;
 }
 
 const READOUT_TEXT: Record<ReadoutChannel, (value: number, state: ReplicaState) => string> = {
@@ -362,6 +368,10 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     };
   }
 
+  function readForTests(channel: ScrollChannel): DemoTestSnapshot {
+    return { scenarioMs, deviation: deviationOf(channel).offset };
+  }
+
   return {
     subscribe: (listener) => {
       listeners.add(listener);
@@ -374,5 +384,6 @@ export function createDemoStore(initialScenario: Scenario): DemoStore {
     override,
     setScenario,
     mount,
+    readForTests,
   };
 }
