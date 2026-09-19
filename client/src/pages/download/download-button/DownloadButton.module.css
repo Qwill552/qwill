@@ -46,7 +46,7 @@
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--text-on-primary);
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
@@ -65,16 +65,11 @@
 .meta {
   display: block;
   font-size: var(--font-meta);
-  opacity: 0.85;
-}
-
-.button.disabled .meta {
-  opacity: 1;
 }
 
 .notice {
   margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
+  color: var(--page-text-subtle);
   font-size: var(--font-meta);
   text-align: center;
 }

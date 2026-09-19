@@ -96,7 +96,7 @@
   right: 0;
   left: 0;
   padding: 0 10px calc(96px + var(--safe-bottom));
-  will-change: transform;
+  will-change: var(--demo-will-change);
 }
 
 .row {

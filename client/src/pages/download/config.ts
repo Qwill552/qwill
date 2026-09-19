@@ -15,9 +15,12 @@ export const PHONE_BEZEL = {
 
 const PHONE_FRAME = PHONE_BEZEL.metal + PHONE_BEZEL.black;
 
+export const PHONE_BUTTON_PROTRUSION = 3;
+
 export const PHONE_BODY = {
   width: PHONE_LOGICAL.width + PHONE_FRAME * 2,
   height: PHONE_LOGICAL.height + PHONE_FRAME * 2,
+  bleed: PHONE_BUTTON_PROTRUSION,
 } as const;
 
 export const PHONE_RADIUS_SCREEN = 56;
@@ -32,7 +35,7 @@ export const PHONE_PUNCH_HOLE = {
 } as const;
 
 export const PHONE_BUTTONS = {
-  protrusion: 3,
+  protrusion: PHONE_BUTTON_PROTRUSION,
   radius: 2,
   power: { top: 226, height: 62 },
   volume: { top: 316, height: 112 },
@@ -44,6 +47,10 @@ export const DEMO_SCALE = {
   max: 1,
   min: 0.3,
   heightRatio: 0.78,
+} as const;
+
+export const DEMO_FIT = {
+  minFitHeight: 520,
 } as const;
 
 export const DEMO_CLOCK = {
@@ -188,6 +195,7 @@ export const LAPTOP_TRACKPAD = {
 export const LAPTOP_BODY = {
   width: LAPTOP_BASE.frontWidth,
   height: LAPTOP_LID.height + LAPTOP_BASE.visibleDepth + LAPTOP_BASE.frontHeight,
+  bleed: 0,
 } as const;
 
 export const LAPTOP_SHADOW = {

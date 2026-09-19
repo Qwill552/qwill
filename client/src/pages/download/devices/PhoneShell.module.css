@@ -78,7 +78,6 @@
 .screenContent {
   position: absolute;
   inset: 0;
-  will-change: transform;
 }
 
 .punch {

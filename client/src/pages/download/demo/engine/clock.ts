@@ -4,9 +4,11 @@ export type FrameTick = (dtMs: number, nowMs: number) => void;
 
 const ticks = new Set<FrameTick>();
 const onScreen = new Set<Element>();
+const runListeners = new Set<(running: boolean) => void>();
 
 let frame = 0;
 let lastMs = 0;
+let running = false;
 let intersections: IntersectionObserver | null = null;
 let watchingVisibility = false;
 
@@ -24,15 +26,25 @@ function step(nowMs: number): void {
 }
 
 function sync(): void {
-  if (shouldRun() && frame === 0) {
+  const next = shouldRun();
+  if (next && frame === 0) {
     lastMs = performance.now();
     frame = requestAnimationFrame(step);
-    return;
-  }
-  if (!shouldRun() && frame !== 0) {
+  } else if (!next && frame !== 0) {
     cancelAnimationFrame(frame);
     frame = 0;
   }
+  if (next === running) return;
+  running = next;
+  for (const listener of runListeners) listener(running);
+}
+
+export function whileRunning(listener: (running: boolean) => void): () => void {
+  runListeners.add(listener);
+  listener(running);
+  return () => {
+    runListeners.delete(listener);
+  };
 }
 
 function watchVisibility(): void {

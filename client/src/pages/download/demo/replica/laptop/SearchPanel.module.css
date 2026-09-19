@@ -116,3 +116,9 @@
   font-size: var(--font-meta);
   font-weight: 600;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}

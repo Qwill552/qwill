@@ -16,7 +16,7 @@
   position: absolute;
   overflow: hidden;
   inset: 0;
-  will-change: transform;
+  will-change: var(--demo-will-change);
 }
 
 .root {

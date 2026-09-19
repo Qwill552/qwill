@@ -5,6 +5,8 @@
   --page-max-width: 400px;
   --page-padding-inline: var(--space-4);
   --page-padding-block: var(--space-6);
+  --page-text-subtle: #5c6377;
+  --page-text-muted: #676d7e;
 
   --header-logo-size: 48px;
   --header-brand-gap: var(--space-3);
@@ -65,6 +67,8 @@
   --page-max-width: 400px;
   --page-padding-inline: var(--space-4);
   --page-padding-block: var(--space-6);
+  --page-text-subtle: #9096a8;
+  --page-text-muted: #737a8e;
 
   --header-logo-size: 48px;
   --header-brand-gap: var(--space-3);
@@ -126,7 +130,7 @@
   :root[data-theme='dark'],
   [data-theme='dark'] {
     --page-max-width: 480px;
-      --header-logo-size: 64px;
+    --header-logo-size: 64px;
     --header-brand-gap: var(--space-4);
     --header-title-size: 2em;
     --header-subtitle-size: 1.06em;
@@ -332,4 +336,14 @@
   --replica-logo-tile-br: #101124;
   --replica-logo-tile-spread: 62%;
   --replica-logo-tile-inset: 18%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :root[data-theme='light'],
+  [data-theme='light'],
+  :root[data-theme='dark'],
+  [data-theme='dark'] {
+    --release-info-content-delay: 0ms;
+  }
 }

@@ -153,3 +153,9 @@
     animation: none;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
