@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +49,15 @@ async function readElectronVersion() {
   return manifest.version;
 }
 
+async function dropStaleChannelManifests() {
+  const present = await readdir(outputDir).catch(() => []);
+  for (const name of present) {
+    if (/^[a-z][a-z0-9-]*\.yml$/.test(name) && name !== 'builder-debug.yml') {
+      await rm(path.join(outputDir, name), { force: true });
+    }
+  }
+}
+
 async function copyArtifacts(version) {
   await mkdir(releaseDir, { recursive: true });
 
@@ -57,6 +66,12 @@ async function copyArtifacts(version) {
   const missing = wanted.filter((name) => !present.has(name));
   if (missing.length > 0) {
     console.error(`electron-builder не создал: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  const manifest = await readFile(path.join(outputDir, 'latest.yml'), 'utf8');
+  if (!new RegExp(`^version: ${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(manifest)) {
+    console.error(`latest.yml описывает не ${version}:\n${manifest}`);
     process.exit(1);
   }
 
@@ -82,6 +97,7 @@ console.log(
 );
 
 run('node', [path.join(here, 'build.mjs')], repoRoot);
+await dropStaleChannelManifests();
 run(
   'npx',
   [
@@ -91,6 +107,7 @@ run(
     'never',
     `-c.electronVersion=${electronVersion}`,
     `-c.publish.url=${apiUrl}/api/app/win`,
+    '-c.publish.channel=latest',
   ],
   desktopDir,
 );
