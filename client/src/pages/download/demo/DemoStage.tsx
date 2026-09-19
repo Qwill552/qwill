@@ -33,6 +33,8 @@ const store = createDemoStore(SCENARIOS[0]!);
 
 const laptopStore = createDemoStore(DESKTOP_SCENARIOS[0]!);
 
+const screenStore = createDemoStore(DESKTOP_SCENARIOS[0]!);
+
 const SWITCHABLE = SCENARIOS.length > 1;
 
 const RESERVED_WIDTH = SWITCHABLE ? SCENARIO_SWITCH.buttonSize + SCENARIO_SWITCH.gap : 0;
@@ -133,10 +135,11 @@ export function DemoStage({ os }: { os: OsChoice }) {
   }
 
   function renderDevice(target: DemoDevice) {
-    if (target === 'laptop') {
+    if (target === 'laptop' || target === 'screen') {
+      const bare = target === 'screen';
       return (
-        <LaptopShell>
-          <LaptopDemo store={laptopStore} />
+        <LaptopShell bare={bare}>
+          <LaptopDemo store={bare ? screenStore : laptopStore} />
         </LaptopShell>
       );
     }
@@ -153,13 +156,11 @@ export function DemoStage({ os }: { os: OsChoice }) {
 
   const shownBody = bodyOf(shownDevice);
   const shownScale = scaleOf(fit, shownDevice);
+  const inPlay: DemoDevice[] = leavingDevice === null ? [shownDevice] : [shownDevice, leavingDevice];
 
   return (
     <div ref={hostRef} className={styles.host}>
-      <div
-        className={styles.reserve}
-        style={{ height: `${reserveHeight(fit, metrics.viewportWidth)}px` }}
-      >
+      <div className={styles.reserve} style={{ height: `${reserveHeight(fit, inPlay)}px` }}>
         <div
           className={styles.frame}
           style={{

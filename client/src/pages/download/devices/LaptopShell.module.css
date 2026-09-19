@@ -159,6 +159,7 @@
 .screenContent {
   position: absolute;
   inset: 0;
+  isolation: isolate;
 }
 
 .glare {

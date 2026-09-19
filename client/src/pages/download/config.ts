@@ -102,6 +102,7 @@ const LAPTOP_FRAME = LAPTOP_BEZEL.metal + LAPTOP_BEZEL.black;
 export const LAPTOP_LID = {
   width: LAPTOP_LOGICAL.width + LAPTOP_FRAME * 2,
   height: LAPTOP_LOGICAL.height + LAPTOP_FRAME * 2,
+  bleed: 0,
 } as const;
 
 export const LAPTOP_RADIUS_SCREEN = 28;

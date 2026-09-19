@@ -19,16 +19,17 @@ import {
 import styles from './LaptopShell.module.css';
 
 interface LaptopShellProps {
+  bare?: boolean;
   children: ReactNode;
 }
 
-export function LaptopShell({ children }: LaptopShellProps) {
+export function LaptopShell({ bare = false, children }: LaptopShellProps) {
   return (
     <div
       className={styles.laptop}
       style={{
-        ['--laptop-body-width' as string]: `${LAPTOP_BODY.width}px`,
-        ['--laptop-body-height' as string]: `${LAPTOP_BODY.height}px`,
+        ['--laptop-body-width' as string]: `${bare ? LAPTOP_LID.width : LAPTOP_BODY.width}px`,
+        ['--laptop-body-height' as string]: `${bare ? LAPTOP_LID.height : LAPTOP_BODY.height}px`,
         ['--laptop-lid-width' as string]: `${LAPTOP_LID.width}px`,
         ['--laptop-lid-height' as string]: `${LAPTOP_LID.height}px`,
         ['--laptop-bezel-metal' as string]: `${LAPTOP_BEZEL.metal}px`,
@@ -67,38 +68,42 @@ export function LaptopShell({ children }: LaptopShellProps) {
       }}
     >
       <span className={styles.shadow} />
-      <div className={styles.base}>
-        <span className={styles.well}>
-          <span className={styles.keys}>
-            {LAPTOP_KEY_ROWS.map((row, rowIndex) => (
-              <span
-                key={rowIndex}
-                className={styles.keyRow}
-                style={{ ['--laptop-key-rows' as string]: row.height }}
-              >
-                {row.keys.map((units, keyIndex) =>
-                  units === 'stack' ? (
-                    <span key={keyIndex} className={styles.keyStack}>
-                      <span className={styles.key} />
-                      <span className={styles.key} />
-                    </span>
-                  ) : (
-                    <span
-                      key={keyIndex}
-                      className={styles.key}
-                      style={{ ['--laptop-key-units' as string]: units }}
-                    />
-                  ),
-                )}
+      {!bare && (
+        <>
+          <div className={styles.base}>
+            <span className={styles.well}>
+              <span className={styles.keys}>
+                {LAPTOP_KEY_ROWS.map((row, rowIndex) => (
+                  <span
+                    key={rowIndex}
+                    className={styles.keyRow}
+                    style={{ ['--laptop-key-rows' as string]: row.height }}
+                  >
+                    {row.keys.map((units, keyIndex) =>
+                      units === 'stack' ? (
+                        <span key={keyIndex} className={styles.keyStack}>
+                          <span className={styles.key} />
+                          <span className={styles.key} />
+                        </span>
+                      ) : (
+                        <span
+                          key={keyIndex}
+                          className={styles.key}
+                          style={{ ['--laptop-key-units' as string]: units }}
+                        />
+                      ),
+                    )}
+                  </span>
+                ))}
               </span>
-            ))}
+            </span>
+            <span className={styles.trackpad} />
+          </div>
+          <span className={styles.front}>
+            <span className={styles.finger} />
           </span>
-        </span>
-        <span className={styles.trackpad} />
-      </div>
-      <span className={styles.front}>
-        <span className={styles.finger} />
-      </span>
+        </>
+      )}
       <div className={styles.lid}>
         <div className={styles.bezel}>
           <div className={styles.screen}>

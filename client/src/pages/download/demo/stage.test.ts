@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEMO_FIT, DEMO_SCALE, LAPTOP_BODY, LAPTOP_SCALE, PHONE_BODY } from '../config';
+import {
+  DEMO_FIT,
+  DEMO_SCALE,
+  LAPTOP_BODY,
+  LAPTOP_LID,
+  LAPTOP_SCALE,
+  PHONE_BODY,
+} from '../config';
 import {
   bodyOf,
   deviceFor,
@@ -35,14 +42,23 @@ describe('какое устройство показываем', () => {
   });
 
   it('в режиме Windows ноутбук только от 700 и шире', () => {
-    expect(deviceFor('windows', 699)).toBe('phone');
     expect(deviceFor('windows', 700)).toBe('laptop');
     expect(deviceFor('windows', 1920)).toBe('laptop');
   });
 
-  it('на узком экране места под ноутбук не резервируется', () => {
-    expect(reachableDevices(360)).toEqual(['phone']);
+  it('на узком экране Windows показывает широкий экран, а не телефон', () => {
+    expect(deviceFor('windows', 320)).toBe('screen');
+    expect(deviceFor('windows', 699)).toBe('screen');
+  });
+
+  it('телефон на узком экране показывается только в режиме Android', () => {
+    expect(reachableDevices(360)).toEqual(['phone', 'screen']);
     expect(reachableDevices(1024)).toEqual(['phone', 'laptop']);
+  });
+
+  it('широкий экран — это крышка без основания и клавиатуры', () => {
+    expect(bodyOf('screen')).toBe(LAPTOP_LID);
+    expect(bodyOf('screen').height).toBeLessThan(bodyOf('laptop').height);
   });
 });
 
@@ -64,7 +80,7 @@ describe('устройство не вылезает за край', () => {
   });
 
   it('выступ кнопок телефона учтён в ширине сцены', () => {
-    const fit = { phone: 1, laptop: 1 };
+    const fit = { phone: 1, laptop: 1, screen: 1 };
     expect(stageWidth(fit, 'phone')).toBe(PHONE_BODY.width + PHONE_BODY.bleed * 2);
   });
 });
@@ -79,6 +95,7 @@ describe('низкий экран', () => {
     const low = fitStage(metricsFor(1280, DEMO_FIT.minFitHeight - 1), 0);
     expect(low.phone).toBe(DEMO_SCALE.max);
     expect(low.laptop).toBe(milli(DEMO_MAX_WIDTH / LAPTOP_BODY.width));
+    expect(low.screen).toBe(milli(DEMO_MAX_WIDTH / LAPTOP_LID.width));
   });
 
   it('у самого порога скачка нет', () => {
@@ -90,18 +107,19 @@ describe('низкий экран', () => {
 });
 
 describe('высота, отведённая под сцену', () => {
-  it('на широком экране накрывает оба устройства', () => {
-    const metrics = metricsFor(1280, 900);
-    const fit = fitStage(metrics, 0);
-    const reserved = reserveHeight(fit, metrics.viewportWidth);
-    expect(reserved).toBeGreaterThanOrEqual(PHONE_BODY.height * fit.phone);
-    expect(reserved).toBeGreaterThanOrEqual(LAPTOP_BODY.height * fit.laptop);
-  });
-
-  it('на узком экране равна высоте телефона', () => {
+  it('в покое равна высоте показанного устройства', () => {
     const metrics = metricsFor(360, 800);
     const fit = fitStage(metrics, 0);
-    expect(reserveHeight(fit, metrics.viewportWidth)).toBe(PHONE_BODY.height * fit.phone);
+    expect(reserveHeight(fit, ['phone'])).toBe(PHONE_BODY.height * fit.phone);
+    expect(reserveHeight(fit, ['screen'])).toBe(LAPTOP_LID.height * fit.screen);
+  });
+
+  it('на время смены устройств держит более высокое из двух', () => {
+    const metrics = metricsFor(360, 800);
+    const fit = fitStage(metrics, 0);
+    const during = reserveHeight(fit, ['screen', 'phone']);
+    expect(during).toBe(PHONE_BODY.height * fit.phone);
+    expect(during).toBeGreaterThan(reserveHeight(fit, ['screen']));
   });
 });
 
@@ -123,6 +141,6 @@ describe('нижний предел масштаба', () => {
   it('тело устройства известно для обоих видов', () => {
     expect(bodyOf('phone')).toBe(PHONE_BODY);
     expect(bodyOf('laptop')).toBe(LAPTOP_BODY);
-    expect(scaleOf({ phone: 0.5, laptop: 0.2 }, 'laptop')).toBe(0.2);
+    expect(scaleOf({ phone: 0.5, laptop: 0.2, screen: 0.3 }, 'laptop')).toBe(0.2);
   });
 });
