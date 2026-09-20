@@ -1,9 +1,9 @@
-import { deviceCallDeclineSchema } from '@messenger/shared';
+import { deviceCallDeclineSchema, ErrorCode } from '@messenger/shared';
 import { Router } from 'express';
 
 import { prisma } from '../../db/prisma.js';
-import { unauthorized } from '../../lib/errors.js';
-import { finishCall } from '../../realtime/call-handlers.js';
+import { conflict, unauthorized } from '../../lib/errors.js';
+import { declineCall } from '../../realtime/call-handlers.js';
 import * as callService from '../../services/call.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
@@ -29,7 +29,10 @@ callsRouter.post('/decline', validateBody(deviceCallDeclineSchema), async (req, 
     });
     if (!subscription) throw unauthorized('Устройство не зарегистрировано');
 
-    await finishCall(callId, subscription.userId, 'DECLINED');
+    const outcome = await declineCall(callId, subscription.userId);
+    if (outcome === 'already-accepted') {
+      throw conflict(ErrorCode.CALL_ALREADY_ACCEPTED, 'Звонок уже принят на другом устройстве');
+    }
     res.status(204).end();
   } catch (error) {
     next(error);

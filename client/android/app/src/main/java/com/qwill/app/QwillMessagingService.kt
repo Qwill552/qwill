@@ -34,6 +34,11 @@ class QwillMessagingService : FirebaseMessagingService() {
             return
         }
 
+        if (data["kind"] == "call-taken" && !callId.isNullOrEmpty()) {
+            NativeCalls.reportTakenElsewhere(applicationContext, callId)
+            return
+        }
+
         val chatId = data["chatId"]
         if (data["kind"] == "read" && !chatId.isNullOrEmpty()) {
             NotificationManagerCompat.from(applicationContext).cancel(chatId, FCM_NOTIFICATION_ID)

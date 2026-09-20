@@ -110,6 +110,10 @@ export function emitToChatExcept(chatId: string, userId: string, event: string, 
   io?.to(chatId).except(userRoom(userId)).emit(event, payload);
 }
 
+export function emitToOtherDevices(socket: Socket, userId: string, event: string, payload: unknown): void {
+  socket.to(userRoom(userId)).emit(event, payload);
+}
+
 /**
  * Разово синхронизирует онлайн-статус между двумя пользователями сразу после создания чата —
  * без этого собеседник узнаёт о статусе друг друга только после переподключения сокета,

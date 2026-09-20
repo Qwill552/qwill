@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.telecom.Connection
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
@@ -67,10 +68,22 @@ object NativeCalls {
     }
 
     fun reportEnded(context: Context, callId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Ringer.stop()
+            CallNotifications.cancel(context)
+            return
+        }
+        val connection = CallRegistry.take(callId) ?: return
         Ringer.stop()
         CallNotifications.cancel(context)
+        connection.finishRemotely()
+    }
+
+    fun reportTakenElsewhere(context: Context, callId: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        CallRegistry.take(callId)?.finishRemotely()
+        val connection = CallRegistry.peek(callId) ?: return
+        if (connection.state != Connection.STATE_RINGING) return
+        reportEnded(context, callId)
     }
 
     fun answer(callId: String) {

@@ -4,6 +4,7 @@ import type {
   CallInviteEvent,
   CallLiveEvent,
   CallParticipantChangedEvent,
+  CallTakenElsewhereEvent,
   ChatBlockEvent,
   ChatDeletedEvent,
   ChatDto,
@@ -2025,12 +2026,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket
       .off(SocketEvent.CallParticipantChanged)
       .on(SocketEvent.CallParticipantChanged, (event: CallParticipantChangedEvent) => {
-        const joinedElsewhere = useCallStore
-          .getState()
-          .dismissInviteJoinedElsewhere(event.call, get().myUserId);
-        if (joinedElsewhere) void reportCallEnded(event.call.id);
         useCallStore.getState().applyCallUpdate(event.call);
         set((state) => ({ activeCallByChat: { ...state.activeCallByChat, [event.call.chatId]: event.call } }));
+      });
+
+    socket
+      .off(SocketEvent.CallTakenElsewhere)
+      .on(SocketEvent.CallTakenElsewhere, (event: CallTakenElsewhereEvent) => {
+        traceCall('call:takenElsewhere получен', event.callId);
+        void reportCallEnded(event.callId);
+        useCallStore.getState().clearInvite(event.callId);
       });
 
     socket.off('connect').on('connect', () => {

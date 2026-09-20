@@ -122,6 +122,20 @@ export async function joinCall(input: { callId: string; userId: string }): Promi
   return { call: toCallDto(updated), token, url: env.LIVEKIT_URL };
 }
 
+export type DeclineOutcome = 'finish' | 'already-accepted' | 'not-ringing';
+
+export async function resolveDecline(input: { callId: string; userId: string }): Promise<DeclineOutcome> {
+  const call = await getCallOrThrow(input.callId);
+  await assertMember(call.chatId, input.userId);
+
+  const alreadyIn = call.participants.some(
+    (participant) => participant.userId === input.userId && participant.leftAt === null,
+  );
+  if (alreadyIn) return 'already-accepted';
+  if (call.status !== 'RINGING') return 'not-ringing';
+  return 'finish';
+}
+
 export async function leaveCall(input: { callId: string; userId: string }): Promise<CallDto> {
   const call = await getCallOrThrow(input.callId);
   await assertMember(call.chatId, input.userId);

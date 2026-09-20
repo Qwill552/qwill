@@ -37,6 +37,7 @@ export const ErrorCode = {
 
   // Звонки
   CALL_NOT_FOUND: 'CALL_NOT_FOUND',
+  CALL_ALREADY_ACCEPTED: 'CALL_ALREADY_ACCEPTED',
 
   // Файлы
   FILE_NOT_FOUND: 'FILE_NOT_FOUND',

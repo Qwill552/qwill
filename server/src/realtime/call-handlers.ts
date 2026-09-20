@@ -8,6 +8,7 @@ import {
   type CallStartAck,
   type CallStartPayload,
   type CallStatus,
+  type CallTakenElsewhereEvent,
 } from '@messenger/shared';
 import type { Socket } from 'socket.io';
 
@@ -17,8 +18,8 @@ import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import * as callService from '../services/call.js';
 import { messageInclude, toMessageDto } from '../services/message.js';
-import { notifyCallEnded } from '../services/push.js';
-import { emitToChatExcept, getIo } from './index.js';
+import { notifyCallEnded, notifyCallTaken } from '../services/push.js';
+import { emitToChatExcept, emitToOtherDevices, getIo } from './index.js';
 
 const MISSED_TIMEOUT_MS = env.CALL_MISSED_TIMEOUT_MS;
 const missedTimers = new Map<string, NodeJS.Timeout>();
@@ -69,6 +70,12 @@ export async function finishCall(callId: string, userId: string, status: CallSta
   if (message) io?.to(call.chatId).emit(SocketEvent.MessageNew, toMessageDto(message));
 }
 
+export async function declineCall(callId: string, userId: string): Promise<callService.DeclineOutcome> {
+  const outcome = await callService.resolveDecline({ callId, userId });
+  if (outcome === 'finish') await finishCall(callId, userId, 'DECLINED');
+  return outcome;
+}
+
 export function registerCallHandlers(socket: Socket, userId: string): void {
   socket.on(SocketEvent.CallStart, (payload: CallStartPayload, ack?: (result: CallStartAck) => void) => {
     callService
@@ -93,6 +100,13 @@ export function registerCallHandlers(socket: Socket, userId: string): void {
         io?.to(access.call.chatId).emit(SocketEvent.CallParticipantChanged, {
           call: access.call,
         } satisfies CallParticipantChangedEvent);
+        emitToOtherDevices(socket, userId, SocketEvent.CallTakenElsewhere, {
+          callId: access.call.id,
+          chatId: access.call.chatId,
+        } satisfies CallTakenElsewhereEvent);
+        notifyCallTaken(access.call.id, access.call.chatId, userId).catch((error: unknown) => {
+          logger.error({ err: error, callId: access.call.id }, 'Не удалось отправить FCM о принятии звонка');
+        });
       })
       .catch((error: unknown) => {
         ack?.({ ok: false, error: toAckError(error) });
@@ -100,7 +114,7 @@ export function registerCallHandlers(socket: Socket, userId: string): void {
   });
 
   socket.on(SocketEvent.CallDecline, (payload: CallActionPayload) => {
-    finishCall(payload.callId, userId, 'DECLINED').catch((error: unknown) => {
+    declineCall(payload.callId, userId).catch((error: unknown) => {
       logger.error({ err: error, userId }, 'Ошибка обработки call:decline');
     });
   });

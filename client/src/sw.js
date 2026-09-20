@@ -230,6 +230,15 @@ self.addEventListener('push', (event) => {
     return;
   }
 
+  if (payload.kind === 'call-taken' || payload.kind === 'call-ended') {
+    event.waitUntil(
+      self.registration
+        .getNotifications({ tag: `call-${payload.chatId}` })
+        .then((notifications) => notifications.forEach((notification) => notification.close())),
+    );
+    return;
+  }
+
   event.waitUntil(
     self.registration.showNotification(payload.title ?? 'Messenger', {
       body: payload.body ?? '',

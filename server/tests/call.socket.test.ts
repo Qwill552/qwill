@@ -8,6 +8,7 @@ import {
   type CallInviteEvent,
   type CallParticipantChangedEvent,
   type CallStartAck,
+  type CallTakenElsewhereEvent,
 } from '@messenger/shared';
 import type { Server as SocketServer } from 'socket.io';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
@@ -71,6 +72,18 @@ function waitForEvent<T>(socket: ClientSocket, event: string): Promise<T> {
 
 function emitWithAck<T>(socket: ClientSocket, event: string, payload: unknown): Promise<T> {
   return new Promise((resolve) => socket.emit(event, payload, resolve as (response: T) => void));
+}
+
+function collectEvent<T>(socket: ClientSocket, event: string): { seen: () => T | null } {
+  let received: T | null = null;
+  socket.on(event, (payload: T) => {
+    received = payload;
+  });
+  return { seen: () => received };
+}
+
+function settle(ms = 400): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 beforeAll(async () => {
@@ -162,6 +175,64 @@ describe('сигнализация звонков (этап ЗВОНКИ-3)', ()
     const changed = await participantChangedPromise;
     expect(changed.call.status).toBe('ACTIVE');
     expect(changed.call.id).toBe(callId);
+  });
+
+  it('приём на одном устройстве гасит вызов на остальных устройствах того же человека, но не на принявшем', async () => {
+    const a = await registerUser('cs3c_a');
+    const b = await registerUser('cs3c_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+
+    const socketA = await connectSocket(a.accessToken);
+    const phoneB = await connectSocket(b.accessToken);
+    const desktopB = await connectSocket(b.accessToken);
+
+    const startAck = await emitWithAck<CallStartAck>(socketA, SocketEvent.CallStart, { chatId, kind: 'AUDIO' });
+    const callId = startAck.access!.call.id;
+
+    const takenOnPhone = waitForEvent<CallTakenElsewhereEvent>(phoneB, SocketEvent.CallTakenElsewhere);
+    const takenOnDesktop = collectEvent<CallTakenElsewhereEvent>(desktopB, SocketEvent.CallTakenElsewhere);
+    const takenOnCaller = collectEvent<CallTakenElsewhereEvent>(socketA, SocketEvent.CallTakenElsewhere);
+
+    await emitWithAck<CallAcceptAck>(desktopB, SocketEvent.CallAccept, { callId });
+
+    const taken = await takenOnPhone;
+    expect(taken.callId).toBe(callId);
+    expect(taken.chatId).toBe(chatId);
+
+    await settle();
+    expect(takenOnDesktop.seen()).toBeNull();
+    expect(takenOnCaller.seen()).toBeNull();
+  });
+
+  it('отклонение с другого своего устройства не рушит уже принятый звонок', async () => {
+    const a = await registerUser('cs3d_a');
+    const b = await registerUser('cs3d_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+
+    const socketA = await connectSocket(a.accessToken);
+    const phoneB = await connectSocket(b.accessToken);
+    const desktopB = await connectSocket(b.accessToken);
+
+    const startAck = await emitWithAck<CallStartAck>(socketA, SocketEvent.CallStart, { chatId, kind: 'AUDIO' });
+    const callId = startAck.access!.call.id;
+    const acceptAck = await emitWithAck<CallAcceptAck>(desktopB, SocketEvent.CallAccept, { callId });
+    expect(acceptAck.access?.call.status).toBe('ACTIVE');
+
+    const endedForCaller = collectEvent<CallEndedEvent>(socketA, SocketEvent.CallEnded);
+    const endedForDesktop = collectEvent<CallEndedEvent>(desktopB, SocketEvent.CallEnded);
+    phoneB.emit(SocketEvent.CallDecline, { callId });
+    await settle();
+
+    expect(endedForCaller.seen()).toBeNull();
+    expect(endedForDesktop.seen()).toBeNull();
+
+    const call = await prisma.call.findUnique({ where: { id: callId } });
+    expect(call?.status).toBe('ACTIVE');
+    expect(call?.endedAt).toBeNull();
+
+    const live = await getLiveCallsForParticipant(b.userId);
+    expect(live.map((item) => item.id)).toContain(callId);
+    expect(await prisma.message.count({ where: { chatId, type: 'CALL' } })).toBe(0);
   });
 
   it('call:leave в активном 1:1-звонке завершает его для обеих сторон', async () => {

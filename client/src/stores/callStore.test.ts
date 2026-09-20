@@ -79,40 +79,35 @@ describe('callStore', () => {
 
   it('приглашение снимается, когда звонок принят на другом устройстве', () => {
     useCallStore.getState().applyInvite(buildCall());
-    const accepted = buildCall({
-      status: 'ACTIVE',
-      participants: [
-        {
-          user: { id: 'me', displayName: 'Я', username: 'me', avatarUrl: null },
-          joinedAt: '2026-09-17T12:00:00.000Z',
-          leftAt: null,
-        },
-      ] as CallDto['participants'],
-    });
 
-    const dismissed = useCallStore.getState().dismissInviteJoinedElsewhere(accepted, 'me');
+    useCallStore.getState().clearInvite('call-1');
 
-    expect(dismissed).toBe(true);
     expect(useCallStore.getState().phase).toBe('idle');
     expect(useCallStore.getState().call).toBeNull();
   });
 
-  it('приглашение не снимается, пока сам не значишься участником', () => {
+  it('снятие чужого приглашения не трогает текущее', () => {
     useCallStore.getState().applyInvite(buildCall());
-    const other = buildCall({
-      participants: [
-        {
-          user: { id: 'other', displayName: 'Не я', username: 'other', avatarUrl: null },
-          joinedAt: '2026-09-17T12:00:00.000Z',
-          leftAt: null,
-        },
-      ] as CallDto['participants'],
-    });
 
-    const dismissed = useCallStore.getState().dismissInviteJoinedElsewhere(other, 'me');
+    useCallStore.getState().clearInvite('call-other');
 
-    expect(dismissed).toBe(false);
     expect(useCallStore.getState().phase).toBe('incoming');
+    expect(useCallStore.getState().call?.id).toBe('call-1');
+  });
+
+  it('снятие приглашения не трогает уже идущий разговор', async () => {
+    const emit = vi.fn((_event: string, _payload: unknown, ack: (result: unknown) => void) => {
+      ack({ ok: true, access: { call: buildCall({ status: 'ACTIVE' }), token: 't', url: 'wss://x' } });
+    });
+    vi.mocked(getSocket).mockReturnValue({ emit } as unknown as Socket);
+    useCallStore.getState().applyInvite(buildCall());
+    await useCallStore.getState().acceptCall();
+    expect(useCallStore.getState().phase).toBe('active');
+
+    useCallStore.getState().clearInvite('call-1');
+
+    expect(useCallStore.getState().phase).toBe('active');
+    expect(useCallStore.getState().call?.id).toBe('call-1');
   });
 
   it('отклонение возвращает phase в idle и очищает call', () => {

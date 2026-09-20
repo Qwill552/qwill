@@ -33,6 +33,7 @@ export const SocketEvent = {
   CallLeave: 'call:leave',
   CallEnded: 'call:ended',
   CallParticipantChanged: 'call:participantChanged',
+  CallTakenElsewhere: 'call:takenElsewhere',
   CallLive: 'call:live',
 } as const;
 
@@ -169,6 +170,11 @@ export interface CallEndedEvent {
 
 export interface CallParticipantChangedEvent {
   call: CallDto;
+}
+
+export interface CallTakenElsewhereEvent {
+  callId: string;
+  chatId: string;
 }
 
 /** Звонки, в которых человек всё ещё числится участником, — присылаются при подключении сокета,

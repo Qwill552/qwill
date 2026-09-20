@@ -149,6 +149,17 @@ export async function sendToUser(userId: string, notification: PushNotificationP
   );
 }
 
+async function sendToUsers(userIds: string[], notification: PushNotificationPayload, options?: PushSendOptions): Promise<void> {
+  if (userIds.length === 0) return;
+
+  const subscriptions = await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } });
+  await Promise.all(
+    subscriptions.map((sub) =>
+      sub.provider === 'fcm' ? sendViaFcm(sub, notification, options) : sendViaWebPush(sub, notification, options),
+    ),
+  );
+}
+
 export async function notifyOfflineMembersOfCall(
   callId: string,
   chatId: string,
@@ -185,22 +196,19 @@ export async function notifyChatRead(userId: string, chatId: string): Promise<vo
 }
 
 export async function notifyCallEnded(callId: string, chatId: string, excludeUserId: string): Promise<void> {
-  if (!fcmReady) return;
-
   const members = await prisma.chatMember.findMany({
     where: { chatId, userId: { not: excludeUserId } },
     select: { userId: true },
   });
   if (members.length === 0) return;
 
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId: { in: members.map((m) => m.userId) }, provider: 'fcm' },
-    select: { id: true, fcmToken: true },
-  });
-
-  await Promise.all(
-    subscriptions.map((sub) =>
-      sendViaFcm(sub, { title: 'Звонок завершён', body: '', chatId, kind: 'call-ended', callId }, { ttl: 30, urgency: 'high' }),
-    ),
+  await sendToUsers(
+    members.map((m) => m.userId),
+    { title: 'Звонок завершён', body: '', chatId, kind: 'call-ended', callId },
+    { ttl: 30, urgency: 'high' },
   );
+}
+
+export async function notifyCallTaken(callId: string, chatId: string, userId: string): Promise<void> {
+  await sendToUser(userId, { title: '', body: '', chatId, kind: 'call-taken', callId }, { ttl: 30, urgency: 'high' });
 }
