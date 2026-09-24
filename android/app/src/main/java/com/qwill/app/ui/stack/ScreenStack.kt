@@ -146,7 +146,7 @@ class ScreenStack(context: Context) : FrameLayout(context) {
         for (screen in screens.asReversed()) {
             screen.view?.let { removeView(it) }
             screen.releaseView()
-            screen.onDestroyed()
+            screen.destroy()
             screen.stack = null
         }
         screens.clear()
@@ -250,7 +250,7 @@ class ScreenStack(context: Context) : FrameLayout(context) {
         leaving.view?.let { removeView(it) }
         leaving.onHidden()
         leaving.releaseView()
-        leaving.onDestroyed()
+        leaving.destroy()
         leaving.stack = null
         val current = screens.last()
         current.view?.translationX = 0f

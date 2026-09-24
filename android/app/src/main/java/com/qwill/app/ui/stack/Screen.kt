@@ -2,9 +2,13 @@ package com.qwill.app.ui.stack
 
 import android.content.Context
 import android.view.View
+import com.qwill.app.QwillApplication
+import com.qwill.app.net.RequestGuid
 import com.qwill.app.ui.insets.SafeArea
 
 abstract class Screen {
+    val classGuid: Int = RequestGuid.next()
+
     var stack: ScreenStack? = null
         internal set
 
@@ -33,6 +37,11 @@ abstract class Screen {
 
     protected fun backStateChanged() {
         stack?.notifyBackStateChanged()
+    }
+
+    internal fun destroy() {
+        QwillApplication.api.cancelRequestsForGuid(classGuid)
+        onDestroyed()
     }
 
     internal fun obtainView(context: Context): View = view ?: createView(context).also { view = it }

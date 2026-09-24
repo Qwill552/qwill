@@ -1,9 +1,7 @@
 package com.qwill.app.stand
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.util.TypedValue
 import android.view.Gravity
@@ -49,6 +47,7 @@ class StandScreen(private val level: Int) : Screen() {
     private lateinit var info: TextView
     private lateinit var card: LinearLayout
     private lateinit var pushButton: TextView
+    private var sessionPanel: SessionPanel? = null
     private val styled = ArrayList<Styled>()
     private val themeSegments = ArrayList<Segment<ThemePreference>>()
     private val sizeSegments = ArrayList<Segment<FontSize>>()
@@ -74,6 +73,12 @@ class StandScreen(private val level: Int) : Screen() {
         }
         val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         column.addView(buildControls(), wrapWidth())
+        if (level == 1) {
+            val panel = SessionPanel(context, classGuid)
+            column.addView(panel.view, wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
+            panel.attach()
+            sessionPanel = panel
+        }
         for (index in 0 until STUB_ROWS) column.addView(buildRow(index), wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
         scroll.addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         content.addView(scroll, matchParent())
@@ -104,6 +109,11 @@ class StandScreen(private val level: Int) : Screen() {
 
         applyAppearance()
         return root
+    }
+
+    override fun onViewDestroyed() {
+        sessionPanel?.detach()
+        sessionPanel = null
     }
 
     override fun onShown() {
@@ -254,8 +264,9 @@ class StandScreen(private val level: Int) : Screen() {
                 },
             )
         }
-        card.background = cardBackground()
-        for (row in rowCards) row.background = cardBackground()
+        card.background = cardBackground(context)
+        sessionPanel?.applyAppearance()
+        for (row in rowCards) row.background = cardBackground(context)
         pushButton.background = ripple(palette.primary, context.dp(Dimens.RADIUS_MD), withAlpha(palette.textOnPrimary, 0.24f))
         for (group in segmentGroups) {
             group.background = GradientDrawable().apply {
@@ -287,24 +298,6 @@ class StandScreen(private val level: Int) : Screen() {
         val motion = if (Motion.animationsEnabled) "включены" else "выключены"
         val depth = stack?.depth ?: level
         info.text = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · размытие: $blur · анимации: $motion · в стеке: $depth"
-    }
-
-    private fun cardBackground(): GradientDrawable = GradientDrawable().apply {
-        cornerRadius = context.dp(Dimens.CARD_RADIUS)
-        setColor(Theme.palette.cardBg)
-        setStroke(context.dpInt(Dimens.HAIRLINE), Theme.palette.cardBorder)
-    }
-
-    private fun ripple(fill: Int, radius: Float, rippleColor: Int): RippleDrawable {
-        val shape = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(fill)
-        }
-        val mask = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(FixedColors.lift)
-        }
-        return RippleDrawable(ColorStateList.valueOf(rippleColor), shape, mask)
     }
 
     private fun sectionLabel(): LinearLayout.LayoutParams = wrapWidth().apply {
