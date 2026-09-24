@@ -6,8 +6,9 @@
 
 **Мессенджер для общения. Просто будь на связи.**
 
-Android · Windows · браузер
-
+![Android](https://img.shields.io/badge/Android-7B61FF?style=flat-square&logo=android&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-7B61FF?style=flat-square&logo=windows&logoColor=white)
+![Web](https://img.shields.io/badge/Web-7B61FF?style=flat-square&logo=googlechrome&logoColor=white)
 ![Статус: бета](https://img.shields.io/badge/%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81-%D0%B1%D0%B5%D1%82%D0%B0-4B3F99?style=flat-square)
 ![Лицензия: AGPL-3.0](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-AGPL--3.0-4B3F99?style=flat-square)
 
