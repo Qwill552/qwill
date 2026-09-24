@@ -1,6 +1,7 @@
 package com.qwill.app.auth
 
 import com.qwill.app.model.PublicUser
+import com.qwill.app.net.ApiException
 
 sealed class SessionState {
     object Anonymous : SessionState()
@@ -20,4 +21,10 @@ fun interface SessionStateListener {
 
 fun interface SessionClearedListener {
     fun onSessionCleared()
+}
+
+sealed class LiveToken {
+    class Ready(val token: String, val refreshed: Boolean) : LiveToken()
+
+    class Failed(val error: ApiException) : LiveToken()
 }

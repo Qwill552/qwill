@@ -63,6 +63,12 @@ class NetworkError(cause: Throwable? = null) : ApiException(MESSAGE, cause) {
     }
 }
 
+class NoResponseError : ApiException(MESSAGE) {
+    companion object {
+        const val MESSAGE = "Сервер не ответил"
+    }
+}
+
 @Serializable
 internal data class ApiErrorBody(val error: ApiErrorPayload)
 

@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import com.qwill.app.auth.FileSessionStore
 import com.qwill.app.auth.Session
+import com.qwill.app.auth.SessionState
 import com.qwill.app.core.DispatchQueue
 import com.qwill.app.core.MainQueue
 import com.qwill.app.net.ApiClient
@@ -13,6 +14,9 @@ import com.qwill.app.net.ExtraRootTrust
 import com.qwill.app.net.HttpClients
 import com.qwill.app.net.HttpTransport
 import com.qwill.app.net.NetworkMonitor
+import com.qwill.app.realtime.Presence
+import com.qwill.app.realtime.SocketConnection
+import com.qwill.app.realtime.TypingStore
 import java.io.File
 
 class QwillApplication : Application() {
@@ -20,18 +24,62 @@ class QwillApplication : Application() {
         super.onCreate()
         val trust = ExtraRootTrust.systemPlus(resources.openRawResource(R.raw.isrg_root_x1))
         val userAgent = HttpClients.userAgent(BuildConfig.VERSION_NAME, Build.VERSION.RELEASE, Build.MANUFACTURER, Build.MODEL)
-        val transport = HttpTransport(HttpClients.create(trust), BuildConfig.API_ORIGIN, userAgent)
+        val httpClient = HttpClients.create(trust)
+        val transport = HttpTransport(httpClient, BuildConfig.API_ORIGIN, userAgent)
         val sessionQueue = DispatchQueue("sessionQueue")
 
         session = Session(transport, FileSessionStore(File(filesDir, SESSION_FILE)), sessionQueue, MainQueue)
         api = ApiClient(transport, session, sessionQueue, MainQueue)
+        socket = SocketConnection(
+            httpClient,
+            BuildConfig.API_ORIGIN,
+            userAgent,
+            session::liveAccessToken,
+            session::reportIpBanned,
+            DispatchQueue("socketQueue"),
+            MainQueue,
+        )
+        presence = Presence(MainQueue).also { it.attach(socket) }
+        typing = TypingStore(MainQueue, { (session.state as? SessionState.Authenticated)?.user?.id }).also { it.attach(socket) }
+
+        session.addStateListener { socket.onSessionState(it) }
+        session.addClearedListener {
+            socket.onSessionCleared()
+            presence.clear()
+            typing.clear()
+        }
         session.start()
 
-        NetworkMonitor(this) { session.onNetworkAvailable() }.start()
-        registerActivityLifecycleCallbacks(ForegroundTracker { session.onForeground() })
+        val network = NetworkMonitor(
+            this,
+            object : NetworkMonitor.Listener {
+                override fun onNetworkAvailable() {
+                    session.onNetworkAvailable()
+                    socket.onNetworkAvailable()
+                }
+
+                override fun onNetworkLost() {
+                    socket.onNetworkLost()
+                }
+            },
+        ).start()
+        socket.start(session.state, network)
+
+        registerActivityLifecycleCallbacks(
+            ForegroundTracker(
+                onForeground = {
+                    session.onForeground()
+                    socket.onForeground()
+                },
+                onBackground = { socket.onBackground() },
+            ),
+        )
     }
 
-    private class ForegroundTracker(private val onForeground: () -> Unit) : ActivityLifecycleCallbacks {
+    private class ForegroundTracker(
+        private val onForeground: () -> Unit,
+        private val onBackground: () -> Unit,
+    ) : ActivityLifecycleCallbacks {
         private var started = 0
 
         override fun onActivityStarted(activity: Activity) {
@@ -41,6 +89,7 @@ class QwillApplication : Application() {
 
         override fun onActivityStopped(activity: Activity) {
             started--
+            if (started == 0) onBackground()
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
@@ -61,6 +110,15 @@ class QwillApplication : Application() {
             private set
 
         lateinit var api: ApiClient
+            private set
+
+        lateinit var socket: SocketConnection
+            private set
+
+        lateinit var presence: Presence
+            private set
+
+        lateinit var typing: TypingStore
             private set
     }
 }

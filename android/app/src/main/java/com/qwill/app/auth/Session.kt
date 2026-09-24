@@ -103,6 +103,33 @@ class Session(
         send(request, handle, retried = false, done)
     }
 
+    internal fun liveAccessToken(rejected: String?, done: (LiveToken) -> Unit) {
+        queue.post {
+            val token = accessToken
+            val stale = token == null || token == rejected || accessExpired()
+            when {
+                refreshToken == null -> done(LiveToken.Failed(sessionGone()))
+                !stale && token != null -> done(LiveToken.Ready(token, refreshed = false))
+                else -> awaitRefresh { outcome ->
+                    val fresh = accessToken
+                    when {
+                        outcome is RefreshOutcome.Failed -> done(LiveToken.Failed(outcome.error))
+                        fresh == null -> done(LiveToken.Failed(sessionGone()))
+                        else -> done(LiveToken.Ready(fresh, refreshed = true))
+                    }
+                }
+            }
+        }
+    }
+
+    internal fun reportIpBanned() {
+        queue.post {
+            if (refreshToken == null) return@post
+            needsRefresh = true
+            if (current !is SessionState.IpBanned) publish(SessionState.IpBanned(user))
+        }
+    }
+
     internal fun signIn(auth: AuthResponse): ApiResult<PublicUser> {
         val next = auth.refreshToken ?: return ApiResult.Failure(ApiError.unreadable(200))
         establish(auth, next)
@@ -226,8 +253,9 @@ class Session(
             retryLater()
             return
         }
-        val apiError = error as ApiError
+        val apiError = error as? ApiError
         when {
+            apiError == null -> retryLater()
             apiError.status == HTTP_UNAUTHORIZED -> wipe(SessionState.Anonymous)
             apiError.status == HTTP_FORBIDDEN && apiError.code == ErrorCode.IP_BANNED -> {
                 needsRefresh = true
