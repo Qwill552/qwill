@@ -31,7 +31,14 @@ import type {
   UserPresenceEvent,
   UserTypingEvent,
 } from '@messenger/shared';
-import { ErrorCode, isPlayableVideoMimeType, PRESENCE_CONFIRM_MS, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
+import {
+  categorizeAttachment,
+  ErrorCode,
+  isPlayableVideoMimeType,
+  PRESENCE_CONFIRM_MS,
+  SocketEvent,
+  TYPING_TIMEOUT_MS,
+} from '@messenger/shared';
 import { create } from 'zustand';
 
 import { getLiveCallsRequest } from '../api/calls';
@@ -57,9 +64,15 @@ import {
 import { NetworkError } from '../api/client';
 import { blockUserRequest, unblockUserRequest } from '../api/users';
 import { generateVideoThumbnail, measureMediaSize, uploadFile } from '../api/files';
-import { buildImageAssets } from '../api/mediaTasks';
+import { buildImageAssets, hashBlob } from '../api/mediaTasks';
 import { openCacheDb, type OutboxAttachment, type OutboxEntry } from '../cache/db';
-import { CLEANUP_INTERVAL_MS, evictToBudget, removeCachedMediaByFileIds } from '../cache/mediaCache';
+import {
+  CLEANUP_INTERVAL_MS,
+  evictToBudget,
+  removeCachedMediaByFileIds,
+  storeSentMedia,
+  type SentMediaEntry,
+} from '../cache/mediaCache';
 import {
   pruneCachedHistory,
   readCachedChats,
@@ -82,6 +95,7 @@ import {
   nextRetryDelayMs,
   outboxAttachmentToFile,
   readOutbox,
+  rememberOutboxSha256,
   removeOutboxByChat,
 } from '../cache/outbox';
 import {
@@ -372,6 +386,29 @@ interface PreparedImage {
 
 const preparedImages = new Map<string, Promise<PreparedImage>>();
 
+interface PreparedVideo {
+  thumb: File;
+  preview: Blob | null;
+  width: number;
+  height: number;
+  duration: number;
+}
+
+const preparedVideos = new Map<string, Promise<PreparedVideo>>();
+
+const uploadNetworkRetries = new Map<string, { attempt: number; timer: ReturnType<typeof setTimeout> | null }>();
+
+function clearUploadNetworkRetry(clientId: string): void {
+  const retry = uploadNetworkRetries.get(clientId);
+  if (retry?.timer) clearTimeout(retry.timer);
+  uploadNetworkRetries.delete(clientId);
+}
+
+function forgetPreparedAssets(clientId: string): void {
+  preparedImages.delete(clientId);
+  preparedVideos.delete(clientId);
+}
+
 const UPLOAD_SLOTS = 2;
 
 let activeUploads = 0;
@@ -401,6 +438,20 @@ function prepareImage(clientId: string, file: File): Promise<PreparedImage> {
 
   task.catch(() => preparedImages.delete(clientId));
   preparedImages.set(clientId, task);
+  return task;
+}
+
+function prepareVideo(clientId: string, file: File): Promise<PreparedVideo> {
+  const ready = preparedVideos.get(clientId);
+  if (ready) return ready;
+
+  const task = generateVideoThumbnail(file).then(async (thumb) => {
+    const assets = await buildImageAssets(thumb.file);
+    return { thumb: thumb.file, preview: assets.preview, width: thumb.width, height: thumb.height, duration: thumb.duration };
+  });
+
+  task.catch(() => preparedVideos.delete(clientId));
+  preparedVideos.set(clientId, task);
   return task;
 }
 
@@ -506,6 +557,41 @@ function scheduleOutboxRetry(drain: () => void): void {
     outboxRetryTimer = null;
     drain();
   }, nextRetryDelayMs(outboxRetryAttempt));
+}
+
+interface SentBlob {
+  fileId: string;
+  blob: Blob;
+  thumb: boolean;
+}
+
+function scheduleUploadNetworkRetry(chatId: string, clientId: string, run: () => void): void {
+  const retry = uploadNetworkRetries.get(clientId) ?? { attempt: 0, timer: null };
+  if (retry.timer) return;
+  if (!getSocket()?.connected) {
+    uploadNetworkRetries.delete(clientId);
+    return;
+  }
+  retry.attempt += 1;
+  retry.timer = setTimeout(() => {
+    retry.timer = null;
+    if (!useChatStore.getState().messagesByChat[chatId]?.some((m) => m.clientId === clientId)) {
+      uploadNetworkRetries.delete(clientId);
+      return;
+    }
+    run();
+  }, nextRetryDelayMs(retry.attempt));
+  uploadNetworkRetries.set(clientId, retry);
+}
+
+function sentMediaEntries(chatId: string, mimeType: string, peaks: number[] | undefined, sent: SentBlob[]): SentMediaEntry[] {
+  const category = categorizeAttachment(mimeType, peaks);
+  const kind = category === 'gif' ? 'photo' : category;
+  return sent.map((entry) => ({
+    fileId: entry.fileId,
+    blob: entry.blob,
+    descriptor: { tier: entry.thumb ? 'thumb' : 'full', chatId, kind },
+  }));
 }
 
 function isFeedLive(state: Pick<ChatState, 'viewportNewestByChat' | 'hasMoreAfterByChat'>, chatId: string): boolean {
@@ -1474,17 +1560,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async runAttachmentUpload(chatId, clientId) {
+    if (uploadAbortControllers.has(clientId)) return;
+    const controller = new AbortController();
+    uploadAbortControllers.set(clientId, controller);
+    const release = (): void => {
+      if (uploadAbortControllers.get(clientId) === controller) uploadAbortControllers.delete(clientId);
+    };
+
     const db = await openCacheDb();
     const stored = await db?.get('outbox', clientId);
     const attachment = stored?.attachment ?? unqueuedAttachments.get(clientId);
-    if (!attachment) return;
+    if (!attachment || controller.signal.aborted) {
+      release();
+      return;
+    }
 
     const file = outboxAttachmentToFile(attachment);
     const duration = attachment.duration ?? undefined;
     const peaks = attachment.peaks ?? undefined;
 
-    const controller = new AbortController();
-    uploadAbortControllers.set(clientId, controller);
     get().updateLocalAttachment(chatId, clientId, { progress: 0, error: undefined });
     set((state) => ({
       messagesByChat: {
@@ -1502,6 +1596,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const isImage = file.type.startsWith('image/');
       const isVideo = isPlayableVideoMimeType(file.type);
+      const sent: SentBlob[] = [];
 
       let thumbnailFileId: string | undefined;
       let thumbnailSha256: string | undefined;
@@ -1522,6 +1617,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         );
         thumbnailFileId = uploadedThumb.id;
         thumbnailSha256 = uploadedThumb.sha256;
+        sent.push({ fileId: uploadedThumb.id, blob: prepared.thumb, thumb: true });
         width = prepared.width;
         height = prepared.height;
 
@@ -1530,36 +1626,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
           previewFileId = uploadedPreview.id;
           previewSha256 = uploadedPreview.sha256;
+          sent.push({ fileId: uploadedPreview.id, blob: prepared.preview, thumb: true });
         }
       } else if (isVideo) {
-        const thumb = await generateVideoThumbnail(file);
-        const uploadedThumb = await uploadFile(thumb.file, 'message', undefined, controller.signal);
+        const prepared = await prepareVideo(clientId, file);
+        const uploadedThumb = await uploadFile(prepared.thumb, 'message', undefined, controller.signal);
         thumbnailFileId = uploadedThumb.id;
         thumbnailSha256 = uploadedThumb.sha256;
-        width = thumb.width;
-        height = thumb.height;
-        videoDuration = thumb.duration;
+        sent.push({ fileId: uploadedThumb.id, blob: prepared.thumb, thumb: true });
+        width = prepared.width;
+        height = prepared.height;
+        videoDuration = prepared.duration;
 
-        const previewAssets = await buildImageAssets(thumb.file);
-        if (previewAssets.preview) {
-          const previewFile = new File([previewAssets.preview], 'preview.jpg', { type: 'image/jpeg' });
+        if (prepared.preview) {
+          const previewFile = new File([prepared.preview], 'preview.jpg', { type: 'image/jpeg' });
           const uploadedPreview = await uploadFile(previewFile, 'message', undefined, controller.signal);
           previewFileId = uploadedPreview.id;
           previewSha256 = uploadedPreview.sha256;
+          sent.push({ fileId: uploadedPreview.id, blob: prepared.preview, thumb: true });
         }
       }
+
+      const knownSha256 = stored?.sha256 ?? (await hashBlob(file));
+      if (!stored?.sha256) void rememberOutboxSha256(clientId, knownSha256).catch(() => undefined);
+      controller.signal.throwIfAborted();
 
       const uploaded = await uploadFile(
         file,
         'message',
         (loaded, total) => get().updateLocalAttachment(chatId, clientId, { progress: total ? loaded / total : 0 }),
         controller.signal,
+        knownSha256,
       );
+      if (!isVideo) sent.push({ fileId: uploaded.id, blob: file, thumb: false });
 
       const message = get().messagesByChat[chatId]?.find((m) => m.clientId === clientId);
-      if (!message) return;
+      if (!message) {
+        release();
+        return;
+      }
 
-      const attachment: MessageAttachmentInput = {
+      const attachmentInput: MessageAttachmentInput = {
         fileId: uploaded.id,
         sha256: uploaded.sha256,
         thumbnailFileId,
@@ -1576,23 +1683,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const socket = getSocket();
       if (!socket) throw new Error('Нет соединения');
 
+      clearUploadNetworkRetry(clientId);
+      release();
       socket.emit(
         SocketEvent.MessageSend,
         {
           chatId,
           clientId,
           content: message.content || undefined,
-          attachment,
+          attachment: attachmentInput,
           replyToId: message.replyToId ?? undefined,
           albumId: message.albumId ?? undefined,
         },
         (ack: MessageSendAck) => {
-          uploadAbortControllers.delete(clientId);
-          preparedImages.delete(clientId);
           if (ack.ok && ack.message) {
+            forgetPreparedAssets(clientId);
             unqueuedAttachments.delete(clientId);
             void dequeueOutbox(clientId);
             get().applyIncomingMessage(ack.message);
+            void storeSentMedia(sentMediaEntries(chatId, file.type, peaks, sent)).catch(() => undefined);
             return;
           }
           if (isBlockedSendError(ack)) void get().reloadChatState(chatId);
@@ -1601,9 +1710,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       );
     } catch (error) {
-      uploadAbortControllers.delete(clientId);
+      release();
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      if (error instanceof NetworkError) return;
+      if (error instanceof NetworkError) {
+        scheduleUploadNetworkRetry(chatId, clientId, () => void get().runAttachmentUpload(chatId, clientId));
+        return;
+      }
+      clearUploadNetworkRetry(clientId);
       get().updateLocalAttachment(chatId, clientId, {
         error: error instanceof Error ? error.message : 'Не удалось загрузить файл',
       });
@@ -1619,7 +1732,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     uploadAbortControllers.get(clientId)?.abort();
     uploadAbortControllers.delete(clientId);
-    preparedImages.delete(clientId);
+    clearUploadNetworkRetry(clientId);
+    forgetPreparedAssets(clientId);
     unqueuedAttachments.delete(clientId);
     dropPacketQueuedForReconnect(clientId);
     if (message.localAttachment?.previewUrl) URL.revokeObjectURL(message.localAttachment.previewUrl);
@@ -1683,6 +1797,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     for (const entry of await readOutbox()) {
       if (entry.attachment) {
+        if (uploadAbortControllers.has(entry.clientId)) continue;
+        clearUploadNetworkRetry(entry.clientId);
         const attempts = await bumpAttempts(entry.clientId);
         if (attempts > MAX_OUTBOX_ATTEMPTS) {
           get().setMessageFailed(entry.chatId, entry.clientId);
@@ -2145,6 +2261,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     stopMaintenanceSchedule();
     for (const controller of uploadAbortControllers.values()) controller.abort();
     uploadAbortControllers.clear();
+    for (const clientId of [...uploadNetworkRetries.keys()]) clearUploadNetworkRetry(clientId);
+    preparedImages.clear();
+    preparedVideos.clear();
     unqueuedAttachments.clear();
     for (const list of Object.values(get().messagesByChat)) {
       for (const message of list) {

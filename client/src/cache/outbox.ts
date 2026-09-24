@@ -59,6 +59,15 @@ export async function bumpAttempts(clientId: string): Promise<number> {
   return attempts;
 }
 
+export async function rememberOutboxSha256(clientId: string, sha256: string): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  const entry = await db.get('outbox', clientId);
+  if (!entry || entry.sha256 === sha256) return;
+  await db.put('outbox', { ...entry, sha256 });
+}
+
 export function outboxAttachmentToFile(attachment: OutboxAttachment): File {
   return new File([attachment.blob], attachment.fileName, { type: attachment.mimeType });
 }

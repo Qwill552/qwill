@@ -254,6 +254,20 @@ export function resolveMedia(fileId: string, descriptor: MediaDescriptor): Promi
   return task;
 }
 
+export interface SentMediaEntry {
+  fileId: string;
+  descriptor: MediaDescriptor;
+  blob: Blob;
+}
+
+export async function storeSentMedia(entries: SentMediaEntry[]): Promise<void> {
+  for (const entry of entries) {
+    if (inflight.has(entry.fileId)) continue;
+    await writeToCache(entry.fileId, entry.descriptor, entry.blob);
+    noteWrittenBytes(entry.blob.size);
+  }
+}
+
 export async function hasCachedMedia(fileId: string): Promise<boolean> {
   const db = await openCacheDb();
   if (!db) return false;

@@ -95,6 +95,7 @@ export interface OutboxEntry {
   attachment: OutboxAttachment | null;
   createdAt: number;
   attempts: number;
+  sha256?: string;
 }
 
 interface CacheSchema extends DBSchema {
