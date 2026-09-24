@@ -34,6 +34,9 @@ const webDir = path.join(repoRoot, 'client', 'public');
 const androidResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'main', 'res');
 const DEV_HUE = 150;
 const devResDir = path.join(repoRoot, 'client', 'android', 'app', 'src', 'dev', 'res');
+const NATIVE_HUE = 210;
+const nativeResDir = path.join(repoRoot, 'android', 'app', 'src', 'main', 'res');
+const nativeNatResDir = path.join(repoRoot, 'android', 'app', 'src', 'nat', 'res');
 
 function square(source, size, hue) {
   const base = sharp(source).resize(size, size, { fit: 'cover' });
@@ -92,6 +95,8 @@ async function main() {
 
   await writeAndroidIcons(androidResDir);
   await writeAndroidIcons(devResDir, DEV_HUE);
+  await writeAndroidIcons(nativeResDir);
+  await writeAndroidIcons(nativeNatResDir, NATIVE_HUE);
 }
 
 await main();

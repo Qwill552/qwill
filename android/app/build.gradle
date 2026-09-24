@@ -1,0 +1,73 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def versionProperties = new Properties()
+versionProperties.load(new FileInputStream(rootProject.file('../client/android/version.properties')))
+
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = 'com.qwill.app'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId 'com.qwill.app'
+        minSdk 21
+        targetSdk 36
+        versionCode versionProperties.getProperty('versionCode').toInteger()
+        versionName versionProperties.getProperty('versionName')
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    flavorDimensions = ['channel']
+    productFlavors {
+        prod {
+            dimension 'channel'
+            buildConfigField 'String', 'API_ORIGIN', '"https://qwill.mooo.com"'
+        }
+        nat {
+            dimension 'channel'
+            applicationIdSuffix '.nat'
+            versionNameSuffix '-nat'
+            buildConfigField 'String', 'API_ORIGIN', '"https://dev.qwill.mooo.com"'
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties.getProperty('storeFile'))
+                storePassword keystoreProperties.getProperty('storePassword')
+                keyAlias keystoreProperties.getProperty('keyAlias')
+                keyPassword keystoreProperties.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+}
