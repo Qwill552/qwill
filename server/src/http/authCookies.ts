@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
+import { SESSION_MODE_BODY, SESSION_MODE_HEADER } from '@messenger/shared';
 import type { Request, Response } from 'express';
 
 import { env } from '../config/env.js';
@@ -43,9 +44,14 @@ export function clearSessionCookies(res: Response): void {
   res.clearCookie(LEGACY_REFRESH_COOKIE, { path: LEGACY_REFRESH_COOKIE_PATH });
 }
 
+export function wantsBodySession(req: Request): boolean {
+  return req.get(SESSION_MODE_HEADER) === SESSION_MODE_BODY;
+}
+
 export function readRefreshToken(req: Request): string | undefined {
-  const cookies = cookiesOf(req);
   const fromBody = (req.body as { refreshToken?: string } | undefined)?.refreshToken;
+  if (wantsBodySession(req)) return fromBody;
+  const cookies = cookiesOf(req);
   return cookies[REFRESH_COOKIE] ?? cookies[LEGACY_REFRESH_COOKIE] ?? fromBody;
 }
 

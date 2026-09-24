@@ -84,8 +84,12 @@ export interface PublicUser {
   pendingConsent: PendingConsentDto | null;
 }
 
+export const SESSION_MODE_HEADER = 'x-qwill-session';
+export const SESSION_MODE_BODY = 'body';
+
 export interface AuthResponse {
   accessToken: string;
   user: PublicUser;
   csrfToken: string;
+  refreshToken?: string;
 }
