@@ -40,6 +40,10 @@ export const CHAT_CALENDAR_MAX_MONTHS = 24;
 /** Через столько миллисекунд без событий индикатор «печатает» гаснет сам. */
 export const TYPING_TIMEOUT_MS = 5_000;
 
+export const TYPING_REPEAT_MS = 4_000;
+
+export const PRESENCE_CONFIRM_MS = 3_000;
+
 export const INLINE_SAFE_MIME_TYPES = [
   'image/jpeg',
   'image/png',

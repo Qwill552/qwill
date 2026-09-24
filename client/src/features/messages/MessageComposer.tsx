@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_FILE_SIZE_BYTES } from '@messenger/shared';
+import { DEFAULT_MAX_FILE_SIZE_BYTES, TYPING_REPEAT_MS } from '@messenger/shared';
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ClipboardEvent,
@@ -86,6 +86,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   }, [chatId]);
 
   const isTypingRef = useRef(false);
+  const typingSentAtRef = useRef(0);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fieldRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -178,8 +179,10 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       return;
     }
 
-    if (!isTypingRef.current) {
+    const now = Date.now();
+    if (!isTypingRef.current || now - typingSentAtRef.current >= TYPING_REPEAT_MS) {
       isTypingRef.current = true;
+      typingSentAtRef.current = now;
       startTyping(chatId);
     }
     clearTimeout(stopTimerRef.current);

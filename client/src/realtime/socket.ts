@@ -1,6 +1,8 @@
 import { SocketEvent, type VisibilityPayload } from '@messenger/shared';
 import { io, type Socket } from 'socket.io-client';
 
+import { refreshSession } from '../api/client';
+
 const SOCKET_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
 
 let socket: Socket | null = null;
@@ -11,6 +13,39 @@ interface PendingEmit {
 }
 
 const pendingEmits: PendingEmit[] = [];
+
+const SOCKET_UNAUTHORIZED = 'unauthorized';
+const TOKEN_RETRY_MS = 10_000;
+
+let currentToken: string | null = null;
+let refreshedForToken: string | null = null;
+let tokenRetryTimer: ReturnType<typeof setTimeout> | undefined;
+let lastTokenRefreshAt = 0;
+
+function retryConnectLater(target: Socket, delayMs: number): void {
+  clearTimeout(tokenRetryTimer);
+  tokenRetryTimer = setTimeout(() => {
+    if (socket === target && !target.connected) target.connect();
+  }, delayMs);
+}
+
+function handleConnectError(target: Socket, error: Error): void {
+  if (target.active || error.message !== SOCKET_UNAUTHORIZED) return;
+  if (refreshedForToken === currentToken) return;
+  const sinceLastRefresh = Date.now() - lastTokenRefreshAt;
+  if (sinceLastRefresh < TOKEN_RETRY_MS) {
+    retryConnectLater(target, TOKEN_RETRY_MS - sinceLastRefresh);
+    return;
+  }
+  refreshedForToken = currentToken;
+  lastTokenRefreshAt = Date.now();
+  const rejectedToken = currentToken;
+  void refreshSession().finally(() => {
+    if (socket !== target || target.connected || currentToken !== rejectedToken) return;
+    refreshedForToken = null;
+    retryConnectLater(target, TOKEN_RETRY_MS);
+  });
+}
 
 function flushPendingEmits(target: Socket): void {
   const queued = pendingEmits.splice(0, pendingEmits.length);
@@ -34,6 +69,8 @@ function emitVisibility(): void {
 /** Единственное место создания сокет-соединения (секция 4). Живое соединение при рефреше токена
  *  не рвётся: обновляется только `auth`, который socket.io читает при следующем реконнекте. */
 export function connectSocket(accessToken: string): Socket {
+  currentToken = accessToken;
+  clearTimeout(tokenRetryTimer);
   if (socket) {
     socket.auth = { token: accessToken };
     if (!socket.connected) socket.connect();
@@ -46,6 +83,8 @@ export function connectSocket(accessToken: string): Socket {
     withCredentials: true,
   });
   socket.on('connect', emitVisibility);
+  const created = socket;
+  socket.on('connect_error', (error) => handleConnectError(created, error));
   document.addEventListener('visibilitychange', emitVisibility);
   flushPendingEmits(socket);
   return socket;
@@ -53,6 +92,10 @@ export function connectSocket(accessToken: string): Socket {
 
 export function disconnectSocket(): void {
   pendingEmits.length = 0;
+  currentToken = null;
+  refreshedForToken = null;
+  clearTimeout(tokenRetryTimer);
+  lastTokenRefreshAt = 0;
   document.removeEventListener('visibilitychange', emitVisibility);
   socket?.disconnect();
   socket = null;

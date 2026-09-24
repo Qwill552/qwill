@@ -42,8 +42,8 @@ class DevSocketTest {
         socket.cancel()
 
         val open = packets.first() as SocketPacket.Open
-        assertEquals(25_000L, open.pingInterval)
-        assertEquals(20_000L, open.pingTimeout)
+        assertEquals(10_000L, open.pingInterval)
+        assertEquals(5_000L, open.pingTimeout)
         assertEquals(SocketPacket.ConnectError("unauthorized"), packets.last())
     }
 }

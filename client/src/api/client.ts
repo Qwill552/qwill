@@ -84,6 +84,10 @@ export function setRefreshHandler(handler: (() => Promise<boolean>) | null): voi
   refreshHandler = handler;
 }
 
+export function refreshSession(): Promise<boolean> {
+  return refreshHandler ? refreshHandler() : Promise.resolve(false);
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;

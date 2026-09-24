@@ -30,7 +30,7 @@ import type {
   UserPresenceEvent,
   UserTypingEvent,
 } from '@messenger/shared';
-import { ErrorCode, isPlayableVideoMimeType, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
+import { ErrorCode, isPlayableVideoMimeType, PRESENCE_CONFIRM_MS, SocketEvent, TYPING_TIMEOUT_MS } from '@messenger/shared';
 import { create } from 'zustand';
 
 import { getLiveCallsRequest } from '../api/calls';
@@ -297,6 +297,7 @@ interface ChatState {
   applyChatBlock: (event: ChatBlockEvent) => void;
   /** Внутренний метод: обрабатывает user:typing с автогашением по таймеру. */
   setTyping: (event: UserTypingEvent) => void;
+  expectPresenceSnapshot: () => void;
   /** Внутренний метод: гоняет хэш/превью/загрузку/emit одного вложения, вызывается и при
    *  первой отправке, и при повторе (этап 7). */
   runAttachmentUpload: (chatId: string, clientId: string) => Promise<void>;
@@ -329,6 +330,15 @@ function seedPresence(
 
 // Таймеры автогашения «печатает» — вне стора, ключ `${chatId}:${userId}` (секция 3: TYPING_TIMEOUT_MS).
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+const unconfirmedPresence = new Set<string>();
+let presenceConfirmTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearPresenceConfirmation(): void {
+  clearTimeout(presenceConfirmTimer);
+  presenceConfirmTimer = undefined;
+  unconfirmedPresence.clear();
+}
 
 const uploadAbortControllers = new Map<string, AbortController>();
 
@@ -1982,6 +1992,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socket.off(SocketEvent.UserPresence).on(SocketEvent.UserPresence, (event: UserPresenceEvent) => {
+      unconfirmedPresence.delete(event.userId);
       set((state) => ({
         presenceByUser: {
           ...state.presenceByUser,
@@ -2040,6 +2051,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off('connect').on('connect', () => {
       socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
+      get().expectPresenceSnapshot();
       const activeChatId = get().activeChatId;
       const sync = (): void => {
         void syncAllCachedChats().then(() => {
@@ -2058,9 +2070,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  expectPresenceSnapshot() {
+    clearPresenceConfirmation();
+    for (const [userId, info] of Object.entries(get().presenceByUser)) {
+      if (info.online) unconfirmedPresence.add(userId);
+    }
+    if (unconfirmedPresence.size === 0) return;
+    presenceConfirmTimer = setTimeout(() => {
+      const expired = [...unconfirmedPresence];
+      clearPresenceConfirmation();
+      set((state) => {
+        const presenceByUser = { ...state.presenceByUser };
+        for (const userId of expired) {
+          const info = presenceByUser[userId];
+          if (info) presenceByUser[userId] = { ...info, online: false };
+        }
+        return { presenceByUser };
+      });
+    }, PRESENCE_CONFIRM_MS);
+  },
+
   reset() {
     for (const timer of typingTimers.values()) clearTimeout(timer);
     typingTimers.clear();
+    clearPresenceConfirmation();
     clearOutboxRetry();
     preloadedChatIds.clear();
     preloadStarted = false;

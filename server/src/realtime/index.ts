@@ -54,6 +54,9 @@ import { messageRateLimiter } from './rateLimit.js';
 
 let io: SocketServer | null = null;
 
+const SOCKET_PING_INTERVAL_MS = 10_000;
+const SOCKET_PING_TIMEOUT_MS = 5_000;
+
 /** Личная комната сокетов пользователя — на неё держатся уведомления о новых чатах и т.п. (секция 3). */
 function userRoom(userId: string): string {
   return `user:${userId}`;
@@ -407,6 +410,8 @@ async function handleChatPin(
 export function createSocketServer(httpServer: HttpServer | HttpsServer): SocketServer {
   io = new SocketServer(httpServer, {
     cors: { origin: (origin, callback) => callback(null, isAllowedClientOrigin(origin)), credentials: true },
+    pingInterval: SOCKET_PING_INTERVAL_MS,
+    pingTimeout: SOCKET_PING_TIMEOUT_MS,
   });
 
   // Access-токен передаётся в handshake.auth — та же проверка, что и на HTTP (секция 3),
