@@ -2,13 +2,20 @@ package com.qwill.app
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import com.qwill.app.auth.FileSessionStore
 import com.qwill.app.auth.Session
 import com.qwill.app.auth.SessionState
 import com.qwill.app.core.DispatchQueue
 import com.qwill.app.core.MainQueue
+import com.qwill.app.database.MessagesStorage
+import com.qwill.app.database.NativeSqlDatabase
+import com.qwill.app.messenger.ApiMessagesTransport
+import com.qwill.app.messenger.MessagesController
 import com.qwill.app.net.ApiClient
 import com.qwill.app.net.ExtraRootTrust
 import com.qwill.app.net.HttpClients
@@ -41,13 +48,30 @@ class QwillApplication : Application() {
         )
         presence = Presence(MainQueue).also { it.attach(socket) }
         typing = TypingStore(MainQueue, { (session.state as? SessionState.Authenticated)?.user?.id }).also { it.attach(socket) }
+        val storage = MessagesStorage(File(filesDir, MessagesStorage.FILE_NAME), NativeSqlDatabase.OPENER) { Log.w(STORAGE_TAG, it) }
+        messages = MessagesController(
+            storage = storage,
+            storageQueue = DispatchQueue("storageQueue"),
+            main = MainQueue,
+            transport = ApiMessagesTransport(api, socket),
+            me = { (session.state as? SessionState.Authenticated)?.user },
+            seedPresence = presence::seed,
+            setUpdating = socket::setUpdating,
+            holdSocket = { socket.hold()::release },
+            dataSaver = ::isDataSaverOn,
+        ).also { it.attach(socket) }
 
-        session.addStateListener { socket.onSessionState(it) }
+        session.addStateListener {
+            socket.onSessionState(it)
+            messages.onSessionState(it)
+        }
         session.addClearedListener {
             socket.onSessionCleared()
             presence.clear()
             typing.clear()
+            messages.onSessionCleared()
         }
+        messages.onSessionState(session.state)
         session.start()
 
         val network = NetworkMonitor(
@@ -74,6 +98,12 @@ class QwillApplication : Application() {
                 onBackground = { socket.onBackground() },
             ),
         )
+    }
+
+    private fun isDataSaverOn(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+        val connectivity = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+        return connectivity.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
     }
 
     private class ForegroundTracker(
@@ -105,6 +135,7 @@ class QwillApplication : Application() {
 
     companion object {
         private const val SESSION_FILE = "session.json"
+        private const val STORAGE_TAG = "QwillStorage"
 
         lateinit var session: Session
             private set
@@ -119,6 +150,9 @@ class QwillApplication : Application() {
             private set
 
         lateinit var typing: TypingStore
+            private set
+
+        lateinit var messages: MessagesController
             private set
     }
 }

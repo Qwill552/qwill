@@ -49,6 +49,7 @@ class StandScreen(private val level: Int) : Screen() {
     private lateinit var pushButton: TextView
     private var sessionPanel: SessionPanel? = null
     private var socketPanel: SocketPanel? = null
+    private var databasePanel: DatabasePanel? = null
     private val styled = ArrayList<Styled>()
     private val themeSegments = ArrayList<Segment<ThemePreference>>()
     private val sizeSegments = ArrayList<Segment<FontSize>>()
@@ -83,6 +84,10 @@ class StandScreen(private val level: Int) : Screen() {
             column.addView(sockets.view, wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
             sockets.attach()
             socketPanel = sockets
+            val database = DatabasePanel(context, classGuid)
+            column.addView(database.view, wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
+            database.attach()
+            databasePanel = database
         }
         for (index in 0 until STUB_ROWS) column.addView(buildRow(index), wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
         scroll.addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -121,6 +126,8 @@ class StandScreen(private val level: Int) : Screen() {
         sessionPanel = null
         socketPanel?.detach()
         socketPanel = null
+        databasePanel?.detach()
+        databasePanel = null
     }
 
     override fun onShown() {
@@ -274,6 +281,7 @@ class StandScreen(private val level: Int) : Screen() {
         card.background = cardBackground(context)
         sessionPanel?.applyAppearance()
         socketPanel?.applyAppearance()
+        databasePanel?.applyAppearance()
         for (row in rowCards) row.background = cardBackground(context)
         pushButton.background = ripple(palette.primary, context.dp(Dimens.RADIUS_MD), withAlpha(palette.textOnPrimary, 0.24f))
         for (group in segmentGroups) {

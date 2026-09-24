@@ -99,6 +99,7 @@ class SocketConnection(
     private var sleepDue = false
     private var asleep = false
     private var holds = 0
+    private var updating = false
 
     private var phase = Phase.IDLE
     private var generation = 0
@@ -227,6 +228,13 @@ class SocketConnection(
         }
     }
 
+    fun setUpdating(value: Boolean) {
+        queue.post {
+            updating = value
+            if (phase == Phase.CONNECTED) report(connectedState())
+        }
+    }
+
     fun emit(event: String, body: JsonElement) {
         queue.post {
             if (phase == Phase.CONNECTED) sendFrame(SocketPackets.event(event, body))
@@ -344,7 +352,7 @@ class SocketConnection(
             return
         }
         if (phase == Phase.IDLE && !retryScheduled) connect()
-        report(if (phase == Phase.CONNECTED) ConnectionState.Connected else ConnectionState.Connecting)
+        report(if (phase == Phase.CONNECTED) connectedState() else ConnectionState.Connecting)
     }
 
     private fun connect() {
@@ -415,7 +423,7 @@ class SocketConnection(
         val queued = ArrayList(deferred)
         deferred.clear()
         for (frame in queued) sendFrame(frame)
-        report(ConnectionState.Connected)
+        report(connectedState())
         main.post {
             lastConnectedAt = at
             for (listener in ArrayList(connectedListeners)) listener.onSocketConnected(afterDrop)
@@ -531,6 +539,8 @@ class SocketConnection(
         evaluate()
         trySleep()
     }
+
+    private fun connectedState(): ConnectionState = if (updating) ConnectionState.Updating else ConnectionState.Connected
 
     private fun trySleep() {
         if (!sleepDue || foreground || asleep || pendingAcks.isNotEmpty() || holds > 0) return

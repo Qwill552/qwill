@@ -6,6 +6,7 @@ enum class ConnectionState {
     WaitingForNetwork,
     Connecting,
     Connected,
+    Updating,
     Sleeping,
     Off,
 }

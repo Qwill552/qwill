@@ -28,7 +28,7 @@ abstract class StandPanel(protected val context: Context) {
         setPadding(pad, pad, pad, pad)
     }
 
-    fun applyAppearance() {
+    open fun applyAppearance() {
         val palette = Theme.palette
         view.background = cardBackground(context)
         for ((text, secondary) in texts) {
