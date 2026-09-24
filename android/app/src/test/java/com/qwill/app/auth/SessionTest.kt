@@ -137,9 +137,7 @@ class SessionTest {
         )
         for (failure in failures) {
             refreshCalls.set(0)
-            open(expiredSession()) { request ->
-                if (request.path == "/api/auth/refresh") failure else json(200, userJson())
-            }
+            open(expiredSession()) { failure }
 
             requestProfile().await()
             settle()
@@ -152,6 +150,53 @@ class SessionTest {
             sessionQueue.shutdown()
             sessionQueue = ExecutorQueue()
         }
+    }
+
+    private fun awaitState(expected: SessionState, timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            mainQueue.drain()
+            if (session.state == expected) return true
+            Thread.sleep(50)
+        }
+        return false
+    }
+
+    @Test
+    fun networkErrorOnRefreshRetriesByItself() {
+        val attempts = AtomicInteger()
+        open(liveSession()) { request ->
+            if (request.path == "/api/auth/refresh" && attempts.incrementAndGet() == 1) {
+                MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
+            } else {
+                json(200, authJson(newAccess, "r1"))
+            }
+        }
+
+        session.start()
+
+        assertTrue(awaitState(SessionState.Authenticated(storedUser, confirmed = true), 5_000))
+        assertEquals(2, refreshCalls.get())
+    }
+
+    @Test
+    fun successfulResponseConfirmsUnsettledSession() {
+        val attempts = AtomicInteger()
+        open(liveSession()) { request ->
+            when {
+                request.path == "/api/auth/refresh" && attempts.incrementAndGet() == 1 ->
+                    MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
+                request.path == "/api/auth/refresh" -> json(200, authJson(newAccess, "r1"))
+                else -> json(200, """{"status":"ok"}""")
+            }
+        }
+
+        session.start()
+        while (refreshCalls.get() < 1) Thread.sleep(10)
+        settle()
+        Awaiting<Any>().also { api.send(Requests.health(), guid, it) }.await()
+
+        assertTrue(awaitState(SessionState.Authenticated(storedUser, confirmed = true), 1_500))
     }
 
     @Test

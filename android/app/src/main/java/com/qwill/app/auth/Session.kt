@@ -80,7 +80,10 @@ class Session(
     }
 
     fun onNetworkAvailable() {
-        queue.post { refreshIfUnsettled() }
+        queue.post {
+            retryDelayMs = 0
+            refreshIfUnsettled()
+        }
     }
 
     fun onForeground() {
@@ -152,6 +155,7 @@ class Session(
             }
             applySessionError(error)
         }
+        if (result is ApiResult.Success) refreshIfUnsettled()
         done(result)
     }
 
@@ -219,7 +223,7 @@ class Session(
 
     private fun applyRefreshFailure(error: ApiException) {
         if (error is NetworkError) {
-            needsRefresh = true
+            retryLater()
             return
         }
         val apiError = error as ApiError
