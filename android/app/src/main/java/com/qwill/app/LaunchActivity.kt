@@ -2,6 +2,7 @@ package com.qwill.app
 
 import android.annotation.TargetApi
 import android.app.Activity
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -11,6 +12,7 @@ import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import com.qwill.app.stand.StandScreen
+import com.qwill.app.ui.ActivityResults
 import com.qwill.app.ui.insets.SafeAreaTracker
 import com.qwill.app.ui.insets.SystemBars
 import com.qwill.app.ui.stack.ScreenStack
@@ -49,6 +51,13 @@ class LaunchActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Motion.refresh(this)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (ActivityResults.dispatch(requestCode, resultCode, data)) return
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

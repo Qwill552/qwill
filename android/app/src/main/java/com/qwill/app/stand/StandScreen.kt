@@ -50,6 +50,7 @@ class StandScreen(private val level: Int) : Screen() {
     private var sessionPanel: SessionPanel? = null
     private var socketPanel: SocketPanel? = null
     private var databasePanel: DatabasePanel? = null
+    private var filesPanel: FilesPanel? = null
     private val styled = ArrayList<Styled>()
     private val themeSegments = ArrayList<Segment<ThemePreference>>()
     private val sizeSegments = ArrayList<Segment<FontSize>>()
@@ -88,6 +89,10 @@ class StandScreen(private val level: Int) : Screen() {
             column.addView(database.view, wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
             database.attach()
             databasePanel = database
+            val files = FilesPanel(context, classGuid)
+            column.addView(files.view, wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
+            files.attach()
+            filesPanel = files
         }
         for (index in 0 until STUB_ROWS) column.addView(buildRow(index), wrapWidth().apply { topMargin = context.dpInt(Dimens.SPACE_2) })
         scroll.addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -128,6 +133,8 @@ class StandScreen(private val level: Int) : Screen() {
         socketPanel = null
         databasePanel?.detach()
         databasePanel = null
+        filesPanel?.detach()
+        filesPanel = null
     }
 
     override fun onShown() {
@@ -282,6 +289,7 @@ class StandScreen(private val level: Int) : Screen() {
         sessionPanel?.applyAppearance()
         socketPanel?.applyAppearance()
         databasePanel?.applyAppearance()
+        filesPanel?.applyAppearance()
         for (row in rowCards) row.background = cardBackground(context)
         pushButton.background = ripple(palette.primary, context.dp(Dimens.RADIUS_MD), withAlpha(palette.textOnPrimary, 0.24f))
         for (group in segmentGroups) {

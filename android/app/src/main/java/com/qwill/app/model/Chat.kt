@@ -209,6 +209,8 @@ data class MessageSendPayload(
     val clientId: String,
     val content: String? = null,
     val replyToId: Long? = null,
+    val attachment: MessageAttachmentInput? = null,
+    val albumId: String? = null,
 )
 
 @Serializable

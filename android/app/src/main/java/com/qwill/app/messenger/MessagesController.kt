@@ -6,6 +6,8 @@ import com.qwill.app.database.MessagesStorage
 import com.qwill.app.database.PageSide
 import com.qwill.app.database.StorageStats
 import com.qwill.app.database.SyncCursor
+import com.qwill.app.database.UnsentMessage
+import com.qwill.app.files.NoAttachments
 import com.qwill.app.model.ChatBlockEvent
 import com.qwill.app.model.ChatDeletedEvent
 import com.qwill.app.model.ChatDto
@@ -14,6 +16,7 @@ import com.qwill.app.model.ChatMemberSummary
 import com.qwill.app.model.ChatPinnedEvent
 import com.qwill.app.model.ChatReadEvent
 import com.qwill.app.model.ChatUpdatedEvent
+import com.qwill.app.model.LocalAttachment
 import com.qwill.app.model.MemberChangedEvent
 import com.qwill.app.model.MessageDeletedBatchEvent
 import com.qwill.app.model.MessageDto
@@ -27,6 +30,7 @@ import com.qwill.app.net.NoResponseError
 import com.qwill.app.net.RequestGuid
 import com.qwill.app.realtime.SocketConnection
 import com.qwill.app.realtime.SocketEvent
+import java.util.concurrent.Executor
 
 class MessagesController(
     private val storage: MessagesStorage,
@@ -40,6 +44,11 @@ class MessagesController(
     private val dataSaver: () -> Boolean,
     private val timings: MessagesTimings = MessagesTimings(),
     clock: () -> Long = System::currentTimeMillis,
+    attachments: AttachmentBackend = NoAttachments,
+    prepareQueue: TaskQueue = storageQueue,
+    uploadWorkers: Executor = Executor { it.run() },
+    mediaTimings: MediaSendTimings = MediaSendTimings(),
+    onUploadsChanged: (Int) -> Unit = {},
 ) : SendMessagesHelper.Host {
     private sealed class SyncOutcome {
         object Done : SyncOutcome()
@@ -86,7 +95,27 @@ class MessagesController(
 
     private val sender = SendMessagesHelper(storage, storageQueue, main, transport, holdSocket, timings, clock, guid, this)
 
-    val isSending: Boolean get() = sender.isSending
+    private val media = SendMediaHelper(
+        storage = storage,
+        storageQueue = storageQueue,
+        main = main,
+        transport = transport,
+        backend = attachments,
+        prepareQueue = prepareQueue,
+        workers = uploadWorkers,
+        holdSocket = holdSocket,
+        localTime = sender::nextLocalTime,
+        isoTime = sender::isoTime,
+        clock = clock,
+        guid = guid,
+        host = this,
+        timings = mediaTimings,
+        onActiveChanged = onUploadsChanged,
+    )
+
+    val isSending: Boolean get() = sender.isSending || media.activeCount > 0
+
+    val activeUploads: Int get() = media.activeCount
 
     fun attach(socket: SocketConnection) {
         val none = RequestGuid.NONE
@@ -176,16 +205,59 @@ class MessagesController(
         sender.sendText(chatId, text, me()?.let { asSender(it) }, replyTo, callback)
     }
 
+    fun sendMedia(
+        chatId: String,
+        input: AttachmentInput,
+        caption: String? = null,
+        replyTo: MessageDto? = null,
+        albumId: String? = null,
+        duration: Int? = null,
+        peaks: List<Double>? = null,
+        callback: SendCallback? = null,
+    ) {
+        media.sendMedia(chatId, input, caption, me()?.let { asSender(it) }, replyTo, albumId, duration, peaks, callback)
+    }
+
+    fun cancelMessage(chatId: String, clientId: String) {
+        media.cancel(chatId, clientId)
+    }
+
+    fun retryMessage(chatId: String, clientId: String) {
+        media.retry(chatId, clientId)
+    }
+
+    fun readUnsentAttachments(callback: (List<UnsentMessage>) -> Unit) {
+        val current = epoch
+        storageQueue.post {
+            val rows = storage.readUnsent().filter { it.local != null }
+            main.post { if (current == epoch) callback(rows) }
+        }
+    }
+
+    fun onNetworkAvailable() {
+        media.onNetworkAvailable()
+    }
+
+    fun recentAttachments(chatId: String, limit: Int, callback: (List<MessageDto>) -> Unit) {
+        val current = epoch
+        storageQueue.post {
+            val found = storage.readTail(chatId, ATTACHMENT_SCAN_LIMIT).filter { it.attachment != null }.takeLast(limit).asReversed()
+            main.post { if (current == epoch) callback(found) }
+        }
+    }
+
     fun openChat(chatId: String, requestGuid: Int, callback: HistoryCallback) {
         openedChatId = chatId
         val current = epoch
         storageQueue.post {
             val tail = storage.readTail(chatId, timings.pageSize)
-            val pending = storage.readUnsent(chatId).map { it.message }
+            val unsent = storage.readUnsent(chatId)
+            val pending = unsent.map { it.message }
+            val locals = localsOf(unsent)
             val details = storage.readDetails(chatId)
             main.post {
                 if (!alive(current, requestGuid)) return@post
-                callback.onHistory(HistoryPage(chatId, tail, pending, tail.isNotEmpty(), false, HistorySource.DISK))
+                callback.onHistory(HistoryPage(chatId, tail, pending, tail.isNotEmpty(), false, HistorySource.DISK, pendingLocal = locals))
                 if (details != null) callback.onDetails(details, HistorySource.DISK)
                 loadDetails(chatId, requestGuid, callback)
                 refreshOpenedHistory(chatId, tail.isEmpty() && pending.isEmpty(), requestGuid, callback)
@@ -228,7 +300,11 @@ class MessagesController(
             preloadWaiting = false
             main.postDelayed(preloadTask, timings.preloadIntervalMs)
         }
-        sender.drain { if (generation == entryGeneration) loadChatList(generation) }
+        sender.drain {
+            if (generation != entryGeneration) return@drain
+            media.drain()
+            loadChatList(generation)
+        }
     }
 
     fun applyIncomingMessage(message: MessageDto) {
@@ -332,8 +408,12 @@ class MessagesController(
         notifyChats()
         preloadQueue.remove(chatId)
         storageQueue.post {
-            storage.removeChat(chatId)
-            main.post { if (current == epoch) notify(FeedUpdate.ChatGone(chatId, kicked = false)) }
+            val queued = storage.removeChat(chatId)
+            main.post {
+                if (current != epoch) return@post
+                media.onChatRemoved(chatId, queued)
+                notify(FeedUpdate.ChatGone(chatId, kicked = false))
+            }
         }
     }
 
@@ -405,6 +485,7 @@ class MessagesController(
         main.cancel(preloadTask)
         main.cancel(cleanupTask)
         sender.clear()
+        media.clear()
         transport.cancelRequestsForGuid(guid)
         setUpdating(false)
     }
@@ -579,10 +660,14 @@ class MessagesController(
             }
             storageQueue.post {
                 val tail = storage.readTail(chatId, timings.pageSize)
-                val pending = storage.readUnsent(chatId).map { it.message }
+                val unsent = storage.readUnsent(chatId)
+                val pending = unsent.map { it.message }
+                val locals = localsOf(unsent)
                 main.post {
                     if (!alive(current, requestGuid)) return@post
-                    callback.onHistory(HistoryPage(chatId, tail, pending, tail.size >= timings.pageSize, false, HistorySource.NETWORK))
+                    callback.onHistory(
+                        HistoryPage(chatId, tail, pending, tail.size >= timings.pageSize, false, HistorySource.NETWORK, pendingLocal = locals),
+                    )
                 }
             }
         }
@@ -737,6 +822,15 @@ class MessagesController(
         for (listener in ArrayList(chatsListeners)) listener.onChatsChanged()
     }
 
+    private fun localsOf(rows: List<UnsentMessage>): Map<String, LocalAttachment> {
+        val result = HashMap<String, LocalAttachment>()
+        for (row in rows) {
+            val clientId = row.message.clientId ?: continue
+            row.local?.let { result[clientId] = it }
+        }
+        return result
+    }
+
     private fun alive(current: Int, requestGuid: Int): Boolean = current == epoch && requestGuid !in cancelledGuids
 
     private fun alive(messages: List<MessageDto>): List<MessageDto> = messages.filter { it.deletedAt == null }
@@ -747,4 +841,8 @@ class MessagesController(
 
     private fun asSender(user: PublicUser): ChatMemberSummary =
         ChatMemberSummary(user.id, user.username, user.displayName, user.avatarUrl, user.avatarColor, user.lastSeenAt, false)
+
+    private companion object {
+        const val ATTACHMENT_SCAN_LIMIT = 500
+    }
 }

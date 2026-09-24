@@ -1,6 +1,7 @@
 package com.qwill.app
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
@@ -14,6 +15,12 @@ import com.qwill.app.core.DispatchQueue
 import com.qwill.app.core.MainQueue
 import com.qwill.app.database.MessagesStorage
 import com.qwill.app.database.NativeSqlDatabase
+import com.qwill.app.files.FileHttp
+import com.qwill.app.files.FilesController
+import com.qwill.app.files.MediaDirs
+import com.qwill.app.files.SessionAccessTokens
+import com.qwill.app.files.UploadService
+import com.qwill.app.messenger.FeedUpdate
 import com.qwill.app.messenger.ApiMessagesTransport
 import com.qwill.app.messenger.MessagesController
 import com.qwill.app.net.ApiClient
@@ -25,6 +32,7 @@ import com.qwill.app.realtime.Presence
 import com.qwill.app.realtime.SocketConnection
 import com.qwill.app.realtime.TypingStore
 import java.io.File
+import java.util.concurrent.Executors
 
 class QwillApplication : Application() {
     override fun onCreate() {
@@ -49,9 +57,31 @@ class QwillApplication : Application() {
         presence = Presence(MainQueue).also { it.attach(socket) }
         typing = TypingStore(MainQueue, { (session.state as? SessionState.Authenticated)?.user?.id }).also { it.attach(socket) }
         val storage = MessagesStorage(File(filesDir, MessagesStorage.FILE_NAME), NativeSqlDatabase.OPENER) { Log.w(STORAGE_TAG, it) }
+        val storageQueue = DispatchQueue("storageQueue")
+        val mediaTaskQueue = DispatchQueue("mediaTaskQueue").apply { priority = Thread.MIN_PRIORITY }
+        val fileHttp = FileHttp(
+            httpClient,
+            BuildConfig.API_ORIGIN,
+            userAgent,
+            SessionAccessTokens(session::liveAccessToken),
+            session::reportIpBanned,
+        )
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        files = FilesController(
+            context = this,
+            dirs = MediaDirs(cacheDir, filesDir),
+            storage = storage,
+            storageQueue = storageQueue,
+            main = MainQueue,
+            http = fileHttp,
+            fileQueue = DispatchQueue("fileQueue"),
+            imageQueue = DispatchQueue("imageQueue"),
+            memoryClassMb = activityManager.memoryClass,
+        )
+        var uploadPercent = -1
         messages = MessagesController(
             storage = storage,
-            storageQueue = DispatchQueue("storageQueue"),
+            storageQueue = storageQueue,
             main = MainQueue,
             transport = ApiMessagesTransport(api, socket),
             me = { (session.state as? SessionState.Authenticated)?.user },
@@ -59,19 +89,37 @@ class QwillApplication : Application() {
             setUpdating = socket::setUpdating,
             holdSocket = { socket.hold()::release },
             dataSaver = ::isDataSaverOn,
+            attachments = files.backend,
+            prepareQueue = mediaTaskQueue,
+            uploadWorkers = Executors.newFixedThreadPool(UPLOAD_SLOTS),
+            onUploadsChanged = { count ->
+                if (count == 0) uploadPercent = -1
+                UploadService.update(this, count, uploadPercent)
+            },
         ).also { it.attach(socket) }
+        messages.addFeedListener { update ->
+            if (update !is FeedUpdate.UploadProgress) return@addFeedListener
+            val percent = (update.share * 100).toInt()
+            if (percent == uploadPercent) return@addFeedListener
+            uploadPercent = percent
+            UploadService.update(this, messages.activeUploads, percent)
+        }
 
         session.addStateListener {
             socket.onSessionState(it)
             messages.onSessionState(it)
+            if (it is SessionState.Authenticated) files.start()
         }
         session.addClearedListener {
             socket.onSessionCleared()
             presence.clear()
             typing.clear()
             messages.onSessionCleared()
+            files.onSessionCleared(mediaTaskQueue)
+            UploadService.update(this, 0)
         }
         messages.onSessionState(session.state)
+        if (session.state is SessionState.Authenticated) files.start()
         session.start()
 
         val network = NetworkMonitor(
@@ -80,6 +128,8 @@ class QwillApplication : Application() {
                 override fun onNetworkAvailable() {
                     session.onNetworkAvailable()
                     socket.onNetworkAvailable()
+                    files.onNetworkAvailable()
+                    MainQueue.post { messages.onNetworkAvailable() }
                 }
 
                 override fun onNetworkLost() {
@@ -136,6 +186,7 @@ class QwillApplication : Application() {
     companion object {
         private const val SESSION_FILE = "session.json"
         private const val STORAGE_TAG = "QwillStorage"
+        private const val UPLOAD_SLOTS = 2
 
         lateinit var session: Session
             private set
@@ -153,6 +204,9 @@ class QwillApplication : Application() {
             private set
 
         lateinit var messages: MessagesController
+            private set
+
+        lateinit var files: FilesController
             private set
     }
 }

@@ -161,6 +161,7 @@ class DatabasePanel(context: Context, private val guid: Int) : StandPanel(contex
     }
 
     private fun onFeed(update: FeedUpdate) {
+        if (update is FeedUpdate.UploadProgress) return
         val line = when (update) {
             is FeedUpdate.Added -> "пришло ${update.messages.size}"
             is FeedUpdate.Changed -> "изменено ${update.messages.size}"
@@ -171,6 +172,10 @@ class DatabasePanel(context: Context, private val guid: Int) : StandPanel(contex
             is FeedUpdate.Sent -> "отправлено ${update.message.id}"
             is FeedUpdate.Failed -> "не отправлено" + (update.reason?.let { ": $it" } ?: "")
             is FeedUpdate.DetailsChanged -> "описание чата обновлено"
+            is FeedUpdate.LocalAttachmentChanged -> "вложение ${update.clientId.take(CLIENT_ID_CHARS)}" +
+                if (update.local.failed) ": не отправлено" + (update.local.error?.let { " — $it" } ?: "") else ""
+            is FeedUpdate.UploadProgress -> return
+            is FeedUpdate.Discarded -> "отменено ${update.clientId.take(CLIENT_ID_CHARS)}"
             is FeedUpdate.ChatGone -> if (update.kicked) "исключён из чата" else "чат удалён"
         }
         record("${update.chatId.take(CHAT_ID_CHARS)} $line")

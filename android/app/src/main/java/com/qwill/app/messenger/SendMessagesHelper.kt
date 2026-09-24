@@ -87,7 +87,7 @@ class SendMessagesHelper internal constructor(
         val epoch = host.epoch
         storageQueue.post {
             val rows = storage.readUnsent()
-            val due = rows.filter { it.message.clientId != null }
+            val due = rows.filter { it.message.clientId != null && it.local == null }
             for (row in due) storage.bumpAttempts(row.message.clientId!!)
             main.post {
                 if (epoch != host.epoch) return@post
@@ -176,7 +176,7 @@ class SendMessagesHelper internal constructor(
         }
     }
 
-    private fun nextLocalTime(): Long {
+    internal fun nextLocalTime(): Long {
         val now = clock()
         lastLocalTime = if (now > lastLocalTime) now else lastLocalTime + 1
         return lastLocalTime
@@ -190,7 +190,7 @@ class SendMessagesHelper internal constructor(
         deletedAt = target.deletedAt,
     )
 
-    private fun isoTime(ms: Long): String = SimpleDateFormat(ISO_PATTERN, Locale.ROOT)
+    internal fun isoTime(ms: Long): String = SimpleDateFormat(ISO_PATTERN, Locale.ROOT)
         .apply { timeZone = TimeZone.getTimeZone("UTC") }
         .format(Date(ms))
 

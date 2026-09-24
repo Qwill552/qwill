@@ -20,7 +20,7 @@ class MessagesStorageTest {
         val file = tempDatabase()
         val storage = openStorage(file)
         assertTrue(storage.isOpen)
-        assertEquals(StorageStats(0, 0, 0, 0, storage.stats().fileBytes), storage.stats())
+        assertEquals(StorageStats(0, 0, 0, 0, 0, storage.stats().fileBytes), storage.stats())
         storage.close()
         assertEquals(MessagesStorage.VERSION.toLong(), version(file))
     }

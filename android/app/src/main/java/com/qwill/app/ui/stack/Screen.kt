@@ -43,6 +43,7 @@ abstract class Screen {
         QwillApplication.api.cancelRequestsForGuid(classGuid)
         QwillApplication.socket.cancelRequestsForGuid(classGuid)
         QwillApplication.messages.cancelRequestsForGuid(classGuid)
+        QwillApplication.files.cancelRequestsForGuid(classGuid)
         onDestroyed()
     }
 

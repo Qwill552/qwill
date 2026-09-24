@@ -1,9 +1,11 @@
 package com.qwill.app.messenger
 
 import com.qwill.app.model.ChatDto
+import com.qwill.app.model.LocalAttachment
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageReactionDto
 import com.qwill.app.net.ApiException
+import java.io.File
 
 sealed class FeedUpdate(val chatId: String) {
     class Added(chatId: String, val messages: List<MessageDto>) : FeedUpdate(chatId)
@@ -21,6 +23,12 @@ sealed class FeedUpdate(val chatId: String) {
     class Sent(chatId: String, val clientId: String, val message: MessageDto) : FeedUpdate(chatId)
 
     class Failed(chatId: String, val clientId: String, val reason: String?) : FeedUpdate(chatId)
+
+    class LocalAttachmentChanged(chatId: String, val clientId: String, val local: LocalAttachment, val dir: File) : FeedUpdate(chatId)
+
+    class UploadProgress(chatId: String, val clientId: String, val share: Float) : FeedUpdate(chatId)
+
+    class Discarded(chatId: String, val clientId: String) : FeedUpdate(chatId)
 
     class DetailsChanged(chatId: String, val details: ChatDto) : FeedUpdate(chatId)
 
@@ -45,6 +53,7 @@ class HistoryPage(
     val hasMoreAfter: Boolean,
     val source: HistorySource,
     val offline: Boolean = false,
+    val pendingLocal: Map<String, LocalAttachment> = emptyMap(),
 )
 
 interface HistoryCallback {

@@ -1,7 +1,13 @@
 package com.qwill.app.database
 
+import com.qwill.app.files.ByteRange
+import com.qwill.app.files.CachedMedia
+import com.qwill.app.files.MediaKind
+import com.qwill.app.files.MediaTier
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListItemDto
+import com.qwill.app.model.ChatType
+import com.qwill.app.model.LocalAttachment
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageReactionDto
 import com.qwill.app.model.MessagesSyncResponse
@@ -12,7 +18,23 @@ data class SyncCursor(val maxId: Long, val maxUpdatedAt: String?)
 
 data class MessageRange(val fromId: Long, val toId: Long)
 
-data class UnsentMessage(val message: MessageDto, val createdAtMs: Long, val attempts: Int)
+data class UnsentMessage(val message: MessageDto, val createdAtMs: Long, val attempts: Int, val local: LocalAttachment? = null)
+
+data class MediaRow(
+    val fileId: String,
+    val chatId: String?,
+    val kind: MediaKind,
+    val tier: MediaTier,
+    val size: Long,
+    val totalSize: Long,
+    val complete: Boolean,
+    val lastUsedAt: Long,
+    val path: String,
+) {
+    fun asCached(): CachedMedia = CachedMedia(fileId, chatId, kind, tier, size, lastUsedAt, complete)
+}
+
+data class PartialRanges(val ranges: List<ByteRange>, val totalSize: Long, val mime: String?)
 
 enum class PageSide { OLDER, NEWER }
 
@@ -21,6 +43,7 @@ data class StorageStats(
     val messages: Int,
     val ranges: Int,
     val unsent: Int,
+    val unsentAttachments: Int,
     val fileBytes: Long,
 )
 
@@ -33,7 +56,18 @@ class MessagesStorage(
     private val opener: SqlOpener,
     private val log: (String) -> Unit,
 ) {
-    private class UnsentRow(val chatId: String, val id: Long, val clientId: String, val createdAt: Long, val attempts: Long, val data: String)
+    private class UnsentRow(
+        val chatId: String,
+        val id: Long,
+        val clientId: String,
+        val createdAt: Long,
+        val attempts: Long,
+        val data: String,
+        val local: String?,
+    )
+
+    @Volatile
+    var onRecreated: () -> Unit = {}
 
     private var db: SqlDatabase? = null
 
@@ -62,6 +96,7 @@ class MessagesStorage(
     fun wipe() {
         close()
         deleteFiles()
+        onRecreated()
     }
 
     fun readChats(): List<ChatListItemDto> = guard(emptyList()) { db ->
@@ -86,16 +121,20 @@ class MessagesStorage(
         guard(Unit) { db -> db.execute("DELETE FROM chats WHERE id = ?", chatId) }
     }
 
-    fun removeChat(chatId: String) {
-        guard(Unit) { db ->
-            db.transaction {
+    fun removeChat(chatId: String): List<String> = guard(emptyList()) { db ->
+        val queued = db.query(
+            "SELECT client_id FROM messages WHERE chat_id = ? AND send_state = ? AND local_attachment IS NOT NULL",
+            chatId,
+            SENDING,
+        ) { it.string(0) }.filterNotNull()
+        db.transaction {
                 db.execute("DELETE FROM chats WHERE id = ?", chatId)
                 db.execute("DELETE FROM chat_details WHERE id = ?", chatId)
                 db.execute("DELETE FROM messages WHERE chat_id = ?", chatId)
                 db.execute("DELETE FROM message_ranges WHERE chat_id = ?", chatId)
                 db.execute("DELETE FROM sync_cursors WHERE chat_id = ?", chatId)
             }
-        }
+        queued
     }
 
     fun readDetails(chatId: String): ChatDto? = guard(null) { db ->
@@ -263,18 +302,19 @@ class MessagesStorage(
         }
     }
 
-    fun insertUnsent(message: MessageDto, createdAtMs: Long) {
+    fun insertUnsent(message: MessageDto, createdAtMs: Long, local: LocalAttachment? = null) {
         val current = db ?: throw SqlException(0, "база недоступна")
         require(message.id < 0 && message.clientId != null) { "неотправленное — только с отрицательным id и clientId" }
         try {
             current.execute(
-                "INSERT INTO messages(chat_id, id, send_state, client_id, created_at, attempts, data) VALUES (?, ?, ?, ?, ?, 0, ?)",
+                "INSERT INTO messages(chat_id, id, send_state, client_id, created_at, attempts, data, local_attachment) VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
                 message.chatId,
                 message.id,
                 SENDING,
                 message.clientId,
                 createdAtMs,
                 encodeMessage(message),
+                local?.let { encodeLocal(it) },
             )
         } catch (e: SqlException) {
             if (e.corrupt) reset()
@@ -284,10 +324,10 @@ class MessagesStorage(
 
     fun readUnsent(chatId: String? = null): List<UnsentMessage> = guard(emptyList()) { db ->
         val rows = if (chatId == null) {
-            db.query("SELECT data, created_at, attempts FROM messages WHERE send_state = ? ORDER BY created_at, id DESC", SENDING, read = ::unsent)
+            db.query("SELECT data, created_at, attempts, local_attachment FROM messages WHERE send_state = ? ORDER BY created_at, id DESC", SENDING, read = ::unsent)
         } else {
             db.query(
-                "SELECT data, created_at, attempts FROM messages WHERE send_state = ? AND chat_id = ? ORDER BY created_at, id DESC",
+                "SELECT data, created_at, attempts, local_attachment FROM messages WHERE send_state = ? AND chat_id = ? ORDER BY created_at, id DESC",
                 SENDING,
                 chatId,
                 read = ::unsent,
@@ -299,6 +339,104 @@ class MessagesStorage(
     fun bumpAttempts(clientId: String): Int = guard(0) { db ->
         db.execute("UPDATE messages SET attempts = attempts + 1 WHERE client_id = ? AND send_state = ?", clientId, SENDING)
         db.queryLong("SELECT attempts FROM messages WHERE client_id = ? AND send_state = ?", clientId, SENDING)?.toInt() ?: 0
+    }
+
+    fun readUnsentByClient(clientId: String): UnsentMessage? = guard(null) { db ->
+        db.query(
+            "SELECT data, created_at, attempts, local_attachment FROM messages WHERE send_state = ? AND client_id = ?",
+            SENDING,
+            clientId,
+            read = ::unsent,
+        ).firstOrNull()
+    }
+
+    fun updateLocalAttachment(clientId: String, local: LocalAttachment): Boolean = guard(false) { db ->
+        db.execute(
+            "UPDATE messages SET local_attachment = ? WHERE client_id = ? AND send_state = ?",
+            encodeLocal(local),
+            clientId,
+            SENDING,
+        )
+        db.changes() > 0
+    }
+
+    fun resetAttempts(clientId: String) {
+        guard(Unit) { db -> db.execute("UPDATE messages SET attempts = 0 WHERE client_id = ? AND send_state = ?", clientId, SENDING) }
+    }
+
+    fun readChatTypes(): Map<String, ChatType> = guard(emptyMap()) { db ->
+        db.query("SELECT id, type FROM chats") { row ->
+            val type = if (row.string(1) == ChatType.GROUP.name) ChatType.GROUP else ChatType.PRIVATE
+            row.string(0).orEmpty() to type
+        }.toMap()
+    }
+
+    fun readMedia(fileId: String): MediaRow? = guard(null) { db ->
+        db.query("SELECT $MEDIA_COLUMNS FROM media WHERE file_id = ?", fileId, read = ::mediaRow).firstOrNull()
+    }
+
+    fun readAllMedia(): List<MediaRow> = guard(emptyList()) { db ->
+        db.query("SELECT $MEDIA_COLUMNS FROM media", read = ::mediaRow)
+    }
+
+    fun putMedia(row: MediaRow) {
+        guard(Unit) { db ->
+            db.transaction {
+                insertMedia(db, row)
+                if (row.complete) db.execute("DELETE FROM media_ranges WHERE file_id = ?", row.fileId)
+            }
+        }
+    }
+
+    fun touchMedia(fileId: String, now: Long) {
+        guard(Unit) { db -> db.execute("UPDATE media SET last_used_at = ? WHERE file_id = ?", now, fileId) }
+    }
+
+    fun deleteMedia(fileIds: Collection<String>) {
+        if (fileIds.isEmpty()) return
+        guard(Unit) { db ->
+            db.transaction {
+                for (id in fileIds) {
+                    db.execute("DELETE FROM media WHERE file_id = ?", id)
+                    db.execute("DELETE FROM media_ranges WHERE file_id = ?", id)
+                }
+            }
+        }
+    }
+
+    fun clearMedia() {
+        guard(Unit) { db ->
+            db.transaction {
+                db.execute("DELETE FROM media")
+                db.execute("DELETE FROM media_ranges")
+            }
+        }
+    }
+
+    fun readMediaRanges(fileId: String): PartialRanges? = guard(null) { db ->
+        val rows = db.query("SELECT from_byte, to_byte, total_size, mime FROM media_ranges WHERE file_id = ? ORDER BY from_byte", fileId) {
+            Triple(ByteRange(it.long(0), it.long(1)), it.long(2), it.string(3))
+        }
+        if (rows.isEmpty()) null else PartialRanges(rows.map { it.first }, rows.first().second, rows.first().third)
+    }
+
+    fun writeMediaRanges(row: MediaRow, ranges: List<ByteRange>, mime: String?) {
+        guard(Unit) { db ->
+            db.transaction {
+                insertMedia(db, row)
+                db.execute("DELETE FROM media_ranges WHERE file_id = ?", row.fileId)
+                for (range in ranges) {
+                    db.execute(
+                        "INSERT INTO media_ranges(file_id, from_byte, to_byte, total_size, mime) VALUES (?, ?, ?, ?, ?)",
+                        row.fileId,
+                        range.start,
+                        range.end,
+                        row.totalSize,
+                        mime,
+                    )
+                }
+            }
+        }
     }
 
     fun removeUnsent(clientId: String): Boolean = guard(false) { db ->
@@ -342,12 +480,16 @@ class MessagesStorage(
         dropped
     }
 
-    fun stats(): StorageStats = guard(StorageStats(0, 0, 0, 0, fileBytes())) { db ->
+    fun stats(): StorageStats = guard(StorageStats(0, 0, 0, 0, 0, fileBytes())) { db ->
         StorageStats(
             chats = db.queryLong("SELECT COUNT(*) FROM chats")?.toInt() ?: 0,
             messages = db.queryLong("SELECT COUNT(*) FROM messages WHERE send_state = ?", SENT)?.toInt() ?: 0,
             ranges = db.queryLong("SELECT COUNT(*) FROM message_ranges")?.toInt() ?: 0,
             unsent = db.queryLong("SELECT COUNT(*) FROM messages WHERE send_state = ?", SENDING)?.toInt() ?: 0,
+            unsentAttachments = db.queryLong(
+                "SELECT COUNT(*) FROM messages WHERE send_state = ? AND local_attachment IS NOT NULL",
+                SENDING,
+            )?.toInt() ?: 0,
             fileBytes = fileBytes(),
         )
     }
@@ -405,6 +547,7 @@ class MessagesStorage(
 
     private fun rebuild(rescued: List<UnsentRow>): SqlDatabase? {
         deleteFiles()
+        onRecreated()
         return try {
             val fresh = openAndMigrate()
             if (rescued.isNotEmpty()) {
@@ -419,11 +562,15 @@ class MessagesStorage(
     }
 
     private fun rescueUnsent(source: SqlDatabase): List<UnsentRow> = try {
-        source.query(
-            "SELECT chat_id, id, client_id, created_at, attempts, data FROM messages WHERE send_state = ?",
-            SENDING,
-        ) { UnsentRow(it.string(0).orEmpty(), it.long(1), it.string(2).orEmpty(), it.long(3), it.long(4), it.string(5).orEmpty()) }
-            .filter { it.chatId.isNotEmpty() && it.clientId.isNotEmpty() && it.data.isNotEmpty() }
+        val hasLocal = (source.queryLong("PRAGMA user_version") ?: 0L) >= LOCAL_ATTACHMENT_VERSION
+        val sql = if (hasLocal) {
+            "SELECT chat_id, id, client_id, created_at, attempts, data, local_attachment FROM messages WHERE send_state = ?"
+        } else {
+            "SELECT chat_id, id, client_id, created_at, attempts, data, NULL FROM messages WHERE send_state = ?"
+        }
+        source.query(sql, SENDING) {
+            UnsentRow(it.string(0).orEmpty(), it.long(1), it.string(2).orEmpty(), it.long(3), it.long(4), it.string(5).orEmpty(), it.string(6))
+        }.filter { it.chatId.isNotEmpty() && it.clientId.isNotEmpty() && it.data.isNotEmpty() }
     } catch (e: Exception) {
         log("неотправленное не вычиталось: ${e.message}")
         emptyList()
@@ -431,7 +578,7 @@ class MessagesStorage(
 
     private fun insertUnsentRow(db: SqlDatabase, row: UnsentRow) {
         db.execute(
-            "INSERT OR REPLACE INTO messages(chat_id, id, send_state, client_id, created_at, attempts, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO messages(chat_id, id, send_state, client_id, created_at, attempts, data, local_attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             row.chatId,
             row.id,
             SENDING,
@@ -439,6 +586,7 @@ class MessagesStorage(
             row.createdAt,
             row.attempts,
             row.data,
+            row.local,
         )
     }
 
@@ -533,8 +681,38 @@ class MessagesStorage(
 
     private fun unsent(row: SqlRow): UnsentMessage? {
         val message = decodeMessage(row.string(0)) ?: return null
-        return UnsentMessage(message, row.long(1), row.long(2).toInt())
+        val local = row.string(3)?.let { decode(it) { text -> ApiJson.decodeFromString(LocalAttachment.serializer(), text) } }
+        return UnsentMessage(message, row.long(1), row.long(2).toInt(), local)
     }
+
+    private fun mediaRow(row: SqlRow): MediaRow = MediaRow(
+        fileId = row.string(0).orEmpty(),
+        chatId = row.string(1),
+        kind = MediaKind.of(row.string(2)),
+        tier = MediaTier.of(row.string(3)),
+        size = row.long(4),
+        totalSize = row.long(5),
+        complete = row.long(6) != 0L,
+        lastUsedAt = row.long(7),
+        path = row.string(8).orEmpty(),
+    )
+
+    private fun insertMedia(db: SqlDatabase, row: MediaRow) {
+        db.execute(
+            "INSERT OR REPLACE INTO media($MEDIA_COLUMNS) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            row.fileId,
+            row.chatId,
+            row.kind.key,
+            row.tier.key,
+            row.size,
+            row.totalSize,
+            if (row.complete) 1 else 0,
+            row.lastUsedAt,
+            row.path,
+        )
+    }
+
+    private fun encodeLocal(local: LocalAttachment): String = ApiJson.encodeToString(LocalAttachment.serializer(), local)
 
     private fun decodeChat(text: String?): ChatListItemDto? =
         text?.let { decode(it) { value -> ApiJson.decodeFromString(ChatListItemDto.serializer(), value) } }
@@ -554,7 +732,9 @@ class MessagesStorage(
     private fun isPersistable(message: MessageDto): Boolean = message.id > 0 && message.deletedAt == null
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
+        private const val LOCAL_ATTACHMENT_VERSION = 2
+        private const val MEDIA_COLUMNS = "file_id, chat_id, kind, tier, size, total_size, complete, last_used_at, path"
         const val FILE_NAME = "messages.db"
         private const val SENT = 0
         private const val SENDING = 1
@@ -580,6 +760,19 @@ class MessagesStorage(
                 db.execute(
                     "CREATE TABLE sync_cursors(chat_id TEXT PRIMARY KEY, max_id INTEGER NOT NULL, max_updated_at TEXT) WITHOUT ROWID",
                 )
+            },
+            { db ->
+                db.execute(
+                    "CREATE TABLE media(file_id TEXT PRIMARY KEY, chat_id TEXT, kind TEXT NOT NULL, tier TEXT NOT NULL, " +
+                        "size INTEGER NOT NULL, total_size INTEGER NOT NULL, complete INTEGER NOT NULL, last_used_at INTEGER NOT NULL, " +
+                        "path TEXT NOT NULL)",
+                )
+                db.execute("CREATE INDEX media_last_used ON media(last_used_at)")
+                db.execute(
+                    "CREATE TABLE media_ranges(file_id TEXT NOT NULL, from_byte INTEGER NOT NULL, to_byte INTEGER NOT NULL, " +
+                        "total_size INTEGER NOT NULL, mime TEXT, PRIMARY KEY(file_id, from_byte)) WITHOUT ROWID",
+                )
+                db.execute("ALTER TABLE messages ADD COLUMN local_attachment TEXT")
             },
         )
     }
