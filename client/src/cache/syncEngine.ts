@@ -1,8 +1,19 @@
-import type { MessageDto } from '@messenger/shared';
+import type { ChatListItemDto, MessageDto } from '@messenger/shared';
 
-import { syncMessagesRequest } from '../api/chats';
+import { getMessagesRequest, syncMessagesRequest } from '../api/chats';
 import { openCacheDb } from './db';
 import { removeCachedMessages, writeCachedMessages } from './messageCache';
+
+export const SYNC_PAGE_LIMIT = 5;
+
+export interface ChatSyncCursor {
+  maxId: number;
+  maxUpdatedAt: string | null;
+}
+
+export type ChatSyncResult =
+  | { kind: 'delta'; created: MessageDto[]; changed: MessageDto[] }
+  | { kind: 'reset'; messages: MessageDto[]; hasMore: boolean };
 
 export function mergeSyncedMessages(
   current: MessageDto[],
@@ -29,51 +40,105 @@ export function mergeSyncedMessages(
   return [...settled, ...queued];
 }
 
-async function readCursor(chatId: string): Promise<{ maxId: number; maxUpdatedAt: string | null }> {
+export function selectSyncTargets(
+  chats: ChatListItemDto[],
+  cursors: Map<string, ChatSyncCursor>,
+  activeChatId: string | null,
+): string[] {
+  const targets = activeChatId ? [activeChatId] : [];
+  for (const chat of chats) {
+    if (chat.id === activeChatId) continue;
+    const cursor = cursors.get(chat.id);
+    const newest = chat.lastMessage?.id;
+    if (cursor && newest !== undefined && newest > cursor.maxId) targets.push(chat.id);
+  }
+  return targets;
+}
+
+async function readCursor(chatId: string): Promise<ChatSyncCursor | null> {
   const db = await openCacheDb();
-  if (!db) return { maxId: 0, maxUpdatedAt: null };
+  if (!db) return null;
 
   const cursor = await db.get('syncCursors', chatId);
-  return { maxId: cursor?.maxId ?? 0, maxUpdatedAt: cursor?.maxUpdatedAt ?? null };
+  return cursor ? { maxId: cursor.maxId, maxUpdatedAt: cursor.maxUpdatedAt } : null;
 }
 
-async function writeCursor(chatId: string, maxId: number, maxUpdatedAt: string | null): Promise<void> {
+export async function readSyncCursors(): Promise<Map<string, ChatSyncCursor>> {
+  const db = await openCacheDb();
+  if (!db) return new Map();
+
+  const cursors = await db.getAll('syncCursors');
+  return new Map(cursors.map((cursor) => [cursor.chatId, { maxId: cursor.maxId, maxUpdatedAt: cursor.maxUpdatedAt }]));
+}
+
+export async function hasSyncCursor(chatId: string): Promise<boolean> {
+  return (await readCursor(chatId)) !== null;
+}
+
+async function writeCursor(chatId: string, cursor: ChatSyncCursor): Promise<void> {
   const db = await openCacheDb();
   if (!db) return;
 
-  await db.put('syncCursors', { chatId, maxId, maxUpdatedAt });
+  await db.put('syncCursors', { chatId, maxId: cursor.maxId, maxUpdatedAt: cursor.maxUpdatedAt });
 }
 
-export async function syncChat(chatId: string): Promise<{ created: MessageDto[]; changed: MessageDto[] } | null> {
-  const cursor = await readCursor(chatId);
+async function resetCachedHistory(chatId: string): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  const keys = await db.getAllKeysFromIndex('messages', 'byChat', chatId);
+  const tx = db.transaction(['messages', 'messageRanges', 'syncCursors'], 'readwrite');
+  await Promise.all([
+    ...keys.map((key) => tx.objectStore('messages').delete(key)),
+    tx.objectStore('messageRanges').delete(chatId),
+    tx.objectStore('syncCursors').delete(chatId),
+  ]);
+  await tx.done;
+}
+
+export async function establishSyncCursor(chatId: string, tail: MessageDto[]): Promise<void> {
+  await resetCachedHistory(chatId);
+  await writeCachedMessages(tail);
+  const newest = tail.reduce<MessageDto | null>((best, message) => (!best || message.id > best.id ? message : best), null);
+  await writeCursor(chatId, { maxId: newest?.id ?? 0, maxUpdatedAt: newest?.createdAt ?? null });
+}
+
+async function reloadTail(chatId: string): Promise<ChatSyncResult> {
+  const page = await getMessagesRequest(chatId);
+  await establishSyncCursor(chatId, page.messages);
+  return { kind: 'reset', messages: page.messages.filter((message) => !message.deletedAt), hasMore: page.hasMore };
+}
+
+export async function syncChat(chatId: string): Promise<ChatSyncResult | null> {
+  const created: MessageDto[] = [];
+  const changed: MessageDto[] = [];
 
   try {
-    const result = await syncMessagesRequest(chatId, cursor.maxId, cursor.maxUpdatedAt);
+    let cursor = await readCursor(chatId);
+    if (!cursor) return await reloadTail(chatId);
 
-    const deletedIds = result.changed.filter((message) => message.deletedAt).map((message) => message.id);
-    if (deletedIds.length > 0) await removeCachedMessages(chatId, deletedIds);
+    for (let page = 1; ; page += 1) {
+      const result = await syncMessagesRequest(chatId, cursor.maxId, cursor.maxUpdatedAt);
 
-    const alive = [...result.created, ...result.changed].filter((message) => !message.deletedAt);
-    await writeCachedMessages(alive);
+      const deletedIds = result.changed.filter((message) => message.deletedAt).map((message) => message.id);
+      if (deletedIds.length > 0) await removeCachedMessages(chatId, deletedIds);
 
-    await writeCursor(
-      chatId,
-      result.maxId ?? cursor.maxId,
-      result.maxUpdatedAt ?? cursor.maxUpdatedAt,
-    );
+      const alive = [...result.created, ...result.changed].filter((message) => !message.deletedAt);
+      await writeCachedMessages(alive);
 
-    return { created: result.created, changed: result.changed };
+      cursor = {
+        maxId: result.maxId ?? cursor.maxId,
+        maxUpdatedAt: result.maxUpdatedAt ?? cursor.maxUpdatedAt,
+      };
+      await writeCursor(chatId, cursor);
+
+      created.push(...result.created);
+      changed.push(...result.changed);
+
+      if (!result.hasMore) return { kind: 'delta', created, changed };
+      if (page >= SYNC_PAGE_LIMIT) return await reloadTail(chatId);
+    }
   } catch {
-    return null;
-  }
-}
-
-export async function syncAllCachedChats(): Promise<void> {
-  const db = await openCacheDb();
-  if (!db) return;
-
-  const chats = await db.getAllKeys('chats');
-  for (const chatId of chats) {
-    await syncChat(chatId);
+    return created.length > 0 || changed.length > 0 ? { kind: 'delta', created, changed } : null;
   }
 }

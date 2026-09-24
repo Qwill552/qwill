@@ -9,6 +9,7 @@ import type {
   ChatDeletedEvent,
   ChatDto,
   ChatListItemDto,
+  ChatListResponse,
   ChatMemberSummary,
   ChatPinnedEvent,
   ChatReadEvent,
@@ -83,7 +84,14 @@ import {
   readOutbox,
   removeOutboxByChat,
 } from '../cache/outbox';
-import { mergeSyncedMessages, syncAllCachedChats, syncChat } from '../cache/syncEngine';
+import {
+  establishSyncCursor,
+  hasSyncCursor,
+  mergeSyncedMessages,
+  readSyncCursors,
+  selectSyncTargets,
+  syncChat,
+} from '../cache/syncEngine';
 import { traceCall } from '../calls/callTrace';
 import {
   consumeNativeAccept,
@@ -203,7 +211,7 @@ interface ChatState {
   selectionMode: boolean;
   selectedIds: Set<number>;
 
-  loadChats: () => Promise<void>;
+  loadChats: () => Promise<boolean>;
   openChat: (chatId: string) => Promise<void>;
   openChatAt: (chatId: string, messageId: number) => Promise<boolean>;
   primeChatFromCache: (chatId: string) => Promise<void>;
@@ -223,6 +231,7 @@ interface ChatState {
   replaceFeed: (chatId: string, messages: MessageDto[], options: ReplaceFeedOptions) => void;
   focusMessage: (chatId: string, messageId: number, quiet?: boolean, offset?: number) => void;
   syncChatMessages: (chatId: string) => Promise<void>;
+  catchUpAfterConnect: () => Promise<void>;
   startPrivateChat: (username: string) => Promise<ChatDto>;
   createGroup: (title: string, usernames: string[]) => Promise<ChatDto>;
   loadMembers: (chatId: string) => Promise<void>;
@@ -596,6 +605,17 @@ async function waitForActiveChatSettled(get: () => Pick<ChatState, 'activeChatId
   }
 }
 
+let chatListInFlight: Promise<ChatListResponse> | null = null;
+
+function requestChatList(): Promise<ChatListResponse> {
+  if (chatListInFlight) return chatListInFlight;
+  const request = listChatsRequest().finally(() => {
+    if (chatListInFlight === request) chatListInFlight = null;
+  });
+  chatListInFlight = request;
+  return request;
+}
+
 async function preloadOneChat(chatId: string): Promise<void> {
   const position = await readCachedPosition(chatId);
   if (position && !position.atTail && position.anchorId !== null) {
@@ -604,7 +624,8 @@ async function preloadOneChat(chatId: string): Promise<void> {
     return;
   }
   const page = await getMessagesRequest(chatId);
-  await writeCachedMessages(page.messages);
+  if (await hasSyncCursor(chatId)) await writeCachedMessages(page.messages);
+  else await establishSyncCursor(chatId, page.messages);
 }
 
 interface MessageRemovalResult {
@@ -709,9 +730,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     let chats: ChatListItemDto[];
     try {
-      ({ chats } = await listChatsRequest());
+      ({ chats } = await requestChatList());
     } catch (error) {
-      if (error instanceof NetworkError) return;
+      if (error instanceof NetworkError) return false;
       throw error;
     }
 
@@ -729,6 +750,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       void get().preloadTopChats();
     }
     startMaintenanceSchedule(get);
+    return true;
   },
 
   replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset }) {
@@ -867,7 +889,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           hasMoreByChat: { ...state.hasMoreByChat, [chatId]: page.value!.hasMore },
           historyByChat: { ...state.historyByChat, [chatId]: 'ready' },
         }));
-        void writeCachedMessages(page.value.messages);
+        const tail = page.value.messages;
+        void writeCachedMessages(tail).then(async () => {
+          if (!(await hasSyncCursor(chatId))) await establishSyncCursor(chatId, tail);
+        });
       }
       void get().restoreOutboxMessages();
     } else if (page.reason instanceof NetworkError) {
@@ -1142,9 +1167,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   async syncChatMessages(chatId) {
-    if (get().hasMoreAfterByChat[chatId]) return;
     const result = await syncChat(chatId);
-    if (!result) return;
+    if (!result || get().hasMoreAfterByChat[chatId]) return;
+
+    if (result.kind === 'reset') {
+      if (get().messagesByChat[chatId]) {
+        get().replaceFeed(chatId, result.messages, { hasMoreBefore: result.hasMore, hasMoreAfter: false });
+      }
+      return;
+    }
 
     set((state) => {
       const current = state.messagesByChat[chatId];
@@ -1156,6 +1187,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       };
     });
+  },
+
+  async catchUpAfterConnect() {
+    let listed: boolean;
+    try {
+      listed = await get().loadChats();
+    } catch {
+      return;
+    }
+    if (!listed) return;
+
+    const cursors = await readSyncCursors();
+    const targets = selectSyncTargets(get().chats, cursors, get().activeChatId);
+    for (const chatId of targets) {
+      await get().syncChatMessages(chatId);
+    }
   },
 
   async startPrivateChat(username) {
@@ -2052,13 +2099,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.off('connect').on('connect', () => {
       socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
       get().expectPresenceSnapshot();
-      const activeChatId = get().activeChatId;
       const sync = (): void => {
-        void syncAllCachedChats().then(() => {
-          if (activeChatId) void get().syncChatMessages(activeChatId);
-        });
         clearOutboxRetry();
         void get().drainOutbox();
+        void get().catchUpAfterConnect();
       };
 
       if (hasPendingNativeAccept()) afterCallStarts(sync);
