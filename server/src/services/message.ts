@@ -504,18 +504,31 @@ export async function syncMessages(input: SyncMessagesInput): Promise<MessagesSy
       })
     : [];
 
-  const hasMore = created.length > SYNC_PAGE_SIZE;
-  const createdPage = hasMore ? created.slice(0, SYNC_PAGE_SIZE) : created;
-  const all = [...createdPage, ...changed];
+  const createdTruncated = created.length > SYNC_PAGE_SIZE;
+  const changedTruncated = changed.length === SYNC_PAGE_SIZE;
+  const createdPage = createdTruncated ? created.slice(0, SYNC_PAGE_SIZE) : created;
 
   return {
     created: createdPage.map(toMessageDto),
     changed: changed.map(toMessageDto),
     maxId: createdPage.length > 0 ? createdPage[createdPage.length - 1]!.id : null,
-    maxUpdatedAt:
-      all.length > 0 ? new Date(Math.max(...all.map((m) => m.updatedAt.getTime()))).toISOString() : null,
-    hasMore,
+    maxUpdatedAt: syncUpdatedCursor(createdPage, changed, changedTruncated),
+    hasMore: createdTruncated || changedTruncated,
   };
+}
+
+function syncUpdatedCursor(
+  createdPage: { updatedAt: Date }[],
+  changed: { updatedAt: Date }[],
+  changedTruncated: boolean,
+): string | null {
+  if (changedTruncated) {
+    const lastDelivered = changed[changed.length - 1]!.updatedAt.getTime();
+    return new Date(lastDelivered - 1).toISOString();
+  }
+  const all = [...createdPage, ...changed];
+  if (all.length === 0) return null;
+  return new Date(Math.max(...all.map((m) => m.updatedAt.getTime()))).toISOString();
 }
 
 export interface ReactToMessageInput {

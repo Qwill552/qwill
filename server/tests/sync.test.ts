@@ -100,6 +100,67 @@ describe('GET /api/chats/:chatId/sync', () => {
     expect(changed.find((m) => m.id === secondMessageId)?.reactions.map((r) => r.emoji)).toEqual(['👍']);
   });
 
+  it('больше страницы правок не теряется, даже когда рядом новые сообщения', async () => {
+    const senderId = createdUserIds[0]!;
+    await prisma.message.createMany({
+      data: Array.from({ length: 210 }, (_, index) => ({
+        chatId,
+        senderId,
+        content: `старое ${index}`,
+        clientId: `sync_${RUN_ID}_bulk_${index}`,
+      })),
+    });
+    const bulk = await prisma.message.findMany({
+      where: { chatId, clientId: { startsWith: `sync_${RUN_ID}_bulk_` } },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+    const bulkIds = bulk.map((m) => m.id);
+
+    const first = await request.get(`/api/chats/${chatId}/sync?sinceId=0`).set('Authorization', `Bearer ${token}`);
+    let createdCursor = first.body as { maxId: number; maxUpdatedAt: string; hasMore: boolean };
+    while (createdCursor.hasMore) {
+      const next = await request
+        .get(
+          `/api/chats/${chatId}/sync?sinceId=${createdCursor.maxId}&sinceUpdatedAt=${encodeURIComponent(createdCursor.maxUpdatedAt)}`,
+        )
+        .set('Authorization', `Bearer ${token}`);
+      createdCursor = next.body as { maxId: number; maxUpdatedAt: string; hasMore: boolean };
+    }
+    const fullSinceId = createdCursor.maxId;
+    const fullCursor = createdCursor.maxUpdatedAt;
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await prisma.message.updateMany({ where: { id: { in: bulkIds.slice(0, 150) } }, data: { content: 'правка а' } });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await prisma.message.updateMany({ where: { id: { in: bulkIds.slice(150) } }, data: { content: 'правка б' } });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await prisma.message.create({
+      data: { chatId, senderId, content: 'новое', clientId: `sync_${RUN_ID}_fresh` },
+    });
+
+    const seen = new Set<number>();
+    let pageSinceId = fullSinceId;
+    let pageCursor = fullCursor;
+    let pages = 0;
+    let hasMore = true;
+    while (hasMore && pages < 5) {
+      const res = await request
+        .get(`/api/chats/${chatId}/sync?sinceId=${pageSinceId}&sinceUpdatedAt=${encodeURIComponent(pageCursor)}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      for (const message of res.body.changed as { id: number }[]) seen.add(message.id);
+      if (res.body.maxId !== null) pageSinceId = res.body.maxId as number;
+      if (res.body.maxUpdatedAt !== null) pageCursor = res.body.maxUpdatedAt as string;
+      hasMore = res.body.hasMore as boolean;
+      pages += 1;
+    }
+
+    expect(hasMore).toBe(false);
+    expect(pages).toBeGreaterThan(1);
+    expect(bulkIds.filter((id) => !seen.has(id))).toEqual([]);
+  });
+
   it('чужому пользователю чат недоступен', async () => {
     const stranger = await registerUser('c');
     const res = await request.get(`/api/chats/${chatId}/sync?sinceId=0`).set('Authorization', `Bearer ${stranger.token}`);
