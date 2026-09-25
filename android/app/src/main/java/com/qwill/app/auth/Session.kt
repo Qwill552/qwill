@@ -90,10 +90,6 @@ class Session(
         queue.post { refreshIfUnsettled() }
     }
 
-    fun debugCorruptAccessToken() {
-        queue.post { if (accessToken != null) accessToken = CORRUPTED_TOKEN }
-    }
-
     internal fun <T> execute(request: ApiRequest<T>, handle: RequestHandle, done: (ApiResult<T>) -> Unit) {
         if (handle.cancelled) return
         if (request.authRetry && refreshToken != null && accessExpired()) {
@@ -330,7 +326,6 @@ class Session(
         const val EXPIRY_MARGIN_MS = 5_000L
         const val RETRY_FIRST_MS = 2_000L
         const val RETRY_MAX_MS = 60_000L
-        const val CORRUPTED_TOKEN = "corrupted"
         const val SESSION_GONE_MESSAGE = "Нет активной сессии"
     }
 }

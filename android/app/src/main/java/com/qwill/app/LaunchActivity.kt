@@ -11,7 +11,10 @@ import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
-import com.qwill.app.stand.StandScreen
+import com.qwill.app.auth.AuthScreen
+import com.qwill.app.auth.SessionState
+import com.qwill.app.auth.SessionStateListener
+import com.qwill.app.chats.ChatsScreen
 import com.qwill.app.ui.ActivityResults
 import com.qwill.app.ui.insets.SafeAreaTracker
 import com.qwill.app.ui.insets.SystemBars
@@ -31,6 +34,8 @@ class LaunchActivity : Activity() {
         stack.dispatchThemeChanged()
     }
 
+    private val sessionListener = SessionStateListener { routeReactively(it) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Theme.init(this)
@@ -45,8 +50,19 @@ class LaunchActivity : Activity() {
         Theme.addListener(themeListener)
 
         stack.onBackStateChanged = ::updateBackCallback
-        stack.setRoot(StandScreen(1))
+        val initialState = QwillApplication.session.state
+        stack.setRoot(if (RootRouting.routeFor(initialState) == RootRoute.CHATS) ChatsScreen() else authScreenFor(initialState))
+        QwillApplication.session.addStateListener(sessionListener)
     }
+
+    private fun routeReactively(state: SessionState) {
+        if (RootRouting.routeFor(state) != RootRoute.AUTH) return
+        val top = stack.top
+        if (top is AuthScreen) return
+        stack.resetTo(authScreenFor(state))
+    }
+
+    private fun authScreenFor(state: SessionState): AuthScreen = AuthScreen((state as? SessionState.Banned)?.message)
 
     override fun onResume() {
         super.onResume()
@@ -67,6 +83,7 @@ class LaunchActivity : Activity() {
 
     override fun onDestroy() {
         Theme.removeListener(themeListener)
+        QwillApplication.session.removeStateListener(sessionListener)
         unregisterBackCallback()
         stack.destroyAll()
         super.onDestroy()

@@ -31,6 +31,7 @@ import com.qwill.app.net.NetworkMonitor
 import com.qwill.app.realtime.Presence
 import com.qwill.app.realtime.SocketConnection
 import com.qwill.app.realtime.TypingStore
+import com.qwill.app.ui.AppForeground
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -144,8 +145,12 @@ class QwillApplication : Application() {
                 onForeground = {
                     session.onForeground()
                     socket.onForeground()
+                    AppForeground.set(true)
                 },
-                onBackground = { socket.onBackground() },
+                onBackground = {
+                    socket.onBackground()
+                    AppForeground.set(false)
+                },
             ),
         )
     }

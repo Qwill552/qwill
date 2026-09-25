@@ -37,6 +37,15 @@ data class LegalVersionsDto(
 )
 
 @Serializable
+data class LegalDocumentDto(
+    val doc: String,
+    val version: String,
+    val title: String,
+    val effectiveDate: String,
+    val content: String,
+)
+
+@Serializable
 data class HealthDto(
     val status: String = "",
 )

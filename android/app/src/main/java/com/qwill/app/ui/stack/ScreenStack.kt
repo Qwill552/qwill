@@ -51,6 +51,40 @@ class ScreenStack(context: Context) : FrameLayout(context) {
         notifyBackStateChanged()
     }
 
+    fun resetTo(screen: Screen) {
+        setRoot(screen)
+    }
+
+    fun replaceAll(screen: Screen) {
+        finishTransition()
+        val outgoing = ArrayList(screens)
+        val under = screens.lastOrNull()
+        val view = attach(screen)
+        screens.clear()
+        screens.add(screen)
+        notifyBackStateChanged()
+        val underView = under?.view
+        if (under == null || underView == null || width == 0 || !Motion.animationsEnabled) {
+            finishReplace(under, outgoing, screen)
+            return
+        }
+        view.translationX = width.toFloat()
+        runTransition(view, underView, 0f, 1f) { finishReplace(under, outgoing, screen) }
+    }
+
+    private fun finishReplace(under: Screen?, outgoing: List<Screen>, incoming: Screen) {
+        under?.onHidden()
+        for (screen in outgoing.asReversed()) {
+            screen.view?.let { removeView(it) }
+            screen.releaseView()
+            screen.destroy()
+            screen.stack = null
+        }
+        incoming.view?.translationX = 0f
+        clearMoving()
+        incoming.onShown()
+    }
+
     fun push(screen: Screen, animated: Boolean = true) {
         finishTransition()
         val under = screens.lastOrNull()

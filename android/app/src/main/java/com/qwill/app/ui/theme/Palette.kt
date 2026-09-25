@@ -54,6 +54,9 @@ class Palette(
     val chromeBorder: Int,
     val chromeHighlight: Int,
     val cardBorder: Int,
+    val authCardBg: Int,
+    val authCardBorder: Int,
+    val authCardBorderStrong: Int,
 ) {
     val updateLiveFrom: Int = FixedColors.updateLiveFrom
     val updateLiveTo: Int = FixedColors.updateLiveTo
@@ -118,6 +121,9 @@ class Palette(
             chromeBorder = withAlpha(rgb(0xE1E4EC), 0.85f),
             chromeHighlight = withAlpha(FixedColors.lift, 0.70f),
             cardBorder = rgb(0xE1E4EC),
+            authCardBg = withAlpha(rgb(0xFFFFFF), 0.45f),
+            authCardBorder = withAlpha(rgb(0xFFFFFF), 0.60f),
+            authCardBorderStrong = withAlpha(rgb(0xFFFFFF), 0.85f),
         )
 
         val dark = Palette(
@@ -165,6 +171,9 @@ class Palette(
             chromeBorder = withAlpha(FixedColors.lift, 0.09f),
             chromeHighlight = withAlpha(FixedColors.lift, 0.14f),
             cardBorder = withAlpha(FixedColors.lift, 0.05f),
+            authCardBg = withAlpha(rgb(30, 27, 40), 0.55f),
+            authCardBorder = withAlpha(rgb(0xFFFFFF), 0.10f),
+            authCardBorderStrong = withAlpha(rgb(0xFFFFFF), 0.18f),
         )
     }
 }
@@ -203,4 +212,17 @@ object FixedColors {
     val blobBlue: Int = withAlpha(rgb(77, 141, 255), 0.55f)
     val blobViolet: Int = withAlpha(rgb(160, 90, 255), 0.45f)
     val blobTeal: Int = withAlpha(rgb(0, 190, 190), 0.32f)
+
+    val authSkyDay: Int = rgb(0x7BD3F7)
+    val authSkyNightTop: Int = rgb(0x09, 0x10, 0x24)
+    val authSkyNightMid: Int = rgb(0x15, 0x22, 0x4A)
+    val authSkyNightBottom: Int = rgb(0x1E, 0x33, 0x68)
+    val authSun: Int = rgb(0xFFDF73)
+    val authSunGlow: Int = withAlpha(rgb(0xFFDF73), 0.70f)
+    val authSunRayGlow: Int = withAlpha(rgb(0xFFDF73), 0.80f)
+    val authCloudDay: Int = rgb(0xFFFFFF)
+    val authCloudNight: Int = rgb(0x1C, 0x2D, 0x5A)
+    val authStar: Int = rgb(0xFFFFFF)
+    val authDanger: Int = rgb(0xD1, 0x43, 0x43)
+    val authDangerSoft: Int = withAlpha(rgb(0xD1, 0x43, 0x43), 0.10f)
 }

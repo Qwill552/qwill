@@ -4,6 +4,7 @@ import com.qwill.app.model.AuthResponse
 import com.qwill.app.model.ChangePasswordBody
 import com.qwill.app.model.ChangePasswordResponse
 import com.qwill.app.model.HealthDto
+import com.qwill.app.model.LegalDocumentDto
 import com.qwill.app.model.LegalVersionsDto
 import com.qwill.app.model.LoginInput
 import com.qwill.app.model.PublicUser
@@ -58,6 +59,9 @@ object Requests {
     fun me(): ApiRequest<PublicUser> = ApiRequest.get("/api/users/me", PublicUser.serializer())
 
     fun legalCurrent(): ApiRequest<LegalVersionsDto> = ApiRequest.get("/api/legal/current", LegalVersionsDto.serializer())
+
+    fun legalDocument(doc: String, version: String): ApiRequest<LegalDocumentDto> =
+        ApiRequest.get("/api/legal/$doc/$version", LegalDocumentDto.serializer())
 
     fun health(): ApiRequest<HealthDto> = ApiRequest.get("/api/health", HealthDto.serializer())
 }
