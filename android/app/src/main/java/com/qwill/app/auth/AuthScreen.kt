@@ -138,7 +138,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             setPadding(padX, padY, padX, padY)
         }
         buildCardContent(cardContent, prefs)
-        cardBox.addView(cardContent, matchParent())
+        cardBox.addView(cardContent, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         usernameTooltip = TextView(context).apply {
             text = "Выбирайте имя пользователя с умом! Его невозможно изменить после регистрации. " +
