@@ -13,6 +13,7 @@ import android.graphics.RenderNode
 import android.graphics.Shader
 import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import com.qwill.app.ui.theme.Dimens
 import com.qwill.app.ui.theme.Glass
@@ -141,7 +142,7 @@ class GlassView(
         }
         val recording = renderNode.beginRecording()
         recording.translate(pad + dx, pad + dy)
-        source.draw(recording)
+        drawSource(recording)
         renderNode.endRecording()
         canvas.save()
         canvas.translate(-pad.toFloat(), -pad.toFloat())
@@ -164,7 +165,7 @@ class GlassView(
         offscreen.save()
         offscreen.scale(1f / DOWNSAMPLE, 1f / DOWNSAMPLE)
         offscreen.translate(pad + dx, pad + dy)
-        source.draw(offscreen)
+        drawSource(offscreen)
         offscreen.restore()
         StackBlur.blur(target, stackRadius(sigma))
         canvas.save()
@@ -172,6 +173,35 @@ class GlassView(
         canvas.scale(DOWNSAMPLE, DOWNSAMPLE)
         canvas.drawBitmap(target, 0f, 0f, bitmapPaint)
         canvas.restore()
+    }
+
+    private fun drawSource(canvas: Canvas) {
+        val group = source as? ViewGroup
+        val ownBranch = group?.let { branchUnder(it) }
+        if (group == null || ownBranch == null) {
+            source.draw(canvas)
+            return
+        }
+        group.background?.draw(canvas)
+        for (index in 0 until group.childCount) {
+            val child = group.getChildAt(index)
+            if (child === ownBranch || child.visibility != View.VISIBLE) continue
+            canvas.save()
+            canvas.translate(child.left + child.translationX - group.scrollX, child.top + child.translationY - group.scrollY)
+            child.draw(canvas)
+            canvas.restore()
+        }
+    }
+
+    private fun branchUnder(ancestor: ViewGroup): View? {
+        var current: View = this
+        var parent = current.parent
+        while (parent is View) {
+            if (parent === ancestor) return current
+            current = parent
+            parent = current.parent
+        }
+        return null
     }
 
     private fun stackRadius(sigma: Float): Int = (STACK_SIGMA_RATIO * sigma / DOWNSAMPLE - 1f).roundToInt().coerceAtLeast(1)

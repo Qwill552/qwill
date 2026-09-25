@@ -166,4 +166,11 @@ class PosterMathTest {
     private fun assertNear(expected: Int, actual: Int) {
         assertTrue("expected $expected ± 2, got $actual", abs(expected - actual) <= 2)
     }
+
+    @Test
+    fun buttonRowNeverSqueezesAWordBelowItsWidth() {
+        assertTrue(FlexShares.distribute(250, floatArrayOf(1f, 1.5f), intArrayOf(50, 50)).contentEquals(intArrayOf(100, 150)))
+        assertTrue(FlexShares.distribute(250, floatArrayOf(1f, 1.5f), intArrayOf(125, 60)).contentEquals(intArrayOf(125, 125)))
+        assertTrue(FlexShares.distribute(100, floatArrayOf(1f, 1.5f), intArrayOf(80, 70)).contentEquals(intArrayOf(80, 70)))
+    }
 }

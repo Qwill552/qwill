@@ -462,7 +462,7 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
         gate.setOnClickListener { switch.toggle() }
         column.addView(gate, wrap().apply { topMargin = m.floor(34f, Dimens.SPACE_4).roundToInt() })
 
-        val actions = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val actions = FlexRow(context, m.floor(20f, Dimens.SPACE_3).roundToInt(), floatArrayOf(1f, 1.5f))
         val buttonHeight = m.floor(96f, Dimens.COMPOSER_MIN_H).roundToInt()
         val buttonPad = m.floor(24f, Dimens.SPACE_3).roundToInt()
         val border = max(m.units(2f), 1f).roundToInt()
@@ -479,7 +479,7 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
             setOnClickListener { if (!pending) openDeclineDialog() }
         }
         declineButton = decline
-        actions.addView(decline, LinearLayout.LayoutParams(0, buttonHeight, 1f))
+        actions.addView(decline, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, buttonHeight))
         val accept = text(PosterText.ACCEPT, max(m.units(34f), baseText()), FontWeight.BOLD, colors.white).apply {
             gravity = Gravity.CENTER
             maxLines = 1
@@ -494,9 +494,7 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
             setOnClickListener { accept() }
         }
         acceptButton = accept
-        actions.addView(accept, LinearLayout.LayoutParams(0, buttonHeight, 1.5f).apply {
-            leftMargin = m.floor(20f, Dimens.SPACE_3).roundToInt()
-        })
+        actions.addView(accept, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, buttonHeight))
         column.addView(actions, wrap().apply { topMargin = m.floor(34f, Dimens.SPACE_4).roundToInt() })
         return column
     }
@@ -1034,6 +1032,38 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
             val x = anchorBox.centerX() - view.measuredWidth / 2
             val y = anchorBox.top - gap - view.measuredHeight
             view.layout(x, y, x + view.measuredWidth, y + view.measuredHeight)
+        }
+    }
+
+    class FlexRow(context: Context, private val gap: Int, private val grow: FloatArray) : ViewGroup(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val total = MeasureSpec.getSize(widthMeasureSpec)
+            val count = childCount
+            val minimums = IntArray(count)
+            for (i in 0 until count) {
+                val child = getChildAt(i)
+                child.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), exactHeight(child))
+                minimums[i] = child.measuredWidth
+            }
+            val widths = FlexShares.distribute((total - gap * (count - 1)).coerceAtLeast(0), grow, minimums)
+            var height = 0
+            for (i in 0 until count) {
+                val child = getChildAt(i)
+                child.measure(MeasureSpec.makeMeasureSpec(widths[i], MeasureSpec.EXACTLY), exactHeight(child))
+                height = max(height, child.measuredHeight)
+            }
+            setMeasuredDimension(total, height)
+        }
+
+        private fun exactHeight(child: View): Int = MeasureSpec.makeMeasureSpec(child.layoutParams.height.coerceAtLeast(0), MeasureSpec.EXACTLY)
+
+        override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+            var x = 0
+            for (i in 0 until childCount) {
+                val child = getChildAt(i)
+                child.layout(x, 0, x + child.measuredWidth, child.measuredHeight)
+                x += child.measuredWidth + gap
+            }
         }
     }
 

@@ -39,6 +39,31 @@ object ConsentGateRule {
     }
 }
 
+object FlexShares {
+    fun distribute(space: Int, grow: FloatArray, minimums: IntArray): IntArray {
+        val widths = IntArray(grow.size)
+        val frozen = BooleanArray(grow.size)
+        while (true) {
+            var free = space
+            var weight = 0f
+            for (i in grow.indices) if (frozen[i]) free -= widths[i] else weight += grow[i]
+            var violated = false
+            for (i in grow.indices) {
+                if (frozen[i]) continue
+                val share = if (weight > 0f) (free * grow[i] / weight).toInt() else 0
+                if (share < minimums[i]) {
+                    widths[i] = minimums[i]
+                    frozen[i] = true
+                    violated = true
+                } else {
+                    widths[i] = share
+                }
+            }
+            if (!violated) return widths
+        }
+    }
+}
+
 object PosterText {
     const val WORDMARK = "Qwill"
     const val BADGE = "Важное обновление"
