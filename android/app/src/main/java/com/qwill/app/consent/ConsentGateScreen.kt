@@ -193,13 +193,15 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
         sizedWidth = width
         sizedHeight = height
         val density = context.resources.displayMetrics.density
-        val reserved = safeArea.left + safeArea.right + 4 * hairline(density)
+        val reserved = 2 * sideInset() + 4 * hairline(density)
         val next = PosterMetrics.compute(width.toFloat(), height.toFloat(), density, reserved.toFloat())
         val previous = metrics
         metrics = next
         if (previous != null && previous.u == next.u && previous.wide == next.wide && previous.screenHeight == next.screenHeight) return
         rebuildAll()
     }
+
+    private fun sideInset(): Int = max(safeArea.left, safeArea.right)
 
     private fun hairline(density: Float): Int = max(1, density.roundToInt())
 
@@ -226,8 +228,8 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
             val hairline = hairline(density)
             val windowWidth = (m.posterWidth + 2 * pad + 4 * hairline).roundToInt()
             window.layoutParams = FrameLayout.LayoutParams(windowWidth, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
-                leftMargin = gutter + safeArea.left
-                rightMargin = gutter + safeArea.right
+                leftMargin = gutter + sideInset()
+                rightMargin = gutter + sideInset()
                 topMargin = gutter + safeArea.top
                 bottomMargin = gutter + safeArea.bottom
             }
