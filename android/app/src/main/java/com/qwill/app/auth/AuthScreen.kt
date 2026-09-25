@@ -63,7 +63,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         val input: EditText,
         val error: TextView,
         val background: View = input,
-        val trailing: TextView? = null,
+        val trailing: com.qwill.app.ui.PasswordToggleView? = null,
     )
 
     private lateinit var context: Context
@@ -328,22 +328,18 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         input.background = null
         input.setPadding(input.paddingLeft, input.paddingTop, toggleSide, input.paddingBottom)
         row.addView(input, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        val toggle = TextView(context).apply {
-            text = EYE_HIDDEN
-            gravity = Gravity.CENTER
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 18f)
+        val toggle = com.qwill.app.ui.PasswordToggleView(context).apply {
             isFocusable = true
             contentDescription = "Показать пароль"
         }
-        var passwordVisible = false
         toggle.setOnClickListener {
-            passwordVisible = !passwordVisible
+            toggle.revealed = !toggle.revealed
             val selection = input.selectionStart.coerceAtLeast(0)
             input.inputType = InputType.TYPE_CLASS_TEXT or
-                if (passwordVisible) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD
+                if (toggle.revealed) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD
             input.typeface = Fonts.display(FontWeight.REGULAR)
             input.setSelection(selection.coerceAtMost(input.text?.length ?: 0))
-            toggle.text = if (passwordVisible) EYE_VISIBLE else EYE_HIDDEN
+            toggle.contentDescription = if (toggle.revealed) "Скрыть пароль" else "Показать пароль"
         }
         row.addView(toggle, FrameLayout.LayoutParams(toggleSide, toggleSide, Gravity.END or Gravity.CENTER_VERTICAL))
         wrapper.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -458,10 +454,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         glass.tint = palette.authCardBg
         glass.borderColor = palette.authCardBorder
         glass.highlightColor = palette.authCardBorderStrong
-        logo.background = android.graphics.drawable.GradientDrawable(
-            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-            intArrayOf(palette.accentFrom, palette.accentTo),
-        ).apply { shape = android.graphics.drawable.GradientDrawable.OVAL }
+        logo.background = context.getDrawable(if (Theme.isDark) R.drawable.logo_bg_dark else R.drawable.logo_bg_light)
         title.setTextColor(palette.textPrimary)
         title.text = if (mode == Mode.LOGIN) "С возвращением!" else "Добро пожаловать!"
         formErrorText.setTextColor(FixedColors.authDanger)
@@ -473,7 +466,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             field.input.setTextColor(palette.textPrimary)
             field.input.setHintTextColor(palette.textSecondary)
             field.error.setTextColor(FixedColors.authDanger)
-            field.trailing?.setTextColor(palette.textSecondary)
+            field.trailing?.color = palette.textSecondary
             paintFieldBackground(field, danger = fieldHasError(field))
         }
         usernameTooltip.setTextColor(palette.textPrimary)
@@ -944,8 +937,6 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         const val SHAKE_EPSILON_PX = 0.5f
         const val SUCCESS_DELAY_MS = 150L
         const val NETWORK_ERROR_TEXT = "Не удалось выполнить запрос. Проверьте соединение."
-        const val EYE_HIDDEN = "👁️"
-        const val EYE_VISIBLE = "🙈"
         const val DRAFT_PREFS = "auth_draft"
         const val KEY_MODE = "mode"
         const val KEY_USERNAME = "username"

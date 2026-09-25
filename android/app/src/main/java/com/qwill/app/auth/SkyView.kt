@@ -203,7 +203,7 @@ class CelestialView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
-        val cy = context.dp(SUN_CENTER_OFFSET_DP)
+        val cy = height / 2f + context.dp(SUN_CENTER_OFFSET_DP)
         drawMoon(canvas, cx, cy)
         drawSun(canvas, cx, cy)
     }
