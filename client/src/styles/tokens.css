@@ -693,12 +693,14 @@
   --dur-wheel-step: 300ms; /* шаг барабана на одну строку по тапу или стрелке */
   --dur-cloud-pop: 190ms;
   --dur-title-swap: 220ms; /* смена «Qwill» на состояние соединения в шапке списка */
+  --dur-search-collapse: 400ms;
   --dur-ellipsis: 1500ms; /* цикл живого многоточия «Соединение…» */
   --ellipsis-state: running;
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
   --ease-close: ease-in;
   --ease-spring: cubic-bezier(0.2, 1.5, 0.4, 1);
+  --ease-collapse: cubic-bezier(0.22, 1, 0.36, 1);
 
   --transition: var(--dur-menu) var(--ease-screen);
 }
@@ -736,6 +738,7 @@
     --dur-wheel-step: 1ms;
     --dur-cloud-pop: 1ms;
     --dur-title-swap: 1ms;
+    --dur-search-collapse: 1ms;
     --ellipsis-state: paused;
     --transition: 1ms linear;
   }

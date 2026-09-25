@@ -184,10 +184,7 @@
 /* Полное поле поиска гаснет и уезжает вверх, схлопывая свою высоту — буквально
  * searchWrap из референса. */
 .searchWrap {
-  transition:
-    opacity 0.3s ease,
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    margin-top 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.3s ease;
 }
 
 .searchWrapHidden {

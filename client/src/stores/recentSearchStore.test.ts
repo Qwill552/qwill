@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { recentSearchKey, useRecentSearchStore, type RecentSearchEntry } from './recentSearchStore';
 
-const STORAGE_KEY = 'messenger.recentSearches';
+const LEGACY_KEY = 'messenger.recentSearches';
+const STORAGE_KEY = 'messenger.recentSearches:me';
 
 function personEntry(overrides: Partial<RecentSearchEntry> = {}): RecentSearchEntry {
   return {
@@ -35,7 +36,8 @@ function chatEntry(overrides: Partial<RecentSearchEntry> = {}): RecentSearchEntr
 describe('recentSearchStore (R-12)', () => {
   beforeEach(() => {
     localStorage.clear();
-    useRecentSearchStore.setState({ entries: [] });
+    useRecentSearchStore.setState({ userId: null, entries: [] });
+    useRecentSearchStore.getState().setUser('me');
   });
 
   it('человек без chatId запоминается и ключуется по username', () => {
@@ -82,5 +84,39 @@ describe('recentSearchStore (R-12)', () => {
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!) as RecentSearchEntry[];
     expect(parsed[0]?.chatId).toBeNull();
+  });
+
+  it('у каждого аккаунта свои недавние', () => {
+    useRecentSearchStore.getState().remember(personEntry());
+    useRecentSearchStore.getState().setUser('other');
+    expect(useRecentSearchStore.getState().entries).toHaveLength(0);
+    useRecentSearchStore.getState().remember(chatEntry());
+    useRecentSearchStore.getState().setUser('me');
+    expect(useRecentSearchStore.getState().entries.map((entry) => entry.kind)).toEqual(['user']);
+  });
+
+  it('выход из аккаунта стирает недавние всех аккаунтов на устройстве', () => {
+    useRecentSearchStore.getState().remember(personEntry());
+    useRecentSearchStore.getState().setUser('other');
+    useRecentSearchStore.getState().remember(chatEntry());
+
+    useRecentSearchStore.getState().clear();
+
+    expect(useRecentSearchStore.getState().entries).toHaveLength(0);
+    expect(localStorage.length).toBe(0);
+    useRecentSearchStore.getState().setUser('me');
+    expect(useRecentSearchStore.getState().entries).toHaveLength(0);
+  });
+
+  it('старый общий список переезжает к первому вошедшему и больше никому не достаётся', () => {
+    localStorage.setItem(LEGACY_KEY, JSON.stringify([personEntry({ username: 'legacy' })]));
+    useRecentSearchStore.setState({ userId: null, entries: [] });
+
+    useRecentSearchStore.getState().setUser('first');
+    expect(useRecentSearchStore.getState().entries.map((entry) => entry.username)).toEqual(['legacy']);
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+
+    useRecentSearchStore.getState().setUser('second');
+    expect(useRecentSearchStore.getState().entries).toHaveLength(0);
   });
 });

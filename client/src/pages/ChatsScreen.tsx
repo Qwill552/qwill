@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { listReportGroupsRequest } from '../api/admin';
@@ -26,6 +26,7 @@ import { onTabReactivate } from '../app/tabNav';
 import { revealTransition } from '../app/viewTransition';
 import { useHotkey } from '../app/hotkeys';
 import { useLayoutMode } from '../app/useLayoutMode';
+import { cssDurationMs } from '../ui/motion';
 import styles from './ChatsScreen.module.css';
 
 /** Радиус капсулы-триггера — совпадает с её собственным border-radius в CSS, но геометрию
@@ -50,6 +51,30 @@ let savedScrollTop = 0;
  *  возвращается ниже 8px — зазор гасит дребезг на границе. */
 const SEARCH_HIDE_AT = 26;
 const SEARCH_SHOW_AT = 8;
+const SEARCH_SLOT = 56;
+const SEARCH_LIFT = 14;
+const SEARCH_HIDDEN_TRANSFORM = `translateY(-${SEARCH_LIFT}px) scale(0.97)`;
+
+function playSearchCollapse(wrap: HTMLElement, hidden: boolean, running: Animation[]): Animation[] {
+  for (const animation of running) animation.cancel();
+  if (typeof wrap.animate !== 'function') return [];
+  const options: KeyframeAnimationOptions = {
+    duration: cssDurationMs('--dur-search-collapse'),
+    easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-collapse').trim() || 'ease-out',
+  };
+  const shift = hidden ? SEARCH_SLOT : -SEARCH_SLOT;
+  const followers: Element[] = [];
+  for (let next = wrap.nextElementSibling; next; next = next.nextElementSibling) followers.push(next);
+  const list = wrap.parentElement?.nextElementSibling;
+  if (list) followers.push(list);
+  const wrapFrames = hidden
+    ? [{ transform: `translateY(${SEARCH_SLOT}px)` }, { transform: SEARCH_HIDDEN_TRANSFORM }]
+    : [{ transform: `translateY(${-SEARCH_SLOT - SEARCH_LIFT}px) scale(0.97)` }, { transform: 'none' }];
+  return [
+    wrap.animate(wrapFrames, options),
+    ...followers.map((element) => element.animate([{ transform: `translateY(${shift}px)` }, { transform: 'none' }], options)),
+  ];
+}
 
 /** Вкладка «Сообщения»: шапка (аватар/меню), поле поиска, чипсы фильтров — статичным блоком
  *  над отдельно скроллящимся списком (буквально из референса, не плавающая хрома). */
@@ -67,6 +92,9 @@ export function ChatsScreen() {
   const screenRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLDivElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const collapseAnimations = useRef<Animation[]>([]);
+  const collapseShown = useRef<boolean | null>(null);
   const themeSwitchRef = useRef<HTMLSpanElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -143,6 +171,21 @@ export function ChatsScreen() {
   useEffect(() => {
     listRef.current?.restoreScrollTop(savedScrollTop);
   }, []);
+
+  useLayoutEffect(() => {
+    const wrap = searchWrapRef.current;
+    const previous = collapseShown.current;
+    collapseShown.current = searchHidden;
+    if (!wrap || previous === null || previous === searchHidden) return;
+    collapseAnimations.current = playSearchCollapse(wrap, searchHidden, collapseAnimations.current);
+  }, [searchHidden]);
+
+  useEffect(
+    () => () => {
+      for (const animation of collapseAnimations.current) animation.cancel();
+    },
+    [],
+  );
 
   useEffect(
     () =>
@@ -366,6 +409,7 @@ export function ChatsScreen() {
             </div>
 
             <div
+              ref={searchWrapRef}
               className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
             >
               <button

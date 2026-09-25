@@ -358,6 +358,7 @@ const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const unconfirmedPresence = new Set<string>();
 let presenceConfirmTimer: ReturnType<typeof setTimeout> | undefined;
+let connectListener: (() => void) | null = null;
 
 function clearPresenceConfirmation(): void {
   clearTimeout(presenceConfirmTimer);
@@ -2220,7 +2221,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         useCallStore.getState().clearInvite(event.callId);
       });
 
-    socket.off('connect').on('connect', () => {
+    if (connectListener) socket.off('connect', connectListener);
+    connectListener = () => {
       socket.emit(SocketEvent.VisibilityChange, { visible: document.visibilityState === 'visible' });
       get().expectPresenceSnapshot();
       const sync = (): void => {
@@ -2235,7 +2237,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       void getLiveCallsRequest()
         .then((response) => useCallStore.getState().applyLiveCalls(response.calls))
         .catch(() => undefined);
-    });
+    };
+    socket.on('connect', connectListener);
   },
 
   expectPresenceSnapshot() {
