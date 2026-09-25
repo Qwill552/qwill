@@ -26,10 +26,13 @@ private val STAR_SPOTS = listOf(
 )
 
 class SkyBackdropView(context: Context) : View(context) {
+    var onRepaint: (() -> Unit)? = null
+
     var nightProgress: Float = 0f
         private set(value) {
             field = value
             invalidate()
+            onRepaint?.invoke()
         }
 
     private val bgPaint = Paint()

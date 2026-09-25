@@ -271,14 +271,16 @@ class CloudsView(context: Context) : View(context) {
         out.addRoundRect(bodyRect, context.dp(50f) * scale, context.dp(50f) * scale, Path.Direction.CW)
 
         val breathe = breatheOffset(state, now, left = true)
-        addCircle(out, leftPx, topPx, g.beforeLeft, g.beforeTop, g.beforeW, g.beforeH, density, scale, breathe)
+        addCircle(out, cx, cy, leftPx, topPx, g.beforeLeft, g.beforeTop, g.beforeW, g.beforeH, density, scale, breathe)
         val breatheR = breatheOffset(state, now, left = false)
         val afterLeft = g.w - g.afterRight - g.afterW
-        addCircle(out, leftPx, topPx, afterLeft, g.afterTop, g.afterW, g.afterH, density, scale, breatheR)
+        addCircle(out, cx, cy, leftPx, topPx, afterLeft, g.afterTop, g.afterW, g.afterH, density, scale, breatheR)
     }
 
     private fun addCircle(
         out: Path,
+        pivotX: Float,
+        pivotY: Float,
         bodyLeftPx: Float,
         bodyTopPx: Float,
         localLeftDp: Float,
@@ -289,10 +291,12 @@ class CloudsView(context: Context) : View(context) {
         scale: Float,
         breathe: FloatArray,
     ) {
+        val naturalCx = bodyLeftPx + (localLeftDp + wDp / 2f) * density
+        val naturalCy = bodyTopPx + (localTopDp + hDp / 2f) * density
+        val cx = pivotX + (naturalCx - pivotX) * scale + breathe[1] * density * scale
+        val cy = pivotY + (naturalCy - pivotY) * scale + breathe[2] * density * scale
         val w = wDp * density * scale * breathe[0]
         val h = hDp * density * scale * breathe[0]
-        val cx = bodyLeftPx + (localLeftDp + wDp / 2f) * density * scale + breathe[1] * density
-        val cy = bodyTopPx + (localTopDp + hDp / 2f) * density * scale + breathe[2] * density
         out.addOval(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f, Path.Direction.CW)
     }
 

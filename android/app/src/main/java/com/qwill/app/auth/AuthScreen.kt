@@ -17,10 +17,12 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.qwill.app.QwillApplication
+import com.qwill.app.R
 import com.qwill.app.chats.ChatsScreen
 import com.qwill.app.legal.LegalScreen
 import com.qwill.app.model.LegalVersionsDto
@@ -56,7 +58,13 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
 
     private enum class Mode { LOGIN, REGISTER }
 
-    private class Field(val wrapper: LinearLayout, val input: EditText, val error: TextView)
+    private class Field(
+        val wrapper: LinearLayout,
+        val input: EditText,
+        val error: TextView,
+        val background: View = input,
+        val trailing: TextView? = null,
+    )
 
     private lateinit var context: Context
     private lateinit var root: FrameLayout
@@ -67,7 +75,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
     private lateinit var centerBox: LinearLayout
     private lateinit var cardBox: MaxWidthBox
     private lateinit var glass: com.qwill.app.ui.glass.GlassView
-    private lateinit var logo: TextView
+    private lateinit var logo: ImageView
     private lateinit var title: TextView
     private lateinit var formErrorText: TextView
     private lateinit var usernameField: Field
@@ -120,6 +128,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         glass = com.qwill.app.ui.glass.GlassView(context, backdrop, blurDp = CARD_BLUR_DP, saturation = CARD_SATURATION).apply {
             cornerRadius = context.dp(Dimens.RADIUS_CARD)
         }
+        backdrop.onRepaint = { glass.invalidate() }
         cardBox.addView(glass, matchParent())
 
         val cardContent = LinearLayout(context).apply {
@@ -177,6 +186,8 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         clouds = CloudsView(context)
         root.addView(clouds, matchParent())
 
+        if (Build.VERSION.SDK_INT >= 30) attachKeyboardMotion(root)
+
         restoreDraft(prefs)
         applyMode(animated = false)
         applyAppearance(animated = false)
@@ -185,11 +196,11 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
     }
 
     private fun buildCardContent(cardContent: LinearLayout, prefs: SharedPreferences) {
-        logo = TextView(context).apply {
-            text = "M"
-            gravity = Gravity.CENTER
-            typeface = Fonts.display(FontWeight.BOLD)
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, LOGO_TEXT_DP)
+        logo = ImageView(context).apply {
+            setImageResource(R.drawable.logo_mark)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            val pad = context.dpInt(LOGO_PADDING_DP)
+            setPadding(pad, pad, pad, pad)
         }
         val logoSide = context.dpInt(LOGO_SIZE_DP)
         cardContent.addView(
@@ -305,9 +316,39 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             setPadding(padX, padTop, padX, 0)
             visibility = View.GONE
         }
-        wrapper.addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        if (!isPassword) {
+            wrapper.addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            wrapper.addView(error, wrap())
+            return Field(wrapper, input, error)
+        }
+
+        val row = FrameLayout(context)
+        val toggleSide = context.dpInt(Dimens.TAP_MIN)
+        input.background = null
+        input.setPadding(input.paddingLeft, input.paddingTop, toggleSide, input.paddingBottom)
+        row.addView(input, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val toggle = TextView(context).apply {
+            text = EYE_HIDDEN
+            gravity = Gravity.CENTER
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 18f)
+            isFocusable = true
+            contentDescription = "Показать пароль"
+        }
+        var passwordVisible = false
+        toggle.setOnClickListener {
+            passwordVisible = !passwordVisible
+            val selection = input.selectionStart.coerceAtLeast(0)
+            input.inputType = InputType.TYPE_CLASS_TEXT or
+                if (passwordVisible) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD
+            input.typeface = Fonts.display(FontWeight.REGULAR)
+            input.setSelection(selection.coerceAtMost(input.text?.length ?: 0))
+            toggle.text = if (passwordVisible) EYE_VISIBLE else EYE_HIDDEN
+        }
+        row.addView(toggle, FrameLayout.LayoutParams(toggleSide, toggleSide, Gravity.END or Gravity.CENTER_VERTICAL))
+        wrapper.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         wrapper.addView(error, wrap())
-        return Field(wrapper, input, error)
+        return Field(wrapper, input, error, background = row, trailing = toggle)
     }
 
     override fun onShown() {
@@ -347,8 +388,60 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
 
     override fun onSafeAreaChanged(area: SafeArea) {
         safeArea = area
-        val bottom = if (area.keyboard > 0) area.keyboard else area.bottom
-        scroll.setPadding(area.left, area.top, area.right, bottom)
+        scroll.setPadding(area.left, area.top, area.right, area.bottom)
+        if (Build.VERSION.SDK_INT < 30) {
+            scroll.translationY = -computeKeyboardShift(area.keyboard)
+        }
+    }
+
+    private fun computeKeyboardShift(keyboardHeightPx: Int): Float {
+        if (keyboardHeightPx <= 0) return 0f
+        val focused = root.findFocus() as? EditText ?: return 0f
+        val fieldRect = android.graphics.Rect()
+        if (!focused.getGlobalVisibleRect(fieldRect)) return 0f
+        val screenHeight = context.resources.displayMetrics.heightPixels
+        val visibleBottom = screenHeight - keyboardHeightPx
+        val margin = context.dpInt(Dimens.SPACE_4)
+        val overlap = (fieldRect.bottom + margin) - visibleBottom
+        return overlap.coerceAtLeast(0).toFloat()
+    }
+
+    @android.annotation.TargetApi(30)
+    private fun attachKeyboardMotion(target: View) {
+        var shiftTarget = 0f
+        var maxImeBottom = 0
+        target.setWindowInsetsAnimationCallback(object : android.view.WindowInsetsAnimation.Callback(
+            android.view.WindowInsetsAnimation.Callback.DISPATCH_MODE_CONTINUE_ON_SUBTREE,
+        ) {
+            override fun onStart(
+                animation: android.view.WindowInsetsAnimation,
+                bounds: android.view.WindowInsetsAnimation.Bounds,
+            ): android.view.WindowInsetsAnimation.Bounds {
+                if (animation.typeMask and android.view.WindowInsets.Type.ime() != 0) {
+                    maxImeBottom = bounds.upperBound.bottom
+                    shiftTarget = computeKeyboardShift(maxImeBottom)
+                }
+                return super.onStart(animation, bounds)
+            }
+
+            override fun onProgress(
+                insets: android.view.WindowInsets,
+                runningAnimations: MutableList<android.view.WindowInsetsAnimation>,
+            ): android.view.WindowInsets {
+                val imeRunning = runningAnimations.any { it.typeMask and android.view.WindowInsets.Type.ime() != 0 }
+                if (!imeRunning || maxImeBottom <= 0) return insets
+                val current = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+                val progress = (current.toFloat() / maxImeBottom).coerceIn(0f, 1f)
+                scroll.translationY = -shiftTarget * progress
+                return insets
+            }
+
+            override fun onEnd(animation: android.view.WindowInsetsAnimation) {
+                if (animation.typeMask and android.view.WindowInsets.Type.ime() == 0) return
+                val visible = target.rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) == true
+                scroll.translationY = if (visible) -shiftTarget else 0f
+            }
+        })
     }
 
     override fun onThemeChanged() {
@@ -365,8 +458,10 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         glass.tint = palette.authCardBg
         glass.borderColor = palette.authCardBorder
         glass.highlightColor = palette.authCardBorderStrong
-        logo.background = context.roundRect(context.dp(LOGO_SIZE_DP) / 2f, palette.primary)
-        logo.setTextColor(palette.textOnPrimary)
+        logo.background = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            intArrayOf(palette.accentFrom, palette.accentTo),
+        ).apply { shape = android.graphics.drawable.GradientDrawable.OVAL }
         title.setTextColor(palette.textPrimary)
         title.text = if (mode == Mode.LOGIN) "С возвращением!" else "Добро пожаловать!"
         formErrorText.setTextColor(FixedColors.authDanger)
@@ -378,7 +473,8 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             field.input.setTextColor(palette.textPrimary)
             field.input.setHintTextColor(palette.textSecondary)
             field.error.setTextColor(FixedColors.authDanger)
-            paintFieldBackground(field, danger = false)
+            field.trailing?.setTextColor(palette.textSecondary)
+            paintFieldBackground(field, danger = fieldHasError(field))
         }
         usernameTooltip.setTextColor(palette.textPrimary)
         usernameTooltip.background = context.fieldBackground(TOOLTIP_RADIUS_DP, palette.surface, palette.border)
@@ -412,7 +508,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             else -> palette.border
         }
         val ring = if (focused && !danger) palette.primarySoft else 0
-        field.input.background = context.fieldBackground(Dimens.RADIUS_MD, palette.surface, border, ring)
+        field.background.background = context.fieldBackground(Dimens.RADIUS_MD, palette.surface, border, ring)
     }
 
     private fun onUsernameFocusChanged(focused: Boolean) {
@@ -800,9 +896,27 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
             val maxPx = context.dpInt(maxWidthDp)
             val mode = View.MeasureSpec.getMode(widthMeasureSpec)
             val size = View.MeasureSpec.getSize(widthMeasureSpec)
-            val capped = if (mode == View.MeasureSpec.UNSPECIFIED) maxPx else min(size, maxPx)
-            val spec = View.MeasureSpec.makeMeasureSpec(capped, if (mode == View.MeasureSpec.UNSPECIFIED) View.MeasureSpec.AT_MOST else mode)
-            super.onMeasure(spec, heightMeasureSpec)
+            val cappedWidth = if (mode == View.MeasureSpec.UNSPECIFIED) maxPx else min(size, maxPx)
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(cappedWidth, View.MeasureSpec.EXACTLY)
+
+            var contentHeight = 0
+            for (i in 0 until childCount) {
+                val child = getChildAt(i)
+                val lp = child.layoutParams as LayoutParams
+                if (lp.height == LayoutParams.MATCH_PARENT) continue
+                measureChildWithMargins(child, widthSpec, 0, heightMeasureSpec, 0)
+                contentHeight = maxOf(contentHeight, child.measuredHeight + lp.topMargin + lp.bottomMargin)
+            }
+            val resolvedHeight = resolveSize(contentHeight + paddingTop + paddingBottom, heightMeasureSpec)
+            setMeasuredDimension(cappedWidth, resolvedHeight)
+
+            val exactHeightSpec = View.MeasureSpec.makeMeasureSpec(resolvedHeight, View.MeasureSpec.EXACTLY)
+            for (i in 0 until childCount) {
+                val child = getChildAt(i)
+                val lp = child.layoutParams as LayoutParams
+                if (lp.height != LayoutParams.MATCH_PARENT) continue
+                measureChildWithMargins(child, widthSpec, 0, exactHeightSpec, 0)
+            }
         }
 
         private fun min(a: Int, b: Int) = if (a < b) a else b
@@ -813,7 +927,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         const val CARD_BLUR_DP = 24f
         const val CARD_SATURATION = 1.8f
         const val LOGO_SIZE_DP = 64f
-        const val LOGO_TEXT_DP = 28f
+        const val LOGO_PADDING_DP = 12f
         const val TITLE_TEXT_DP = 22f
         const val FORM_ERROR_TEXT_DP = 13f
         const val FIELD_TEXT_DP = 15f
@@ -830,6 +944,8 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         const val SHAKE_EPSILON_PX = 0.5f
         const val SUCCESS_DELAY_MS = 150L
         const val NETWORK_ERROR_TEXT = "Не удалось выполнить запрос. Проверьте соединение."
+        const val EYE_HIDDEN = "👁️"
+        const val EYE_VISIBLE = "🙈"
         const val DRAFT_PREFS = "auth_draft"
         const val KEY_MODE = "mode"
         const val KEY_USERNAME = "username"
