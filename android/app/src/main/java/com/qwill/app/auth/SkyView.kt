@@ -8,7 +8,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.view.View
@@ -108,9 +107,6 @@ class CelestialView(context: Context) : View(context) {
     private val sunGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val moonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val moonPath = Path()
-    private val moonCutout = Path()
-    private val moonCrescent = Path()
 
     private var visible = false
     private var appActive = true
@@ -246,29 +242,17 @@ class CelestialView(context: Context) : View(context) {
     private fun drawMoon(canvas: Canvas, cx: Float, cy: Float) {
         val opacity = nightProgress
         if (opacity <= 0f) return
-        val dx = context.dp(MOON_ENTER_DX_DP) * (1f - nightProgress) * -1f
-        val dy = context.dp(MOON_ENTER_DY_DP) * (1f - nightProgress)
-        val mx = cx + dx
-        val my = cy + dy
+        val dx = context.dp(MOON_HIDDEN_DX_DP) + context.dp(MOON_REST_DX_DP - MOON_HIDDEN_DX_DP) * nightProgress
+        val dy = context.dp(MOON_HIDDEN_DY_DP) + context.dp(MOON_REST_DY_DP - MOON_HIDDEN_DY_DP) * nightProgress
         val radius = context.dp(MOON_DIAMETER_DP) / 2f
-        val shiftX = context.dp(MOON_SHADOW_DX_DP)
-        val shiftY = context.dp(MOON_SHADOW_DY_DP)
-
-        moonPath.reset()
-        moonPath.addCircle(mx, my, radius, Path.Direction.CW)
-        moonCutout.reset()
-        moonCutout.addCircle(mx + shiftX, my + shiftY, radius, Path.Direction.CW)
-        moonCrescent.reset()
-        moonCrescent.op(moonPath, moonCutout, Path.Op.DIFFERENCE)
-
         moonPaint.color = withAlpha(FixedColors.authStar, opacity)
-        canvas.drawPath(moonCrescent, moonPaint)
+        canvas.drawCircle(cx + dx, cy + dy, radius, moonPaint)
     }
 
     private companion object {
         const val RAY_SPIN_MS = 20_000L
         const val TRANSITION_MS = 1000L
-        const val SUN_CENTER_OFFSET_DP = -370f
+        const val SUN_CENTER_OFFSET_DP = -310f
         const val SUN_DISC_DP = 100f
         const val SUN_RAY_LEN_DP = 180f
         const val SUN_RAY_W_DP = 6f
@@ -277,9 +261,9 @@ class CelestialView(context: Context) : View(context) {
         const val SUN_EXIT_DX_DP = 300f
         const val SUN_EXIT_DY_DP = 150f
         const val MOON_DIAMETER_DP = 90f
-        const val MOON_ENTER_DX_DP = 300f
-        const val MOON_ENTER_DY_DP = 150f
-        const val MOON_SHADOW_DX_DP = -18f
-        const val MOON_SHADOW_DY_DP = 12f
+        const val MOON_REST_DX_DP = -6f
+        const val MOON_REST_DY_DP = 4f
+        const val MOON_HIDDEN_DX_DP = -318f
+        const val MOON_HIDDEN_DY_DP = 162f
     }
 }
