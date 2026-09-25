@@ -27,6 +27,7 @@ interface ChatRowProps {
   myUserId: string | null;
   /** Порядковый номер в списке — задержка входной анимации, буквально i*0.045s из референса. */
   index: number;
+  today: Date;
 }
 
 function isVoice(chat: ChatListItemDto): boolean {
@@ -69,7 +70,7 @@ function previewText(chat: ChatListItemDto, own: boolean): string {
   return 'Нет сообщений';
 }
 
-export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowProps) {
+export function ChatRow({ chat, online, typingNames, myUserId, index, today }: ChatRowProps) {
   const navigate = useNavigate();
   const layout = useLayoutMode();
   const setChatMuted = useChatStore((s) => s.setChatMuted);
@@ -183,7 +184,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index }: ChatRowP
             {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
                 «отправлено». Двойная галочка появится вместе с этими данными. */}
             {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
-            {last && <span className={styles.time}>{formatChatRowWhen(last.createdAt)}</span>}
+            {last && <span className={styles.time}>{formatChatRowWhen(last.createdAt, today)}</span>}
           </div>
           <div className={styles.bottom}>
             {typing ? (

@@ -9,6 +9,7 @@ import { ChatRow } from './ChatRow';
 import type { ChatFilter } from './ChatFilters';
 import styles from './ChatList.module.css';
 import { EmptyState } from './EmptyState';
+import { useToday } from './useToday';
 import { selectVisibleChats } from './visibleChats';
 
 export interface ChatListHandle {
@@ -43,6 +44,7 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
   const myUserId = useChatStore((s) => s.myUserId);
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const listRef = useRef<HTMLElement>(null);
+  const today = useToday();
 
   useImperativeHandle(ref, () => ({
     scrollToTop() {
@@ -118,6 +120,7 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
           online={chat.otherMember ? (presenceByUser[chat.otherMember.id]?.online ?? false) : false}
           typingNames={(typingByChat[chat.id] ?? []).map((u) => u.displayName)}
           index={index}
+          today={today}
         />
       ))}
     </nav>

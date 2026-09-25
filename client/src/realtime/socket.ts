@@ -2,6 +2,7 @@ import { SocketEvent, type VisibilityPayload } from '@messenger/shared';
 import { io, type Socket } from 'socket.io-client';
 
 import { refreshSession } from '../api/client';
+import { useConnectionStatus } from './connectionStatus';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
 
@@ -15,6 +16,7 @@ interface PendingEmit {
 const pendingEmits: PendingEmit[] = [];
 
 const SOCKET_UNAUTHORIZED = 'unauthorized';
+const SOCKET_IP_BANNED = 'ip_banned';
 const TOKEN_RETRY_MS = 10_000;
 
 let currentToken: string | null = null;
@@ -30,6 +32,7 @@ function retryConnectLater(target: Socket, delayMs: number): void {
 }
 
 function handleConnectError(target: Socket, error: Error): void {
+  if (error.message === SOCKET_IP_BANNED) useConnectionStatus.setState({ ipBanned: true });
   if (target.active || error.message !== SOCKET_UNAUTHORIZED) return;
   if (refreshedForToken === currentToken) return;
   const sinceLastRefresh = Date.now() - lastTokenRefreshAt;
@@ -82,7 +85,11 @@ export function connectSocket(accessToken: string): Socket {
     auth: { token: accessToken },
     withCredentials: true,
   });
-  socket.on('connect', emitVisibility);
+  socket.on('connect', () => {
+    useConnectionStatus.setState({ socketConnected: true, ipBanned: false });
+    emitVisibility();
+  });
+  socket.on('disconnect', () => useConnectionStatus.setState({ socketConnected: false }));
   const created = socket;
   socket.on('connect_error', (error) => handleConnectError(created, error));
   document.addEventListener('visibilitychange', emitVisibility);
@@ -99,6 +106,7 @@ export function disconnectSocket(): void {
   document.removeEventListener('visibilitychange', emitVisibility);
   socket?.disconnect();
   socket = null;
+  useConnectionStatus.setState({ socketConnected: false, ipBanned: false, updating: false });
 }
 
 export function getSocket(): Socket | null {

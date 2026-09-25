@@ -17,6 +17,7 @@ import {
   updateGroupSchema,
   updateRoleSchema,
   type ChatDeletedEvent,
+  type ChatMutedEvent,
 } from '@messenger/shared';
 import type { Request } from 'express';
 import { Router } from 'express';
@@ -227,10 +228,12 @@ chatsRouter.delete('/:id', (req, res, next) => {
     chatService
       .deleteChat(chatId, userId, forEveryone)
       .then(async (result) => {
+        const event: ChatDeletedEvent = { chatId };
         if (result.forEveryone) {
-          const event: ChatDeletedEvent = { chatId };
           emitToChat(chatId, SocketEvent.ChatDeleted, event);
           await Promise.all(result.memberIds.map((memberId) => unsubscribeUserFromChat(memberId, chatId)));
+        } else {
+          emitToUser(userId, SocketEvent.ChatDeleted, event);
         }
         res.status(204).end();
       })
@@ -263,9 +266,16 @@ chatsRouter.patch('/:id', validateBody(updateGroupSchema), (req, res, next) => {
 });
 
 chatsRouter.patch('/:id/mute', validateBody(chatMuteSchema), (req, res, next) => {
+  const chatId = paramId(req, 'id');
+  const userId = req.userId!;
+
   chatService
-    .setChatMuted(paramId(req, 'id'), req.userId!, req.body.muted)
-    .then((muted) => res.json({ muted }))
+    .setChatMuted(chatId, userId, req.body.muted)
+    .then((muted) => {
+      const event: ChatMutedEvent = { chatId, muted };
+      emitToUser(userId, SocketEvent.ChatMuted, event);
+      res.json({ muted });
+    })
     .catch(next);
 });
 

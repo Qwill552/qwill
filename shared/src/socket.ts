@@ -15,6 +15,7 @@ export const SocketEvent = {
   MessageReaction: 'message:reaction',
   ChatCreated: 'chat:created',
   ChatDeleted: 'chat:deleted',
+  ChatMuted: 'chat:muted',
   ChatRead: 'chat:read',
   ChatPin: 'chat:pin',
   ChatPinned: 'chat:pinned',
@@ -81,6 +82,11 @@ export interface ChatPinnedEvent {
 
 export interface ChatDeletedEvent {
   chatId: string;
+}
+
+export interface ChatMutedEvent {
+  chatId: string;
+  muted: boolean;
 }
 
 export interface ChatBlockEvent {

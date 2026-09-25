@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listReportGroupsRequest } from '../api/admin';
 import { ChatList, type ChatListHandle } from '../features/chats/ChatList';
 import { ChatFilters, type ChatFilter } from '../features/chats/ChatFilters';
+import { ConnectionTitle } from '../features/chats/ConnectionTitle';
 import { CreateGroupModal } from '../features/groups/CreateGroupModal';
 import { SearchReveal, type RevealOrigin } from '../features/chats/SearchReveal';
 import { BugReportDialog } from '../features/support/BugReportDialog';
@@ -332,7 +333,7 @@ export function ChatsScreen() {
             >
               <div className={styles.brand}>
                 <Avatar label={me?.displayName ?? 'Q'} avatarUrl={me?.avatarUrl} size={38} color={me?.avatarColor} />
-                <span className={styles.wordmark}>Qwill</span>
+                <ConnectionTitle />
               </div>
               <div className={styles.actions}>
                 <span className={`${styles.searchToggleSlot} ${searchHidden ? styles.searchToggleVisible : ''}`}>

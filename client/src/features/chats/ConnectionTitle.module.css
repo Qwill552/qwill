@@ -1,0 +1,125 @@
+.title {
+  display: grid;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.text {
+  grid-area: 1 / 1;
+  align-self: center;
+  min-width: 0;
+  overflow-x: clip;
+  color: rgb(var(--pulse-ink));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.status {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.enter {
+  animation: title-enter var(--dur-title-swap) var(--ease-screen) both;
+}
+
+.leave {
+  animation: title-leave var(--dur-title-swap) var(--ease-screen) both;
+  pointer-events: none;
+}
+
+@keyframes title-enter {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes title-leave {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+
+  to {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+.dot {
+  display: inline-block;
+  animation: var(--dur-ellipsis) linear calc(var(--dur-ellipsis) / -2) infinite var(--ellipsis-state);
+}
+
+.dotFirst {
+  animation-name: dot-first;
+}
+
+.dotSecond {
+  animation-name: dot-second;
+}
+
+.dotThird {
+  animation-name: dot-third;
+}
+
+@keyframes dot-first {
+  0% {
+    opacity: 0;
+  }
+
+  20%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes dot-second {
+  0%,
+  20% {
+    opacity: 0;
+  }
+
+  40%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes dot-third {
+  0%,
+  40% {
+    opacity: 0;
+  }
+
+  60%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}

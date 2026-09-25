@@ -7,6 +7,7 @@ import type {
   CallTakenElsewhereEvent,
   ChatBlockEvent,
   ChatDeletedEvent,
+  ChatMutedEvent,
   ChatDto,
   ChatListItemDto,
   ChatListResponse,
@@ -124,6 +125,7 @@ import {
   type FeedSide,
 } from '../features/messages/feedWindow';
 import { closeDesktopChatNotifications } from '../native/desktop';
+import { trackUpdating } from '../realtime/connectionStatus';
 import { emitWhenReady, getSocket } from '../realtime/socket';
 import { notifyDesktopOfMessage } from '../app/desktopNotify';
 import { useAuthStore } from './authStore';
@@ -2121,6 +2123,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().applyChatDeleted(event.chatId);
     });
 
+    socket.off(SocketEvent.ChatMuted).on(SocketEvent.ChatMuted, (event: ChatMutedEvent) => {
+      set((state) => ({
+        chats: state.chats.map((c) => (c.id === event.chatId && c.muted !== event.muted ? { ...c, muted: event.muted } : c)),
+      }));
+    });
+
     socket.off(SocketEvent.MemberChanged).on(SocketEvent.MemberChanged, (event: MemberChangedEvent) => {
       get().applyMemberChanged(event);
     });
@@ -2218,7 +2226,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const sync = (): void => {
         clearOutboxRetry();
         void get().drainOutbox();
-        void get().catchUpAfterConnect();
+        void trackUpdating(get().catchUpAfterConnect());
       };
 
       if (hasPendingNativeAccept()) afterCallStarts(sync);

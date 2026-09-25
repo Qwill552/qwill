@@ -25,6 +25,7 @@ const refreshSessionMock = vi.fn<() => Promise<boolean>>();
 vi.mock('../api/client', () => ({ refreshSession: () => refreshSessionMock() }));
 
 const { connectSocket, disconnectSocket, emitWhenReady } = await import('./socket');
+const { useConnectionStatus } = await import('./connectionStatus');
 
 describe('сокет: отправка не теряется до появления соединения', () => {
   beforeEach(() => {
@@ -137,5 +138,43 @@ describe('сокет: вход, отвергнутый за протухший �
     await vi.runAllTimersAsync();
 
     expect(refresher).not.toHaveBeenCalled();
+  });
+});
+
+describe('сокет: состояние соединения для шапки', () => {
+  beforeEach(() => {
+    disconnectSocket();
+    handlers.clear();
+    fakeSocket.active = false;
+  });
+
+  it('connect и disconnect переключают признак живого соединения', () => {
+    connectSocket('token');
+    expect(useConnectionStatus.getState().socketConnected).toBe(false);
+
+    handlers.get('connect')?.();
+    expect(useConnectionStatus.getState().socketConnected).toBe(true);
+
+    handlers.get('disconnect')?.();
+    expect(useConnectionStatus.getState().socketConnected).toBe(false);
+  });
+
+  it('ip_banned поднимает блокировку, успешный вход её снимает', () => {
+    connectSocket('token');
+
+    handlers.get('connect_error')?.(new Error('ip_banned'));
+    expect(useConnectionStatus.getState().ipBanned).toBe(true);
+
+    handlers.get('connect')?.();
+    expect(useConnectionStatus.getState().ipBanned).toBe(false);
+  });
+
+  it('обычный обрыв блокировку не поднимает', () => {
+    connectSocket('token');
+    fakeSocket.active = true;
+
+    handlers.get('connect_error')?.(new Error('xhr poll error'));
+
+    expect(useConnectionStatus.getState().ipBanned).toBe(false);
   });
 });
