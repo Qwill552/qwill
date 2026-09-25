@@ -30,12 +30,24 @@ class PosterMathTest {
     fun wideScreensFitTheCanvasIntoTheWindow() {
         val m900 = PosterMetrics.compute(900f * density, 600f * density, density)
         assertTrue(m900.wide)
-        assertEquals((900f - 48f) * density / 1080f, m900.u, 1e-4f)
+        assertEquals((900f - 48f - 24f) * density / 1080f, m900.u, 1e-4f)
         assertEquals(m900.u, m900.artU, 1e-6f)
         assertEquals(1f, m900.toggleScale, 1e-6f)
         val m1280 = PosterMetrics.compute(1280f * density, 800f * density, density)
         assertEquals(density, m1280.u, 1e-4f)
         assertEquals(1080f * density, m1280.posterWidth, 1e-2f)
+    }
+
+    @Test
+    fun landscapePhoneWindowFitsBetweenInsets() {
+        val widthPx = 2856f
+        val cutout = 150f
+        val hairline = 3f
+        val m = PosterMetrics.compute(widthPx, 1280f, density, cutout + 4f * hairline)
+        assertTrue(m.wide)
+        val window = m.posterWidth + 2f * 12f * density + 4f * hairline
+        val margins = 2f * 24f * density + cutout
+        assertTrue("window $window + margins $margins > screen $widthPx", window + margins <= widthPx + 0.5f)
     }
 
     @Test

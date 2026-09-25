@@ -98,6 +98,7 @@ class PosterMetrics(
         const val HERO_UNITS = 1106f
         const val HERO_PAD = 76f
         const val WIDE_GUTTER_DP = 24f
+        const val WIDE_WINDOW_PAD_DP = 12f
         const val NARROW_ART_SCALE = 1.6f
         const val NARROW_TOGGLE_SCALE = 1.333f
         const val NARROW_TITLE_TOP_SHARE = 0.13f
@@ -137,13 +138,13 @@ class PosterMetrics(
             SmokeSpec(-70f, false, 0f, 1240f, 474f, 0.66f, 46_000, SmokeKind.A, bottomUnits = -110f),
         )
 
-        fun compute(widthPx: Float, heightPx: Float, density: Float): PosterMetrics {
+        fun compute(widthPx: Float, heightPx: Float, density: Float, wideReservedPx: Float = 0f): PosterMetrics {
             val wide = widthPx / density >= WIDE_MIN_DP
             if (!wide) {
                 val u = widthPx / NARROW_CANVAS_UNITS
                 return PosterMetrics(false, u, u * NARROW_ART_SCALE, NARROW_TOGGLE_SCALE, density, widthPx, heightPx)
             }
-            val canvas = min(CANVAS_UNITS * density, widthPx - 2f * WIDE_GUTTER_DP * density)
+            val canvas = min(CANVAS_UNITS * density, widthPx - 2f * (WIDE_GUTTER_DP + WIDE_WINDOW_PAD_DP) * density - wideReservedPx)
             val u = canvas / CANVAS_UNITS
             return PosterMetrics(true, u, u, 1f, density, widthPx, heightPx)
         }

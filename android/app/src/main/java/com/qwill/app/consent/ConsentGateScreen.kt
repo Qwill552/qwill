@@ -82,6 +82,8 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
     private var cardBackground: PosterCardDrawable? = null
 
     private var metrics: PosterMetrics? = null
+    private var sizedWidth = 0
+    private var sizedHeight = 0
     private var safeArea = SafeArea.NONE
     private var art: PosterArtSet? = null
     private var artRequest = 0
@@ -164,7 +166,9 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
 
     override fun onSafeAreaChanged(area: SafeArea) {
         safeArea = area
-        if (::root.isInitialized && metrics != null) applyGeometry()
+        if (!::root.isInitialized || metrics == null) return
+        onSized(sizedWidth, sizedHeight)
+        applyGeometry()
     }
 
     override fun onThemeChanged() {
@@ -186,12 +190,18 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
 
     private fun onSized(width: Int, height: Int) {
         if (width == 0 || height == 0) return
-        val next = PosterMetrics.compute(width.toFloat(), height.toFloat(), context.resources.displayMetrics.density)
+        sizedWidth = width
+        sizedHeight = height
+        val density = context.resources.displayMetrics.density
+        val reserved = safeArea.left + safeArea.right + 4 * hairline(density)
+        val next = PosterMetrics.compute(width.toFloat(), height.toFloat(), density, reserved.toFloat())
         val previous = metrics
         metrics = next
         if (previous != null && previous.u == next.u && previous.wide == next.wide && previous.screenHeight == next.screenHeight) return
         rebuildAll()
     }
+
+    private fun hairline(density: Float): Int = max(1, density.roundToInt())
 
     private fun rebuildAll() {
         val m = metrics ?: return
@@ -213,7 +223,7 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
         if (m.wide) {
             val gutter = context.dpInt(Dimens.SPACE_5)
             val pad = context.dpInt(Dimens.SPACE_3)
-            val hairline = max(1, density.roundToInt())
+            val hairline = hairline(density)
             val windowWidth = (m.posterWidth + 2 * pad + 4 * hairline).roundToInt()
             window.layoutParams = FrameLayout.LayoutParams(windowWidth, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER).apply {
                 leftMargin = gutter + safeArea.left

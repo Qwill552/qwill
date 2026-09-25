@@ -195,7 +195,9 @@ object PosterArt {
         val topSide = Path().apply {
             moveTo(0f, 0f)
             lineTo(width, 0f)
-            lineTo(width / 2f, width / 2f)
+            lineTo(width - border, border)
+            lineTo(width / 2f, height / 2f)
+            lineTo(border, border)
             close()
         }
         canvas.save()
