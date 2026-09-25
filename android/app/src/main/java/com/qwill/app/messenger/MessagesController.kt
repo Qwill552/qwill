@@ -228,6 +228,15 @@ class MessagesController(
         }
     }
 
+    fun startPrivateChat(username: String, requestGuid: Int, callback: (ApiResult<ChatDto>) -> Unit) {
+        val current = epoch
+        transport.createPrivateChat(username, requestGuid) { result ->
+            if (!alive(current, requestGuid)) return@createPrivateChat
+            if (result is ApiResult.Success) applyChatDetail(result.value)
+            callback(result)
+        }
+    }
+
     fun setLiveChat(chatId: String?) {
         liveChatId = chatId
     }

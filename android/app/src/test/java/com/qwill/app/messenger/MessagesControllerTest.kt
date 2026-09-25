@@ -732,4 +732,32 @@ class MessagesControllerTest {
         assertEquals("Нельзя", (results.single() as ApiError).message)
         assertEquals(2, storage.readChats().size)
     }
+
+    @Test
+    fun startPrivateChatAppliesDetailsBeforeCallback() {
+        start()
+        val guid = RequestGuid.next()
+        transport.privateChat = { ApiResult.Success(details("p1")) }
+        val opened = ArrayList<String>()
+        controller.startPrivateChat("peer", guid) { result -> if (result is ApiResult.Success) opened.add(result.value.id) }
+        assertEquals(listOf("private:peer"), transport.callsStartingWith("private"))
+        assertEquals(listOf("p1"), opened)
+        assertTrue(controller.chats.any { it.id == "p1" })
+        assertTrue(updatesOf<FeedUpdate.DetailsChanged>().any { it.chatId == "p1" })
+    }
+
+    @Test
+    fun startPrivateChatFailureReachesCallerAndCancelledOwnerHearsNothing() {
+        start()
+        val guid = RequestGuid.next()
+        transport.privateChat = { ApiResult.Failure(NetworkError()) }
+        val results = ArrayList<ApiResult<*>>()
+        controller.startPrivateChat("peer", guid) { results.add(it) }
+        assertTrue((results.single() as ApiResult.Failure).error is NetworkError)
+        assertTrue(controller.chats.none { it.id == "p1" })
+        transport.privateChat = { ApiResult.Success(details("p1")) }
+        controller.cancelRequestsForGuid(guid)
+        controller.startPrivateChat("peer", guid) { results.add(it) }
+        assertEquals(1, results.size)
+    }
 }

@@ -16,9 +16,9 @@ import android.window.OnBackInvokedDispatcher
 import com.qwill.app.auth.AuthScreen
 import com.qwill.app.auth.SessionState
 import com.qwill.app.auth.SessionStateListener
-import com.qwill.app.chats.ChatsScreen
 import com.qwill.app.consent.ConsentGateLayer
 import com.qwill.app.consent.ConsentGateRule
+import com.qwill.app.tabs.MainTabsScreen
 import com.qwill.app.ui.ActivityResults
 import com.qwill.app.ui.insets.SafeAreaTracker
 import com.qwill.app.ui.insets.SystemBars
@@ -65,7 +65,7 @@ class LaunchActivity : Activity() {
         stack.onBackStateChanged = ::updateBackCallback
         gate.onBackStateChanged = ::updateBackCallback
         val initialState = QwillApplication.session.state
-        stack.setRoot(if (RootRouting.routeFor(initialState) == RootRoute.CHATS) ChatsScreen() else authScreenFor(initialState))
+        stack.setRoot(if (RootRouting.routeFor(initialState) == RootRoute.CHATS) MainTabsScreen() else authScreenFor(initialState))
         applyGate(initialState, initial = true)
         QwillApplication.session.addStateListener(sessionListener)
     }

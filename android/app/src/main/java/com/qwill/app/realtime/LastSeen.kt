@@ -26,6 +26,16 @@ object LastSeen {
         return "был(а) ${moment.get(Calendar.DAY_OF_MONTH)} ${MONTHS[moment.get(Calendar.MONTH)]} в $time"
     }
 
+    fun formatShort(iso: String, nowMs: Long = System.currentTimeMillis(), zone: TimeZone = TimeZone.getDefault()): String {
+        val at = parse(iso) ?: return ""
+        val moment = Calendar.getInstance(zone).apply { timeInMillis = at }
+        val now = Calendar.getInstance(zone).apply { timeInMillis = nowMs }
+        val today = moment.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+            moment.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+        if (today) return "был(а) в ${"%02d:%02d".format(Locale.ROOT, moment.get(Calendar.HOUR_OF_DAY), moment.get(Calendar.MINUTE))}"
+        return "был(а) ${moment.get(Calendar.DAY_OF_MONTH)} ${MONTHS[moment.get(Calendar.MONTH)]}"
+    }
+
     private fun parse(iso: String): Long? = try {
         SimpleDateFormat(ISO_PATTERN, Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(iso)?.time
     } catch (e: ParseException) {

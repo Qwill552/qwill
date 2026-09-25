@@ -375,6 +375,14 @@ object FixedColors {
     val menuDanger: Int = rgb(0xFF5D73)
     val menuShadow: Int = withAlpha(rgb(0x000000), 0.7f)
 
+    val tabActive: Int = rgb(0x4FAAFF)
+    val tabShadow: Int = withAlpha(rgb(0x000000), 0.95f)
+
+    val contactsInviteFrom: Int = rgb(0x4D8DFF)
+    val contactsInviteTo: Int = rgb(0x2F6FE0)
+    val contactsCallsFrom: Int = rgb(0x3DDC84)
+    val contactsCallsTo: Int = rgb(0x1FAF63)
+
     val chipActiveFrom: Int = withAlpha(rgb(77, 141, 255), 0.92f)
     val chipActiveTo: Int = withAlpha(rgb(160, 90, 255), 0.88f)
     val chipActiveBorder: Int = withAlpha(rgb(150, 180, 255), 0.45f)

@@ -9,8 +9,14 @@ import com.qwill.app.ui.insets.SafeArea
 abstract class Screen {
     val classGuid: Int = RequestGuid.next()
 
-    var stack: ScreenStack? = null
-        internal set
+    private var ownStack: ScreenStack? = null
+    private var host: Screen? = null
+
+    var stack: ScreenStack?
+        get() = host?.stack ?: ownStack
+        internal set(value) {
+            ownStack = value
+        }
 
     var view: View? = null
         private set
@@ -34,6 +40,10 @@ abstract class Screen {
     open fun onSafeAreaChanged(area: SafeArea) {}
 
     open fun onThemeChanged() {}
+
+    fun embedIn(host: Screen) {
+        this.host = host
+    }
 
     protected fun backStateChanged() {
         stack?.notifyBackStateChanged()

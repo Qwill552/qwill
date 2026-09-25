@@ -32,6 +32,8 @@ import com.qwill.app.net.NetworkMonitor
 import com.qwill.app.realtime.Presence
 import com.qwill.app.realtime.SocketConnection
 import com.qwill.app.realtime.TypingStore
+import com.qwill.app.search.PreferencesRecentStorage
+import com.qwill.app.search.RecentSearches
 import com.qwill.app.ui.AppForeground
 import java.io.File
 import java.util.concurrent.Executors
@@ -109,6 +111,12 @@ class QwillApplication : Application() {
             UploadService.update(this, messages.activeUploads, percent)
         }
 
+        recentSearches = RecentSearches(
+            PreferencesRecentStorage(this),
+            storageQueue,
+            MainQueue,
+        ) { (session.state as? SessionState.Authenticated)?.user?.id }
+
         session.addStateListener {
             socket.onSessionState(it)
             messages.onSessionState(it)
@@ -119,6 +127,7 @@ class QwillApplication : Application() {
             presence.clear()
             typing.clear()
             messages.onSessionCleared()
+            recentSearches.clear()
             files.onSessionCleared(mediaTaskQueue)
             UploadService.update(this, 0)
         }
@@ -215,6 +224,9 @@ class QwillApplication : Application() {
             private set
 
         lateinit var files: FilesController
+            private set
+
+        lateinit var recentSearches: RecentSearches
             private set
     }
 }

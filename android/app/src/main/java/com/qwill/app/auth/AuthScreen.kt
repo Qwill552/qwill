@@ -23,7 +23,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.qwill.app.QwillApplication
 import com.qwill.app.R
-import com.qwill.app.chats.ChatsScreen
 import com.qwill.app.legal.LegalScreen
 import com.qwill.app.model.LegalVersionsDto
 import com.qwill.app.model.LoginInput
@@ -35,6 +34,7 @@ import com.qwill.app.net.ApiResult
 import com.qwill.app.net.ErrorCode
 import com.qwill.app.net.NetworkError
 import com.qwill.app.net.NoResponseError
+import com.qwill.app.tabs.MainTabsScreen
 import com.qwill.app.ui.QwillDialog
 import com.qwill.app.ui.SpringMotion
 import com.qwill.app.ui.fieldBackground
@@ -733,7 +733,7 @@ class AuthScreen(private val bannedMessage: String? = null) : Screen() {
         imm?.hideSoftInputFromWindow(usernameField.input.windowToken, 0)
         clearDraft()
         usernameField.input.postDelayed({
-            stack?.replaceAll(ChatsScreen())
+            stack?.replaceAll(MainTabsScreen())
         }, SUCCESS_DELAY_MS)
     }
 

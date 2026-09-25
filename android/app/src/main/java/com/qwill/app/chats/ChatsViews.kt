@@ -311,6 +311,7 @@ class EmptyStateView(context: Context) : LinearLayout(context) {
     fun setTexts(heading: String, detail: String) {
         title.text = heading
         subtitle.text = detail
+        subtitle.visibility = if (detail.isEmpty()) GONE else VISIBLE
     }
 
     fun applyTheme() {

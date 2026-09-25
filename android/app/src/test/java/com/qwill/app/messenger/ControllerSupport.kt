@@ -83,6 +83,7 @@ class FakeTransport : MessagesTransport {
     var mute: (String, Boolean) -> ApiResult<ChatMuteResponse>? = { _, muted -> ApiResult.Success(ChatMuteResponse(muted)) }
     var delete: (String, Boolean) -> ApiResult<Unit>? = { _, _ -> ApiResult.Success(Unit) }
     val heldDeletes = ArrayList<Held<Unit>>()
+    var privateChat: (String) -> ApiResult<ChatDto>? = { ApiResult.Failure(NetworkError()) }
 
     override fun listChats(guid: Int, callback: ApiCallback<ChatListResponse>) {
         calls.add("chats")
@@ -125,6 +126,11 @@ class FakeTransport : MessagesTransport {
         calls.add("delete:$chatId:$forEveryone")
         val result = delete(chatId, forEveryone)
         if (result == null) heldDeletes.add(Held("delete:$chatId", callback)) else callback.onResult(result)
+    }
+
+    override fun createPrivateChat(username: String, guid: Int, callback: ApiCallback<ChatDto>) {
+        calls.add("private:$username")
+        privateChat(username)?.let { callback.onResult(it) }
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

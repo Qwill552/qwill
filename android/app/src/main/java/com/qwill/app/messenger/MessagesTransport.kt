@@ -5,6 +5,7 @@ import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatMuteInput
 import com.qwill.app.model.ChatMuteResponse
 import com.qwill.app.model.ChatListResponse
+import com.qwill.app.model.CreatePrivateChatInput
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendAck
 import com.qwill.app.model.MessageSendPayload
@@ -35,6 +36,8 @@ interface MessagesTransport {
     fun setChatMuted(chatId: String, muted: Boolean, guid: Int, callback: ApiCallback<ChatMuteResponse>)
 
     fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>)
+
+    fun createPrivateChat(username: String, guid: Int, callback: ApiCallback<ChatDto>)
 
     fun cancelRequestsForGuid(guid: Int)
 }
@@ -95,6 +98,10 @@ class ApiMessagesTransport(
 
     override fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>) {
         api.send(ApiRequest("DELETE", "/api/chats/${encode(chatId)}?forEveryone=$forEveryone", ApiRequest.NO_CONTENT), guid, callback)
+    }
+
+    override fun createPrivateChat(username: String, guid: Int, callback: ApiCallback<ChatDto>) {
+        api.send(ApiRequest.post("/api/chats/private", CreatePrivateChatInput.serializer(), CreatePrivateChatInput(username), ChatDto.serializer()), guid, callback)
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

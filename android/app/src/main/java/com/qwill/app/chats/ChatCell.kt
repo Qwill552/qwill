@@ -3,7 +3,6 @@ package com.qwill.app.chats
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
@@ -25,7 +24,6 @@ import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.PathInterpolator
 import com.qwill.app.QwillApplication
-import com.qwill.app.R
 import com.qwill.app.consent.CssGradient
 import com.qwill.app.emoji.Emoji
 import com.qwill.app.files.ImageReceiver
@@ -33,6 +31,7 @@ import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatType
 import com.qwill.app.ui.AvatarDrawable
 import com.qwill.app.ui.QwillIcon
+import com.qwill.app.ui.ServiceLogo
 import com.qwill.app.ui.theme.Dimens
 import com.qwill.app.ui.theme.FixedColors
 import com.qwill.app.ui.theme.FontWeight
@@ -584,29 +583,6 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
             cached = result
             cachedDensity = density
             return result
-        }
-    }
-
-    private object ServiceLogo {
-        private const val PADDING_SHARE = 0.1875f
-        private var light: Bitmap? = null
-        private var dark: Bitmap? = null
-        private var mark: Bitmap? = null
-        private val rect = RectF()
-
-        fun draw(canvas: Canvas, context: Context, left: Float, top: Float, size: Float, paint: Paint) {
-            val resources = context.resources
-            val background = if (Theme.isDark) {
-                dark ?: BitmapFactory.decodeResource(resources, R.drawable.logo_bg_dark).also { dark = it }
-            } else {
-                light ?: BitmapFactory.decodeResource(resources, R.drawable.logo_bg_light).also { light = it }
-            }
-            val foreground = mark ?: BitmapFactory.decodeResource(resources, R.drawable.logo_mark).also { mark = it }
-            rect.set(left, top, left + size, top + size)
-            canvas.drawBitmap(background, null, rect, paint)
-            val inset = size * PADDING_SHARE
-            rect.inset(inset, inset)
-            canvas.drawBitmap(foreground, null, rect, paint)
         }
     }
 
