@@ -51,6 +51,25 @@ class RealtimeStoresTest {
     }
 
     @Test
+    fun seedAllKeepsLiveStatusAndNotifiesOncePerBatch() {
+        val presence = Presence(main)
+        val notified = ArrayList<String?>()
+        onMain {
+            presence.apply(UserPresenceEvent("a", online = true, lastSeenAt = "x"))
+            presence.addListener { notified.add(it) }
+            presence.seedAll(mapOf("a" to "old", "b" to "old", "c" to "older"))
+        }
+        assertTrue(onMain { presence["a"]!!.online })
+        assertEquals("old", onMain { presence["b"]!!.lastSeenAt })
+        assertEquals("older", onMain { presence["c"]!!.lastSeenAt })
+        assertEquals(listOf<String?>(null), notified)
+        onMain { presence.seedAll(mapOf("a" to "new", "b" to "new")) }
+        assertEquals(1, notified.size)
+        onMain { presence.seedAll(mapOf("d" to "new")) }
+        assertEquals(listOf(null, "d"), notified)
+    }
+
+    @Test
     fun seedDoesNotOverwriteLive() {
         val presence = Presence(main)
         onMain {

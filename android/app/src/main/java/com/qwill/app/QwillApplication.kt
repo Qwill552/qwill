@@ -15,6 +15,7 @@ import com.qwill.app.core.DispatchQueue
 import com.qwill.app.core.MainQueue
 import com.qwill.app.database.MessagesStorage
 import com.qwill.app.database.NativeSqlDatabase
+import com.qwill.app.emoji.Emoji
 import com.qwill.app.files.FileHttp
 import com.qwill.app.files.FilesController
 import com.qwill.app.files.MediaDirs
@@ -68,6 +69,8 @@ class QwillApplication : Application() {
             session::reportIpBanned,
         )
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val imageQueue = DispatchQueue("imageQueue")
+        Emoji.init(assets, imageQueue, MainQueue)
         files = FilesController(
             context = this,
             dirs = MediaDirs(cacheDir, filesDir),
@@ -76,7 +79,7 @@ class QwillApplication : Application() {
             main = MainQueue,
             http = fileHttp,
             fileQueue = DispatchQueue("fileQueue"),
-            imageQueue = DispatchQueue("imageQueue"),
+            imageQueue = imageQueue,
             memoryClassMb = activityManager.memoryClass,
         )
         var uploadPercent = -1
@@ -86,7 +89,7 @@ class QwillApplication : Application() {
             main = MainQueue,
             transport = ApiMessagesTransport(api, socket),
             me = { (session.state as? SessionState.Authenticated)?.user },
-            seedPresence = presence::seed,
+            seedPresence = presence::seedAll,
             setUpdating = socket::setUpdating,
             holdSocket = { socket.hold()::release },
             dataSaver = ::isDataSaverOn,

@@ -4,6 +4,7 @@ import com.qwill.app.core.TaskQueue
 import com.qwill.app.database.SyncCursor
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListResponse
+import com.qwill.app.model.ChatMuteResponse
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendPayload
 import com.qwill.app.model.MessagesAround
@@ -79,6 +80,9 @@ class FakeTransport : MessagesTransport {
     var around: (String, Long) -> ApiResult<MessagesAround>? = { _, _ -> ApiResult.Failure(NetworkError()) }
     var sync: (String, SyncCursor) -> ApiResult<MessagesSyncResponse>? = { _, _ -> ApiResult.Success(MessagesSyncResponse()) }
     var send: (MessageSendPayload) -> ApiResult<MessageDto>? = { null }
+    var mute: (String, Boolean) -> ApiResult<ChatMuteResponse>? = { _, muted -> ApiResult.Success(ChatMuteResponse(muted)) }
+    var delete: (String, Boolean) -> ApiResult<Unit>? = { _, _ -> ApiResult.Success(Unit) }
+    val heldDeletes = ArrayList<Held<Unit>>()
 
     override fun listChats(guid: Int, callback: ApiCallback<ChatListResponse>) {
         calls.add("chats")
@@ -110,6 +114,17 @@ class FakeTransport : MessagesTransport {
         sent.add(payload)
         val result = send(payload)
         if (result == null) heldSends.add(Held("send:${payload.clientId}", callback)) else callback.onResult(result)
+    }
+
+    override fun setChatMuted(chatId: String, muted: Boolean, guid: Int, callback: ApiCallback<ChatMuteResponse>) {
+        calls.add("mute:$chatId:$muted")
+        mute(chatId, muted)?.let { callback.onResult(it) }
+    }
+
+    override fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>) {
+        calls.add("delete:$chatId:$forEveryone")
+        val result = delete(chatId, forEveryone)
+        if (result == null) heldDeletes.add(Held("delete:$chatId", callback)) else callback.onResult(result)
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

@@ -38,7 +38,7 @@ class MessagesController(
     private val main: TaskQueue,
     private val transport: MessagesTransport,
     private val me: () -> PublicUser?,
-    private val seedPresence: (userId: String, lastSeenAt: String) -> Unit,
+    private val seedPresence: (lastSeenByUser: Map<String, String>) -> Unit,
     private val setUpdating: (Boolean) -> Unit,
     holdSocket: () -> () -> Unit,
     private val dataSaver: () -> Boolean,
@@ -70,6 +70,8 @@ class MessagesController(
     var chats: List<ChatListItemDto> = emptyList()
         private set
 
+    val chatsReady: Boolean get() = chatsFromNetwork || chats.isNotEmpty()
+
     var lastCatchUpAt = 0L
         private set
 
@@ -79,7 +81,8 @@ class MessagesController(
     var openedChatId: String? = null
         private set
 
-    private var liveChatId: String? = null
+    var liveChatId: String? = null
+        private set
     private var started = false
     private var chatsFromNetwork = false
     private var entryGeneration = 0
@@ -181,6 +184,47 @@ class MessagesController(
         if (wasStarted) {
             started = true
             main.postDelayed(cleanupTask, timings.cleanupIntervalMs)
+        }
+    }
+
+    fun setChatMuted(chatId: String, muted: Boolean, callback: ((ApiException?) -> Unit)? = null) {
+        val previous = chats.firstOrNull { it.id == chatId }?.muted ?: return
+        val current = epoch
+        updateChat(chatId) { it.copy(muted = muted) }
+        transport.setChatMuted(chatId, muted, guid) mute@{ result ->
+            if (current != epoch) return@mute
+            when (result) {
+                is ApiResult.Success -> callback?.invoke(null)
+                is ApiResult.Failure -> {
+                    updateChat(chatId) { it.copy(muted = previous) }
+                    callback?.invoke(result.error)
+                }
+            }
+        }
+    }
+
+    fun deleteChat(chatId: String, forEveryone: Boolean, callback: (ApiException?) -> Unit) {
+        val removed = chats.firstOrNull { it.id == chatId }
+        val current = epoch
+        if (removed != null) {
+            chats = chats.filter { it.id != chatId }
+            notifyChats()
+        }
+        transport.deleteChat(chatId, forEveryone, guid) delete@{ result ->
+            if (current != epoch) return@delete
+            when (result) {
+                is ApiResult.Success -> {
+                    applyChatDeleted(chatId)
+                    callback(null)
+                }
+                is ApiResult.Failure -> {
+                    if (removed != null && chats.none { it.id == chatId }) {
+                        chats = sortChats(chats + removed)
+                        notifyChats()
+                    }
+                    callback(result.error)
+                }
+            }
         }
     }
 
@@ -385,7 +429,7 @@ class MessagesController(
             storage.putDetails(chat)
             main.post {
                 if (current != epoch) return@post
-                for (member in chat.members) seedPresence(member.id, member.lastSeenAt)
+                seedPresence(chat.members.associate { it.id to it.lastSeenAt })
                 upsertChat(chat.toListItem())
                 notify(FeedUpdate.DetailsChanged(chat.id, chat))
             }
@@ -640,7 +684,7 @@ class MessagesController(
             if (!alive(current, requestGuid) || result !is ApiResult.Success) return@getChat
             val chat = result.value
             storageQueue.post { storage.putDetails(chat) }
-            for (member in chat.members) seedPresence(member.id, member.lastSeenAt)
+            seedPresence(chat.members.associate { it.id to it.lastSeenAt })
             updateChat(chat.id) { chat.toListItem() }
             callback.onDetails(chat, HistorySource.NETWORK)
         }
@@ -814,7 +858,9 @@ class MessagesController(
 
     private fun publishChats(list: List<ChatListItemDto>) {
         chats = list
-        for (chat in list) chat.otherMember?.let { seedPresence(it.id, it.lastSeenAt) }
+        val lastSeen = HashMap<String, String>()
+        for (chat in list) chat.otherMember?.let { lastSeen[it.id] = it.lastSeenAt }
+        seedPresence(lastSeen)
         notifyChats()
     }
 

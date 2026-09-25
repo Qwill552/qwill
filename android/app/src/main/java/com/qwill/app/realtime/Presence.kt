@@ -48,6 +48,19 @@ class Presence(
         notify(userId)
     }
 
+    fun seedAll(lastSeenByUser: Map<String, String>) {
+        var added: String? = null
+        var count = 0
+        for ((userId, lastSeenAt) in lastSeenByUser) {
+            if (userId in byUser) continue
+            byUser[userId] = PresenceInfo(false, lastSeenAt)
+            added = userId
+            count++
+        }
+        if (count == 0) return
+        notify(if (count == 1) added else null)
+    }
+
     fun onConnected() {
         main.cancel(expireTask)
         unconfirmed.clear()

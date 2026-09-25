@@ -2,6 +2,8 @@ package com.qwill.app.messenger
 
 import com.qwill.app.database.SyncCursor
 import com.qwill.app.model.ChatDto
+import com.qwill.app.model.ChatMuteInput
+import com.qwill.app.model.ChatMuteResponse
 import com.qwill.app.model.ChatListResponse
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendAck
@@ -29,6 +31,10 @@ interface MessagesTransport {
     fun sync(chatId: String, cursor: SyncCursor, guid: Int, callback: ApiCallback<MessagesSyncResponse>)
 
     fun sendMessage(payload: MessageSendPayload, guid: Int, callback: ApiCallback<MessageDto>)
+
+    fun setChatMuted(chatId: String, muted: Boolean, guid: Int, callback: ApiCallback<ChatMuteResponse>)
+
+    fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>)
 
     fun cancelRequestsForGuid(guid: Int)
 }
@@ -75,6 +81,20 @@ class ApiMessagesTransport(
             guid,
             callback,
         )
+    }
+
+    override fun setChatMuted(chatId: String, muted: Boolean, guid: Int, callback: ApiCallback<ChatMuteResponse>) {
+        val request = ApiRequest(
+            "PATCH",
+            "/api/chats/${encode(chatId)}/mute",
+            ApiRequest.parser(ChatMuteResponse.serializer()),
+            body = { ApiJson.encodeToString(ChatMuteInput.serializer(), ChatMuteInput(muted)) },
+        )
+        api.send(request, guid, callback)
+    }
+
+    override fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>) {
+        api.send(ApiRequest("DELETE", "/api/chats/${encode(chatId)}?forEveryone=$forEveryone", ApiRequest.NO_CONTENT), guid, callback)
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

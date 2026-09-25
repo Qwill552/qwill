@@ -108,6 +108,12 @@ class DevicePreferences(private val prefs: SharedPreferences) {
 
     fun treatAsCellular(): Boolean = prefs.getBoolean(KEY_FORCE_CELLULAR, false)
 
+    fun folderTabsEnabled(): Boolean = prefs.getBoolean(KEY_FOLDER_TABS, false)
+
+    fun setFolderTabsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_FOLDER_TABS, enabled).apply()
+    }
+
     fun setTreatAsCellular(value: Boolean) {
         prefs.edit().putBoolean(KEY_FORCE_CELLULAR, value).apply()
     }
@@ -137,5 +143,6 @@ class DevicePreferences(private val prefs: SharedPreferences) {
         private const val KEY_BUDGET = "retention.budget"
         private const val KEY_RISKY_SKIP = "risky.skipWarning"
         private const val KEY_FORCE_CELLULAR = "stand.forceCellular"
+        private const val KEY_FOLDER_TABS = "chats.folderTabs"
     }
 }

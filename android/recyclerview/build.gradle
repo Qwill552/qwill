@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace = 'androidx.recyclerview'
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+}
+
+dependencies {
+    api 'androidx.annotation:annotation:1.8.1'
+    api 'androidx.core:core:1.13.0'
+    implementation 'androidx.collection:collection:1.4.2'
+    implementation 'androidx.customview:customview:1.0.0'
+    implementation 'androidx.customview:customview-poolingcontainer:1.0.0'
+}

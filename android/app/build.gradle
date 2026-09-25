@@ -86,7 +86,36 @@ android {
     }
 }
 
+abstract class EmojiAssetsTask extends DefaultTask {
+    @InputFiles
+    @PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract ConfigurableFileCollection getSources()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void copyAll() {
+        def target = new File(outputDir.get().asFile, 'emoji')
+        target.mkdirs()
+        sources.files.each { file ->
+            java.nio.file.Files.copy(file.toPath(), new File(target, file.name).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+def emojiAssets = tasks.register('emojiAssets', EmojiAssetsTask) {
+    sources.from(rootProject.file('../client/public/emoji/sheet.webp'), rootProject.file('../client/public/emoji/index.json'))
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(emojiAssets, EmojiAssetsTask::getOutputDir)
+    }
+}
+
 dependencies {
+    implementation project(':recyclerview')
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
 

@@ -57,7 +57,7 @@ class MessagesControllerTest {
             main = queue,
             transport = transport,
             me = { user },
-            seedPresence = { _, _ -> },
+            seedPresence = { },
             setUpdating = { updating.add(it) },
             holdSocket = {
                 holds++
@@ -664,5 +664,72 @@ class MessagesControllerTest {
         controller.onSocketConnected()
         assertEquals(listOf("c2"), controller.chats.map { it.id })
         assertEquals(listOf("c2"), storage.readChats().map { it.id })
+    }
+
+    @Test
+    fun chatsReadyOnlyAfterDiskHadChatsOrNetworkAnswered() {
+        start()
+        assertFalse(controller.chatsReady)
+        transport.chatList = { ApiResult.Failure(NetworkError()) }
+        controller.onSocketConnected()
+        assertFalse(controller.chatsReady)
+        serveChats()
+        controller.onSocketConnected()
+        assertTrue(controller.chatsReady)
+        assertTrue(controller.chats.isEmpty())
+    }
+
+    @Test
+    fun chatsReadyFromNonEmptyDisk() {
+        seed { replaceChats(listOf(chat("disk"))) }
+        start()
+        assertTrue(controller.chatsReady)
+    }
+
+    @Test
+    fun muteIsOptimisticAndRevertsSilentlyOnFailure() {
+        seed { replaceChats(listOf(chat("c1"))) }
+        start()
+        controller.setChatMuted("c1", true)
+        assertTrue(controller.chats.single().muted)
+        assertTrue(storage.readChats().single().muted)
+        assertEquals(listOf("mute:c1:true"), transport.callsStartingWith("mute"))
+        transport.mute = { _, _ -> ApiResult.Failure(NetworkError()) }
+        val errors = ArrayList<ApiException?>()
+        controller.setChatMuted("c1", false) { errors.add(it) }
+        assertTrue(controller.chats.single().muted)
+        assertTrue(storage.readChats().single().muted)
+        assertTrue(errors.single() is NetworkError)
+    }
+
+    @Test
+    fun deleteRemovesAtOnceAndWipesAfterServerConfirms() {
+        seed {
+            replaceChats(listOf(chat("c1"), chat("c2")))
+            putMessages(listOf(message(1, chatId = "c1")))
+        }
+        start()
+        transport.delete = { _, _ -> null }
+        val results = ArrayList<ApiException?>()
+        controller.deleteChat("c1", forEveryone = true) { results.add(it) }
+        assertEquals(listOf("c2"), controller.chats.map { it.id })
+        assertEquals(2, storage.readChats().size)
+        assertEquals(listOf("delete:c1:true"), transport.callsStartingWith("delete"))
+        transport.heldDeletes.single().reply(ApiResult.Success(Unit))
+        assertEquals(listOf<ApiException?>(null), results)
+        assertEquals(listOf("c2"), storage.readChats().map { it.id })
+        assertTrue(updatesOf<FeedUpdate.ChatGone>().any { it.chatId == "c1" })
+    }
+
+    @Test
+    fun deleteFailureReturnsChatToItsPlace() {
+        seed { replaceChats(listOf(chat("c1", updatedAt = time(20)), chat("c2", updatedAt = time(10)))) }
+        start()
+        transport.delete = { _, _ -> ApiResult.Failure(ApiError(403, ErrorCode.FORBIDDEN, "Нельзя")) }
+        val results = ArrayList<ApiException?>()
+        controller.deleteChat("c1", forEveryone = false) { results.add(it) }
+        assertEquals(listOf("c1", "c2"), controller.chats.map { it.id })
+        assertEquals("Нельзя", (results.single() as ApiError).message)
+        assertEquals(2, storage.readChats().size)
     }
 }

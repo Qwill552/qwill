@@ -94,7 +94,7 @@ class SendMediaTest {
             main = queue,
             transport = transport,
             me = { user },
-            seedPresence = { _, _ -> },
+            seedPresence = { },
             setUpdating = {},
             holdSocket = { {} },
             dataSaver = { false },

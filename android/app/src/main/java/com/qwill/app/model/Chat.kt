@@ -175,6 +175,12 @@ data class ChatDto(
 data class ChatListResponse(val chats: List<ChatListItemDto> = emptyList())
 
 @Serializable
+data class ChatMuteInput(val muted: Boolean)
+
+@Serializable
+data class ChatMuteResponse(val muted: Boolean = false)
+
+@Serializable
 data class MessagesPage(
     val messages: List<MessageDto> = emptyList(),
     val hasMore: Boolean = false,
