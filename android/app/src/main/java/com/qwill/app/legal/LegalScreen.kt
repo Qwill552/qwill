@@ -177,22 +177,35 @@ class LegalScreen(private val doc: String, private val version: String?) : Scree
         is LegalBlock.Table -> HorizontalScrollView(context).apply {
             isFillViewport = false
             addView(buildTable(block))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = context.dpInt(Dimens.SPACE_3)
+            }
         }
     }
 
     private fun buildTable(table: LegalBlock.Table): TableLayout = TableLayout(context).apply {
-        val border = Theme.palette.cardBorder
-        addView(tableRow(table.header, bold = true, border = border))
-        for (row in table.rows) addView(tableRow(row, bold = false, border = border))
+        val line = context.dpInt(Dimens.HAIRLINE)
+        setBackgroundColor(Theme.palette.cardBorder)
+        setPadding(line, line, 0, 0)
+        addView(tableRow(table.header, bold = true))
+        for (row in table.rows) addView(tableRow(row, bold = false))
     }
 
-    private fun tableRow(cells: List<List<LegalInline>>, bold: Boolean, border: Int): TableRow = TableRow(context).apply {
+    private fun tableRow(cells: List<List<LegalInline>>, bold: Boolean): TableRow = TableRow(context).apply {
+        val line = context.dpInt(Dimens.HAIRLINE)
+        val pad = context.dpInt(Dimens.SPACE_2)
         for (cell in cells) {
-            val cellView = textView(cell, 13f, if (bold) FontWeight.SEMIBOLD else FontWeight.REGULAR)
-            val pad = context.dpInt(Dimens.SPACE_2)
+            val cellView = textView(cell, TABLE_TEXT_DP, if (bold) FontWeight.SEMIBOLD else FontWeight.REGULAR)
             cellView.setPadding(pad, pad, pad, pad)
-            cellView.setBackgroundColor(if (bold) Theme.palette.cardBg else 0)
-            addView(cellView, TableRow.LayoutParams(context.dpInt(160f), ViewGroup.LayoutParams.WRAP_CONTENT))
+            cellView.gravity = Gravity.TOP or Gravity.START
+            cellView.setBackgroundColor(if (bold) Theme.palette.cardBg else Theme.palette.bg)
+            addView(
+                cellView,
+                TableRow.LayoutParams(context.dpInt(TABLE_CELL_DP), ViewGroup.LayoutParams.MATCH_PARENT).apply {
+                    rightMargin = line
+                    bottomMargin = line
+                },
+            )
         }
     }
 
@@ -230,5 +243,7 @@ class LegalScreen(private val doc: String, private val version: String?) : Scree
 
     private companion object {
         const val CONTENT_MAX_WIDTH = 640f
+        const val TABLE_CELL_DP = 160f
+        const val TABLE_TEXT_DP = 14f
     }
 }
