@@ -37,6 +37,12 @@ data class LegalVersionsDto(
 )
 
 @Serializable
+data class AcceptLegalInput(
+    val termsVersion: String,
+    val privacyVersion: String,
+)
+
+@Serializable
 data class LegalDocumentDto(
     val doc: String,
     val version: String,

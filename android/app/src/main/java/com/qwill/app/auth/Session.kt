@@ -126,6 +126,17 @@ class Session(
         }
     }
 
+    fun acceptUser(accepted: PublicUser) {
+        queue.post {
+            val token = refreshToken ?: return@post
+            if (accepted.id != user?.id) return@post
+            persist(StoredSession(token, accessToken, accessExpiresAt, accepted))
+            user = accepted
+            val confirmed = (current as? SessionState.Authenticated)?.confirmed ?: false
+            publish(SessionState.Authenticated(accepted, confirmed))
+        }
+    }
+
     internal fun signIn(auth: AuthResponse): ApiResult<PublicUser> {
         val next = auth.refreshToken ?: return ApiResult.Failure(ApiError.unreadable(200))
         establish(auth, next)

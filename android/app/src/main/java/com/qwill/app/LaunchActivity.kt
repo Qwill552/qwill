@@ -7,6 +7,8 @@ import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
@@ -15,6 +17,8 @@ import com.qwill.app.auth.AuthScreen
 import com.qwill.app.auth.SessionState
 import com.qwill.app.auth.SessionStateListener
 import com.qwill.app.chats.ChatsScreen
+import com.qwill.app.consent.ConsentGateLayer
+import com.qwill.app.consent.ConsentGateRule
 import com.qwill.app.ui.ActivityResults
 import com.qwill.app.ui.insets.SafeAreaTracker
 import com.qwill.app.ui.insets.SystemBars
@@ -26,12 +30,14 @@ import com.qwill.app.ui.theme.ThemeListener
 
 class LaunchActivity : Activity() {
     private lateinit var stack: ScreenStack
+    private lateinit var gate: ConsentGateLayer
     private var backCallback: OnBackInvokedCallback? = null
     private var backCallbackRegistered = false
 
     private val themeListener = ThemeListener {
         applyWindowTheme()
         stack.dispatchThemeChanged()
+        gate.dispatchThemeChanged()
     }
 
     private val sessionListener = SessionStateListener { routeReactively(it) }
@@ -43,24 +49,40 @@ class LaunchActivity : Activity() {
         Motion.refresh(this)
         SystemBars.edgeToEdge(window)
 
+        val root = FrameLayout(this)
         stack = ScreenStack(this)
-        setContentView(stack)
+        gate = ConsentGateLayer(this, stack)
+        root.addView(stack, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        root.addView(gate, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(root)
         applyWindowTheme()
-        SafeAreaTracker(stack) { stack.safeArea = it }.attach()
+        SafeAreaTracker(root) {
+            stack.safeArea = it
+            gate.stack.safeArea = it
+        }.attach()
         Theme.addListener(themeListener)
 
         stack.onBackStateChanged = ::updateBackCallback
+        gate.onBackStateChanged = ::updateBackCallback
         val initialState = QwillApplication.session.state
         stack.setRoot(if (RootRouting.routeFor(initialState) == RootRoute.CHATS) ChatsScreen() else authScreenFor(initialState))
+        applyGate(initialState, initial = true)
         QwillApplication.session.addStateListener(sessionListener)
     }
 
     private fun routeReactively(state: SessionState) {
+        applyGate(state, initial = false)
         if (RootRouting.routeFor(state) != RootRoute.AUTH) return
         val top = stack.top
         if (top is AuthScreen) return
         stack.resetTo(authScreenFor(state))
     }
+
+    private fun applyGate(state: SessionState, initial: Boolean) {
+        gate.apply(ConsentGateRule.decide(gate.shown, initial, state), ConsentGateRule.pendingOf(state))
+    }
+
+    private fun activeStack(): ScreenStack = if (gate.shown) gate.stack else stack
 
     private fun authScreenFor(state: SessionState): AuthScreen = AuthScreen((state as? SessionState.Banned)?.message)
 
@@ -85,12 +107,17 @@ class LaunchActivity : Activity() {
         Theme.removeListener(themeListener)
         QwillApplication.session.removeStateListener(sessionListener)
         unregisterBackCallback()
+        gate.stack.destroyAll()
         stack.destroyAll()
         super.onDestroy()
     }
 
     @Suppress("OVERRIDE_DEPRECATION", "GestureBackNavigation")
     override fun onBackPressed() {
+        if (gate.shown) {
+            if (!gate.stack.handleBack()) moveTaskToBack(true)
+            return
+        }
         if (stack.handleBack()) return
         @Suppress("DEPRECATION")
         super.onBackPressed()
@@ -103,7 +130,7 @@ class LaunchActivity : Activity() {
 
     private fun updateBackCallback() {
         if (Build.VERSION.SDK_INT < 33) return
-        val wanted = stack.canHandleBack()
+        val wanted = activeStack().canHandleBack()
         if (wanted == backCallbackRegistered) return
         if (wanted) {
             val callback = backCallback ?: createBackCallback().also { backCallback = it }
@@ -121,26 +148,33 @@ class LaunchActivity : Activity() {
     }
 
     private fun createBackCallback(): OnBackInvokedCallback {
-        if (Build.VERSION.SDK_INT >= 34) return AnimatedBack(stack)
-        return OnBackInvokedCallback { stack.handleBack() }
+        if (Build.VERSION.SDK_INT >= 34) return AnimatedBack(::activeStack)
+        return OnBackInvokedCallback { activeStack().handleBack() }
     }
 
     @TargetApi(34)
-    private class AnimatedBack(private val stack: ScreenStack) : OnBackAnimationCallback {
+    private class AnimatedBack(private val stack: () -> ScreenStack) : OnBackAnimationCallback {
+        private var gestureStack: ScreenStack? = null
+
         override fun onBackStarted(backEvent: BackEvent) {
-            stack.beginBackGesture()
+            val target = stack()
+            gestureStack = target
+            target.beginBackGesture()
         }
 
         override fun onBackProgressed(backEvent: BackEvent) {
-            stack.updateBackGesture(backEvent.progress)
+            gestureStack?.updateBackGesture(backEvent.progress)
         }
 
         override fun onBackCancelled() {
-            stack.cancelBackGesture()
+            gestureStack?.cancelBackGesture()
+            gestureStack = null
         }
 
         override fun onBackInvoked() {
-            stack.commitBackGesture()
+            val target = gestureStack ?: stack()
+            gestureStack = null
+            target.commitBackGesture()
         }
     }
 }

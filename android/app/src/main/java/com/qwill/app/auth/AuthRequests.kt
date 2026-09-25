@@ -1,5 +1,6 @@
 package com.qwill.app.auth
 
+import com.qwill.app.model.AcceptLegalInput
 import com.qwill.app.model.AuthResponse
 import com.qwill.app.model.ChangePasswordBody
 import com.qwill.app.model.ChangePasswordResponse
@@ -59,6 +60,13 @@ object Requests {
     fun me(): ApiRequest<PublicUser> = ApiRequest.get("/api/users/me", PublicUser.serializer())
 
     fun legalCurrent(): ApiRequest<LegalVersionsDto> = ApiRequest.get("/api/legal/current", LegalVersionsDto.serializer())
+
+    fun acceptLegal(versions: LegalVersionsDto): ApiRequest<PublicUser> = ApiRequest.post(
+        "/api/legal/accept",
+        AcceptLegalInput.serializer(),
+        AcceptLegalInput(versions.termsVersion, versions.privacyVersion),
+        PublicUser.serializer(),
+    )
 
     fun legalDocument(doc: String, version: String): ApiRequest<LegalDocumentDto> =
         ApiRequest.get("/api/legal/$doc/$version", LegalDocumentDto.serializer())
