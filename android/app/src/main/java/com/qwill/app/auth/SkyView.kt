@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.view.View
@@ -107,6 +108,9 @@ class CelestialView(context: Context) : View(context) {
     private val sunGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val moonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val moonBody = Path()
+    private val moonShadow = Path()
+    private val moonCrescent = Path()
 
     private var visible = false
     private var appActive = true
@@ -242,11 +246,25 @@ class CelestialView(context: Context) : View(context) {
     private fun drawMoon(canvas: Canvas, cx: Float, cy: Float) {
         val opacity = nightProgress
         if (opacity <= 0f) return
-        val dx = context.dp(MOON_HIDDEN_DX_DP) + context.dp(MOON_REST_DX_DP - MOON_HIDDEN_DX_DP) * nightProgress
-        val dy = context.dp(MOON_HIDDEN_DY_DP) + context.dp(MOON_REST_DY_DP - MOON_HIDDEN_DY_DP) * nightProgress
+        val p = nightProgress
+        val ex = cx + context.dp(MOON_HIDDEN_DX_DP + (MOON_REST_DX_DP - MOON_HIDDEN_DX_DP) * p)
+        val ey = cy + context.dp(MOON_HIDDEN_DY_DP + (MOON_REST_DY_DP - MOON_HIDDEN_DY_DP) * p)
+        val rotation = MOON_HIDDEN_ROTATION + (0f - MOON_HIDDEN_ROTATION) * p
         val radius = context.dp(MOON_DIAMETER_DP) / 2f
+
+        moonBody.reset()
+        moonBody.addCircle(0f, 0f, radius, Path.Direction.CW)
+        moonShadow.reset()
+        moonShadow.addCircle(context.dp(MOON_SHADOW_DX_DP), context.dp(MOON_SHADOW_DY_DP), radius, Path.Direction.CW)
+        moonCrescent.reset()
+        moonCrescent.op(moonShadow, moonBody, Path.Op.DIFFERENCE)
+
         moonPaint.color = withAlpha(FixedColors.authStar, opacity)
-        canvas.drawCircle(cx + dx, cy + dy, radius, moonPaint)
+        canvas.save()
+        canvas.translate(ex, ey)
+        canvas.rotate(rotation)
+        canvas.drawPath(moonCrescent, moonPaint)
+        canvas.restore()
     }
 
     private companion object {
@@ -261,9 +279,12 @@ class CelestialView(context: Context) : View(context) {
         const val SUN_EXIT_DX_DP = 300f
         const val SUN_EXIT_DY_DP = 150f
         const val MOON_DIAMETER_DP = 90f
-        const val MOON_REST_DX_DP = -6f
-        const val MOON_REST_DY_DP = 4f
-        const val MOON_HIDDEN_DX_DP = -318f
-        const val MOON_HIDDEN_DY_DP = 162f
+        const val MOON_REST_DX_DP = 12f
+        const val MOON_REST_DY_DP = -8f
+        const val MOON_HIDDEN_DX_DP = -300f
+        const val MOON_HIDDEN_DY_DP = 150f
+        const val MOON_HIDDEN_ROTATION = -45f
+        const val MOON_SHADOW_DX_DP = -18f
+        const val MOON_SHADOW_DY_DP = 12f
     }
 }
