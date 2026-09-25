@@ -926,8 +926,7 @@ class ConsentGateScreen(consent: PendingConsentDto) : Screen() {
             view.scaleY = scale
         }
         doneBadge?.let { floatBody(it, m.u, 1f, swing(9_000), 0f, -26f, -3f, 4f) }
-        val bob = context.dp(LoopClock.lerp(-7f, 9f, swing(2_000)))
-        for (i in 0 until hint.childCount) hint.getChildAt(i).translationY = bob
+        hint.translationY = context.dp(LoopClock.lerp(-7f, 9f, swing(2_000)))
     }
 
     private fun entrance(elapsed: Long, delay: Long, animated: Boolean): Float =

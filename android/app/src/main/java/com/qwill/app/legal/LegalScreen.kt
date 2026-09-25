@@ -48,11 +48,16 @@ class LegalScreen(private val doc: String, private val version: String?) : Scree
         val root = FrameLayout(context)
         scroll = ScrollView(context).apply { clipToPadding = false }
         content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val centeredWrap = FrameLayout(context)
-        centeredWrap.addView(
-            content,
-            FrameLayout.LayoutParams(context.dpInt(640f), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL),
-        )
+        val contentParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL)
+        val maxContentWidth = context.dpInt(CONTENT_MAX_WIDTH)
+        val centeredWrap = object : FrameLayout(context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val available = MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight
+                contentParams.width = minOf(maxContentWidth, available.coerceAtLeast(0))
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            }
+        }
+        centeredWrap.addView(content, contentParams)
         scroll.addView(centeredWrap, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
@@ -222,4 +227,8 @@ class LegalScreen(private val doc: String, private val version: String?) : Scree
     }
 
     private fun headingWeight(level: Int): FontWeight = if (level == 1) FontWeight.BOLD else FontWeight.SEMIBOLD
+
+    private companion object {
+        const val CONTENT_MAX_WIDTH = 640f
+    }
 }
