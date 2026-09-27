@@ -86,17 +86,20 @@ android {
     }
 }
 
-abstract class EmojiAssetsTask extends DefaultTask {
+abstract class CopyAssetsTask extends DefaultTask {
     @InputFiles
     @PathSensitive(PathSensitivity.NAME_ONLY)
     abstract ConfigurableFileCollection getSources()
+
+    @Input
+    abstract Property<String> getTargetPath()
 
     @OutputDirectory
     abstract DirectoryProperty getOutputDir()
 
     @TaskAction
     void copyAll() {
-        def target = new File(outputDir.get().asFile, 'emoji')
+        def target = new File(outputDir.get().asFile, targetPath.get())
         target.mkdirs()
         sources.files.each { file ->
             java.nio.file.Files.copy(file.toPath(), new File(target, file.name).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
@@ -104,13 +107,20 @@ abstract class EmojiAssetsTask extends DefaultTask {
     }
 }
 
-def emojiAssets = tasks.register('emojiAssets', EmojiAssetsTask) {
+def emojiAssets = tasks.register('emojiAssets', CopyAssetsTask) {
     sources.from(rootProject.file('../client/public/emoji/sheet.webp'), rootProject.file('../client/public/emoji/index.json'))
+    targetPath.set('emoji')
+}
+
+def wallpaperAssets = tasks.register('wallpaperAssets', CopyAssetsTask) {
+    sources.from(rootProject.fileTree('../client/public/wallpaper/patterns') { include '*.svg' })
+    targetPath.set('wallpaper/patterns')
 }
 
 androidComponents {
     onVariants(selector().all()) { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(emojiAssets, EmojiAssetsTask::getOutputDir)
+        variant.sources.assets?.addGeneratedSourceDirectory(emojiAssets, CopyAssetsTask::getOutputDir)
+        variant.sources.assets?.addGeneratedSourceDirectory(wallpaperAssets, CopyAssetsTask::getOutputDir)
     }
 }
 

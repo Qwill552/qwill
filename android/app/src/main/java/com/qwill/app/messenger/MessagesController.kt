@@ -62,6 +62,8 @@ class MessagesController(
     private val cancelledGuids = HashSet<Int>()
     private val syncWaiters = HashMap<String, MutableList<(SyncOutcome) -> Unit>>()
     private val preloadQueue = ArrayDeque<String>()
+    private val unreadRefreshes = LinkedHashSet<String>()
+    private val unreadRefreshTask = Runnable { runUnreadRefreshes() }
     private val clock = clock
 
     override var epoch = 0
@@ -287,6 +289,14 @@ class MessagesController(
         }
     }
 
+    fun readUnsent(chatId: String, callback: (List<UnsentMessage>) -> Unit) {
+        val current = epoch
+        storageQueue.post {
+            val rows = storage.readUnsent(chatId)
+            main.post { if (current == epoch) callback(rows) }
+        }
+    }
+
     fun onNetworkAvailable() {
         media.onNetworkAvailable()
     }
@@ -321,16 +331,51 @@ class MessagesController(
     fun openChatAt(chatId: String, messageId: Long, requestGuid: Int, callback: HistoryCallback) {
         openedChatId = chatId
         val current = epoch
+        storageQueue.post {
+            val window = storage.readAround(chatId, messageId, timings.pageSize / 2)
+            val cursor = if (window != null) storage.readCursor(chatId) else null
+            val newest = window?.maxOfOrNull { it.id }
+            val atTail = window != null && cursor != null && newest != null && newest >= cursor.maxId
+            val unsent = if (atTail) storage.readUnsent(chatId) else emptyList()
+            main.post {
+                if (!alive(current, requestGuid)) return@post
+                if (window != null) {
+                    callback.onHistory(
+                        HistoryPage(chatId, window, unsent.map { it.message }, true, !atTail, HistorySource.DISK, pendingLocal = localsOf(unsent)),
+                    )
+                    return@post
+                }
+                loadAround(chatId, messageId, requestGuid, callback)
+            }
+        }
+    }
+
+    private fun loadAround(chatId: String, messageId: Long, requestGuid: Int, callback: HistoryCallback) {
+        val current = epoch
         transport.getMessagesAround(chatId, messageId, requestGuid) { result ->
             if (!alive(current, requestGuid)) return@getMessagesAround
             when (result) {
                 is ApiResult.Failure -> callback.onHistoryFailed(result.error)
                 is ApiResult.Success -> {
                     val around = result.value
-                    storageQueue.post { storage.putMessages(around.messages) }
-                    callback.onHistory(
-                        HistoryPage(chatId, alive(around.messages), emptyList(), around.hasMoreBefore, around.hasMoreAfter, HistorySource.NETWORK),
-                    )
+                    storageQueue.post {
+                        storage.putMessages(around.messages)
+                        val unsent = if (around.hasMoreAfter) emptyList() else storage.readUnsent(chatId)
+                        main.post {
+                            if (!alive(current, requestGuid)) return@post
+                            callback.onHistory(
+                                HistoryPage(
+                                    chatId,
+                                    alive(around.messages),
+                                    unsent.map { it.message },
+                                    around.hasMoreBefore,
+                                    around.hasMoreAfter,
+                                    HistorySource.NETWORK,
+                                    pendingLocal = localsOf(unsent),
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -429,7 +474,38 @@ class MessagesController(
 
     fun applyChatRead(event: ChatReadEvent) {
         updateDetails(event.chatId) { it.copy(readCursors = it.readCursors + (event.userId to event.lastReadMessageId)) }
-        if (event.userId == me()?.id) updateChat(event.chatId) { it.copy(unreadCount = 0) }
+        if (event.userId == me()?.id) refreshUnread(event.chatId)
+    }
+
+    fun refreshUnread(chatId: String) {
+        if (!unreadRefreshes.add(chatId)) return
+        main.postDelayed(unreadRefreshTask, timings.unreadRefreshMs)
+    }
+
+    fun markRead(chatId: String, messageId: Long) {
+        if (messageId <= 0) return
+        transport.markRead(chatId, messageId)
+    }
+
+    fun react(chatId: String, messageId: Long, emoji: String) {
+        if (messageId <= 0) return
+        transport.react(chatId, messageId, emoji)
+    }
+
+    fun setLocalUnread(chatId: String, count: Int) {
+        updateChat(chatId) { it.copy(unreadCount = count.coerceAtLeast(0)) }
+    }
+
+    private fun runUnreadRefreshes() {
+        val targets = unreadRefreshes.toList()
+        unreadRefreshes.clear()
+        val current = epoch
+        for (chatId in targets) {
+            transport.getChat(chatId, guid) { result ->
+                if (current != epoch || result !is ApiResult.Success) return@getChat
+                applyChatDetail(result.value)
+            }
+        }
     }
 
     fun applyChatDetail(chat: ChatDto) {
@@ -537,6 +613,8 @@ class MessagesController(
         preloadWaiting = false
         main.cancel(preloadTask)
         main.cancel(cleanupTask)
+        main.cancel(unreadRefreshTask)
+        unreadRefreshes.clear()
         sender.clear()
         media.clear()
         transport.cancelRequestsForGuid(guid)
@@ -836,11 +914,7 @@ class MessagesController(
             return
         }
         val mine = message.sender?.id == me()?.id
-        val unread = when {
-            mine -> chat.unreadCount
-            liveChatId == message.chatId -> 0
-            else -> chat.unreadCount + 1
-        }
+        val unread = if (mine) chat.unreadCount else chat.unreadCount + 1
         upsertChat(chat.copy(lastMessage = message, updatedAt = message.createdAt, unreadCount = unread))
     }
 

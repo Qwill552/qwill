@@ -254,6 +254,39 @@ class MessagesStorage(
         }
     }
 
+    fun readAround(chatId: String, messageId: Long, half: Int): List<MessageDto>? = guard(null) { db ->
+        val range = db.query(
+            "SELECT from_id, to_id FROM message_ranges WHERE chat_id = ? AND from_id <= ? AND to_id >= ?",
+            chatId,
+            messageId,
+            messageId,
+        ) { MessageRange(it.long(0), it.long(1)) }.firstOrNull() ?: return@guard null
+        val present = db.queryLong(
+            "SELECT EXISTS(SELECT 1 FROM messages WHERE chat_id = ? AND id = ? AND send_state = ?)",
+            chatId,
+            messageId,
+            SENT,
+        ) == 1L
+        if (!present) return@guard null
+        val older = db.query(
+            "SELECT data FROM messages WHERE chat_id = ? AND send_state = ? AND id BETWEEN ? AND ? ORDER BY id DESC LIMIT ?",
+            chatId,
+            SENT,
+            range.fromId,
+            messageId,
+            half + 1,
+        ) { it.string(0) }.mapNotNull { decodeMessage(it) }.asReversed()
+        val newer = db.query(
+            "SELECT data FROM messages WHERE chat_id = ? AND send_state = ? AND id BETWEEN ? AND ? ORDER BY id ASC LIMIT ?",
+            chatId,
+            SENT,
+            messageId + 1,
+            range.toId,
+            half,
+        ) { it.string(0) }.mapNotNull { decodeMessage(it) }
+        older + newer
+    }
+
     fun readCursor(chatId: String): SyncCursor? = guard(null) { db ->
         db.query("SELECT max_id, max_updated_at FROM sync_cursors WHERE chat_id = ?", chatId) {
             SyncCursor(it.long(0), it.string(1))

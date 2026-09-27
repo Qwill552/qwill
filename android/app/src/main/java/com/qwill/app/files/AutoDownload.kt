@@ -114,6 +114,14 @@ class DevicePreferences(private val prefs: SharedPreferences) {
         prefs.edit().putBoolean(KEY_FOLDER_TABS, enabled).apply()
     }
 
+    fun wallpaperPattern(): String? = prefs.getString(KEY_WALLPAPER_PATTERN, null)
+
+    fun wallpaperGradient(): String? = prefs.getString(KEY_WALLPAPER_GRADIENT, null)
+
+    fun setWallpaper(patternId: String, gradientId: String) {
+        prefs.edit().putString(KEY_WALLPAPER_PATTERN, patternId).putString(KEY_WALLPAPER_GRADIENT, gradientId).apply()
+    }
+
     fun setTreatAsCellular(value: Boolean) {
         prefs.edit().putBoolean(KEY_FORCE_CELLULAR, value).apply()
     }
@@ -144,5 +152,7 @@ class DevicePreferences(private val prefs: SharedPreferences) {
         private const val KEY_RISKY_SKIP = "risky.skipWarning"
         private const val KEY_FORCE_CELLULAR = "stand.forceCellular"
         private const val KEY_FOLDER_TABS = "chats.folderTabs"
+        private const val KEY_WALLPAPER_PATTERN = "wallpaper.pattern"
+        private const val KEY_WALLPAPER_GRADIENT = "wallpaper.gradient"
     }
 }

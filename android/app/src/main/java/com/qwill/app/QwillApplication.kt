@@ -11,6 +11,7 @@ import android.util.Log
 import com.qwill.app.auth.FileSessionStore
 import com.qwill.app.auth.Session
 import com.qwill.app.auth.SessionState
+import com.qwill.app.chat.ChatPositions
 import com.qwill.app.core.DispatchQueue
 import com.qwill.app.core.MainQueue
 import com.qwill.app.database.MessagesStorage
@@ -128,6 +129,7 @@ class QwillApplication : Application() {
             typing.clear()
             messages.onSessionCleared()
             recentSearches.clear()
+            ChatPositions.clear()
             files.onSessionCleared(mediaTaskQueue)
             UploadService.update(this, 0)
         }

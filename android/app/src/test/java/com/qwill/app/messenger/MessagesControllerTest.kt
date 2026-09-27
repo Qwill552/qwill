@@ -451,7 +451,7 @@ class MessagesControllerTest {
         val c1 = controller.chats.first { it.id == "c1" }
         assertEquals(1, c1.unreadCount)
         assertEquals(2L, c1.lastMessage?.id)
-        assertEquals(0, controller.chats.first { it.id == "c2" }.unreadCount)
+        assertEquals(1, controller.chats.first { it.id == "c2" }.unreadCount)
         assertEquals("c2", controller.chats.first().id)
         assertEquals(listOf(1L, 2L), storage.readTail("c1", 50).map { it.id })
         assertEquals(2L, storage.readChats().first { it.id == "c1" }.lastMessage?.id)
@@ -516,7 +516,7 @@ class MessagesControllerTest {
         assertEquals(1L, storage.readDetails("c1")!!.readCursors[PEER])
         assertEquals(4, controller.chats.single().unreadCount)
         controller.applyChatRead(ChatReadEvent("c1", ME, 1))
-        assertEquals(0, controller.chats.single().unreadCount)
+        assertEquals(4, controller.chats.single().unreadCount)
 
         controller.applyChatDetail(details("c9"))
         assertTrue(controller.chats.any { it.id == "c9" })
@@ -759,5 +759,92 @@ class MessagesControllerTest {
         controller.cancelRequestsForGuid(guid)
         controller.startPrivateChat("peer", guid) { results.add(it) }
         assertEquals(1, results.size)
+    }
+
+    @Test
+    fun openChatAtReadsWindowFromDiskInsideRange() {
+        seed {
+            putMessages((1L..100L).map { message(it) })
+            addRange("c1", 1, 100)
+            applyTail("c1", listOf(message(100)))
+        }
+        start()
+        val pages = ArrayList<HistoryPage>()
+
+        controller.openChatAt("c1", 50, RequestGuid.next(), callback(pages))
+        controller.openChatAt("c1", 90, RequestGuid.next(), callback(pages))
+
+        assertTrue(transport.callsStartingWith("around:").isEmpty())
+        assertEquals((25L..75L).toList(), pages[0].messages.map { it.id })
+        assertEquals(HistorySource.DISK, pages[0].source)
+        assertTrue(pages[0].hasMoreBefore)
+        assertTrue(pages[0].hasMoreAfter)
+        assertEquals((65L..100L).toList(), pages[1].messages.map { it.id })
+        assertFalse(pages[1].hasMoreAfter)
+    }
+
+    @Test
+    fun openChatAtGoesToNetworkOutsideRange() {
+        seed { putMessages((1L..100L).map { message(it) }) }
+        start()
+        transport.around = { _, _ -> ApiResult.Success(com.qwill.app.model.MessagesAround((40L..60L).map { message(it) }, true, true)) }
+        val pages = ArrayList<HistoryPage>()
+
+        controller.openChatAt("c1", 50, RequestGuid.next(), callback(pages))
+
+        assertEquals(listOf("around:c1:50"), transport.callsStartingWith("around:"))
+        assertEquals(HistorySource.NETWORK, pages.single().source)
+        assertEquals(21, pages.single().messages.size)
+    }
+
+    @Test
+    fun openChatAtFailureReachesCaller() {
+        start()
+        transport.around = { _, _ -> ApiResult.Failure(ApiError(404, ErrorCode.MESSAGE_NOT_FOUND, "нет")) }
+        val pages = ArrayList<HistoryPage>()
+        val errors = ArrayList<ApiException>()
+
+        controller.openChatAt("c1", 7, RequestGuid.next(), callback(pages, errors))
+
+        assertTrue(pages.isEmpty())
+        assertEquals(ErrorCode.MESSAGE_NOT_FOUND, (errors.single() as ApiError).code)
+    }
+
+    @Test
+    fun ownChatReadRefreshesUnreadFromServerOncePerBurst() {
+        seed { putDetails(details("c1")) }
+        start()
+        serveChats(chat("c1", last = message(9), unread = 5))
+        controller.onSocketConnected()
+        transport.calls.clear()
+        transport.chat = { ApiResult.Success(details("c1").copy(unreadCount = 2, readCursors = mapOf(ME to 4L, PEER to null))) }
+
+        controller.applyChatRead(ChatReadEvent("c1", ME, 3))
+        controller.applyChatRead(ChatReadEvent("c1", ME, 4))
+        assertTrue(transport.callsStartingWith("chat:").isEmpty())
+        assertEquals(5, controller.chats.single().unreadCount)
+
+        queue.advance(1000)
+
+        assertEquals(listOf("chat:c1"), transport.callsStartingWith("chat:"))
+        assertEquals(2, controller.chats.single().unreadCount)
+        assertEquals(4L, storage.readDetails("c1")!!.readCursors[ME])
+    }
+
+    @Test
+    fun localUnreadMarkReadAndReactionGoOut() {
+        start()
+        serveChats(chat("c1", unread = 3))
+        controller.onSocketConnected()
+        transport.calls.clear()
+
+        controller.setLocalUnread("c1", 1)
+        controller.setLocalUnread("c1", -4)
+        controller.markRead("c1", 12)
+        controller.markRead("c1", -2)
+        controller.react("c1", 12, "🔥")
+
+        assertEquals(0, controller.chats.single().unreadCount)
+        assertEquals(listOf("read:c1:12", "react:c1:12:🔥"), transport.calls)
     }
 }

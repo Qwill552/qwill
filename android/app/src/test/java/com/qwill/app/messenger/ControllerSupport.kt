@@ -133,6 +133,14 @@ class FakeTransport : MessagesTransport {
         privateChat(username)?.let { callback.onResult(it) }
     }
 
+    override fun markRead(chatId: String, messageId: Long) {
+        calls.add("read:$chatId:$messageId")
+    }
+
+    override fun react(chatId: String, messageId: Long, emoji: String) {
+        calls.add("react:$chatId:$messageId:$emoji")
+    }
+
     override fun cancelRequestsForGuid(guid: Int) {
         cancelled.add(guid)
     }

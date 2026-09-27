@@ -252,6 +252,16 @@ data class ChatReadEvent(
 )
 
 @Serializable
+data class MessageReactPayload(
+    val chatId: String,
+    val messageId: Long,
+    val emoji: String,
+)
+
+@Serializable
+data class MessageAtDateResponse(val messageId: Long? = null)
+
+@Serializable
 data class ChatUpdatedEvent(
     val chatId: String,
     val title: String = "",

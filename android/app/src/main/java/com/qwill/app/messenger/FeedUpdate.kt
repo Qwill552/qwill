@@ -80,4 +80,5 @@ data class MessagesTimings(
     val retryBaseMs: Long = 1_000,
     val retryMaxMs: Long = 60_000,
     val retryLimit: Int = 12,
+    val unreadRefreshMs: Long = 1_000,
 )

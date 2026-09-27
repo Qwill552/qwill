@@ -5,7 +5,9 @@ import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatMuteInput
 import com.qwill.app.model.ChatMuteResponse
 import com.qwill.app.model.ChatListResponse
+import com.qwill.app.model.ChatReadPayload
 import com.qwill.app.model.CreatePrivateChatInput
+import com.qwill.app.model.MessageReactPayload
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendAck
 import com.qwill.app.model.MessageSendPayload
@@ -38,6 +40,10 @@ interface MessagesTransport {
     fun deleteChat(chatId: String, forEveryone: Boolean, guid: Int, callback: ApiCallback<Unit>)
 
     fun createPrivateChat(username: String, guid: Int, callback: ApiCallback<ChatDto>)
+
+    fun markRead(chatId: String, messageId: Long)
+
+    fun react(chatId: String, messageId: Long, emoji: String)
 
     fun cancelRequestsForGuid(guid: Int)
 }
@@ -102,6 +108,17 @@ class ApiMessagesTransport(
 
     override fun createPrivateChat(username: String, guid: Int, callback: ApiCallback<ChatDto>) {
         api.send(ApiRequest.post("/api/chats/private", CreatePrivateChatInput.serializer(), CreatePrivateChatInput(username), ChatDto.serializer()), guid, callback)
+    }
+
+    override fun markRead(chatId: String, messageId: Long) {
+        socket.emit(SocketEvent.CHAT_READ, ApiJson.encodeToJsonElement(ChatReadPayload.serializer(), ChatReadPayload(chatId, messageId)))
+    }
+
+    override fun react(chatId: String, messageId: Long, emoji: String) {
+        socket.emitDeferred(
+            SocketEvent.MESSAGE_REACT,
+            ApiJson.encodeToJsonElement(MessageReactPayload.serializer(), MessageReactPayload(chatId, messageId, emoji)),
+        )
     }
 
     override fun cancelRequestsForGuid(guid: Int) {
