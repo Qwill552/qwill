@@ -76,7 +76,10 @@ const FLOATING_DATE_HIDE_MS = 1000;
 const DAY_DIVIDER_ESTIMATE = 38;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
-const SMOOTH_JUMP_MS = 700;
+const JUMP_TRAVEL_MS = 900;
+const JUMP_HOLD_MS = 1200;
+const JUMP_EASE_MS = 90;
+const JUMP_MISSING_MS = 500;
 const TYPING_BUBBLE_IN_FEED: boolean = false;
 const COMPOSER_RESERVE = 40;
 
@@ -318,8 +321,8 @@ export function MessageList({
   const flashMessageRef = useRef<(messageId: number) => void>(() => undefined);
   const placedFocus = useRef(0);
   const returnTo = useRef<number | null>(null);
-  const jumpUntil = useRef(0);
-  const jumpTimer = useRef(0);
+  const jumpActive = useRef(false);
+  const jumpFrame = useRef(0);
   const scrollToMessageRef = useRef<(messageId: number) => void>(() => undefined);
   const handleQuoteJump = useCallback((fromId: number, toId: number) => {
     returnTo.current = fromId;
@@ -654,28 +657,78 @@ export function MessageList({
     }
 
     fling.current?.stop();
-    const top = target.offsetTop - el.clientHeight / 2 + target.clientHeight / 2;
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     atVeryBottom.current = false;
-    jumpUntil.current = performance.now() + SMOOTH_JUMP_MS;
-    window.clearTimeout(jumpTimer.current);
-    jumpTimer.current = window.setTimeout(() => {
-      jumpUntil.current = 0;
-      checkEdgesRef.current();
-    }, SMOOTH_JUMP_MS);
-    el.scrollTo({ top, behavior: 'smooth' });
     flashMessage(messageId);
+    runJump(el, messageId);
+  }
+
+  function runJump(el: HTMLDivElement, messageId: number): void {
+    cancelAnimationFrame(jumpFrame.current);
+    jumpActive.current = true;
+    const instant = cssDurationMs('--dur-menu') <= 1;
+    const started = performance.now();
+    let last = started;
+    let arrivedAt = instant ? started : 0;
+    let missingSince = 0;
+
+    function desiredTop(node: HTMLElement): number {
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      const top = node.offsetTop + node.offsetHeight / 2 - visibleCenter(el);
+      return Math.min(max, Math.max(0, top));
+    }
+
+    function step(now: number): void {
+      if (!jumpActive.current) return;
+      const node = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+      if (!node) {
+        if (missingSince === 0) missingSince = now;
+        if (now - missingSince >= JUMP_MISSING_MS) finishJump();
+        else jumpFrame.current = requestAnimationFrame(step);
+        return;
+      }
+      missingSince = 0;
+      const desired = desiredTop(node);
+      const delta = desired - el.scrollTop;
+      if (arrivedAt === 0) {
+        const dt = Math.max(1, now - last);
+        const share = 1 - Math.exp(-dt / JUMP_EASE_MS);
+        const move = Math.abs(delta) <= 1 || now - started >= JUMP_TRAVEL_MS ? delta : delta * share;
+        el.scrollTop += move;
+        if (Math.abs(desired - el.scrollTop) <= 1) arrivedAt = now;
+      } else if (Math.abs(delta) > 1) {
+        el.scrollTop = desired;
+      }
+      last = now;
+      if (arrivedAt !== 0 && now - arrivedAt >= JUMP_HOLD_MS) {
+        finishJump();
+        return;
+      }
+      jumpFrame.current = requestAnimationFrame(step);
+    }
+
+    if (instant) {
+      const node = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+      if (node) el.scrollTop = desiredTop(node);
+    }
+    jumpFrame.current = requestAnimationFrame(step);
+  }
+
+  function finishJump(): void {
+    cancelAnimationFrame(jumpFrame.current);
+    jumpFrame.current = 0;
+    if (!jumpActive.current) return;
+    jumpActive.current = false;
+    checkEdgesRef.current();
   }
 
   function jumping(): boolean {
-    return performance.now() < jumpUntil.current;
+    return jumpActive.current;
   }
 
   function releaseJump(): void {
-    if (jumpUntil.current === 0) return;
-    jumpUntil.current = 0;
-    window.clearTimeout(jumpTimer.current);
+    finishJump();
   }
 
   useLayoutEffect(() => {
@@ -1135,7 +1188,14 @@ export function MessageList({
     prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen);
   }, [chatId, messages, sliceFrom, sliceTo, prefetchFeed]);
 
-  useEffect(() => () => window.clearTimeout(jumpTimer.current), []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(jumpFrame.current);
+      jumpFrame.current = 0;
+      jumpActive.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     checkEdgesRef.current();

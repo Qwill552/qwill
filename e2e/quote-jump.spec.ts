@@ -3,7 +3,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { registerUser, uniqueUser } from './helpers';
 import { prisma } from '../server/src/db/prisma.js';
 
-async function seed(page: Page, label: string, targetIndex: number): Promise<{ chatId: string; targetId: number }> {
+const LONG_TEXT = Array.from({ length: 9 }, (_, line) => `длинная строка номер ${line + 1}, чтобы пузырь был высоким`).join(String.fromCharCode(10));
+
+async function seed(page: Page, label: string, targetIndex: number, varied = false): Promise<{ chatId: string; targetId: number }> {
   const me = uniqueUser(label);
   const other = uniqueUser(`${label}p`);
   await registerUser(page, me);
@@ -19,7 +21,11 @@ async function seed(page: Page, label: string, targetIndex: number): Promise<{ c
   const ids: number[] = [];
   for (let index = 0; index < 120; index += 1) {
     const created = await prisma.message.create({
-      data: { chatId: chat.id, senderId: index % 2 === 0 ? peer.id : mine.id, content: `история ${index + 1}` },
+      data: {
+        chatId: chat.id,
+        senderId: index % 2 === 0 ? peer.id : mine.id,
+        content: varied && index % 3 === 0 ? [`история ${index + 1}`, LONG_TEXT].join(String.fromCharCode(10)) : `история ${index + 1}`,
+      },
     });
     ids.push(created.id);
   }
@@ -62,4 +68,19 @@ test.describe('касание', () => {
       await expect(page.locator(`.message-wrap[data-message-id="${targetId}"]`)).toBeInViewport({ timeout: 8000 });
     });
   }
+});
+
+test('строки разной высоты: прыжок доезжает до цитаты и не срывается пересчётом высот', async ({ page }) => {
+  test.setTimeout(120_000);
+  const { targetId } = await seed(page, 'qvar', 73, true);
+  const answer = page.locator('.message-wrap', { hasText: 'ответ с цитатой' });
+  await expect(answer).toBeInViewport({ timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await answer.locator('[data-reply-quote]').click();
+  const target = page.locator(`.message-wrap[data-message-id="${targetId}"]`);
+  await expect(target).toBeInViewport({ timeout: 8000 });
+  await page.waitForTimeout(2000);
+  await expect(target).toBeInViewport();
 });
