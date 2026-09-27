@@ -76,6 +76,7 @@ const FLOATING_DATE_HIDE_MS = 1000;
 const DAY_DIVIDER_ESTIMATE = 38;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
+const SMOOTH_JUMP_MS = 700;
 const TYPING_BUBBLE_IN_FEED: boolean = false;
 const COMPOSER_RESERVE = 40;
 
@@ -317,6 +318,8 @@ export function MessageList({
   const flashMessageRef = useRef<(messageId: number) => void>(() => undefined);
   const placedFocus = useRef(0);
   const returnTo = useRef<number | null>(null);
+  const jumpUntil = useRef(0);
+  const jumpTimer = useRef(0);
   const scrollToMessageRef = useRef<(messageId: number) => void>(() => undefined);
   const handleQuoteJump = useCallback((fromId: number, toId: number) => {
     returnTo.current = fromId;
@@ -655,8 +658,24 @@ export function MessageList({
     autoScrollUntil.current = 0;
     stuckToBottom.current = false;
     atVeryBottom.current = false;
+    jumpUntil.current = performance.now() + SMOOTH_JUMP_MS;
+    window.clearTimeout(jumpTimer.current);
+    jumpTimer.current = window.setTimeout(() => {
+      jumpUntil.current = 0;
+      checkEdgesRef.current();
+    }, SMOOTH_JUMP_MS);
     el.scrollTo({ top, behavior: 'smooth' });
     flashMessage(messageId);
+  }
+
+  function jumping(): boolean {
+    return performance.now() < jumpUntil.current;
+  }
+
+  function releaseJump(): void {
+    if (jumpUntil.current === 0) return;
+    jumpUntil.current = 0;
+    window.clearTimeout(jumpTimer.current);
   }
 
   useLayoutEffect(() => {
@@ -931,7 +950,7 @@ export function MessageList({
 
   function requestUp(): void {
     const el = listRef.current;
-    if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current) return;
+    if (!el || !hasMore || loadingUp.current || performance.now() < retryUpAt.current || jumping()) return;
     loadingUp.current = true;
     pendingAnchor.current = rememberAnchor(el);
     loadMore(chatId)
@@ -946,7 +965,7 @@ export function MessageList({
 
   function requestDown(): void {
     const el = listRef.current;
-    if (!el || !hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current) return;
+    if (!el || !hasMoreAfter || loadingDown.current || performance.now() < retryDownAt.current || jumping()) return;
     loadingDown.current = true;
     pendingAnchor.current = rememberAnchor(el);
     loadMoreAfter(chatId)
@@ -1110,10 +1129,13 @@ export function MessageList({
   });
 
   useEffect(() => {
+    if (jumping()) return;
     const side = prefetchSide.current;
     const unseen = side === 'older' ? sliceFrom : messages.length - 1 - sliceTo;
     prefetchFeed(chatId, side, FEED_PREFETCH_MARGIN - unseen);
   }, [chatId, messages, sliceFrom, sliceTo, prefetchFeed]);
+
+  useEffect(() => () => window.clearTimeout(jumpTimer.current), []);
 
   useEffect(() => {
     checkEdgesRef.current();
@@ -1205,7 +1227,7 @@ export function MessageList({
     const sample = scrollSample.current;
     scrollSample.current = { t: now, top: el.scrollTop };
     const dt = sample ? now - sample.t : 0;
-    if (sample && dt > 0) {
+    if (sample && dt > 0 && !jumping()) {
       const instVelocity = ((el.scrollTop - sample.top) / dt) * 1000;
       if (instVelocity !== 0) {
         const rows = predictedPrefetchRows(instVelocity, table.average);
@@ -1258,9 +1280,11 @@ export function MessageList({
         onScroll={handleScroll}
         onWheel={() => {
           autoScrollUntil.current = 0;
+          releaseJump();
         }}
         onTouchMove={() => {
           autoScrollUntil.current = 0;
+          releaseJump();
         }}
         onContextMenu={(event) => {
           const target = event.target as HTMLElement;
