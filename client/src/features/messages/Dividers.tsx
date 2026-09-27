@@ -74,7 +74,7 @@ export function FloatingDate({
  *  пока чат открыт, — иначе линия убегает от глаз по мере чтения. */
 export function UnreadDivider({ count }: { count: number }) {
   return (
-    <div className={styles.unread}>
+    <div className={styles.unread} data-unread-divider="true">
       {count > 0 ? `Непрочитанные · ${count}` : 'Непрочитанные'}
     </div>
   );

@@ -53,6 +53,7 @@ interface MessageRowProps {
   onReply: (message: LocalMessage) => void;
   onEdit: (message: LocalMessage) => void;
   onForwardRequest: (messageIds: number[]) => void;
+  onQuoteJump?: () => void;
   children: ReactNode;
 }
 
@@ -136,6 +137,7 @@ export function MessageRow({
   onReply,
   onEdit,
   onForwardRequest,
+  onQuoteJump,
   children,
 }: MessageRowProps) {
   const isAlbum = groupIds.length > 1;
@@ -161,6 +163,7 @@ export function MessageRow({
   const skipGesturesRef = useRef(false);
   const onSelectableRef = useRef(false);
   const mediaTapRef = useRef<{ tile: HTMLElement; x: number; y: number; epoch: number } | null>(null);
+  const quotePressRef = useRef<{ x: number; y: number; epoch: number } | null>(null);
   const linkPressRef = useRef<{ x: number; y: number; timer: ReturnType<typeof setTimeout> | null } | null>(null);
   const menuSeqRef = useRef(0);
   const [menu, setMenu] = useState<{
@@ -276,6 +279,10 @@ export function MessageRow({
     mediaTapRef.current = tile
       ? { tile, x: event.clientX, y: event.clientY, epoch: currentScrollEpoch() }
       : null;
+    quotePressRef.current =
+      onQuoteJump && target.closest('[data-reply-quote]')
+        ? { x: event.clientX, y: event.clientY, epoch: currentScrollEpoch() }
+        : null;
 
     if (linkPressRef.current?.timer) clearTimeout(linkPressRef.current.timer);
     const link = target.closest(LINK_SELECTOR);
@@ -351,6 +358,18 @@ export function MessageRow({
       return;
     }
 
+    const quotePress = quotePressRef.current;
+    quotePressRef.current = null;
+    if (quotePress && onQuoteJump && !selectionMode) {
+      tap.cancel();
+      const suppressed = suppressTapRef.current;
+      suppressTapRef.current = false;
+      const strayed = exceedsMoveThreshold(event.clientX - quotePress.x, event.clientY - quotePress.y);
+      if (suppressed || strayed || quotePress.epoch !== currentScrollEpoch()) return;
+      onQuoteJump();
+      return;
+    }
+
     onSelectableRef.current = (event.target as HTMLElement).closest('[data-selectable]') !== null;
     tap.onPointerUp(event);
   }
@@ -380,6 +399,7 @@ export function MessageRow({
 
   function handlePointerCancel(): void {
     mediaTapRef.current = null;
+    quotePressRef.current = null;
     if (linkPressRef.current?.timer) clearTimeout(linkPressRef.current.timer);
     linkPressRef.current = null;
     if (skipGesturesRef.current) {

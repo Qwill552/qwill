@@ -53,6 +53,7 @@ import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
 import { stickyDate } from './stickyDate';
+import { ReadTracker, unreadBetween } from './unreadEntry';
 import styles from './MessageList.module.css';
 
 /** Сообщения одного автора ближе этого интервала визуально группируются в серию. */
@@ -76,6 +77,7 @@ const DAY_DIVIDER_ESTIMATE = 38;
 const SCROLL_IDLE_MS = 150;
 const AUTO_SCROLL_GUARD_MS = 700;
 const TYPING_BUBBLE_IN_FEED: boolean = false;
+const COMPOSER_RESERVE = 40;
 
 interface RowAnchor {
   id: string;
@@ -105,6 +107,18 @@ function bottomReserve(el: HTMLElement): number {
   return parseFloat(getComputedStyle(el).paddingBottom) || 0;
 }
 
+function visibleEdges(el: HTMLElement): { top: number; bottom: number } {
+  const style = getComputedStyle(el);
+  const top = parseFloat(style.paddingTop) || 0;
+  const bottom = el.clientHeight - Math.max(0, (parseFloat(style.paddingBottom) || 0) - COMPOSER_RESERVE);
+  return { top, bottom: Math.max(top, bottom) };
+}
+
+function visibleCenter(el: HTMLElement): number {
+  const edges = visibleEdges(el);
+  return (edges.top + edges.bottom) / 2;
+}
+
 function predictedPrefetchRows(beltVelocity: number, averageRowHeight: number): number {
   const speed = Math.min(MAX_FLING_VELOCITY, Math.abs(beltVelocity));
   if (speed === 0) return 0;
@@ -128,14 +142,6 @@ function sameRows(a: LocalMessage[], b: LocalMessage[]): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
-}
-
-function lastSettledId(list: LocalMessage[]): number | null {
-  for (let i = list.length - 1; i >= 0; i -= 1) {
-    const id = list[i]!.id;
-    if (id > 0) return id;
-  }
-  return null;
 }
 
 interface MessageRowData {
@@ -247,6 +253,9 @@ export function MessageList({
   const focusMessage = useChatStore((s) => s.focusMessage);
   const openChatAt = useChatStore((s) => s.openChatAt);
   const markRead = useChatStore((s) => s.markRead);
+  const setLocalUnread = useChatStore((s) => s.setLocalUnread);
+  const unreadAnchor = useChatStore((s) => s.unreadAnchorByChat[chatId]) ?? null;
+  const unreadDecided = useChatStore((s) => s.unreadDecidedByChat[chatId]) ?? true;
   const tailRequest = useChatStore((s) => s.tailRequestByChat[chatId]) ?? 0;
   const liveMessage = useChatStore((s) => s.liveMessageByChat[chatId]) ?? 0;
   const readCursors = useChatStore((s) => s.readCursorsByChat[chatId]);
@@ -307,6 +316,12 @@ export function MessageList({
   const flashTimer = useRef(0);
   const flashMessageRef = useRef<(messageId: number) => void>(() => undefined);
   const placedFocus = useRef(0);
+  const returnTo = useRef<number | null>(null);
+  const scrollToMessageRef = useRef<(messageId: number) => void>(() => undefined);
+  const handleQuoteJump = useCallback((fromId: number, toId: number) => {
+    returnTo.current = fromId;
+    scrollToMessageRef.current(toId);
+  }, []);
 
   if (liveSeen.current !== liveMessage) {
     liveSeen.current = liveMessage;
@@ -318,16 +333,6 @@ export function MessageList({
   /** Приватный чат — закреплять может любой участник; группа — только OWNER/ADMIN
    *  (тот же порог, что и на сервере, chat.ts → pinMessage). */
   const canPinBase = !isGroup || isGroupAdmin;
-
-  /** Граница непрочитанного фиксируется один раз на вход в чат: если пересчитывать её
-   *  на каждое сообщение, линия убегает от глаз по мере чтения. */
-  const unreadAnchor = useRef<number | null>(null);
-  if (unreadAnchor.current === null && messages.length > 0) {
-    unreadAnchor.current = unreadCount > 0 ? (messages[messages.length - unreadCount]?.id ?? null) : null;
-  }
-  useEffect(() => {
-    unreadAnchor.current = null;
-  }, [feedKey]);
 
   useEffect(() => {
     scrollSample.current = null;
@@ -398,10 +403,10 @@ export function MessageList({
         canReply: !isService,
         canReact: !isService,
         isPinned: pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id),
-        showUnread: unreadAnchor.current !== null && row.groupIds.includes(unreadAnchor.current),
+        showUnread: unreadAnchor !== null && row.groupIds.includes(unreadAnchor.messageId),
       };
     });
-  }, [rows, myId, readCursors, isGroupAdmin, canPinBase, isService, pinnedMessage]);
+  }, [rows, myId, readCursors, isGroupAdmin, canPinBase, isService, pinnedMessage, unreadAnchor]);
 
   // Удалённое сообщение уходит из стора мгновенно, но не из ленты: строка задерживается
   // здесь замороженной, пока не доиграет распад. Диффим прямо в рендере, а не в эффекте, —
@@ -634,6 +639,8 @@ export function MessageList({
     void focusMessageInChat(chatId, firstMessageId);
   }
 
+  scrollToMessageRef.current = (messageId) => scrollToMessage(messageId);
+
   function scrollToMessage(messageId: number): void {
     const el = listRef.current;
     const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`) ?? null;
@@ -685,9 +692,15 @@ export function MessageList({
     placedFocus.current = focus.seq;
     fling.current?.stop();
     const quiet = focus.quiet === true;
+    const unread = focus.unread === true;
     const offset = focus.offset ?? 0;
     if (quiet) pendingAnchor.current = null;
     function place(): void {
+      if (unread) {
+        const divider = el!.querySelector<HTMLElement>('[data-unread-divider]') ?? target!;
+        el!.scrollTop = Math.max(0, divider.offsetTop + divider.offsetHeight / 2 - visibleCenter(el!));
+        return;
+      }
       if (!quiet) {
         el!.scrollTop = Math.max(0, target!.offsetTop - el!.clientHeight / 3);
         return;
@@ -1020,11 +1033,6 @@ export function MessageList({
 
   useEffect(() => () => setViewportNewest(chatId, null), [chatId, setViewportNewest]);
 
-  const markedUpTo = useRef(0);
-  useEffect(() => {
-    markedUpTo.current = 0;
-  }, [chatId]);
-
   // Свёрнутое окно никто не читает. Раньше открытый чат отмечал прочитанным всё, что
   // придёт, даже когда приложение в трее: уведомление на этом компьютере тут же гасло, а
   // вместе с ним — уведомления на телефоне (они снимаются по прочтению, R-38).
@@ -1035,13 +1043,71 @@ export function MessageList({
     return () => document.removeEventListener('visibilitychange', sync);
   }, []);
 
+  const readTracker = useMemo(
+    () =>
+      new ReadTracker((messageId) => markRead(chatId, messageId), {
+        now: () => performance.now(),
+        setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+        clearTimeout: (handle) => window.clearTimeout(handle),
+      }),
+    [chatId, markRead],
+  );
+  useEffect(() => () => readTracker.flush(), [readTracker]);
   useEffect(() => {
-    if (!isViewportNewest || !documentVisible) return;
-    const last = lastSettledId(messages);
-    if (last === null || last <= markedUpTo.current) return;
-    markedUpTo.current = last;
-    markRead(chatId, last);
-  }, [chatId, messages, isViewportNewest, markRead, documentVisible]);
+    if (!documentVisible) readTracker.flush();
+  }, [documentVisible, readTracker]);
+
+  const myCursor = myId ? readCursors?.[myId] : undefined;
+  useEffect(() => {
+    readTracker.know(myCursor);
+  }, [myCursor, readTracker]);
+
+  const readFrame = useRef(0);
+  const updateReadingRef = useRef<() => void>(() => undefined);
+  updateReadingRef.current = () => {
+    const el = listRef.current;
+    if (!el || !documentVisible || !unreadDecided) return;
+    if (unreadCount > 0 && myCursor === undefined) return;
+    if (focus && focus.seq !== placedFocus.current && entryIndexByMessage.has(focus.messageId)) return;
+    const listTop = el.getBoundingClientRect().top;
+    const edges = visibleEdges(el);
+    const top = listTop + edges.top;
+    const bottom = listTop + edges.bottom;
+    let newest = 0;
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+      const rect = node.getBoundingClientRect();
+      if (rect.bottom <= top || rect.top >= bottom) continue;
+      const index = entryIndexByMessage.get(Number(node.dataset.messageId));
+      const entry = index === undefined ? undefined : displayEntries[index];
+      if (!entry || entry.own || !entry.isReal) continue;
+      newest = Math.max(newest, entry.row.lastId);
+    }
+    if (newest <= 0) return;
+    const before = readTracker.cursor;
+    if (!readTracker.seen(newest)) return;
+    const read = unreadBetween(messages, myId, before, newest);
+    if (read > 0) setLocalUnread(chatId, unreadCount - read);
+  };
+
+  function scheduleReading(): void {
+    if (readFrame.current !== 0) return;
+    readFrame.current = requestAnimationFrame(() => {
+      readFrame.current = 0;
+      updateReadingRef.current();
+    });
+  }
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(readFrame.current);
+      readFrame.current = 0;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    scheduleReading();
+  });
 
   useEffect(() => {
     const side = prefetchSide.current;
@@ -1124,12 +1190,16 @@ export function MessageList({
     } else {
       stuckToBottom.current = distance < STICK_THRESHOLD;
       if (distance > el.clientHeight * JUMP_AFTER_SCREENS) setShowJump(true);
-      else if (distance < STICK_THRESHOLD) setShowJump(false);
+      else if (distance < STICK_THRESHOLD) {
+        setShowJump(false);
+        if (isViewportNewest) returnTo.current = null;
+      }
     }
 
     syncWindow();
     checkEdges();
     updateFloatingDate();
+    scheduleReading();
 
     const now = performance.now();
     const sample = scrollSample.current;
@@ -1153,6 +1223,12 @@ export function MessageList({
   }
 
   function handleJump(): void {
+    const back = returnTo.current;
+    if (back !== null) {
+      returnTo.current = null;
+      scrollToMessage(back);
+      return;
+    }
     if (isViewportNewest) {
       scrollToBottom(true);
       return;
@@ -1223,8 +1299,9 @@ export function MessageList({
             chatId={chatId}
             myId={myId}
             isGroup={isGroup}
-            unreadCount={unreadCount}
+            unreadCount={unreadAnchor?.count ?? 0}
             onReply={onReply}
+            onQuoteJump={handleQuoteJump}
             onEdit={onEdit}
             onForwardRequest={onForwardRequest}
             onToggleReaction={toggleReaction}
@@ -1313,6 +1390,7 @@ const MessageListRow = memo(function MessageListRow({
   onEdit,
   onForwardRequest,
   onToggleReaction,
+  onQuoteJump,
   onLeaveDone,
   flash,
   dayCovered,
@@ -1331,6 +1409,7 @@ const MessageListRow = memo(function MessageListRow({
   onEdit: (message: LocalMessage) => void;
   onForwardRequest: (messageIds: number[]) => void;
   onToggleReaction: (chatId: string, messageId: number, emoji: string) => void;
+  onQuoteJump: (fromId: number, toId: number) => void;
   onLeaveDone: (key: RowKey) => void;
   flash: boolean;
   dayCovered: boolean;
@@ -1343,6 +1422,11 @@ const MessageListRow = memo(function MessageListRow({
 
   const shellRef = useRef<HTMLDivElement>(null);
   const [collapsing, setCollapsing] = useState(false);
+  const replyTarget = message.replyTo && !message.replyTo.deletedAt && isReal ? message.replyTo.id : null;
+  const quoteJump = useMemo(
+    () => (replyTarget === null ? undefined : () => onQuoteJump(message.id, replyTarget)),
+    [replyTarget, message.id, onQuoteJump],
+  );
 
   useLayoutEffect(() => {
     if (!leaving) return;
@@ -1431,11 +1515,13 @@ const MessageListRow = memo(function MessageListRow({
           onReply={onReply}
           onEdit={onEdit}
           onForwardRequest={onForwardRequest}
+          onQuoteJump={quoteJump}
         >
           <MessageBubble
             message={message}
             own={own}
             read={read}
+            onQuoteJump={quoteJump}
             showAuthor={isGroup && !own && !sameAuthorAsPrev}
             album={album ?? undefined}
             hasReactions={isReal && reactions.length > 0}

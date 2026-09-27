@@ -156,7 +156,6 @@
   right: calc(var(--safe-right) + 14px);
   bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
   display: grid;
-  overflow: hidden;
   place-items: center;
   width: 44px;
   height: 44px;

@@ -19,6 +19,24 @@
   --quote-bg: color-mix(in srgb, var(--lift) 16%, transparent);
 }
 
+.interactive {
+  cursor: pointer;
+  transition: background var(--dur-tab) var(--ease-screen);
+}
+
+.interactive:active {
+  --quote-bg: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.onOut.interactive:active {
+  --quote-bg: color-mix(in srgb, var(--lift) 32%, transparent);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--quote-bar, var(--primary));
+  outline-offset: 2px;
+}
+
 .name {
   overflow: hidden;
   color: var(--quote-bar, var(--primary));

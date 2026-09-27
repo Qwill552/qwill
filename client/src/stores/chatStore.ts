@@ -124,6 +124,7 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from '../features/messages/feedWindow';
+import { decideUnreadEntry, firstUnreadAfter } from '../features/messages/unreadEntry';
 import { closeDesktopChatNotifications } from '../native/desktop';
 import { trackUpdating } from '../realtime/connectionStatus';
 import { emitWhenReady, getSocket } from '../realtime/socket';
@@ -169,6 +170,12 @@ export interface FeedFocus {
   seq: number;
   quiet?: boolean;
   offset?: number;
+  unread?: boolean;
+}
+
+export interface UnreadAnchor {
+  messageId: number;
+  count: number;
 }
 
 interface ReplaceFeedOptions {
@@ -177,6 +184,7 @@ interface ReplaceFeedOptions {
   focus?: number;
   focusQuiet?: boolean;
   focusOffset?: number;
+  focusUnread?: boolean;
 }
 
 interface PresenceInfo {
@@ -203,6 +211,8 @@ interface ChatState {
   historyByChat: Record<string, ChatHistoryState>;
   /** lastReadMessageId каждого участника чата — по нему считаются галочки прочтения (секция 3). */
   readCursorsByChat: Record<string, Record<string, number | null>>;
+  unreadAnchorByChat: Record<string, UnreadAnchor>;
+  unreadDecidedByChat: Record<string, boolean>;
   /** Кто печатает в чате прямо сейчас, кроме меня самого. */
   typingByChat: Record<string, TypingUser[]>;
   /** Онлайн-статус известных клиенту пользователей (секция 3). */
@@ -291,6 +301,9 @@ interface ChatState {
   forwardMessages: (fromChatId: string, toChatId: string, messageIds: number[]) => Promise<void>;
   toggleReaction: (chatId: string, messageId: number, emoji: string) => void;
   markRead: (chatId: string, messageId: number) => void;
+  setLocalUnread: (chatId: string, count: number) => void;
+  refreshUnread: (chatId: string) => void;
+  placeUnread: (chatId: string, unreadAtEntry: number, detail: ChatDto) => Promise<void>;
   /** Мультивыбор (секция 3, ux-ui/06): long-press по пузырю/пустой зоне строки. */
   enterSelection: (messageId: number) => void;
   toggleSelected: (messageId: number) => void;
@@ -776,6 +789,13 @@ function reinsertMessageIntoState(
   return { messagesByChat, chats, pinnedByChat };
 }
 
+const UNREAD_REFRESH_MS = 1000;
+const unreadRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function markUnreadDecided(set: (partial: (state: ChatState) => Partial<ChatState>) => void, chatId: string): void {
+  set((state) => (state.unreadDecidedByChat[chatId] === false ? { unreadDecidedByChat: { ...state.unreadDecidedByChat, [chatId]: true } } : {}));
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   messagesByChat: {},
@@ -789,6 +809,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   liveMessageByChat: {},
   historyByChat: {},
   readCursorsByChat: {},
+  unreadAnchorByChat: {},
+  unreadDecidedByChat: {},
   typingByChat: {},
   presenceByUser: {},
   chatsLoaded: false,
@@ -842,7 +864,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return true;
   },
 
-  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset }) {
+  replaceFeed(chatId, messages, { hasMoreBefore, hasMoreAfter, focus, focusQuiet, focusOffset, focusUnread }) {
     void writeCachedMessages(messages);
     set((state) => {
       const current = state.messagesByChat[chatId] ?? [];
@@ -857,6 +879,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           seq: (state.focusByChat[chatId]?.seq ?? 0) + 1,
           quiet: focusQuiet,
           offset: focusOffset,
+          unread: focusUnread,
         };
       }
 
@@ -937,6 +960,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   async openChat(chatId) {
     cancelPendingEmptyChatDrop(chatId);
     let windowed = get().hasMoreAfterByChat[chatId] === true;
+    const unreadAtEntry = get().chats.find((c) => c.id === chatId)?.unreadCount ?? 0;
+    const requestedFocus = get().focusByChat[chatId];
+    const jumpRequested = requestedFocus !== undefined && requestedFocus.quiet !== true;
+    const placesUnread = unreadAtEntry > 0 && !windowed && !jumpRequested;
+    set((state) => {
+      const unreadAnchorByChat = { ...state.unreadAnchorByChat };
+      delete unreadAnchorByChat[chatId];
+      return {
+        unreadAnchorByChat,
+        unreadDecidedByChat: { ...state.unreadDecidedByChat, [chatId]: !placesUnread },
+      };
+    });
     set((state) => ({
       chatError: null,
       activeChatId: chatId,
@@ -959,9 +994,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (detail.status === 'fulfilled') {
       get().applyChatDetail(detail.value);
-    } else if (!(detail.reason instanceof NetworkError)) {
-      set({ chatError: 'Чат не найден или недоступен' });
-      return;
+    } else {
+      markUnreadDecided(set, chatId);
+      if (!(detail.reason instanceof NetworkError)) {
+        set({ chatError: 'Чат не найден или недоступен' });
+        return;
+      }
     }
 
     if (page.status === 'fulfilled') {
@@ -985,14 +1023,63 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       void get().restoreOutboxMessages();
     } else if (page.reason instanceof NetworkError) {
+      markUnreadDecided(set, chatId);
       if ((get().messagesByChat[chatId] ?? []).length === 0) {
         set((state) => ({ historyByChat: { ...state.historyByChat, [chatId]: 'offline' } }));
       }
       return;
     } else {
+      markUnreadDecided(set, chatId);
       throw page.reason;
     }
 
+    if (placesUnread && detail.status === 'fulfilled') await get().placeUnread(chatId, unreadAtEntry, detail.value);
+    else markUnreadDecided(set, chatId);
+  },
+
+  async placeUnread(chatId, unreadAtEntry, detail) {
+    const myId = get().myUserId;
+    const cursor = (myId ? detail.readCursors[myId] : null) ?? 0;
+    const list = get().messagesByChat[chatId] ?? [];
+    const entry = decideUnreadEntry(list, get().hasMoreByChat[chatId] ?? false, unreadAtEntry, cursor, myId);
+    if (entry.kind === 'none') {
+      markUnreadDecided(set, chatId);
+      return;
+    }
+    if (entry.kind === 'anchor') {
+      set((state) => ({
+        unreadAnchorByChat: { ...state.unreadAnchorByChat, [chatId]: { messageId: entry.messageId, count: unreadAtEntry } },
+        unreadDecidedByChat: { ...state.unreadDecidedByChat, [chatId]: true },
+        focusByChat: {
+          ...state.focusByChat,
+          [chatId]: { messageId: entry.messageId, seq: (state.focusByChat[chatId]?.seq ?? 0) + 1, quiet: true, unread: true },
+        },
+      }));
+      return;
+    }
+    let page: MessagesPage;
+    try {
+      page = await getMessagesAfterRequest(chatId, entry.after);
+    } catch {
+      markUnreadDecided(set, chatId);
+      return;
+    }
+    const anchor = firstUnreadAfter(page.messages, entry.after, myId);
+    if (anchor === null || get().activeChatId !== chatId) {
+      markUnreadDecided(set, chatId);
+      return;
+    }
+    set((state) => ({
+      unreadAnchorByChat: { ...state.unreadAnchorByChat, [chatId]: { messageId: anchor, count: unreadAtEntry } },
+      unreadDecidedByChat: { ...state.unreadDecidedByChat, [chatId]: true },
+    }));
+    get().replaceFeed(chatId, page.messages, {
+      hasMoreBefore: true,
+      hasMoreAfter: page.hasMore,
+      focus: anchor,
+      focusQuiet: true,
+      focusUnread: true,
+    });
   },
 
   async openChatAt(chatId, messageId) {
@@ -2061,6 +2148,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
     getSocket()?.emit(SocketEvent.ChatRead, { chatId, messageId });
   },
 
+  setLocalUnread(chatId, count) {
+    set((state) => ({
+      chats: state.chats.map((c) => (c.id === chatId ? { ...c, unreadCount: Math.max(0, count) } : c)),
+    }));
+  },
+
+  refreshUnread(chatId) {
+    if (unreadRefreshTimers.has(chatId)) return;
+    unreadRefreshTimers.set(
+      chatId,
+      setTimeout(() => {
+        unreadRefreshTimers.delete(chatId);
+        getChatRequest(chatId)
+          .then((chat) => {
+            if (!get().chats.some((c) => c.id === chatId)) return;
+            get().applyChatDetail(chat);
+          })
+          .catch(() => undefined);
+      }, UNREAD_REFRESH_MS),
+    );
+  },
+
   startTyping(chatId) {
     getSocket()?.emit(SocketEvent.TypingStart, { chatId });
   },
@@ -2147,16 +2256,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => {
         const cursors = { ...(state.readCursorsByChat[event.chatId] ?? {}) };
         cursors[event.userId] = event.lastReadMessageId;
-        // Прочтение с любого устройства гасит собственный бейдж непрочитанного (секция 8).
-        const chats =
-          event.userId === state.myUserId
-            ? state.chats.map((c) => (c.id === event.chatId ? { ...c, unreadCount: 0 } : c))
-            : state.chats;
-        return {
-          readCursorsByChat: { ...state.readCursorsByChat, [event.chatId]: cursors },
-          chats,
-        };
+        return { readCursorsByChat: { ...state.readCursorsByChat, [event.chatId]: cursors } };
       });
+      if (event.userId === get().myUserId) get().refreshUnread(event.chatId);
     });
 
     socket.off(SocketEvent.UserTyping).on(SocketEvent.UserTyping, (event: UserTypingEvent) => {
@@ -2294,6 +2396,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       liveMessageByChat: {},
       historyByChat: {},
       readCursorsByChat: {},
+      unreadAnchorByChat: {},
+      unreadDecidedByChat: {},
       typingByChat: {},
       presenceByUser: {},
       chatsLoaded: false,
@@ -2337,8 +2441,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!chat) return state;
 
       const isMine = message.sender?.id === state.myUserId;
-      const isActive = state.activeChatId === message.chatId && isFeedLive(state, message.chatId);
-      const unreadCount = isMine ? chat.unreadCount : isActive ? 0 : chat.unreadCount + 1;
+      const unreadCount = isMine ? chat.unreadCount : chat.unreadCount + 1;
 
       const updatedChat: ChatListItemDto = {
         ...chat,

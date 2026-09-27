@@ -170,4 +170,21 @@ describe('chat.service.getMessagesAround (PM-10)', () => {
     expect(tail.body.messages.map((m: { id: number }) => m.id)).toEqual(ids.slice(15));
     expect(tail.body.hasMore).toBe(false);
   });
+
+  it('after=0 — первая страница с самого начала истории: так открывается чат, который ни разу не читали', async () => {
+    const { chatId, ids, alice } = await chatWithHistory('afterzero', 12);
+
+    const page = await request
+      .get(`/api/chats/${chatId}/messages?after=0&limit=5`)
+      .set('Authorization', `Bearer ${alice.token}`);
+
+    expect(page.status).toBe(200);
+    expect(page.body.messages.map((m: { id: number }) => m.id)).toEqual(ids.slice(0, 5));
+    expect(page.body.hasMore).toBe(true);
+
+    const negative = await request
+      .get(`/api/chats/${chatId}/messages?after=-1`)
+      .set('Authorization', `Bearer ${alice.token}`);
+    expect(negative.status).toBe(400);
+  });
 });

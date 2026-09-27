@@ -20,7 +20,7 @@ export type CreatePrivateChatInput = z.infer<typeof createPrivateChatSchema>;
 
 export const messagesQuerySchema = z.object({
   before: z.coerce.number().int().positive().optional(),
-  after: z.coerce.number().int().positive().optional(),
+  after: z.coerce.number().int().nonnegative().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
 });
 export type MessagesQuery = z.infer<typeof messagesQuerySchema>;
@@ -42,7 +42,7 @@ export const chatAttachmentsQuerySchema = z
   .object({
     category: z.enum(['media', 'file', 'voice', 'gif']),
     before: z.coerce.number().int().positive().optional(),
-    after: z.coerce.number().int().positive().optional(),
+    after: z.coerce.number().int().nonnegative().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(MESSAGES_PAGE_SIZE),
   })
   .refine((value) => value.before === undefined || value.after === undefined, {

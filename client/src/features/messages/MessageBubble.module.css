@@ -9,7 +9,7 @@
   width: fit-content;
   max-width: 100%;
   padding: var(--bubble-pad-y) var(--bubble-pad-x) 7px;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 1.34;
   backdrop-filter: blur(10px) saturate(160%);
 }
@@ -55,7 +55,7 @@
   overflow: hidden;
   margin-bottom: 2px;
   color: var(--author-tint, var(--primary));
-  font-size: 12.5px;
+  font-size: 0.8333em;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -69,7 +69,7 @@
   gap: 4px;
   margin-bottom: 2px;
   color: var(--primary);
-  font-size: 12.5px;
+  font-size: 0.8333em;
   font-style: italic;
 }
 

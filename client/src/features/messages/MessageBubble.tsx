@@ -55,13 +55,14 @@ interface MessageBubbleProps {
   /** Чипы реакций и прочее, что рисуется под текстом внутри пузыря. */
   children?: ReactNode;
   hasReactions?: boolean;
+  onQuoteJump?: () => void;
 }
 
 /** Буквально из референса (строка 332): фиксированный радиус 20/20/7/20 (свои) или
  *  20/20/20/7 (чужие) — без поджатия углов в сериях, без хвостиков. Метаданные —
  *  абсолютом в правом нижнем углу (строка 333), текст резервирует под них место
  *  невидимой распоркой после себя (строка 339: `{{ m.pad }}`), а не float. */
-export function MessageBubble({ message, own, read, showAuthor, album, children, hasReactions }: MessageBubbleProps) {
+export function MessageBubble({ message, own, read, showAuthor, album, children, hasReactions, onQuoteJump }: MessageBubbleProps) {
   const status: 'sending' | 'sent' | 'failed' =
     message.status === 'sending' ? 'sending' : message.status === 'failed' ? 'failed' : 'sent';
   const isVoice = message.attachment !== null && isVoiceAttachment(message.attachment);
@@ -173,7 +174,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
         </span>
       )}
 
-      {message.replyTo && <ReplyQuote reply={message.replyTo} own={own} />}
+      {message.replyTo && <ReplyQuote reply={message.replyTo} own={own} onJump={onQuoteJump} />}
 
       {isVoice && message.attachment ? (
         <VoiceMessage

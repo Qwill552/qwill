@@ -103,6 +103,11 @@ async function seedChatWithHistory(mineId: string, username: string, displayName
       content: `строка номер ${index + 1}`,
     })),
   });
+  const last = await prisma.message.findFirstOrThrow({ where: { chatId: chat.id }, orderBy: { id: 'desc' } });
+  await prisma.chatMember.update({
+    where: { chatId_userId: { chatId: chat.id, userId: mineId } },
+    data: { lastReadMessageId: last.id },
+  });
   return chat.id;
 }
 
