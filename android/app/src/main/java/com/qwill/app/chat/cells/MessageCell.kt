@@ -19,6 +19,7 @@ import com.qwill.app.QwillApplication
 import com.qwill.app.chat.AuthorTint
 import com.qwill.app.chat.FeedRow
 import com.qwill.app.chat.LinkRange
+import com.qwill.app.chat.selection.SelectionRules
 import com.qwill.app.consent.CssGradient
 import com.qwill.app.emoji.Emoji
 import com.qwill.app.files.ImageReceiver
@@ -63,6 +64,12 @@ interface MessageCellHost {
     fun onQuoteClick(model: MessageCellModel)
 
     fun onReactionClick(model: MessageCellModel, emoji: String)
+
+    val selectionActive: Boolean get() = false
+
+    val selectionProgress: Float get() = 0f
+
+    fun isSelected(messageId: Long): Boolean = false
 }
 
 class MessageCell(context: Context, private val host: MessageCellHost) : View(context) {
@@ -103,6 +110,11 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
     private var chipsKey: String? = null
     private var bumpAnimator: ValueAnimator? = null
 
+    private var checkKey: String? = null
+    private var checked = false
+    private var checkProgress = 0f
+    private var checkAnimator: ValueAnimator? = null
+
     val key: String? get() = model?.key
 
     val boundModel: MessageCellModel? get() = model
@@ -122,9 +134,37 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         } else {
             avatarImage.setImage(null, null, 0, small = true)
         }
+        syncSelection(animated = previous?.key == next.key)
         layout = null
         requestLayout()
         invalidate()
+    }
+
+    fun syncSelection(animated: Boolean) {
+        val current = model ?: return
+        val message = current.row.message
+        val next = SelectionRules.selectable(message) && host.isSelected(message.id)
+        val sameRow = checkKey == current.key
+        checkKey = current.key
+        if (next == checked && sameRow) return
+        checked = next
+        checkAnimator?.cancel()
+        checkAnimator = null
+        val target = if (next) 1f else 0f
+        if (!animated || !sameRow || !Motion.animationsEnabled || !isAttachedToWindow) {
+            checkProgress = target
+            invalidate()
+            return
+        }
+        val animator = ValueAnimator.ofFloat(checkProgress, target)
+        animator.duration = Motion.duration(Motion.CHECK)
+        animator.interpolator = Motion.easeScreen
+        animator.addUpdateListener {
+            checkProgress = it.animatedValue as Float
+            invalidate()
+        }
+        checkAnimator = animator
+        animator.start()
     }
 
     fun rebindLayout() {
@@ -176,13 +216,24 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         bumpAnimator?.cancel()
         bumpAnimator = null
         chipBumps.clear()
+        checkAnimator?.cancel()
+        checkAnimator = null
+        checkProgress = if (checked) 1f else 0f
     }
 
     override fun onDraw(canvas: Canvas) {
         val current = model ?: return
         val bubble = layout ?: return
         val palette = Theme.palette
+        val selection = host.selectionProgress
+        drawSelectionHighlight(canvas, palette)
         drawFlash(canvas, current, palette)
+        if (selection > 0f && SelectionRules.selectable(current.row.message)) drawCheckbox(canvas, current, bubble, selection, palette)
+        val shift = shiftX(current)
+        if (shift != 0f) {
+            canvas.save()
+            canvas.translate(shift, 0f)
+        }
         if (current.showAvatar && current.row.message.sender != null) drawAvatar(canvas, bubble)
         val save = canvas.save()
         canvas.translate(bubbleX, bubbleY)
@@ -193,6 +244,50 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
             drawContent(canvas, bubble, current, palette)
         }
         canvas.restoreToCount(save)
+        if (shift != 0f) canvas.restore()
+    }
+
+    private fun shiftX(current: MessageCellModel): Float = if (current.row.own) 0f else px(CHECK_COLUMN) * host.selectionProgress
+
+    private fun drawSelectionHighlight(canvas: Canvas, palette: Palette) {
+        if (checkProgress <= 0f) return
+        fillPaint.shader = null
+        fillPaint.color = palette.primarySoft
+        fillPaint.alpha = (android.graphics.Color.alpha(palette.primarySoft) * checkProgress).toInt().coerceIn(0, 255)
+        rect.set(0f, 0f, width.toFloat(), rowHeight - px(BubbleGeometry.ROW_GAP))
+        canvas.drawRoundRect(rect, px(FLASH_RADIUS), px(FLASH_RADIUS), fillPaint)
+    }
+
+    private fun drawCheckbox(canvas: Canvas, current: MessageCellModel, bubble: BubbleLayout, progress: Float, palette: Palette) {
+        val left = current.sideLeft.toFloat()
+        val save = canvas.save()
+        canvas.clipRect(left, 0f, left + px(CHECK_COLUMN) * progress, height.toFloat())
+        val cx = left + px(CHECK_COLUMN) / 2f
+        val cy = bubbleY + bubble.bubbleHeight / 2f
+        val radius = px(CHECK_SIZE) / 2f
+        val ring = px(CHECK_RING)
+        fillPaint.shader = null
+        fillPaint.color = blend(palette.surface, palette.primary, checkProgress)
+        canvas.drawCircle(cx, cy, radius, fillPaint)
+        strokePaint.pathEffect = null
+        strokePaint.strokeWidth = ring
+        strokePaint.color = blend(palette.border, palette.primary, checkProgress)
+        canvas.drawCircle(cx, cy, radius - ring / 2f, strokePaint)
+        if (checkProgress > 0f) {
+            val size = px(CHECK_ICON)
+            QwillIcon.CHECK.draw(canvas, cx - size / 2f, cy - size / 2f, size, withAlpha(palette.textOnPrimary, checkProgress), iconPaint)
+        }
+        canvas.restoreToCount(save)
+    }
+
+    private fun blend(from: Int, to: Int, share: Float): Int {
+        val t = share.coerceIn(0f, 1f)
+        fun channel(shift: Int): Int {
+            val a = (from ushr shift) and 0xFF
+            val b = (to ushr shift) and 0xFF
+            return (a + (b - a) * t).toInt() and 0xFF
+        }
+        return (channel(24) shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
 
     private fun drawFlash(canvas: Canvas, current: MessageCellModel, palette: Palette) {
@@ -533,7 +628,11 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val bubble = layout ?: return false
         val current = model ?: return false
-        val x = event.x - bubbleX
+        if (host.selectionActive) {
+            clearPress()
+            return false
+        }
+        val x = event.x - bubbleX - shiftX(current)
         val y = event.y - bubbleY
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -669,6 +768,12 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
 
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
+        val current = model
+        if (host.selectionActive && current != null && SelectionRules.selectable(current.row.message)) {
+            info.isCheckable = true
+            info.isChecked = checked
+            return
+        }
         val bubble = layout ?: return
         val quote = bubble.quote
         if (quote != null && !quote.deleted) info.addAction(AccessibilityNodeInfo.AccessibilityAction(ACTION_QUOTE, "Перейти к цитате"))
@@ -736,6 +841,10 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         private const val EDITED = "изм."
         private const val FLASH_HOLD = 0.55f
         private const val FLASH_RADIUS = 10f
+        private const val CHECK_COLUMN = 44f
+        private const val CHECK_SIZE = 24f
+        private const val CHECK_RING = 2f
+        private const val CHECK_ICON = 14f
         private const val TAP_MIN = 44f
         private const val BUMP_PEAK = 1.25f
         private const val BUMP_PEAK_AT = 0.6f

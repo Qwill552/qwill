@@ -1,12 +1,17 @@
 package com.qwill.app.messenger
 
 import com.qwill.app.database.SyncCursor
+import com.qwill.app.model.BlockStateDto
 import com.qwill.app.model.ChatDto
+import com.qwill.app.model.ChatPinPayload
 import com.qwill.app.model.ChatMuteInput
 import com.qwill.app.model.ChatMuteResponse
 import com.qwill.app.model.ChatListResponse
 import com.qwill.app.model.ChatReadPayload
 import com.qwill.app.model.CreatePrivateChatInput
+import com.qwill.app.model.MembersResponse
+import com.qwill.app.model.MessageBatchAck
+import com.qwill.app.model.MessageDeleteBatchPayload
 import com.qwill.app.model.MessageReactPayload
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendAck
@@ -44,6 +49,14 @@ interface MessagesTransport {
     fun markRead(chatId: String, messageId: Long)
 
     fun react(chatId: String, messageId: Long, emoji: String)
+
+    fun members(chatId: String, guid: Int, callback: ApiCallback<MembersResponse>)
+
+    fun setBlocked(userId: String, blocked: Boolean, guid: Int, callback: ApiCallback<BlockStateDto>)
+
+    fun pinMessage(chatId: String, messageId: Long?)
+
+    fun deleteBatch(chatId: String, messageIds: List<Long>, guid: Int, callback: ApiCallback<List<MessageDto>>)
 
     fun cancelRequestsForGuid(guid: Int)
 }
@@ -121,10 +134,39 @@ class ApiMessagesTransport(
         )
     }
 
+    override fun members(chatId: String, guid: Int, callback: ApiCallback<MembersResponse>) {
+        api.send(ApiRequest.get("/api/chats/${encode(chatId)}/members", MembersResponse.serializer()), guid, callback)
+    }
+
+    override fun setBlocked(userId: String, blocked: Boolean, guid: Int, callback: ApiCallback<BlockStateDto>) {
+        val path = "/api/users/${encode(userId)}/block"
+        val parse = ApiRequest.parser(BlockStateDto.serializer())
+        val request = if (blocked) ApiRequest("POST", path, parse, body = { EMPTY_BODY }) else ApiRequest("DELETE", path, parse)
+        api.send(request, guid, callback)
+    }
+
+    override fun pinMessage(chatId: String, messageId: Long?) {
+        socket.emitDeferred(SocketEvent.CHAT_PIN, ChatPinPayload(chatId, messageId).toJson())
+    }
+
+    override fun deleteBatch(chatId: String, messageIds: List<Long>, guid: Int, callback: ApiCallback<List<MessageDto>>) {
+        socket.request(
+            SocketEvent.MESSAGE_DELETE_BATCH,
+            ApiJson.encodeToJsonElement(MessageDeleteBatchPayload.serializer(), MessageDeleteBatchPayload(chatId, messageIds)),
+            { body -> ApiJson.decodeFromJsonElement(MessageBatchAck.serializer(), body).messages.orEmpty() },
+            guid,
+            callback,
+        )
+    }
+
     override fun cancelRequestsForGuid(guid: Int) {
         api.cancelRequestsForGuid(guid)
         socket.cancelRequestsForGuid(guid)
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    private companion object {
+        const val EMPTY_BODY = "{}"
+    }
 }

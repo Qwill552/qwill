@@ -1,9 +1,16 @@
 package com.qwill.app.chat
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.RectF
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
@@ -12,12 +19,26 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import com.qwill.app.BuildConfig
 import com.qwill.app.QwillApplication
 import com.qwill.app.auth.SessionState
+import com.qwill.app.calls.ActiveCallsListener
+import com.qwill.app.chat.dialogs.ChatDialogs
+import com.qwill.app.chat.dialogs.ConfirmDialog
+import com.qwill.app.chat.selection.FeedListView
+import com.qwill.app.chat.selection.FeedTouchHelper
+import com.qwill.app.chat.selection.MessageSelection
+import com.qwill.app.chat.selection.SelectionRules
+import com.qwill.app.chat.top.CapsuleModel
+import com.qwill.app.chat.top.ChatSubtitle
+import com.qwill.app.chat.top.ChatTopLayer
+import com.qwill.app.chat.top.ChatTopLayout
+import com.qwill.app.chat.top.SubtitleInput
+import com.qwill.app.chats.DeleteChatDialog
 import com.qwill.app.chat.cells.BubbleLayout
 import com.qwill.app.chat.cells.BubblePaints
 import com.qwill.app.chat.cells.MessageCell
@@ -34,15 +55,25 @@ import com.qwill.app.messenger.FeedUpdate
 import com.qwill.app.messenger.HistoryCallback
 import com.qwill.app.messenger.HistoryPage
 import com.qwill.app.messenger.HistorySource
+import com.qwill.app.messenger.MembersListener
 import com.qwill.app.model.ChatDto
+import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatType
 import com.qwill.app.model.MessageDto
 import com.qwill.app.net.ApiException
 import com.qwill.app.net.ApiResult
 import com.qwill.app.net.NetworkError
 import com.qwill.app.net.NoResponseError
+import com.qwill.app.realtime.ConnectionStateListener
+import com.qwill.app.realtime.PresenceListener
+import com.qwill.app.realtime.TypingListener
 import com.qwill.app.ui.AppForeground
+import com.qwill.app.ui.ConnectionTitleRule
 import com.qwill.app.ui.ForegroundListener
+import com.qwill.app.ui.QwillIcon
+import com.qwill.app.ui.QwillMenu
+import com.qwill.app.ui.QwillMenuItem
+import com.qwill.app.ui.TitleKind
 import com.qwill.app.ui.insets.SafeArea
 import com.qwill.app.ui.stack.Screen
 import com.qwill.app.ui.theme.Dimens
@@ -57,7 +88,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : Screen(), MessageCellHost, ChatAdapterHost, FeedScrollThumb.Host {
+class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
+    Screen(), MessageCellHost, ChatAdapterHost, FeedScrollThumb.Host, FeedTouchHelper.Host {
     private sealed class Placement {
         object Bottom : Placement()
 
@@ -73,7 +105,9 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
     private lateinit var context: Context
     private lateinit var root: FrameLayout
     private lateinit var wallpaper: ChatWallpaperView
-    private lateinit var list: RecyclerView
+    private lateinit var list: FeedListView
+    private lateinit var top: ChatTopLayer
+    private lateinit var touchHelper: FeedTouchHelper
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var adapter: ChatAdapter
     private lateinit var floating: FloatingDateView
@@ -116,6 +150,30 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
     private var layoutDirty = false
     private var appliedSides: Pair<Int, Int>? = null
 
+    private val selection = MessageSelection()
+    private val selectedCache = HashMap<Long, MessageDto>()
+    private var selectionShown = 0f
+    private var selectionAnimator: ValueAnimator? = null
+    private var dragBase: List<Long> = emptyList()
+    private var dragStart = 0L
+    private var dragAdding = true
+    private var menu: QwillMenu? = null
+    private var dialog: ConfirmDialog? = null
+    private var deleteChatDialog: DeleteChatDialog? = null
+    private var membersRequested = false
+    private var connectionKind = TitleKind.BRAND
+    private var targetKind = TitleKind.BRAND
+    private val kindTask = Runnable {
+        connectionKind = targetKind
+        updateSubtitle(animated = true)
+    }
+    private val minuteTask = object : Runnable {
+        override fun run() {
+            updateSubtitle(animated = false)
+            MainQueue.postDelayed(this, MINUTE_MS)
+        }
+    }
+
     private val trimTask = Runnable { trimIfIdle() }
     private val floatingHide = Runnable { floating.hide(animated = true) }
 
@@ -128,16 +186,44 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
     }
 
     private val feedListener = FeedListener { update -> if (update.chatId == chatId) onFeedUpdate(update) }
-    private val chatsListener = ChatsListener { updateJumpCount() }
+    private val chatsListener = ChatsListener {
+        updateJumpCount()
+        updateHeader(animated = true)
+    }
+    private val presenceListener = PresenceListener { updateSubtitle(animated = true) }
+    private val typingListener = TypingListener { changed -> if (changed == null || changed == chatId) updateSubtitle(animated = true) }
+    private val connectionListener = ConnectionStateListener { onConnectionChanged() }
+    private val callsListener = ActiveCallsListener { changed -> if (changed == chatId) updateCall(animated = true) }
+    private val membersListener = MembersListener { changed ->
+        if (changed != chatId) return@MembersListener
+        updatePinned(animated = true)
+        updateSelectionHeader(animated = false)
+    }
     private val emojiListener = EmojiListener { indexChanged ->
         if (indexChanged) {
             layoutCache.clear()
             rebindAll()
+            top.pinnedBanner.applyTheme()
         } else {
             for (index in 0 until list.childCount) list.getChildAt(index).invalidate()
+            top.pinnedBanner.invalidate()
         }
     }
-    private val foregroundListener = ForegroundListener { active -> if (active) list.post { updateReading() } else readTracker.flush() }
+    private val foregroundListener = ForegroundListener { active ->
+        if (active) {
+            list.post { updateReading() }
+            top.header.capsule.invalidate()
+        } else {
+            readTracker.flush()
+        }
+    }
+
+    override val interceptsBack: Boolean
+        get() = menu?.isShowing == true || dialog != null || deleteChatDialog != null || selection.active
+
+    override val selectionActive: Boolean get() = selection.active
+
+    override val selectionProgress: Float get() = selectionShown
 
     override val paintsOwnBackground: Boolean get() = true
 
@@ -149,7 +235,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         wallpaper = ChatWallpaperView(context)
         root.addView(wallpaper, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
-        list = RecyclerView(context)
+        list = FeedListView(context)
         layoutManager = LinearLayoutManager(context, RecyclerView.VERTICAL, true)
         list.layoutManager = layoutManager
         list.setHasFixedSize(true)
@@ -208,11 +294,36 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         thumb = FeedScrollThumb(context, this)
         root.addView(thumb, FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
 
+        top = ChatTopLayer(
+            context,
+            list,
+            onContentTopChanged = { applyInsets() },
+            onPinnedJump = { onPinnedJump() },
+            onPinnedClose = { onPinnedClose() },
+            onJoinCall = {},
+        )
+        root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        top.header.back.setOnClickListener { stack?.pop() }
+        top.header.call.setOnClickListener {}
+        top.header.more.setOnClickListener { openMenu() }
+        top.selection.close.setOnClickListener { exitSelection(animated = true) }
+        top.selection.copy.setOnClickListener { copySelection() }
+        top.selection.delete.setOnClickListener { confirmDeleteSelection() }
+        touchHelper = FeedTouchHelper(list, this)
+        list.touchHelper = touchHelper
+        selectionShown = if (selection.active) 1f else 0f
+
         root.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) onRootResized()
         }
         applyInsets()
         applyTheme()
+        updateHeader(animated = false)
+        updateCall(animated = false)
+        if (selection.active) {
+            top.setSelectionMode(true, animated = false)
+            updateSelectionHeader(animated = false)
+        }
         if (!opened) {
             open()
         } else {
@@ -228,27 +339,70 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         shown = true
         messages.setLiveChat(chatId)
         updateJumpCount()
+        updateSubtitle(animated = false)
+        MainQueue.cancel(minuteTask)
+        MainQueue.postDelayed(minuteTask, MINUTE_MS)
         list.post { updateReading() }
     }
 
     override fun onHidden() {
         shown = false
+        MainQueue.cancel(minuteTask)
+        touchHelper.cancel()
+        menu?.dismissNow()
+        if (selection.active) exitSelection(animated = false)
         rememberPosition()
         readTracker.flush()
         if (messages.liveChatId == chatId) messages.setLiveChat(null)
     }
 
+    override fun onBackPressed(): Boolean {
+        if (menu?.isShowing == true) {
+            menu?.close()
+            return true
+        }
+        dialog?.let {
+            it.requestClose()
+            return true
+        }
+        deleteChatDialog?.let {
+            it.requestClose()
+            return true
+        }
+        if (selection.active) {
+            exitSelection(animated = true)
+            return true
+        }
+        return false
+    }
+
     override fun onViewDestroyed() {
         restoreAnchor = topAnchor()
         MainQueue.cancel(trimTask)
+        MainQueue.cancel(kindTask)
+        selectionAnimator?.cancel()
+        selectionAnimator = null
+        menu?.dismissNow()
+        menu = null
+        dialog?.dismissNow()
+        dialog = null
+        deleteChatDialog = null
     }
 
     override fun onDestroyed() {
         readTracker.stop()
+        MainQueue.cancel(minuteTask)
+        MainQueue.cancel(kindTask)
         messages.removeFeedListener(feedListener)
         messages.removeChatsListener(chatsListener)
+        messages.removeMembersListener(membersListener)
+        QwillApplication.presence.removeListener(presenceListener)
+        QwillApplication.typing.removeListener(typingListener)
+        QwillApplication.socket.removeStateListener(connectionListener)
+        QwillApplication.calls.removeListener(callsListener)
         Emoji.removeListener(emojiListener)
         AppForeground.removeListener(foregroundListener)
+        messages.releaseMembers(chatId)
         messages.closeChat(chatId)
     }
 
@@ -261,6 +415,10 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
     override fun onThemeChanged() {
         if (!::list.isInitialized) return
         applyTheme()
+        top.applyTheme()
+        menu?.applyTheme()
+        dialog?.applyTheme()
+        deleteChatDialog?.applyTheme()
         wallpaper.refresh()
         layoutCache.clear()
         val anchor = topAnchor()
@@ -278,10 +436,12 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
     }
 
     private fun applyInsets() {
-        list.setPadding(0, (px(ChatInsets.HEADER) + safe.top).roundToInt(), 0, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
+        top.setSafeArea(safe)
+        val contentTop = top.contentTop + safe.top
+        list.setPadding(0, contentTop, 0, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
         status.setPadding((px(STATUS_PAD_X) + safe.left).roundToInt(), list.paddingTop, (px(STATUS_PAD_X) + safe.right).roundToInt(), list.paddingBottom)
         (floating.layoutParams as FrameLayout.LayoutParams).topMargin =
-            (px(ChatInsets.HEADER + ChatInsets.FLOATING_DATE_GAP) + safe.top - px(FLOATING_TAP_EXTRA)).roundToInt()
+            (contentTop + px(ChatTopLayout.FLOATING_DATE_GAP) - px(FLOATING_TAP_EXTRA)).roundToInt()
         floating.requestLayout()
         val jumpParams = jump.layoutParams as FrameLayout.LayoutParams
         jumpParams.rightMargin = (px(ChatInsets.JUMP_RIGHT) + safe.right - jump.pad).roundToInt()
@@ -315,8 +475,16 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         feed.unreadAtEntry = messages.chats.firstOrNull { it.id == chatId }?.unreadCount ?: 0
         messages.addFeedListener(feedListener)
         messages.addChatsListener(chatsListener)
+        messages.addMembersListener(membersListener)
+        QwillApplication.presence.addListener(presenceListener)
+        QwillApplication.typing.addListener(typingListener)
+        QwillApplication.socket.addStateListener(connectionListener)
+        QwillApplication.calls.addListener(callsListener)
         Emoji.addListener(emojiListener)
         AppForeground.addListener(foregroundListener)
+        connectionKind = currentKind()
+        targetKind = connectionKind
+        requestMembersIfGroup()
         messages.openChat(chatId, classGuid, historyCallback)
     }
 
@@ -374,10 +542,14 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         failure = "Чат не найден или недоступен"
         applyTheme()
         updateStatus()
+        updateHeader(animated = false)
     }
 
     private fun onChatDetails(chat: ChatDto) {
         details = chat
+        requestMembersIfGroup()
+        updateHeader(animated = true)
+        if (selection.active) updateSelectionHeader(animated = false)
         val me = myId()
         if (me != null && chat.readCursors.containsKey(me)) {
             cursorKnown = true
@@ -503,8 +675,15 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
                 refreshKey("c:${update.clientId}")
             }
             is FeedUpdate.UploadProgress -> Unit
-            is FeedUpdate.Changed -> if (feed.change(update.messages)) submitRows(diff = true)
-            is FeedUpdate.Removed -> if (feed.remove(update.ids)) submitRows(diff = true)
+            is FeedUpdate.Changed -> {
+                if (feed.change(update.messages)) submitRows(diff = true)
+                for (message in update.messages) if (message.id in selectedCache) selectedCache[message.id] = message
+                if (selection.active) updateSelectionHeader(animated = false)
+            }
+            is FeedUpdate.Removed -> {
+                if (feed.remove(update.ids)) submitRows(diff = true)
+                if (selection.active && selection.removeAll(update.ids)) onSelectionChanged()
+            }
             is FeedUpdate.ReactionsChanged -> if (feed.reactions(update.messageId, update.reactions)) submitRows(diff = true)
             is FeedUpdate.Replaced -> {
                 val pending = feed.messages.filter { it.id < 0 }
@@ -513,7 +692,10 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
                 setPlacement(Placement.Bottom)
             }
             is FeedUpdate.DetailsChanged -> onChatDetails(update.details)
-            is FeedUpdate.ChatGone -> if (stack?.top === this) stack?.pop()
+            is FeedUpdate.ChatGone -> {
+                if (selection.active) exitSelection(animated = false)
+                if (stack?.top === this) stack?.pop()
+            }
         }
     }
 
@@ -662,7 +844,9 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
 
     private fun listEnd(): Float = (list.height - list.paddingBottom).toFloat()
 
-    private fun visibleBottom(): Float = list.height - (px(ChatInsets.COMPOSER_TOP) + safe.bottom)
+    override fun visibleTop(): Float = list.paddingTop.toFloat()
+
+    override fun visibleBottom(): Float = list.height - (px(ChatInsets.COMPOSER_TOP) + safe.bottom)
 
     private fun visibleCenter(): Float = (list.paddingTop + visibleBottom()) / 2f
 
@@ -1150,6 +1334,320 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         return row.key to (view.top - list.paddingTop)
     }
 
+
+    private fun listItem(): ChatListItemDto? = messages.chats.firstOrNull { it.id == chatId } ?: details?.toListItem()
+
+    private fun isGroup(): Boolean = listItem()?.type == ChatType.GROUP
+
+    private fun isService(): Boolean = listItem()?.otherMember?.isService == true
+
+    private fun isGroupAdmin(): Boolean = SelectionRules.isGroupAdmin(isGroup(), messages.membersOf(chatId), myId())
+
+    private fun requestMembersIfGroup() {
+        if (membersRequested || !isGroup()) return
+        membersRequested = true
+        messages.loadMembers(chatId)
+    }
+
+    private fun updateHeader(animated: Boolean) {
+        if (!::top.isInitialized) return
+        val chat = listItem()
+        val service = isService()
+        val available = failure == null
+        top.header.setMode(available, service)
+        if (chat != null) {
+            top.header.capsule.setModel(
+                CapsuleModel(
+                    title = chat.title,
+                    avatarColor = chat.otherMember?.avatarColor,
+                    avatarKey = chatId,
+                    avatarUrl = chat.avatarUrl,
+                    service = service,
+                    official = service || chat.isSupportRequest,
+                    muted = chat.muted,
+                ),
+            )
+        } else {
+            top.header.capsule.setModel(CapsuleModel("", null, chatId, null, service = false, official = false, muted = false))
+        }
+        updateSubtitle(animated)
+        updatePinned(animated)
+        updateCall(animated)
+        if (!available && selection.active) exitSelection(animated = false)
+    }
+
+    private fun updateSubtitle(animated: Boolean) {
+        if (!::top.isInitialized) return
+        val chat = listItem()
+        if (chat == null && connectionKind == TitleKind.BRAND) {
+            top.header.capsule.setSubtitle(null, animated)
+            return
+        }
+        val input = SubtitleInput(
+            connection = connectionKind,
+            service = isService(),
+            group = chat?.type == ChatType.GROUP,
+            members = details?.members,
+            myId = myId(),
+            typists = QwillApplication.typing.typists(chatId),
+            otherMember = chat?.otherMember ?: details?.otherMember,
+            presence = { QwillApplication.presence[it] },
+        )
+        top.header.capsule.setSubtitle(ChatSubtitle.of(input), animated && shown)
+    }
+
+    private fun currentKind(): TitleKind =
+        ConnectionTitleRule.kindOf(QwillApplication.socket.state, QwillApplication.session.state is SessionState.IpBanned)
+
+    private fun onConnectionChanged() {
+        val next = currentKind()
+        if (next == targetKind) return
+        targetKind = next
+        MainQueue.cancel(kindTask)
+        val delay = ConnectionTitleRule.delayFor(next)
+        if (delay > 0L) {
+            MainQueue.postDelayed(kindTask, delay)
+        } else {
+            connectionKind = next
+            updateSubtitle(animated = true)
+        }
+    }
+
+    private fun canUnpin(): Boolean = !isGroup() || isGroupAdmin()
+
+    private fun updatePinned(animated: Boolean) {
+        if (!::top.isInitialized) return
+        val pinned = details?.pinnedMessage
+        val visible = pinned != null && failure == null && !selection.active && !QwillApplication.hiddenPins.isHidden(chatId, pinned.id)
+        top.setPinned(if (visible) pinned else null, canUnpin(), animated && shown)
+    }
+
+    private fun updateCall(animated: Boolean) {
+        if (!::top.isInitialized) return
+        val call = if (isGroup() && failure == null) QwillApplication.calls.callOf(chatId) else null
+        top.setCall(call, animated && shown)
+    }
+
+    private fun onPinnedJump() {
+        val pinned = details?.pinnedMessage ?: return
+        jumpTo(pinned.id)
+    }
+
+    private fun onPinnedClose() {
+        val pinned = details?.pinnedMessage ?: return
+        if (!canUnpin()) {
+            QwillApplication.hiddenPins.hide(chatId, pinned.id)
+            updatePinned(animated = true)
+            return
+        }
+        if (dialog != null) return
+        val next = ChatDialogs.unpin(context, root, { messages.unpinMessage(chatId) }) {
+            dialog = null
+            backStateChanged()
+        }
+        dialog = next
+        next.show()
+        backStateChanged()
+    }
+
+    private fun openMenu() {
+        if (menu?.isShowing == true || dialog != null || deleteChatDialog != null) return
+        val chat = listItem() ?: return
+        val target = menu ?: QwillMenu(root).also { menu = it }
+        target.onClosed = { backStateChanged() }
+        target.show(anchorOf(top.header.more), menuItems(chat), safe)
+        backStateChanged()
+    }
+
+    private fun menuItems(chat: ChatListItemDto): List<QwillMenuItem> {
+        val muteItem = QwillMenuItem(
+            label = if (chat.muted) "Включить уведомления" else "Отключить уведомления",
+            icon = if (chat.muted) QwillIcon.MUTE else QwillIcon.BELL,
+            muted = chat.muted,
+        ) { messages.setChatMuted(chatId, !chat.muted) }
+        if (isService() || chat.type == ChatType.GROUP) return listOf(muteItem)
+        val items = arrayListOf(muteItem)
+        val other = chat.otherMember
+        if (other != null) {
+            items.add(
+                QwillMenuItem(label = if (chat.iBlocked) "Разблокировать" else "Заблокировать", icon = QwillIcon.LOCK) {
+                    if (chat.iBlocked) messages.setUserBlocked(chatId, other.id, false) {} else openBlockDialog(other.id, other.username)
+                },
+            )
+        }
+        items.add(QwillMenuItem(label = "Удалить чат", icon = QwillIcon.TRASH, danger = true) { openDeleteChat() })
+        return items
+    }
+
+    private fun openBlockDialog(userId: String, username: String) {
+        if (dialog != null) return
+        val next = ChatDialogs.block(context, root, chatId, userId, username) {
+            dialog = null
+            backStateChanged()
+        }
+        dialog = next
+        next.show()
+        backStateChanged()
+    }
+
+    private fun openDeleteChat() {
+        if (deleteChatDialog != null) return
+        val chat = listItem() ?: return
+        val next = DeleteChatDialog(context, root, chat) {
+            deleteChatDialog = null
+            backStateChanged()
+        }
+        deleteChatDialog = next
+        next.show()
+        backStateChanged()
+    }
+
+    private fun anchorOf(view: View): RectF {
+        val viewLocation = IntArray(2)
+        val rootLocation = IntArray(2)
+        view.getLocationInWindow(viewLocation)
+        root.getLocationInWindow(rootLocation)
+        val left = (viewLocation[0] - rootLocation[0]).toFloat()
+        val topY = (viewLocation[1] - rootLocation[1]).toFloat()
+        val rect = RectF(left, topY, left + view.width, topY + view.height)
+        val inset = (view.width - px(CIRCLE)) / 2f
+        rect.inset(inset, inset)
+        return rect
+    }
+
+    override fun isSelected(messageId: Long): Boolean = messageId in selection
+
+    override fun onLongPress(message: MessageDto): Boolean {
+        if (failure != null || !SelectionRules.selectable(message)) return false
+        if (!selection.active) {
+            selection.start(message.id)
+            dragAdding = true
+        } else if (message.id in selection) {
+            selection.set(selection.ids - message.id)
+            dragAdding = false
+        } else {
+            selection.set(SelectionRules.toggle(selection.ids, message.id))
+            dragAdding = true
+        }
+        selectedCache[message.id] = message
+        dragBase = selection.ids
+        dragStart = message.id
+        onSelectionChanged()
+        return true
+    }
+
+    override fun onSelectTap(message: MessageDto) {
+        if (!selection.active) return
+        selectedCache[message.id] = message
+        selection.set(SelectionRules.toggle(selection.ids, message.id))
+        onSelectionChanged()
+    }
+
+    override fun onDragTo(message: MessageDto) {
+        if (!selection.active) return
+        val ordered = feed.messages.filter { SelectionRules.selectable(it) }.map { it.id }
+        val range = SelectionRules.rangeBetween(ordered, dragStart, message.id)
+        for (id in range) feed.messages.firstOrNull { it.id == id }?.let { selectedCache[id] = it }
+        val next = SelectionRules.dragSelect(dragBase, range, dragAdding)
+        if (next == selection.ids) return
+        selection.set(next)
+        onSelectionChanged()
+    }
+
+    private fun onSelectionChanged() {
+        if (!selection.active) {
+            exitSelection(animated = true)
+            return
+        }
+        selectedCache.keys.retainAll(selection.ids.toHashSet())
+        if (selectionShown < 1f && selectionAnimator == null) runSelectionProgress(1f)
+        top.setSelectionMode(true, animated = true)
+        updateSelectionHeader(animated = true)
+        syncCells()
+        updatePinned(animated = true)
+        backStateChanged()
+    }
+
+    private fun updateSelectionHeader(animated: Boolean) {
+        if (!::top.isInitialized || !selection.active) return
+        top.selection.setState(selection.count, SelectionRules.canDelete(selectedMessages(), myId(), isGroupAdmin()), animated)
+    }
+
+    private fun selectedMessages(): List<MessageDto> =
+        selection.ids.mapNotNull { id -> feed.messages.firstOrNull { it.id == id } ?: selectedCache[id] }
+
+    private fun exitSelection(animated: Boolean) {
+        val wasActive = selection.active || selectionShown > 0f
+        selection.clear()
+        selectedCache.clear()
+        dialog?.let { if (!it.isClosed) it.requestClose() }
+        if (!::top.isInitialized) return
+        top.setSelectionMode(false, animated)
+        if (wasActive) {
+            if (animated) runSelectionProgress(0f) else setSelectionShown(0f)
+        }
+        syncCells()
+        updatePinned(animated)
+        backStateChanged()
+    }
+
+    private fun runSelectionProgress(target: Float) {
+        selectionAnimator?.cancel()
+        selectionAnimator = null
+        if (!Motion.animationsEnabled || !shown) {
+            setSelectionShown(target)
+            return
+        }
+        val animator = ValueAnimator.ofFloat(selectionShown, target)
+        animator.duration = Motion.duration(Motion.CHECK)
+        animator.interpolator = Motion.easeScreen
+        animator.addUpdateListener { setSelectionShown(it.animatedValue as Float) }
+        animator.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (selectionAnimator === animation) selectionAnimator = null
+            }
+        })
+        selectionAnimator = animator
+        animator.start()
+    }
+
+    private fun setSelectionShown(value: Float) {
+        selectionShown = value
+        for (index in 0 until list.childCount) list.getChildAt(index).invalidate()
+    }
+
+    private fun syncCells() {
+        for (index in 0 until list.childCount) {
+            val cell = list.getChildAt(index) as? MessageCell ?: continue
+            cell.syncSelection(animated = true)
+            cell.invalidate()
+        }
+    }
+
+    private fun copySelection() {
+        val text = SelectionRules.copyText(selectedMessages())
+        if (text.isNotEmpty()) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, text))
+            if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, "Текст скопирован", Toast.LENGTH_SHORT).show()
+        }
+        exitSelection(animated = true)
+    }
+
+    private fun confirmDeleteSelection() {
+        if (dialog != null || !selection.active) return
+        val ids = selection.ids.toList()
+        val next = ChatDialogs.deleteMessages(context, root, ids.size, {
+            messages.deleteMessages(chatId, ids) { failure -> if (failure == null && selection.active) exitSelection(animated = true) }
+        }) {
+            dialog = null
+            backStateChanged()
+        }
+        dialog = next
+        next.show()
+        backStateChanged()
+    }
+
     private fun myId(): String? = (QwillApplication.session.state as? SessionState.Authenticated)?.user?.id
 
     private fun px(dp: Float): Float = dp * context.resources.displayMetrics.density
@@ -1182,5 +1680,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) : 
         const val REBIND_MARGIN = 4
         const val DEFAULT_ROW = 56f
         const val AUTO_SCROLL_GUARD_MS = 700L
+        const val MINUTE_MS = 60_000L
+        const val CIRCLE = 40f
+        const val CLIP_LABEL = "Qwill"
     }
 }

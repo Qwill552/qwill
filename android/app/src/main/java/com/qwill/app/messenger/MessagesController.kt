@@ -13,9 +13,11 @@ import com.qwill.app.model.ChatDeletedEvent
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatMemberSummary
+import com.qwill.app.model.ChatMutedEvent
 import com.qwill.app.model.ChatPinnedEvent
 import com.qwill.app.model.ChatReadEvent
 import com.qwill.app.model.ChatUpdatedEvent
+import com.qwill.app.model.GroupMemberDTO
 import com.qwill.app.model.LocalAttachment
 import com.qwill.app.model.MemberChangedEvent
 import com.qwill.app.model.MessageDeletedBatchEvent
@@ -59,6 +61,9 @@ class MessagesController(
     private val guid = RequestGuid.next()
     private val chatsListeners = ArrayList<ChatsListener>()
     private val feedListeners = ArrayList<FeedListener>()
+    private val membersListeners = ArrayList<MembersListener>()
+    private val membersByChat = HashMap<String, List<GroupMemberDTO>>()
+    private val membersWanted = HashSet<String>()
     private val cancelledGuids = HashSet<Int>()
     private val syncWaiters = HashMap<String, MutableList<(SyncOutcome) -> Unit>>()
     private val preloadQueue = ArrayDeque<String>()
@@ -138,6 +143,7 @@ class MessagesController(
         socket.subscribe(SocketEvent.CHAT_BLOCK, ChatBlockEvent.serializer(), none) { applyChatBlock(it) }
         socket.subscribe(SocketEvent.CHAT_DELETED, ChatDeletedEvent.serializer(), none) { applyChatDeleted(it.chatId) }
         socket.subscribe(SocketEvent.MEMBER_CHANGED, MemberChangedEvent.serializer(), none) { applyMemberChanged(it) }
+        socket.subscribe(SocketEvent.CHAT_MUTED, ChatMutedEvent.serializer(), none) { applyChatMuted(it) }
         socket.addConnectedListener { onSocketConnected() }
     }
 
@@ -157,8 +163,78 @@ class MessagesController(
         feedListeners.remove(listener)
     }
 
+    fun addMembersListener(listener: MembersListener) {
+        membersListeners.add(listener)
+    }
+
+    fun removeMembersListener(listener: MembersListener) {
+        membersListeners.remove(listener)
+    }
+
     fun cancelRequestsForGuid(guid: Int) {
         if (guid != RequestGuid.NONE) cancelledGuids.add(guid)
+    }
+
+    fun membersOf(chatId: String): List<GroupMemberDTO>? = membersByChat[chatId]
+
+    fun loadMembers(chatId: String) {
+        membersWanted.add(chatId)
+        requestMembers(chatId)
+    }
+
+    fun releaseMembers(chatId: String) {
+        membersWanted.remove(chatId)
+    }
+
+    fun setUserBlocked(chatId: String, userId: String, blocked: Boolean, callback: (ApiException?) -> Unit) {
+        val current = epoch
+        transport.setBlocked(userId, blocked, guid) block@{ result ->
+            if (current != epoch) return@block
+            when (result) {
+                is ApiResult.Success -> {
+                    applyChatBlock(ChatBlockEvent(chatId, userId, result.value.iBlocked, result.value.blockedMe))
+                    callback(null)
+                }
+                is ApiResult.Failure -> callback(result.error)
+            }
+        }
+    }
+
+    fun unpinMessage(chatId: String) {
+        transport.pinMessage(chatId, null)
+    }
+
+    fun deleteMessages(chatId: String, messageIds: List<Long>, callback: (ApiException?) -> Unit) {
+        if (messageIds.isEmpty()) return
+        val current = epoch
+        transport.deleteBatch(chatId, messageIds, guid) delete@{ result ->
+            if (current != epoch) return@delete
+            when (result) {
+                is ApiResult.Success -> {
+                    for (message in result.value) applyMessageUpdate(message)
+                    callback(null)
+                }
+                is ApiResult.Failure -> callback(result.error)
+            }
+        }
+    }
+
+    fun applyChatMuted(event: ChatMutedEvent) {
+        updateChat(event.chatId) { it.copy(muted = event.muted) }
+        updateDetails(event.chatId) { it.copy(muted = event.muted) }
+    }
+
+    private fun requestMembers(chatId: String) {
+        val current = epoch
+        transport.members(chatId, guid) { result ->
+            if (current != epoch || result !is ApiResult.Success) return@members
+            membersByChat[chatId] = result.value.members
+            notifyMembers(chatId)
+        }
+    }
+
+    private fun notifyMembers(chatId: String) {
+        for (listener in ArrayList(membersListeners)) listener.onMembersChanged(chatId)
     }
 
     fun onSessionState(state: SessionState) {
@@ -244,6 +320,7 @@ class MessagesController(
     }
 
     fun closeChat(chatId: String) {
+        membersWanted.remove(chatId)
         if (openedChatId == chatId) openedChatId = null
         if (liveChatId == chatId) liveChatId = null
     }
@@ -394,6 +471,7 @@ class MessagesController(
         val generation = ++entryGeneration
         setUpdating(true)
         sender.resetRetry()
+        for (chatId in membersWanted.toList()) requestMembers(chatId)
         if (preloadWaiting) {
             preloadWaiting = false
             main.postDelayed(preloadTask, timings.preloadIntervalMs)
@@ -548,6 +626,7 @@ class MessagesController(
 
     fun applyMemberChanged(event: MemberChangedEvent) {
         val selfGone = (event.type == MemberChangedEvent.REMOVED || event.type == MemberChangedEvent.LEFT) && event.userId == me()?.id
+        changeMembers(event)
         updateDetails(event.chatId) { chat ->
             when (event.type) {
                 MemberChangedEvent.ADDED -> {
@@ -567,6 +646,25 @@ class MessagesController(
             storage.removeChatRow(event.chatId)
             main.post { if (current == epoch) notify(FeedUpdate.ChatGone(event.chatId, kicked = true)) }
         }
+    }
+
+    private fun changeMembers(event: MemberChangedEvent) {
+        val list = membersByChat[event.chatId] ?: return
+        val next = when (event.type) {
+            MemberChangedEvent.ADDED -> {
+                val member = event.member ?: return
+                list.filter { it.userId != member.userId } + member
+            }
+            MemberChangedEvent.REMOVED, MemberChangedEvent.LEFT -> list.filter { it.userId != event.userId }
+            MemberChangedEvent.ROLE -> {
+                val role = event.role ?: return
+                list.map { if (it.userId == event.userId) it.copy(role = role) else it }
+            }
+            else -> return
+        }
+        if (next == list) return
+        membersByChat[event.chatId] = next
+        notifyMembers(event.chatId)
     }
 
     override fun notify(update: FeedUpdate) {
@@ -608,6 +706,8 @@ class MessagesController(
         openedChatId = null
         liveChatId = null
         syncWaiters.clear()
+        membersByChat.clear()
+        membersWanted.clear()
         preloadQueue.clear()
         preloadStarted = false
         preloadWaiting = false

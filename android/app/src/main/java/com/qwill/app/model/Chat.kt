@@ -1,6 +1,10 @@
 package com.qwill.app.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 enum class ChatType { PRIVATE, GROUP }
@@ -243,6 +247,32 @@ data class ChatPinnedEvent(
 
 @Serializable
 data class ChatDeletedEvent(val chatId: String)
+
+@Serializable
+data class ChatMutedEvent(val chatId: String, val muted: Boolean = false)
+
+data class ChatPinPayload(val chatId: String, val messageId: Long?) {
+    fun toJson(): JsonObject = buildJsonObject {
+        put("chatId", JsonPrimitive(chatId))
+        put("messageId", messageId?.let { JsonPrimitive(it) } ?: JsonNull)
+    }
+}
+
+@Serializable
+data class MessageDeleteBatchPayload(val chatId: String, val messageIds: List<Long>)
+
+@Serializable
+data class MessageBatchAck(
+    val ok: Boolean = false,
+    val messages: List<MessageDto>? = null,
+    val error: SocketAckError? = null,
+)
+
+@Serializable
+data class BlockStateDto(val iBlocked: Boolean = false, val blockedMe: Boolean = false)
+
+@Serializable
+data class MembersResponse(val members: List<GroupMemberDTO> = emptyList())
 
 @Serializable
 data class ChatReadEvent(

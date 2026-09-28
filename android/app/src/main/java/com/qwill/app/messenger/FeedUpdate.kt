@@ -43,6 +43,10 @@ fun interface ChatsListener {
     fun onChatsChanged()
 }
 
+fun interface MembersListener {
+    fun onMembersChanged(chatId: String)
+}
+
 enum class HistorySource { DISK, NETWORK }
 
 class HistoryPage(

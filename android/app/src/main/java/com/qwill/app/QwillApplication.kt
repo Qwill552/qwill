@@ -9,6 +9,9 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import com.qwill.app.auth.FileSessionStore
+import com.qwill.app.calls.ActiveCalls
+import com.qwill.app.chat.top.HiddenPins
+import com.qwill.app.chat.top.PreferencesHiddenPinsStorage
 import com.qwill.app.auth.Session
 import com.qwill.app.auth.SessionState
 import com.qwill.app.chat.ChatPositions
@@ -61,6 +64,8 @@ class QwillApplication : Application() {
         )
         presence = Presence(MainQueue).also { it.attach(socket) }
         typing = TypingStore(MainQueue, { (session.state as? SessionState.Authenticated)?.user?.id }).also { it.attach(socket) }
+        calls = ActiveCalls().also { it.attach(socket) }
+        hiddenPins = HiddenPins(PreferencesHiddenPinsStorage(this)) { (session.state as? SessionState.Authenticated)?.user?.id }
         val storage = MessagesStorage(File(filesDir, MessagesStorage.FILE_NAME), NativeSqlDatabase.OPENER) { Log.w(STORAGE_TAG, it) }
         val storageQueue = DispatchQueue("storageQueue")
         val mediaTaskQueue = DispatchQueue("mediaTaskQueue").apply { priority = Thread.MIN_PRIORITY }
@@ -127,6 +132,8 @@ class QwillApplication : Application() {
             socket.onSessionCleared()
             presence.clear()
             typing.clear()
+            calls.clear()
+            hiddenPins.clear()
             messages.onSessionCleared()
             recentSearches.clear()
             ChatPositions.clear()
@@ -229,6 +236,12 @@ class QwillApplication : Application() {
             private set
 
         lateinit var recentSearches: RecentSearches
+            private set
+
+        lateinit var calls: ActiveCalls
+            private set
+
+        lateinit var hiddenPins: HiddenPins
             private set
     }
 }

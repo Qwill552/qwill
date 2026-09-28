@@ -42,6 +42,27 @@ object ConnectionTitleRule {
     }
 }
 
+object ConnectionDots {
+    const val DOT = "."
+    const val COUNT = 3
+    const val FRAME_MS = 32L
+    private const val STEP_MS = 300L
+    private const val HIDE_AT_MS = 1200L
+    private const val CYCLE_MS = 1500L
+
+    fun phase(): Long = if (Motion.animationsEnabled) SystemClock.uptimeMillis() % CYCLE_MS else CYCLE_MS / 2
+
+    fun alpha(index: Int, phase: Long): Float {
+        val appear = index * STEP_MS
+        return when {
+            phase < appear -> 0f
+            phase < appear + STEP_MS -> (phase - appear).toFloat() / STEP_MS
+            phase < HIDE_AT_MS -> 1f
+            else -> 1f - (phase - HIDE_AT_MS).toFloat() / (CYCLE_MS - HIDE_AT_MS)
+        }
+    }
+}
+
 class ConnectionTitle(context: Context) : View(context) {
     private val brandPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Fonts.display(FontWeight.BOLD)
@@ -142,7 +163,7 @@ class ConnectionTitle(context: Context) : View(context) {
         val gone = leaving
         if (gone != null) drawKind(canvas, gone, shift * progress, 1f - progress)
         drawKind(canvas, shown, -shift * (1f - progress), if (gone != null) progress else 1f)
-        if (shown.animatedDots && Motion.animationsEnabled && isShown) postInvalidateDelayed(DOTS_FRAME_MS)
+        if (shown.animatedDots && Motion.animationsEnabled && isShown) postInvalidateDelayed(ConnectionDots.FRAME_MS)
     }
 
     private fun drawKind(canvas: Canvas, kind: TitleKind, dy: Float, alpha: Float) {
@@ -153,31 +174,22 @@ class ConnectionTitle(context: Context) : View(context) {
         paint.alpha = baseAlpha
         val metrics = paint.fontMetrics
         val baseline = height / 2f - (metrics.ascent + metrics.descent) / 2f + dy
-        val dotWidth = if (kind.animatedDots) paint.measureText(DOT) * DOT_COUNT else 0f
+        val dotWidth = if (kind.animatedDots) paint.measureText(ConnectionDots.DOT) * ConnectionDots.COUNT else 0f
         val room = (width - dotWidth).coerceAtLeast(0f)
         val text = TextUtils.ellipsize(kind.text, paint, room, TextUtils.TruncateAt.END)
         canvas.drawText(text, 0, text.length, 0f, baseline, paint)
         if (!kind.animatedDots || text.length != kind.text.length) return
         var x = paint.measureText(kind.text)
-        val dot = paint.measureText(DOT)
-        val phase = if (Motion.animationsEnabled) SystemClock.uptimeMillis() % DOTS_CYCLE_MS else DOTS_CYCLE_MS / 2
-        for (index in 0 until DOT_COUNT) {
-            paint.alpha = (baseAlpha * dotAlpha(index, phase)).toInt()
-            canvas.drawText(DOT, x, baseline, paint)
+        val dot = paint.measureText(ConnectionDots.DOT)
+        val phase = ConnectionDots.phase()
+        for (index in 0 until ConnectionDots.COUNT) {
+            paint.alpha = (baseAlpha * ConnectionDots.alpha(index, phase)).toInt()
+            canvas.drawText(ConnectionDots.DOT, x, baseline, paint)
             x += dot
         }
         paint.alpha = baseAlpha
     }
 
-    private fun dotAlpha(index: Int, phase: Long): Float {
-        val appear = index * DOT_STEP_MS
-        return when {
-            phase < appear -> 0f
-            phase < appear + DOT_STEP_MS -> (phase - appear).toFloat() / DOT_STEP_MS
-            phase < DOTS_HIDE_AT_MS -> 1f
-            else -> 1f - (phase - DOTS_HIDE_AT_MS).toFloat() / (DOTS_CYCLE_MS - DOTS_HIDE_AT_MS)
-        }
-    }
 
     private fun sp(value: Float): Float = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics)
 
@@ -188,11 +200,5 @@ class ConnectionTitle(context: Context) : View(context) {
         const val DEFAULT_HEIGHT = 44f
         const val SHIFT_DP = 20f
         const val SWAP_MS = 220L
-        const val DOT = "."
-        const val DOT_COUNT = 3
-        const val DOT_STEP_MS = 300L
-        const val DOTS_HIDE_AT_MS = 1200L
-        const val DOTS_CYCLE_MS = 1500L
-        const val DOTS_FRAME_MS = 32L
     }
 }

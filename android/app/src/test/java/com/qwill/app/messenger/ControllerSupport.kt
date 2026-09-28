@@ -2,9 +2,11 @@ package com.qwill.app.messenger
 
 import com.qwill.app.core.TaskQueue
 import com.qwill.app.database.SyncCursor
+import com.qwill.app.model.BlockStateDto
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListResponse
 import com.qwill.app.model.ChatMuteResponse
+import com.qwill.app.model.MembersResponse
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageSendPayload
 import com.qwill.app.model.MessagesAround
@@ -84,6 +86,9 @@ class FakeTransport : MessagesTransport {
     var delete: (String, Boolean) -> ApiResult<Unit>? = { _, _ -> ApiResult.Success(Unit) }
     val heldDeletes = ArrayList<Held<Unit>>()
     var privateChat: (String) -> ApiResult<ChatDto>? = { ApiResult.Failure(NetworkError()) }
+    var membersOf: (String) -> ApiResult<MembersResponse>? = { ApiResult.Failure(NetworkError()) }
+    var block: (String, Boolean) -> ApiResult<BlockStateDto>? = { _, blocked -> ApiResult.Success(BlockStateDto(iBlocked = blocked)) }
+    var batchDelete: (String, List<Long>) -> ApiResult<List<MessageDto>>? = { _, _ -> ApiResult.Failure(NetworkError()) }
 
     override fun listChats(guid: Int, callback: ApiCallback<ChatListResponse>) {
         calls.add("chats")
@@ -139,6 +144,25 @@ class FakeTransport : MessagesTransport {
 
     override fun react(chatId: String, messageId: Long, emoji: String) {
         calls.add("react:$chatId:$messageId:$emoji")
+    }
+
+    override fun members(chatId: String, guid: Int, callback: ApiCallback<MembersResponse>) {
+        calls.add("members:$chatId")
+        membersOf(chatId)?.let { callback.onResult(it) }
+    }
+
+    override fun setBlocked(userId: String, blocked: Boolean, guid: Int, callback: ApiCallback<BlockStateDto>) {
+        calls.add("block:$userId:$blocked")
+        block(userId, blocked)?.let { callback.onResult(it) }
+    }
+
+    override fun pinMessage(chatId: String, messageId: Long?) {
+        calls.add("pin:$chatId:${messageId ?: "null"}")
+    }
+
+    override fun deleteBatch(chatId: String, messageIds: List<Long>, guid: Int, callback: ApiCallback<List<MessageDto>>) {
+        calls.add("deleteBatch:$chatId:${messageIds.joinToString(",")}")
+        batchDelete(chatId, messageIds)?.let { callback.onResult(it) }
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

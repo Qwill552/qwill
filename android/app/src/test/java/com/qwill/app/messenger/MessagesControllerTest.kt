@@ -15,6 +15,10 @@ import com.qwill.app.database.time
 import com.qwill.app.model.ChatBlockEvent
 import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatListResponse
+import com.qwill.app.model.ChatMutedEvent
+import com.qwill.app.model.GroupMemberDTO
+import com.qwill.app.model.GroupRole
+import com.qwill.app.model.MembersResponse
 import com.qwill.app.model.ChatPinnedEvent
 import com.qwill.app.model.ChatReadEvent
 import com.qwill.app.model.ChatUpdatedEvent
@@ -846,5 +850,88 @@ class MessagesControllerTest {
 
         assertEquals(0, controller.chats.single().unreadCount)
         assertEquals(listOf("read:c1:12", "react:c1:12:🔥"), transport.calls)
+    }
+
+    @Test
+    fun deleteMessagesAppliesBatchOnSuccess() {
+        seed { applyTail("c1", listOf(message(1), message(2), message(3))) }
+        start()
+        transport.batchDelete = { _, ids -> ApiResult.Success(ids.map { message(it, deleted = true) }) }
+        var result: ApiException? = NetworkError()
+        controller.deleteMessages("c1", listOf(2L, 3L)) { result = it }
+        assertNull(result)
+        assertEquals(listOf("deleteBatch:c1:2,3"), transport.callsStartingWith("deleteBatch"))
+        assertEquals(listOf(1L), storage.readTail("c1", 50).map { it.id })
+        assertEquals(listOf(2L, 3L), updatesOf<FeedUpdate.Removed>().flatMap { it.ids })
+    }
+
+    @Test
+    fun deleteMessagesFailureChangesNothing() {
+        seed { applyTail("c1", listOf(message(1), message(2))) }
+        start()
+        transport.batchDelete = { _, _ -> ApiResult.Failure(ApiError(0, ErrorCode.FORBIDDEN, "нельзя")) }
+        var result: ApiException? = null
+        controller.deleteMessages("c1", listOf(2L)) { result = it }
+        assertTrue(result is ApiError)
+        assertEquals(listOf(1L, 2L), storage.readTail("c1", 50).map { it.id })
+        assertTrue(updatesOf<FeedUpdate.Removed>().isEmpty())
+    }
+
+    @Test
+    fun blockAppliesFlagsToListAndDetails() {
+        seed { putDetails(details("c1")) }
+        start()
+        serveChats(chat("c1"))
+        controller.onSocketConnected()
+        var result: ApiException? = NetworkError()
+        controller.setUserBlocked("c1", PEER, true) { result = it }
+        assertNull(result)
+        assertTrue(controller.chats.single().iBlocked)
+        assertTrue(storage.readDetails("c1")!!.iBlocked)
+        controller.setUserBlocked("c1", PEER, false) {}
+        assertFalse(controller.chats.single().iBlocked)
+        assertEquals(listOf("block:$PEER:true", "block:$PEER:false"), transport.callsStartingWith("block:"))
+    }
+
+    @Test
+    fun unpinGoesThroughDeferredPin() {
+        start()
+        controller.unpinMessage("c1")
+        assertEquals(listOf("pin:c1:null"), transport.callsStartingWith("pin:"))
+    }
+
+    @Test
+    fun mutedEventUpdatesChat() {
+        start()
+        serveChats(chat("c1"))
+        controller.onSocketConnected()
+        controller.applyChatMuted(ChatMutedEvent("c1", muted = true))
+        assertTrue(controller.chats.single().muted)
+    }
+
+    @Test
+    fun membersLoadFollowEventsAndReloadOnEntry() {
+        start()
+        transport.membersOf = {
+            ApiResult.Success(MembersResponse(listOf(GroupMemberDTO(ME, role = GroupRole.OWNER), GroupMemberDTO(PEER, role = GroupRole.MEMBER))))
+        }
+        val changed = ArrayList<String>()
+        controller.addMembersListener { changed.add(it) }
+        controller.loadMembers("g1")
+        assertEquals(2, controller.membersOf("g1")?.size)
+
+        controller.applyMemberChanged(MemberChangedEvent(MemberChangedEvent.ROLE, "g1", userId = PEER, role = GroupRole.ADMIN))
+        assertEquals(GroupRole.ADMIN, controller.membersOf("g1")!!.first { it.userId == PEER }.role)
+        controller.applyMemberChanged(MemberChangedEvent(MemberChangedEvent.ADDED, "g1", member = GroupMemberDTO("u3")))
+        assertEquals(3, controller.membersOf("g1")?.size)
+        controller.applyMemberChanged(MemberChangedEvent(MemberChangedEvent.REMOVED, "g1", userId = PEER))
+        assertEquals(listOf(ME, "u3"), controller.membersOf("g1")!!.map { it.userId })
+        assertEquals(4, changed.size)
+
+        controller.onSocketConnected()
+        assertEquals(2, transport.callsStartingWith("members:g1").size)
+        controller.closeChat("g1")
+        controller.onSocketConnected()
+        assertEquals(2, transport.callsStartingWith("members:g1").size)
     }
 }
