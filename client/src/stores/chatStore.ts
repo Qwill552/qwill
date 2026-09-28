@@ -124,6 +124,7 @@ import {
   type FeedKeepRange,
   type FeedSide,
 } from '../features/messages/feedWindow';
+import { toggleIds } from '../features/messages/messageSelection';
 import { decideUnreadEntry, firstUnreadAfter } from '../features/messages/unreadEntry';
 import { closeDesktopChatNotifications } from '../native/desktop';
 import { trackUpdating } from '../realtime/connectionStatus';
@@ -305,8 +306,9 @@ interface ChatState {
   refreshUnread: (chatId: string) => void;
   placeUnread: (chatId: string, unreadAtEntry: number, detail: ChatDto) => Promise<void>;
   /** Мультивыбор (секция 3, ux-ui/06): long-press по пузырю/пустой зоне строки. */
-  enterSelection: (messageId: number) => void;
-  toggleSelected: (messageId: number) => void;
+  enterSelection: (messageIds: number | readonly number[]) => void;
+  toggleSelected: (messageIds: number | readonly number[]) => void;
+  setSelected: (messageIds: ReadonlySet<number>) => void;
   exitSelection: () => void;
   startTyping: (chatId: string) => void;
   stopTyping: (chatId: string) => void;
@@ -345,6 +347,21 @@ interface ChatState {
   setMessageFailed: (chatId: string, clientId: string) => void;
   /** Снимает текст отказа — вызывается, как только человек пробует отправить снова. */
   clearSendRejection: (chatId: string) => void;
+}
+
+function withChatCall(
+  calls: Record<string, CallDto>,
+  chatId: string,
+  call: CallDto | null | undefined,
+): Record<string, CallDto> {
+  if (call === undefined) return calls;
+  if (call === null) {
+    if (!(chatId in calls)) return calls;
+    const next = { ...calls };
+    delete next[chatId];
+    return next;
+  }
+  return { ...calls, [chatId]: call };
 }
 
 function upsertChat(chats: ChatListItemDto[], chat: ChatListItemDto): ChatListItemDto[] {
@@ -2178,18 +2195,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     getSocket()?.emit(SocketEvent.TypingStop, { chatId });
   },
 
-  enterSelection(messageId) {
-    set({ selectionMode: true, selectedIds: new Set([messageId]) });
+  enterSelection(messageIds) {
+    const ids = typeof messageIds === 'number' ? [messageIds] : messageIds;
+    set({ selectionMode: true, selectedIds: toggleIds(new Set(), ids) });
   },
 
-  toggleSelected(messageId) {
-    set((state) => {
-      const next = new Set(state.selectedIds);
-      if (next.has(messageId)) next.delete(messageId);
-      else next.add(messageId);
-      // Снятие последнего выбора выходит из режима мультивыбора (ux-ui/06, «Готово когда»).
-      return next.size === 0 ? { selectionMode: false, selectedIds: next } : { selectedIds: next };
-    });
+  toggleSelected(messageIds) {
+    const ids = typeof messageIds === 'number' ? [messageIds] : messageIds;
+    get().setSelected(toggleIds(get().selectedIds, ids));
+  },
+
+  setSelected(messageIds) {
+    const next = new Set(messageIds);
+    set(next.size === 0 ? { selectionMode: false, selectedIds: next } : { selectedIds: next });
   },
 
   exitSelection() {
@@ -2549,6 +2567,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       readCursorsByChat: { ...state.readCursorsByChat, [chat.id]: chat.readCursors },
       presenceByUser: seedPresence(state.presenceByUser, chat.members),
       pinnedByChat: { ...state.pinnedByChat, [chat.id]: chat.pinnedMessage },
+      activeCallByChat: withChatCall(state.activeCallByChat, chat.id, chat.activeCall),
     }));
   },
 

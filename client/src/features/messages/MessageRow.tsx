@@ -1,5 +1,5 @@
 import type { ChatMemberSummary, MessageReactionDto } from '@messenger/shared';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -20,6 +20,7 @@ import { openMediaViewer } from '../media/mediaViewerStore';
 import { DeleteMessageModal } from './DeleteMessageModal';
 import { MessageContextMenu, type MenuOrigin, type MessageMenuItem } from './MessageContextMenu';
 import styles from './MessageRow.module.css';
+import { SelectionDragContext } from './selectionDrag';
 
 interface MessageRowProps {
   own: boolean;
@@ -148,6 +149,7 @@ export function MessageRow({
   );
   const enterSelection = useChatStore((s) => s.enterSelection);
   const toggleSelected = useChatStore((s) => s.toggleSelected);
+  const startSelectionDrag = useContext(SelectionDragContext);
   const toggleReaction = useChatStore((s) => s.toggleReaction);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
   const cancelMessage = useChatStore((s) => s.cancelMessage);
@@ -157,6 +159,7 @@ export function MessageRow({
 
   const bubbleRef = useRef<HTMLDivElement>(null);
   const suppressTapRef = useRef(false);
+  const pressRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   /** Касание началось на кнопке внутри пузыря («Обновить» в объявлении): строка не
    *  разбирает такое касание вовсе, иначе одно нажатие и нажимало бы кнопку, и
    *  открывало контекстное меню поверх открытого ею экрана. */
@@ -195,10 +198,7 @@ export function MessageRow({
   }
 
   function selectGroup(): void {
-    enterSelection(message.id);
-    for (const id of groupIds) {
-      if (id !== message.id) toggleSelected(id);
-    }
+    enterSelection(groupIds);
   }
 
   function deleteGroup(): Promise<void> {
@@ -212,11 +212,7 @@ export function MessageRow({
   }
 
   function toggleGroupSelected(): void {
-    const { selectedIds } = useChatStore.getState();
-    const target = !groupIds.every((id) => selectedIds.has(id));
-    for (const id of groupIds) {
-      if (selectedIds.has(id) !== target) toggleSelected(id);
-    }
+    toggleSelected(groupIds);
   }
 
   const longPress = useLongPress({
@@ -224,9 +220,20 @@ export function MessageRow({
       suppressTapRef.current = true;
       tap.cancel();
       haptic();
-      selectGroup();
+      if (useChatStore.getState().selectionMode) toggleGroupSelected();
+      else selectGroup();
+      const press = pressRef.current;
+      if (!press) return;
+      const { selectedIds } = useChatStore.getState();
+      startSelectionDrag({
+        messageId: message.id,
+        pointerId: press.pointerId,
+        adding: groupIds.every((id) => selectedIds.has(id)),
+        x: press.x,
+        y: press.y,
+      });
     },
-    disabled: () => selectionMode || menu !== null || !canAct,
+    disabled: () => menu !== null || !canAct,
   });
 
   const tap = useTapGesture({
@@ -301,6 +308,7 @@ export function MessageRow({
       linkPressRef.current = null;
     }
 
+    pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     longPress.onPointerDown(event);
     if (!isMouse) swipe.onPointerDown(event);
   }
@@ -517,7 +525,7 @@ export function MessageRow({
 
   return (
     <div
-      className={`message-wrap ${styles.row} ${own ? styles.own : ''} ${selected ? styles.selected : ''}`}
+      className={`message-wrap ${styles.row} ${own ? styles.own : ''} ${selected ? styles.selected : ''} ${selectionMode ? styles.selecting : ''}`}
       data-message-id={message.id}
       data-flash={flash ? '1' : undefined}
       ref={swipe.ref}
@@ -529,13 +537,11 @@ export function MessageRow({
     >
       <span className={styles.highlight} aria-hidden="true" />
 
-      <span className={`${styles.checkboxSlot} ${selectionMode ? styles.checkboxActive : ''}`}>
-        {selectionMode && (
-          <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
-            {selected && <Icon name="check" size={14} />}
-          </span>
-        )}
-      </span>
+      {canAct && (
+        <span className={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`} aria-hidden="true">
+          {selected && <Icon name="check" size={13} />}
+        </span>
+      )}
 
       <div className={styles.swipeContent}>
         {!own && withAvatarColumn && (

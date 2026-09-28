@@ -1,4 +1,4 @@
-import type { CallAccessDto, CallDto, CallKind, CallParticipantDto, CallStatus } from '@messenger/shared';
+import type { CallAccessDto, CallDto, CallKind, CallStatus } from '@messenger/shared';
 import { ErrorCode } from '@messenger/shared';
 import { AccessToken } from 'livekit-server-sdk';
 
@@ -7,44 +7,11 @@ import { prisma } from '../db/prisma.js';
 import { notFound } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { assertMember, assertNotBlockedInChat } from './chat.js';
-import { toMemberSummary } from './userSummary.js';
+import { ACTIVE_CALL_STATUSES, callWithRelations, findActiveCall, toCallDto, type CallWithRelations } from './callDto.js';
 import { messageInclude } from './message.js';
 import * as pushService from './push.js';
-import type { Call, CallParticipant, User } from '../generated/prisma/client.js';
 
 const TOKEN_TTL = '6h';
-const ACTIVE_STATUSES: CallStatus[] = ['RINGING', 'ACTIVE'];
-
-const callWithRelations = {
-  initiator: true,
-  participants: { include: { user: true }, orderBy: { joinedAt: 'asc' } },
-} as const;
-
-type CallWithRelations = Call & {
-  initiator: User | null;
-  participants: (CallParticipant & { user: User })[];
-};
-
-function toParticipantDto(participant: CallParticipant & { user: User }): CallParticipantDto {
-  return {
-    user: toMemberSummary(participant.user),
-    joinedAt: participant.joinedAt?.toISOString() ?? null,
-    leftAt: participant.leftAt?.toISOString() ?? null,
-  };
-}
-
-function toCallDto(call: CallWithRelations): CallDto {
-  return {
-    id: call.id,
-    chatId: call.chatId,
-    initiator: call.initiator ? toMemberSummary(call.initiator) : null,
-    kind: call.kind,
-    status: call.status,
-    startedAt: call.startedAt?.toISOString() ?? null,
-    endedAt: call.endedAt?.toISOString() ?? null,
-    participants: call.participants.map(toParticipantDto),
-  };
-}
 
 async function issueAccessToken(callId: string, userId: string): Promise<string> {
   const token = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
@@ -72,7 +39,7 @@ export async function startCall(input: { chatId: string; userId: string; kind: C
   await assertNotBlockedInChat(input.chatId, input.userId);
 
   const existing = await prisma.call.findFirst({
-    where: { chatId: input.chatId, status: { in: ACTIVE_STATUSES } },
+    where: { chatId: input.chatId, status: { in: ACTIVE_CALL_STATUSES } },
     include: callWithRelations,
   });
 
@@ -152,7 +119,7 @@ export async function endCall(input: { callId: string; userId: string; status: C
   const call = await getCallOrThrow(input.callId);
   await assertMember(call.chatId, input.userId);
 
-  if (!ACTIVE_STATUSES.includes(call.status)) return toCallDto(call);
+  if (!ACTIVE_CALL_STATUSES.includes(call.status)) return toCallDto(call);
 
   const now = new Date();
   const updated = await prisma.call.update({
@@ -181,12 +148,7 @@ export async function endCall(input: { callId: string; userId: string; status: C
 
 export async function getActiveCall(chatId: string, userId: string): Promise<CallDto | null> {
   await assertMember(chatId, userId);
-
-  const call = await prisma.call.findFirst({
-    where: { chatId, status: { in: ACTIVE_STATUSES } },
-    include: callWithRelations,
-  });
-  return call ? toCallDto(call) : null;
+  return findActiveCall(chatId);
 }
 
 export async function getCall(callId: string): Promise<CallDto> {
@@ -195,7 +157,7 @@ export async function getCall(callId: string): Promise<CallDto> {
 
 export async function getLiveCallsForParticipant(userId: string): Promise<CallDto[]> {
   const calls = await prisma.call.findMany({
-    where: { status: { in: ACTIVE_STATUSES }, participants: { some: { userId, leftAt: null } } },
+    where: { status: { in: ACTIVE_CALL_STATUSES }, participants: { some: { userId, leftAt: null } } },
     include: callWithRelations,
   });
   return calls.map(toCallDto);

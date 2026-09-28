@@ -12,6 +12,7 @@ import { prisma } from '../db/prisma.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { fileUrl } from '../lib/fileUrl.js';
 import { blockStateBetween, blockStatesFor, NO_BLOCK, type BlockState } from './block.js';
+import { findActiveCall } from './callDto.js';
 import { assertAvatarEligible } from './file.js';
 import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
 import { toMemberSummary } from './userSummary.js';
@@ -256,9 +257,12 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
   );
   const readCursors = Object.fromEntries(chat.members.map((m) => [m.userId, m.lastReadMessageId]));
 
-  const pinned = chat.pinnedMessageId
-    ? await prisma.message.findUnique({ where: { id: chat.pinnedMessageId }, include: messageInclude })
-    : null;
+  const [pinned, activeCall] = await Promise.all([
+    chat.pinnedMessageId
+      ? prisma.message.findUnique({ where: { id: chat.pinnedMessageId }, include: messageInclude })
+      : null,
+    findActiveCall(chatId),
+  ]);
 
   const otherId = chat.members.find((m) => m.userId !== userId)?.userId;
   const block = chat.type === 'PRIVATE' && otherId ? await blockStateBetween(userId, otherId) : NO_BLOCK;
@@ -268,6 +272,7 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
     members: chat.members.map((m) => toMemberSummary(m.user)),
     readCursors,
     pinnedMessage: pinned ? toMessageDto(pinned) : null,
+    activeCall,
   };
 }
 

@@ -108,7 +108,7 @@ function listItem(unreadCount: number): ChatListItemDto {
 }
 
 function detail(unreadCount: number, cursor: number | null): ChatDto {
-  return { ...listItem(unreadCount), members: [], readCursors: { [ME]: cursor, [PEER]: null }, pinnedMessage: null };
+  return { ...listItem(unreadCount), members: [], readCursors: { [ME]: cursor, [PEER]: null }, pinnedMessage: null, activeCall: null };
 }
 
 function emit(event: string, payload: unknown): void {

@@ -7,9 +7,12 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  --chat-list-lead: 56px;
 }
 
 .top {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -20,6 +23,7 @@
 @media (min-width: 900px) {
   .screen {
     --chats-header-pad-b: 8px;
+    --chat-list-lead: 0px;
   }
 
   .top {
@@ -116,23 +120,28 @@
   gap: 8px;
 }
 
-/* Кнопка-лупа в шапке проявляется, только когда полное поле поиска ниже уехало —
- * буквально searchCollapsed из референса. */
 .searchToggleSlot {
   display: grid;
-  overflow: hidden;
   flex-shrink: 0;
-  max-width: 0;
   opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: scale(0.6);
   transition:
-    max-width 0.2s,
-    opacity 0.2s;
+    opacity var(--dur-lupa) var(--ease-out-quint),
+    transform var(--dur-lupa) var(--ease-out-quint),
+    visibility 0s linear var(--dur-lupa);
 }
 
 .searchToggleVisible {
-  max-width: 36px;
   opacity: 1;
-  animation: pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity var(--dur-lupa) var(--ease-out-quint),
+    transform var(--dur-lupa) var(--ease-out-quint),
+    visibility 0s;
 }
 
 .iconBtn {
@@ -170,28 +179,14 @@
   }
 }
 
-@keyframes pop {
-  from {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Полное поле поиска гаснет и уезжает вверх, схлопывая свою высоту — буквально
- * searchWrap из референса. */
-.searchWrap {
-  transition: opacity 0.3s ease;
+.searchSlot {
+  overflow: hidden;
+  margin: -12px 0 -56px;
+  padding-top: 12px;
 }
 
 .searchWrapHidden {
-  margin-top: -56px;
-  opacity: 0;
-  transform: translateY(-14px) scale(0.97);
-  pointer-events: none;
+  visibility: hidden;
 }
 
 /* Настоящая строка поиска на время жизни SearchReveal убирается мгновенно и без всякого

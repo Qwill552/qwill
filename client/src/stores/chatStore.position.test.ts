@@ -87,7 +87,7 @@ function listItem(id: string = CHAT_ID): ChatListItemDto {
 }
 
 function detail(id: string = CHAT_ID): ChatDto {
-  return { ...listItem(id), members: [], readCursors: {}, pinnedMessage: null };
+  return { ...listItem(id), members: [], readCursors: {}, pinnedMessage: null, activeCall: null };
 }
 
 function cachedWindow(around?: number): MessageDto[] {

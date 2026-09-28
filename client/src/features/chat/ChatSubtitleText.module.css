@@ -1,0 +1,52 @@
+.typingDots {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 1em;
+  margin-right: 4px;
+  vertical-align: -0.12em;
+}
+
+.typingDot {
+  position: absolute;
+  top: calc(50% - 1.33px);
+  left: calc(3px - 1.33px);
+  width: 2.66px;
+  height: 2.66px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: typing-dot var(--dur-typing-dots) infinite;
+}
+
+.typingDot:nth-child(2) {
+  left: calc(9px - 1.33px);
+  animation-delay: calc(var(--dur-typing-dots) * 0.1875);
+}
+
+.typingDot:nth-child(3) {
+  left: calc(15px - 1.33px);
+  animation-delay: calc(var(--dur-typing-dots) * 0.375);
+}
+
+@keyframes typing-dot {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  40% {
+    transform: scale(1.75);
+    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  80%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typingDot {
+    animation: none;
+  }
+}

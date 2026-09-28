@@ -423,6 +423,7 @@ export interface ChatDto extends ChatListItemDto {
   /** Закреплённое сообщение чата, если есть (этап 6). Полный DTO, а не превью — баннер
    *  показывает содержимое так же, как лента. */
   pinnedMessage: MessageDto | null;
+  activeCall: CallDto | null;
 }
 
 export interface ChatListResponse {

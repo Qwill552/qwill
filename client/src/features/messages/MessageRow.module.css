@@ -69,29 +69,37 @@
   }
 }
 
-/* Слот чекбокса всегда в DOM (иначе появление 140 мс не от чего анимировать) — ширина
-   схлопнута в ноль вне мультивыбора, содержимое рендерится только в режиме выбора. */
-.checkboxSlot {
-  overflow: hidden;
-  width: 0;
-  flex-shrink: 0;
-  transition: width 140ms var(--ease-screen);
-}
-
-.checkboxActive {
-  width: 44px;
-}
-
 .checkbox {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   border: 2px solid var(--border);
   border-radius: 50%;
   background: var(--surface);
   color: var(--text-on-primary);
-  transition: background 140ms var(--ease-screen), border-color 140ms var(--ease-screen);
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateX(-35px);
+  transition:
+    transform var(--dur-select) var(--ease-in),
+    visibility 0s linear var(--dur-select),
+    background var(--dur-check) var(--ease-screen),
+    border-color var(--dur-check) var(--ease-screen);
+}
+
+.selecting .checkbox {
+  visibility: visible;
+  transform: none;
+  transition:
+    transform var(--dur-select) var(--ease-out),
+    visibility 0s,
+    background var(--dur-check) var(--ease-screen),
+    border-color var(--dur-check) var(--ease-screen);
 }
 
 .checkboxChecked {
@@ -108,6 +116,13 @@
   align-items: flex-end;
   justify-content: flex-start;
   transform: translateX(var(--swipe-x));
+  translate: 0;
+  transition: translate var(--dur-select) var(--ease-in);
+}
+
+.selecting:not(.own) .swipeContent {
+  translate: 35px 0;
+  transition-timing-function: var(--ease-out);
 }
 
 .own .swipeContent {
@@ -184,8 +199,8 @@
   }
 
   .highlight,
-  .checkboxSlot,
   .checkbox,
+  .swipeContent,
   .swipeIcon {
     transition-duration: 1ms;
   }

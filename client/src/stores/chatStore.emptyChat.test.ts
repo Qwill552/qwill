@@ -48,7 +48,7 @@ function listItem(overrides: Partial<ChatListItemDto> = {}): ChatListItemDto {
 }
 
 function detail(overrides: Partial<ChatListItemDto> = {}): ChatDto {
-  return { ...listItem(overrides), members: [], readCursors: {}, pinnedMessage: null };
+  return { ...listItem(overrides), members: [], readCursors: {}, pinnedMessage: null, activeCall: null };
 }
 
 describe('chatStore: уборка пустого приватного чата (R-12)', () => {

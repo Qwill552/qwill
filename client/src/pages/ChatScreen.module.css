@@ -125,13 +125,26 @@
   --avatar-ring: var(--surface);
 }
 
-/* Название сервисного чата и пометка «официальный» — одной строкой, галочка не переносится
-   и не растягивает капсулу. */
-.serviceTitle {
-  display: inline-flex;
+.titleRow {
+  display: flex;
   min-width: 0;
   align-items: center;
   gap: var(--space-1);
+}
+
+.titleText {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleRow > :not(.titleText) {
+  flex-shrink: 0;
+}
+
+.mutedIcon {
+  opacity: 0.45;
 }
 
 .error {

@@ -7,6 +7,7 @@ import { onBottomInset, registerInsetMover } from '../../app/bottomInset';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatSearchStore } from '../../stores/chatSearchStore';
+import { useHiddenPinsStore } from '../../stores/hiddenPinsStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
 import { startDissolve } from '../../ui/dissolve';
@@ -52,6 +53,9 @@ import { attachFlingTakeover, flingDistance, MAX_FLING_VELOCITY, type FlingTakeo
 import { isEditableMessage } from './messageEditing';
 import { MessageRow } from './MessageRow';
 import { PinnedBanner } from './PinnedBanner';
+import { SelectionDragContext } from './selectionDrag';
+import { UnpinMessageModal } from './UnpinMessageModal';
+import { useSelectionDrag } from './useSelectionDrag';
 import { stickyDate } from './stickyDate';
 import { ReadTracker, unreadBetween } from './unreadEntry';
 import styles from './MessageList.module.css';
@@ -199,6 +203,12 @@ function isSameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
+function isSameDayOrBefore(a: string, b: string): boolean {
+  const day = new Date(b);
+  day.setHours(23, 59, 59, 999);
+  return new Date(a).getTime() <= day.getTime();
+}
+
 /** Прочитано всеми, кроме автора, — курсоры участников есть всегда, даже «никогда не читал» (null). */
 function isReadByOthers(
   cursors: Record<string, number | null> | undefined,
@@ -219,6 +229,8 @@ export function MessageList({
   onEdit,
   onForwardRequest,
   pinnedSlot,
+  pinnedVisible,
+  topInsetKey,
 }: {
   chatId: string;
   isGroup: boolean;
@@ -233,6 +245,8 @@ export function MessageList({
   /** Узел вне скроллящейся ленты, куда порталится баннер закрепа — иначе он оказался бы
    *  под блюром шапки (ChatScreen.pinnedSlot, ux-ui.md, журнал, этап 6). */
   pinnedSlot: HTMLDivElement | null;
+  pinnedVisible: boolean;
+  topInsetKey: string;
 }) {
   const messages = useChatStore((s) => s.messagesByChat[chatId]) ?? [];
   const hasMore = useChatStore((s) => s.hasMoreByChat[chatId]) ?? false;
@@ -268,6 +282,8 @@ export function MessageList({
   const pinnedMessage = useChatStore((s) => s.pinnedByChat[chatId]) ?? null;
   const members = useChatStore((s) => s.membersByChat[chatId]);
   const loadMembers = useChatStore((s) => s.loadMembers);
+  const hidePin = useHiddenPinsStore((s) => s.hide);
+  const [unpinConfirm, setUnpinConfirm] = useState(false);
   const unreadCount = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.unreadCount ?? 0);
   const isService = useChatStore((s) => isServiceChat(s.chats.find((c) => c.id === chatId)));
   const myId = useAuthStore((s) => s.user?.id) ?? null;
@@ -484,6 +500,23 @@ export function MessageList({
 
   const displayEntriesRef = useRef(displayEntries);
   displayEntriesRef.current = displayEntries;
+
+  const startSelectionDrag = useSelectionDrag(listRef, {
+    rowAt: (index) => {
+      const entry = displayEntriesRef.current[index];
+      if (!entry || leavingRows.has(entry.key)) return undefined;
+      return { groupIds: entry.row.groupIds, selectable: entry.isReal && !entry.row.message.deletedAt };
+    },
+    indexOfMessage: (messageId) =>
+      displayEntriesRef.current.findIndex((entry) => entry.row.groupIds.includes(messageId)),
+    edges: () => {
+      const el = listRef.current;
+      if (!el) return { top: 0, bottom: 0 };
+      const origin = el.getBoundingClientRect().top;
+      const edges = visibleEdges(el);
+      return { top: origin + edges.top, bottom: origin + edges.bottom };
+    },
+  });
 
   const entryIndexByMessage = useMemo(() => {
     const index = new Map<number, number>();
@@ -906,11 +939,17 @@ export function MessageList({
     syncWindow();
   });
 
+  const insetChatRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    geometry.current.padTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
-  }, [chatId, pinnedMessage]);
+    const padTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
+    const delta = padTop - geometry.current.padTop;
+    geometry.current.padTop = padTop;
+    const sameChat = insetChatRef.current === chatId;
+    insetChatRef.current = chatId;
+    if (sameChat && delta !== 0) el.scrollTop += delta;
+  }, [chatId, topInsetKey]);
 
   useEffect(() => {
     if (TYPING_BUBBLE_IN_FEED && typing && stuckToBottom.current) scrollToBottom(true);
@@ -1319,19 +1358,37 @@ export function MessageList({
   }
 
 
+  function handlePinnedClose(): void {
+    if (!pinnedMessage) return;
+    if (canPinBase) setUnpinConfirm(true);
+    else hidePin(chatId, pinnedMessage.id);
+  }
+
   return (
     <MediaFeedContext.Provider value={mediaFeed}>
+      <SelectionDragContext.Provider value={startSelectionDrag}>
       {pinnedMessage &&
+        pinnedVisible &&
         pinnedSlot &&
         createPortal(
           <PinnedBanner
             message={pinnedMessage}
             canUnpin={canPinBase}
             onJump={() => scrollToMessage(pinnedMessage.id)}
-            onUnpin={() => pinMessage(chatId, null)}
+            onClose={handlePinnedClose}
           />,
           pinnedSlot,
         )}
+
+      {unpinConfirm && (
+        <UnpinMessageModal
+          onCancel={() => setUnpinConfirm(false)}
+          onConfirm={() => {
+            setUnpinConfirm(false);
+            pinMessage(chatId, null);
+          }}
+        />
+      )}
 
       <div
         className={`${styles.list} hide-native-scrollbar`}
@@ -1394,7 +1451,7 @@ export function MessageList({
             dayCovered={
               floatingDate !== null &&
               entry.row.showDay &&
-              isSameDay(entry.row.message.createdAt, floatingDate.iso)
+              isSameDayOrBefore(entry.row.message.createdAt, floatingDate.iso)
             }
             listRef={listRef}
             atBottomRef={atVeryBottom}
@@ -1453,6 +1510,7 @@ export function MessageList({
         <Icon name="chevron-down" size={22} />
         <Badge count={unreadCount} small className={styles.jumpBadge} />
       </button>
+      </SelectionDragContext.Provider>
     </MediaFeedContext.Provider>
   );
 }

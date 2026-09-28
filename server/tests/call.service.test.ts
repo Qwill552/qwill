@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { CURRENT_LEGAL_VERSIONS } from '../src/config/legal.js';
 import { prisma } from '../src/db/prisma.js';
-import { getOrCreatePrivateChat } from '../src/services/chat.js';
+import { getChatDetail, getOrCreatePrivateChat } from '../src/services/chat.js';
 import { endCall, getActiveCall, getPendingInvites, joinCall, startCall } from '../src/services/call.js';
 
 const app = createApp();
@@ -125,6 +125,18 @@ describe('call.service (этап ЗВОНКИ-2)', () => {
     await endCall({ callId: started.call.id, userId: a.userId, status: 'ENDED' });
 
     expect(await getActiveCall(chatId, a.userId)).toBeNull();
+  });
+
+  it('детали чата отдают идущий звонок и тому, кто в нём не участвует', async () => {
+    const a = await registerUser('cd1_a');
+    const b = await registerUser('cd1_b');
+    const chatId = await createPrivateChat(a.userId, b.username);
+    const started = await startCall({ chatId, userId: a.userId, kind: 'AUDIO' });
+
+    expect((await getChatDetail(chatId, b.userId)).activeCall?.id).toBe(started.call.id);
+
+    await endCall({ callId: started.call.id, userId: a.userId, status: 'ENDED' });
+    expect((await getChatDetail(chatId, b.userId)).activeCall).toBeNull();
   });
 
   it('getPendingInvites видит RINGING-звонок у приглашённого, но не у инициатора', async () => {

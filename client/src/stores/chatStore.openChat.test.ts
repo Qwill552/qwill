@@ -84,7 +84,7 @@ function listItem(): ChatListItemDto {
 }
 
 function detail(): ChatDto {
-  return { ...listItem(), members: [], readCursors: {}, pinnedMessage: null };
+  return { ...listItem(), members: [], readCursors: {}, pinnedMessage: null, activeCall: null };
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {

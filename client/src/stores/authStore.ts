@@ -9,6 +9,7 @@ import { clearOfflineProfile, readOfflineProfile, saveOfflineProfile } from '../
 import { subscribeToPush, unsubscribePush } from '../realtime/push';
 import { connectSocket, disconnectSocket } from '../realtime/socket';
 import { useChatStore } from './chatStore';
+import { useHiddenPinsStore } from './hiddenPinsStore';
 import { useRecentSearchStore } from './recentSearchStore';
 import { useUiStore } from './uiStore';
 
@@ -48,6 +49,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     set({ user: response.user, status: 'authenticated', isOfflineSession: false });
     saveOfflineProfile(response.user);
     useRecentSearchStore.getState().setUser(response.user.id);
+    useHiddenPinsStore.getState().setUser(response.user.id);
     // Сокет — единственное соединение на вкладку; переподключается со свежим токеном при логине/рефреше (секция 4).
     connectSocket(response.accessToken);
     useChatStore.getState().subscribeToSocket(response.user.id);
@@ -65,6 +67,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     setCsrfToken(null);
     clearOfflineProfile();
     useRecentSearchStore.getState().clear();
+    useHiddenPinsStore.getState().clear();
     disconnectSocket();
     await clearAllCache();
     useChatStore.getState().reset();
@@ -82,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     set({ user: cached, status: 'authenticated', isOfflineSession: true });
     useRecentSearchStore.getState().setUser(cached.id);
+    useHiddenPinsStore.getState().setUser(cached.id);
     const token = restoreAccessToken();
     if (token) connectSocket(token);
     useChatStore.getState().subscribeToSocket(cached.id);

@@ -26,7 +26,6 @@ import { onTabReactivate } from '../app/tabNav';
 import { revealTransition } from '../app/viewTransition';
 import { useHotkey } from '../app/hotkeys';
 import { useLayoutMode } from '../app/useLayoutMode';
-import { cssDurationMs } from '../ui/motion';
 import styles from './ChatsScreen.module.css';
 
 /** Радиус капсулы-триггера — совпадает с её собственным border-radius в CSS, но геометрию
@@ -47,33 +46,15 @@ const SEARCH_DOCK_TOP_GAP = 16;
  *  поэтому храним её вне React-состояния. */
 let savedScrollTop = 0;
 
-/** Буквально onListScroll из референса: полное поле поиска гаснет после 26px прокрутки,
- *  возвращается ниже 8px — зазор гасит дребезг на границе. */
-const SEARCH_HIDE_AT = 26;
-const SEARCH_SHOW_AT = 8;
 const SEARCH_SLOT = 56;
-const SEARCH_LIFT = 14;
-const SEARCH_HIDDEN_TRANSFORM = `translateY(-${SEARCH_LIFT}px) scale(0.97)`;
+const SEARCH_HIDDEN_ALPHA = 0.01;
 
-function playSearchCollapse(wrap: HTMLElement, hidden: boolean, running: Animation[]): Animation[] {
-  for (const animation of running) animation.cancel();
-  if (typeof wrap.animate !== 'function') return [];
-  const options: KeyframeAnimationOptions = {
-    duration: cssDurationMs('--dur-search-collapse'),
-    easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-collapse').trim() || 'ease-out',
-  };
-  const shift = hidden ? SEARCH_SLOT : -SEARCH_SLOT;
-  const followers: Element[] = [];
-  for (let next = wrap.nextElementSibling; next; next = next.nextElementSibling) followers.push(next);
-  const list = wrap.parentElement?.nextElementSibling;
-  if (list) followers.push(list);
-  const wrapFrames = hidden
-    ? [{ transform: `translateY(${SEARCH_SLOT}px)` }, { transform: SEARCH_HIDDEN_TRANSFORM }]
-    : [{ transform: `translateY(${-SEARCH_SLOT - SEARCH_LIFT}px) scale(0.97)` }, { transform: 'none' }];
-  return [
-    wrap.animate(wrapFrames, options),
-    ...followers.map((element) => element.animate([{ transform: `translateY(${shift}px)` }, { transform: 'none' }], options)),
-  ];
+function searchShift(scrollTop: number): number {
+  return Math.min(Math.max(scrollTop, 0), SEARCH_SLOT);
+}
+
+function isSearchCollapsed(shift: number): boolean {
+  return 1 - shift / SEARCH_SLOT <= SEARCH_HIDDEN_ALPHA;
 }
 
 /** Вкладка «Сообщения»: шапка (аватар/меню), поле поиска, чипсы фильтров — статичным блоком
@@ -93,8 +74,8 @@ export function ChatsScreen() {
   const headerRowRef = useRef<HTMLDivElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const searchWrapRef = useRef<HTMLDivElement>(null);
-  const collapseAnimations = useRef<Animation[]>([]);
-  const collapseShown = useRef<boolean | null>(null);
+  const chipsRef = useRef<HTMLDivElement | null>(null);
+  const shiftRef = useRef(searchShift(savedScrollTop));
   const themeSwitchRef = useRef<HTMLSpanElement>(null);
   const reactivateTaps = useRef(0);
   const tapResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -106,7 +87,7 @@ export function ChatsScreen() {
   const [groupOpen, setGroupOpen] = useState(false);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
-  const [searchHidden, setSearchHidden] = useState(savedScrollTop > SEARCH_HIDE_AT);
+  const [searchHidden, setSearchHidden] = useState(() => isSearchCollapsed(searchShift(savedScrollTop)));
   const [searchReveal, setSearchReveal] = useState<RevealOrigin | null>(null);
   const [searchDock, setSearchDock] = useState<RevealOrigin | null>(null);
   const [searchFromIcon, setSearchFromIcon] = useState(false);
@@ -173,19 +154,8 @@ export function ChatsScreen() {
   }, []);
 
   useLayoutEffect(() => {
-    const wrap = searchWrapRef.current;
-    const previous = collapseShown.current;
-    collapseShown.current = searchHidden;
-    if (!wrap || previous === null || previous === searchHidden) return;
-    collapseAnimations.current = playSearchCollapse(wrap, searchHidden, collapseAnimations.current);
-  }, [searchHidden]);
-
-  useEffect(
-    () => () => {
-      for (const animation of collapseAnimations.current) animation.cancel();
-    },
-    [],
-  );
+    paintSearchShift(layout === 'desktop' ? 0 : shiftRef.current);
+  }, [layout]);
 
   useEffect(
     () =>
@@ -210,8 +180,33 @@ export function ChatsScreen() {
     // состояние возобновляется таким же, каким было, после закрытия (searchReveal null).
     if (searchReveal) return;
     savedScrollTop = top;
-    if (top > SEARCH_HIDE_AT && !searchHidden) setSearchHidden(true);
-    else if (top < SEARCH_SHOW_AT && searchHidden) setSearchHidden(false);
+    applySearchShift(top);
+  }
+
+  function applySearchShift(top: number): void {
+    if (layout === 'desktop') return;
+    shiftRef.current = searchShift(top);
+    paintSearchShift(shiftRef.current);
+  }
+
+  function paintSearchShift(shift: number): void {
+    const wrap = searchWrapRef.current;
+    if (wrap) {
+      wrap.style.transform = shift === 0 ? '' : `translateY(${-shift}px)`;
+      wrap.style.opacity = shift === 0 ? '' : String(1 - shift / SEARCH_SLOT);
+    }
+    paintChips(chipsRef.current, shift);
+    const collapsed = isSearchCollapsed(shift);
+    setSearchHidden((current) => (current === collapsed ? current : collapsed));
+  }
+
+  function paintChips(chips: HTMLDivElement | null, shift: number): void {
+    if (chips) chips.style.transform = layout === 'desktop' ? '' : `translateY(${SEARCH_SLOT - shift}px)`;
+  }
+
+  function attachChips(node: HTMLDivElement | null): void {
+    chipsRef.current = node;
+    paintChips(node, shiftRef.current);
   }
 
   /** Поиск раскрывается из капсулы, по которой нажали, — строки поиска или кнопки-лупы
@@ -408,9 +403,10 @@ export function ChatsScreen() {
               </div>
             </div>
 
+            <div className={styles.searchSlot}>
             <div
               ref={searchWrapRef}
-              className={`${styles.searchWrap} ${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
+              className={`${searchHidden ? styles.searchWrapHidden : ''} ${searchReveal ? styles.searchWrapMuted : ''}`}
             >
               <button
                 type="button"
@@ -425,11 +421,14 @@ export function ChatsScreen() {
                 <span>Поиск чатов и людей</span>
               </button>
             </div>
+            </div>
           </>
         )}
 
         {filterRowEnabled && (
-          <ChatFilters value={filter} onChange={handleFilterChange} counts={counts} admin={isAdmin} />
+          <div ref={attachChips}>
+            <ChatFilters value={filter} onChange={handleFilterChange} counts={counts} admin={isAdmin} />
+          </div>
         )}
       </div>
 

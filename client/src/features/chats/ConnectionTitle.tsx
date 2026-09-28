@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState, type AnimationEvent } from 'react';
 
 import { titleDelayMs, titleKindOf, useConnectionStatus, type TitleKind } from '../../realtime/connectionStatus';
+import { LiveEllipsis } from '../../ui/LiveEllipsis';
+import { CONNECTION_TEXT } from '../chat/chatSubtitle';
 import styles from './ConnectionTitle.module.css';
 
-const TITLE_TEXT: Record<TitleKind, string> = {
-  brand: 'Qwill',
-  waiting: 'Ожидание сети',
-  connecting: 'Соединение',
-  updating: 'Обновление',
-  ipBanned: 'Доступ с этого адреса закрыт',
-};
+const TITLE_TEXT: Record<TitleKind, string> = { brand: 'Qwill', ...CONNECTION_TEXT };
 
 const ANIMATED_DOTS: ReadonlySet<TitleKind> = new Set(['waiting', 'connecting', 'updating']);
 
@@ -33,13 +29,7 @@ function TitleText({ kind, className, onAnimationEnd }: { kind: TitleKind; class
       }
     >
       {TITLE_TEXT[kind]}
-      {ANIMATED_DOTS.has(kind) && (
-        <span aria-hidden="true">
-          <span className={`${styles.dot} ${styles.dotFirst}`}>.</span>
-          <span className={`${styles.dot} ${styles.dotSecond}`}>.</span>
-          <span className={`${styles.dot} ${styles.dotThird}`}>.</span>
-        </span>
-      )}
+      {ANIMATED_DOTS.has(kind) && <LiveEllipsis />}
     </span>
   );
 }

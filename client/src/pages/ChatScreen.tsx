@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { ChatDto } from '@messenger/shared';
 
 import { createReportRequest } from '../api/admin';
 import { useEscapeKey, useHotkey } from '../app/hotkeys';
@@ -7,6 +8,9 @@ import { useBackHandler } from '../app/useBackHandler';
 import { bottomLift, registerInsetMover, setEmojiPanelLift } from '../app/bottomInset';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
+import { Icon } from '../ui/Icon';
+import { chatSubtitle } from '../features/chat/chatSubtitle';
+import { ChatSubtitleText, useShownConnectionKind } from '../features/chat/ChatSubtitleText';
 import { ChatWallpaper } from '../features/chat/ChatWallpaper';
 import { OfficialMark } from '../features/chat/OfficialMark';
 import { BlockedBar } from '../features/chat/BlockedBar';
@@ -33,6 +37,7 @@ import {
   type MessageComposerHandle,
 } from '../features/messages/MessageComposer';
 import { isDeletableSelection } from '../features/messages/messageDeleting';
+import { selectionCopyText } from '../features/messages/messageSelection';
 import { isEditableMessage } from '../features/messages/messageEditing';
 import { MessageList } from '../features/messages/MessageList';
 import { ReportSheet } from '../features/reports/ReportSheet';
@@ -40,8 +45,8 @@ import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
 import { useAuthStore } from '../stores/authStore';
 import { useCallStore } from '../stores/callStore';
+import { isPinHidden, useHiddenPinsStore } from '../stores/hiddenPinsStore';
 import { type LocalMessage, useChatStore } from '../stores/chatStore';
-import { formatLastSeen } from '../utils/presence';
 import styles from './ChatScreen.module.css';
 
 /** Буквально из референса (строка 296): отступ шапки от края и зазор между её кусками. */
@@ -140,6 +145,8 @@ export function ChatScreen() {
   const joinCall = useCallStore((s) => s.joinCall);
   const myCallId = useCallStore((s) => s.call?.id ?? null);
   const activeCallByChat = useChatStore((s) => s.activeCallByChat);
+  const hiddenPins = useHiddenPinsStore((s) => s.pins);
+  const connectionKind = useShownConnectionKind();
 
   const selectedMessages = messages.filter((m) => selectedIds.has(m.id));
 
@@ -358,24 +365,20 @@ export function ChatScreen() {
   const activeGroupCall = chatId ? (activeCallByChat[chatId] ?? null) : null;
   const showCallBanner = isGroup && !!activeGroupCall && activeGroupCall.id !== myCallId;
 
-  let subtitle: string | null = null;
-  let subtitleTone: 'default' | 'online' | 'accent' = 'default';
-  if (isService) {
-    subtitle = null;
-  } else if (isTyping) {
-    subtitle = isGroup ? `${typingUsers.map((u) => u.displayName).join(', ')} печатает…` : 'печатает…';
-    subtitleTone = 'accent';
-  } else if (isGroup) {
-    subtitle = null;
-  } else if (activeChat?.otherMember) {
-    const presence = presenceByUser[activeChat.otherMember.id];
-    if (presence?.online) {
-      subtitle = 'в сети';
-      subtitleTone = 'online';
-    } else {
-      subtitle = formatLastSeen(presence?.lastSeenAt ?? activeChat.otherMember.lastSeenAt);
-    }
-  }
+  const subtitle = chatSubtitle({
+    connection: connectionKind,
+    service: isService,
+    group: isGroup,
+    members: activeChat && 'members' in activeChat ? (activeChat as ChatDto).members : null,
+    myId,
+    typists: typingUsers,
+    otherMember: activeChat?.otherMember ?? null,
+    presence: (userId) => presenceByUser[userId],
+  });
+  const subtitleTone = subtitle?.tone ?? 'default';
+
+  const pinnedVisible =
+    pinnedMessage !== null && !selectionMode && !(chatId && isPinHidden(hiddenPins, chatId, pinnedMessage.id));
 
   const canEditSelection =
     selectedMessages.length === 1 &&
@@ -395,10 +398,7 @@ export function ChatScreen() {
   }
 
   function handleSelectionCopy(): void {
-    const text = selectedMessages
-      .map((m) => m.content)
-      .filter((c): c is string => !!c)
-      .join('\n');
+    const text = selectionCopyText(selectedMessages);
     if (text) void navigator.clipboard.writeText(text).catch(() => {});
     exitSelection();
   }
@@ -528,7 +528,7 @@ export function ChatScreen() {
         // На десктопе баннеры — сплошные полосы встык, без --chrome-gap между ними и шапкой
         // (ChatScreen.module.css → .pinnedSlot/.callBannerSlot). Высота самого баннера —
         // токен --pinned-banner-h, его же ставит себе .banner в PinnedBanner.module.css.
-        ['--pinned-h' as string]: `calc(${pinnedMessage ? 'var(--pinned-banner-h)' : '0px'} + var(--call-banner-h))`,
+        ['--pinned-h' as string]: `calc(${pinnedVisible ? (isDesktop ? 'var(--pinned-banner-h)' : 'var(--pinned-banner-h) + var(--chrome-gap)') : '0px'} + var(--call-banner-h))`,
       }}
     >
       <ChatWallpaper />
@@ -543,6 +543,8 @@ export function ChatScreen() {
         onEdit={handleEdit}
         onForwardRequest={setForwardRequest}
         pinnedSlot={pinnedSlot}
+        pinnedVisible={pinnedVisible}
+        topInsetKey={`${pinnedVisible}:${showCallBanner}:${isDesktop}`}
       />
 
       {showCallBanner && activeGroupCall && (
@@ -581,16 +583,13 @@ export function ChatScreen() {
             <GlassPill
               variant={isDesktop ? 'flat' : 'cap'}
               title={
-                isService || isSupportChat ? (
-                  <span className={styles.serviceTitle}>
-                    {activeChat?.title ?? '…'}
-                    <OfficialMark size={16} />
-                  </span>
-                ) : (
-                  (activeChat?.title ?? '…')
-                )
+                <span className={styles.titleRow}>
+                  <span className={styles.titleText}>{activeChat?.title ?? '…'}</span>
+                  {(isService || isSupportChat) && <OfficialMark size={16} />}
+                  {muted && <Icon name="mute" size={14} className={styles.mutedIcon} />}
+                </span>
               }
-              subtitle={subtitle}
+              subtitle={subtitle && <ChatSubtitleText subtitle={subtitle} />}
               subtitleTone={subtitleTone}
               leading={
                 <Avatar
