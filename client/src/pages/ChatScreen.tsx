@@ -369,7 +369,9 @@ export function ChatScreen() {
     connection: connectionKind,
     service: isService,
     group: isGroup,
-    members: activeChat && 'members' in activeChat ? (activeChat as ChatDto).members : null,
+    memberIds:
+      members?.map((m) => m.userId) ??
+      (activeChat && 'members' in activeChat ? (activeChat as ChatDto).members.map((m) => m.id) : null),
     myId,
     typists: typingUsers,
     otherMember: activeChat?.otherMember ?? null,

@@ -36,11 +36,13 @@ export function FloatingDate({
   ref,
   iso,
   hidden,
+  instant,
   onJumpToDay,
 }: {
   ref: React.Ref<HTMLDivElement>;
   iso: string | null;
   hidden: boolean;
+  instant: boolean;
   onJumpToDay?: (iso: string) => void;
 }) {
   const label = iso === null ? '' : formatDayLabel(iso);
@@ -50,7 +52,7 @@ export function FloatingDate({
   return (
     <div
       ref={ref}
-      className={`${styles.floating} ${away ? styles.floatingHidden : ''}`}
+      className={`${styles.floating} ${away ? styles.floatingHidden : ''} ${instant ? styles.floatingInstant : ''}`}
       aria-hidden={interactive && !away ? undefined : 'true'}
     >
       {interactive ? (

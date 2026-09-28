@@ -22,7 +22,7 @@ export interface SubtitleInput {
   connection: TitleKind;
   service: boolean;
   group: boolean;
-  members: ChatMemberSummary[] | null;
+  memberIds: readonly string[] | null;
   myId: string | null;
   typists: SubtitleTypist[];
   otherMember: ChatMemberSummary | null;
@@ -70,10 +70,10 @@ export function chatSubtitle(input: SubtitleInput): Subtitle | null {
   if (typists.length > 0) return subtitle(input.group ? groupTyping(typists) : TYPING, 'accent', true);
 
   if (input.group) {
-    const members = input.members;
-    if (!members) return null;
-    const online = 1 + members.filter((m) => m.id !== input.myId && input.presence(m.id)?.online === true).length;
-    const base = membersText(members.length);
+    const memberIds = input.memberIds;
+    if (!memberIds) return null;
+    const online = 1 + memberIds.filter((id) => id !== input.myId && input.presence(id)?.online === true).length;
+    const base = membersText(memberIds.length);
     return subtitle(online > 1 ? `${base}, ${online} в сети` : base);
   }
 

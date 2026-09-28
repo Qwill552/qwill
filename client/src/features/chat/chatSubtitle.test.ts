@@ -15,7 +15,7 @@ function input(overrides: Partial<SubtitleInput> = {}): SubtitleInput {
     connection: 'brand',
     service: false,
     group: false,
-    members: null,
+    memberIds: null,
     myId: ME,
     typists: [],
     otherMember: member('peer'),
@@ -75,17 +75,17 @@ describe('chatSubtitle', () => {
   });
 
   it('добавляет «в сети» только когда в сети есть кто-то кроме меня', () => {
-    const members = [member(ME), member('a'), member('b')];
-    const alone = chatSubtitle(input({ group: true, members, presence: (id) => (id === ME ? { online: true, lastSeenAt: '' } : undefined) }));
+    const memberIds = [ME, 'a', 'b'];
+    const alone = chatSubtitle(input({ group: true, memberIds, presence: (id) => (id === ME ? { online: true, lastSeenAt: '' } : undefined) }));
     expect(alone?.text).toBe('3 участника');
     const together = chatSubtitle(
-      input({ group: true, members, presence: (id) => (id === 'a' ? { online: true, lastSeenAt: '' } : undefined) }),
+      input({ group: true, memberIds, presence: (id) => (id === 'a' ? { online: true, lastSeenAt: '' } : undefined) }),
     );
     expect(together?.text).toBe('3 участника, 2 в сети');
   });
 
   it('до прихода участников у группы подзаголовка нет', () => {
-    expect(chatSubtitle(input({ group: true, members: null }))).toBeNull();
+    expect(chatSubtitle(input({ group: true, memberIds: null }))).toBeNull();
   });
 
   it('в личке «в сети» тоном online, иначе «был(а) …»', () => {

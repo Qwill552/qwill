@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MessageReactionDto } from '@messenger/shared';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 
 import { chatCalendarRequest } from '../../api/chats';
 import { onBottomInset, registerInsetMover } from '../../app/bottomInset';
@@ -203,6 +203,12 @@ function isSameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
+interface FloatingDateState {
+  iso: string;
+  hidden: boolean;
+  instant: boolean;
+}
+
 function isSameDayOrBefore(a: string, b: string): boolean {
   const day = new Date(b);
   day.setHours(23, 59, 59, 999);
@@ -318,7 +324,9 @@ export function MessageList({
   const floatingDateIdle = useRef(0);
   const floatingDateRef = useRef<HTMLDivElement>(null);
   const floatingDateOffset = useRef(0);
-  const [floatingDate, setFloatingDate] = useState<{ iso: string; hidden: boolean } | null>(null);
+  const [floatingDate, setFloatingDate] = useState<FloatingDateState | null>(null);
+  const floatingDateShown = useRef<FloatingDateState | null>(null);
+  floatingDateShown.current = floatingDate;
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   const loadingUp = useRef(false);
   const loadingDown = useRef(false);
@@ -1263,20 +1271,28 @@ export function MessageList({
       clip,
       dayDividerHeight.current,
     );
-    const entry = stuck === null ? undefined : entries[stuck.topIndex];
+    const entry = stuck === null ? undefined : entries[stuck.dayIndex];
     if (!stuck || !entry) {
       setFloatingDate(null);
       return;
     }
 
     const iso = entry.row.message.createdAt;
+    const shown = floatingDateShown.current;
+    if (shown === null || !isSameDay(shown.iso, iso)) {
+      const next = { iso, hidden: false, instant: true };
+      floatingDateShown.current = next;
+      flushSync(() => setFloatingDate(next));
+    } else if (shown.hidden) {
+      setFloatingDate({ iso: shown.iso, hidden: false, instant: false });
+    }
     moveFloatingDate(stuck.offset);
-    setFloatingDate((current) =>
-      current !== null && current.iso === iso && !current.hidden ? current : { iso, hidden: false },
-    );
     window.clearTimeout(floatingDateIdle.current);
     floatingDateIdle.current = window.setTimeout(
-      () => setFloatingDate((current) => (current === null || current.hidden ? current : { ...current, hidden: true })),
+      () =>
+        setFloatingDate((current) =>
+          current === null || current.hidden ? current : { ...current, hidden: true, instant: false },
+        ),
       FLOATING_DATE_HIDE_MS,
     );
   }
@@ -1485,6 +1501,7 @@ export function MessageList({
         ref={floatingDateRef}
         iso={floatingDate?.iso ?? null}
         hidden={floatingDate?.hidden ?? true}
+        instant={floatingDate?.instant ?? true}
         onJumpToDay={jumpToDayStart}
       />
 

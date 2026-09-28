@@ -22,6 +22,10 @@
   opacity: 0;
 }
 
+.floatingInstant {
+  transition: none;
+}
+
 .floatingHidden .dayButton {
   pointer-events: none;
 }
