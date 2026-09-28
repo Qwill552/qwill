@@ -4,7 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RenderEffect
 import android.graphics.RenderNode
 import android.graphics.Shader
@@ -23,6 +26,8 @@ class SharedBlur(
 ) {
     private val saturationFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = saturationFilter }
+    private val edgePaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+    private var edgeFor = -1
     private val hostLocation = IntArray(2)
     private val sourceLocation = IntArray(2)
     private val viewLocation = IntArray(2)
@@ -126,7 +131,7 @@ class SharedBlur(
         val recording = renderNode.beginRecording()
         recording.scale(1f / scale, 1f / scale)
         recording.translate(pad + dx, pad + dy + recordedPhase)
-        source.draw(recording)
+        drawSource(recording)
         renderNode.endRecording()
     }
 
@@ -143,13 +148,28 @@ class SharedBlur(
         offscreen.save()
         offscreen.scale(1f / scale, 1f / scale)
         offscreen.translate(pad + dx, pad + dy + recordedPhase)
-        source.draw(offscreen)
+        drawSource(offscreen)
         offscreen.restore()
         val sigma = BlurMath.radiusToSigma(radius)
         StackBlur.blur(target, (STACK_SIGMA_RATIO * sigma / scale - 1f).roundToInt().coerceAtLeast(1))
     }
 
+    private fun drawSource(canvas: Canvas) {
+        val fade = scale * EDGE_FADE_STEPS
+        if (edgeFor != fade) {
+            edgeFor = fade
+            edgePaint.shader = LinearGradient(0f, 0f, 0f, fade.toFloat(), 0, -0x1000000, Shader.TileMode.CLAMP)
+        }
+        val width = source.width.toFloat()
+        val height = source.height.toFloat()
+        val save = canvas.saveLayer(0f, 0f, width, height, null)
+        source.draw(canvas)
+        canvas.drawRect(0f, 0f, width, fade.toFloat(), edgePaint)
+        canvas.restoreToCount(save)
+    }
+
     private companion object {
+        const val EDGE_FADE_STEPS = 2
         const val MIN_SCALE = 8
         const val MAX_LOW_SIGMA = 3f
         const val PAD_SIGMAS = 2f
