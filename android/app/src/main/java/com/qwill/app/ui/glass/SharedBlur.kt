@@ -36,9 +36,10 @@ class SharedBlur(
     private var pad = 0
     private var phase = 0
     private var recordedPhase = 0
+    private var scale = MIN_SCALE
 
     fun onScrolled(dy: Int) {
-        phase = ((phase + dy) % DOWNSCALE + DOWNSCALE) % DOWNSCALE
+        phase = ((phase + dy) % scale + scale) % scale
     }
 
     fun addConsumer(view: View) {
@@ -52,14 +53,21 @@ class SharedBlur(
             return
         }
         val radius = host.context.dp(radiusDp)
-        pad = ceil(BlurMath.radiusToSigma(radius) * PAD_SIGMAS / DOWNSCALE).toInt() * DOWNSCALE
+        val sigma = BlurMath.radiusToSigma(radius)
+        val nextScale = BlurMath.scaleFor(sigma, MIN_SCALE, MAX_LOW_SIGMA)
+        if (nextScale != scale) {
+            scale = nextScale
+            phase %= scale
+            nodeEffectKey = -1
+        }
+        pad = ceil(sigma * PAD_SIGMAS / scale).toInt() * scale
         host.getLocationInWindow(hostLocation)
         source.getLocationInWindow(sourceLocation)
         val dx = (sourceLocation[0] - hostLocation[0]).toFloat()
         val dy = (sourceLocation[1] - hostLocation[1]).toFloat()
         recordedPhase = phase
-        val bw = ceil((width + pad * 2f) / DOWNSCALE).toInt().coerceAtLeast(1)
-        val bh = ceil((height + pad * 2f + DOWNSCALE) / DOWNSCALE).toInt().coerceAtLeast(1)
+        val bw = ceil((width + pad * 2f) / scale).toInt().coerceAtLeast(1)
+        val bh = ceil((height + pad * 2f + scale) / scale).toInt().coerceAtLeast(1)
         if (Build.VERSION.SDK_INT >= 31 && hardware) {
             recordNode(bw, bh, radius, dx, dy)
         } else {
@@ -83,12 +91,12 @@ class SharedBlur(
         owner.getLocationInWindow(hostLocation)
         val save = canvas.save()
         canvas.translate((hostLocation[0] - viewLocation[0] - pad).toFloat(), (hostLocation[1] - viewLocation[1] - pad).toFloat())
-        canvas.scale(DOWNSCALE.toFloat(), DOWNSCALE.toFloat())
+        canvas.scale(scale.toFloat(), scale.toFloat())
         val renderNode = node
         if (Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated && renderNode != null) {
             canvas.drawRenderNode(renderNode)
         } else {
-            bitmap?.let { canvas.drawBitmap(it, 0f, -recordedPhase.toFloat() / DOWNSCALE, bitmapPaint) }
+            bitmap?.let { canvas.drawBitmap(it, 0f, -recordedPhase.toFloat() / scale, bitmapPaint) }
         }
         canvas.restoreToCount(save)
     }
@@ -107,16 +115,16 @@ class SharedBlur(
         if (Build.VERSION.SDK_INT < 31) return
         val renderNode = node ?: RenderNode("sharedBlur").also { node = it }
         renderNode.setPosition(0, 0, bw, bh)
-        renderNode.translationY = -recordedPhase.toFloat() / DOWNSCALE
+        renderNode.translationY = -recordedPhase.toFloat() / scale
         val effectKey = radius.roundToInt()
         if (effectKey != nodeEffectKey) {
-            val scaled = BlurMath.downscaleRadius(radius, DOWNSCALE.toFloat())
+            val scaled = BlurMath.downscaleRadius(radius, scale.toFloat())
             val blur = RenderEffect.createBlurEffect(scaled, scaled, Shader.TileMode.CLAMP)
             renderNode.setRenderEffect(RenderEffect.createColorFilterEffect(saturationFilter, blur))
             nodeEffectKey = effectKey
         }
         val recording = renderNode.beginRecording()
-        recording.scale(1f / DOWNSCALE, 1f / DOWNSCALE)
+        recording.scale(1f / scale, 1f / scale)
         recording.translate(pad + dx, pad + dy + recordedPhase)
         source.draw(recording)
         renderNode.endRecording()
@@ -133,16 +141,17 @@ class SharedBlur(
         val offscreen = bitmapCanvas ?: return
         target.eraseColor(0)
         offscreen.save()
-        offscreen.scale(1f / DOWNSCALE, 1f / DOWNSCALE)
+        offscreen.scale(1f / scale, 1f / scale)
         offscreen.translate(pad + dx, pad + dy + recordedPhase)
         source.draw(offscreen)
         offscreen.restore()
         val sigma = BlurMath.radiusToSigma(radius)
-        StackBlur.blur(target, (STACK_SIGMA_RATIO * sigma / DOWNSCALE - 1f).roundToInt().coerceAtLeast(1))
+        StackBlur.blur(target, (STACK_SIGMA_RATIO * sigma / scale - 1f).roundToInt().coerceAtLeast(1))
     }
 
     private companion object {
-        const val DOWNSCALE = 8
+        const val MIN_SCALE = 8
+        const val MAX_LOW_SIGMA = 3f
         const val PAD_SIGMAS = 2f
         const val STACK_SIGMA_RATIO = 2.45f
     }
@@ -156,4 +165,12 @@ object BlurMath {
     fun sigmaToRadius(sigma: Float): Float = if (sigma > 0.5f) (sigma - 0.5f) / SIGMA_SCALE else 0f
 
     fun downscaleRadius(radius: Float, scale: Float): Float = max(1f, sigmaToRadius(radiusToSigma(radius) / scale))
+
+    fun scaleFor(sigma: Float, minScale: Int, maxLowSigma: Float): Int {
+        var scale = minScale
+        while (sigma / scale > maxLowSigma && scale < MAX_SCALE) scale *= 2
+        return scale
+    }
+
+    private const val MAX_SCALE = 128
 }
