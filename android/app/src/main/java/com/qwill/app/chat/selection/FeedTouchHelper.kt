@@ -14,11 +14,20 @@ import kotlin.math.hypot
 
 class FeedListView(context: Context) : RecyclerView(context) {
     var touchHelper: FeedTouchHelper? = null
-    var beforeDraw: (() -> Unit)? = null
+    var beforeFrame: (() -> Unit)? = null
+    private val frameWatcher = android.view.ViewTreeObserver.OnPreDrawListener {
+        beforeFrame?.invoke()
+        true
+    }
 
-    override fun dispatchDraw(canvas: android.graphics.Canvas) {
-        beforeDraw?.invoke()
-        super.dispatchDraw(canvas)
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnPreDrawListener(frameWatcher)
+    }
+
+    override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnPreDrawListener(frameWatcher)
+        super.onDetachedFromWindow()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

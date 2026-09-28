@@ -271,11 +271,13 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
                 return false
             }
         }
-        list.beforeDraw = {
+        list.beforeFrame = {
             if (layoutDirty) {
                 layoutDirty = false
                 updateFloatingDate(false)
                 list.post { onListScrolled(0) }
+            } else {
+                updateCovered()
             }
         }
         root.addView(list, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -299,6 +301,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         top = ChatTopLayer(
             context,
             list,
+            wallpaper,
             onContentTopChanged = { applyInsets() },
             onPinnedJump = { onPinnedJump() },
             onPinnedClose = { onPinnedClose() },
@@ -1160,8 +1163,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
         val children = ArrayList<View>(count)
         for (index in 0 until count) children.add(list.getChildAt(index))
-        children.sortBy { it.top }
-        val tops = FloatArray(children.size) { children[it].top.toFloat() }
+        children.sortBy { it.y }
+        val tops = FloatArray(children.size) { children[it].y }
         val rows = children.map { child -> adapter.rowAt(list.getChildAdapterPosition(child)) }
         val topmostPosition = list.getChildAdapterPosition(children.first())
         val dayAbove = topmostPosition in 0 until adapter.itemCount - 1
@@ -1224,10 +1227,13 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
     }
 
-    private fun isCoveredView(view: DayDividerView): Boolean =
-        view.bottom <= list.paddingTop || (floatingDay >= 0 && view.dayStartMs == floatingDay && view.top <= list.paddingTop)
+    private fun isCoveredView(view: DayDividerView): Boolean {
+        val line = list.paddingTop
+        val top = view.y
+        return top + view.height <= line || (floatingDay >= 0 && view.dayStartMs == floatingDay && top <= line)
+    }
 
-    override fun isCovered(dayStartMs: Long): Boolean = false
+    override fun isCovered(dayStartMs: Long): Boolean = floatingDay >= 0 && dayStartMs == floatingDay
 
     override fun sideInsets(): Pair<Int, Int> =
         (px(ChatInsets.SIDE) + safe.left).roundToInt() to (px(ChatInsets.SIDE) + safe.right).roundToInt()

@@ -29,12 +29,14 @@ import kotlin.math.roundToInt
 class ChatTopLayer(
     context: Context,
     private val blurSource: View,
+    private val underlay: View,
     private val onContentTopChanged: () -> Unit,
     onPinnedJump: () -> Unit,
     onPinnedClose: () -> Unit,
     onJoinCall: () -> Unit,
 ) : FrameLayout(context) {
-    private val blur = SharedBlur(blurSource, BLUR, SATURATION)
+    private val blur = SharedBlur(blurSource, underlay, BLUR_RADIUS, SATURATION)
+    private val consumers = ArrayList<View>()
     private val backdrop = TopBackdrop(context, blur)
     val callBanner = GroupCallBannerView(context, onJoinCall)
     val pinnedBanner = PinnedBannerView(context, onPinnedJump, onPinnedClose)
@@ -59,6 +61,7 @@ class ChatTopLayer(
     private var modeAnimator: ValueAnimator? = null
     private val sourceWatcher = ViewTreeObserver.OnPreDrawListener {
         if (blurSource.isDirty) invalidate()
+        if (underlay.isDirty) for (view in consumers) view.invalidate()
         true
     }
 
@@ -82,6 +85,7 @@ class ChatTopLayer(
         setWillNotDraw(false)
         for (view in listOf(backdrop, pinnedBanner, header.back, header.capsule, header.call, header.more, selection.close, selection.capsule, selection.copy, selection.delete)) {
             blur.addConsumer(view)
+            consumers.add(view)
         }
         pinnedBanner.blur = blur
         header.capsule.blur = blur
@@ -363,7 +367,7 @@ class ChatTopLayer(
     }
 
     private companion object {
-        const val BLUR = 12f
+        const val BLUR_RADIUS = 40f
         const val SATURATION = 1.8f
         const val RISE_SHARE = 1.2f
         const val PINNED_RISE = 6f
