@@ -247,7 +247,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         if (shift != 0f) canvas.restore()
     }
 
-    private fun shiftX(current: MessageCellModel): Float = if (current.row.own) 0f else px(CHECK_COLUMN) * host.selectionProgress
+    private fun shiftX(current: MessageCellModel): Float = if (current.row.own) 0f else px(CHECK_SHIFT) * host.selectionProgress
 
     private fun drawSelectionHighlight(canvas: Canvas, palette: Palette) {
         if (checkProgress <= 0f) return
@@ -259,12 +259,11 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
     }
 
     private fun drawCheckbox(canvas: Canvas, current: MessageCellModel, bubble: BubbleLayout, progress: Float, palette: Palette) {
-        val left = current.sideLeft.toFloat()
-        val save = canvas.save()
-        canvas.clipRect(left, 0f, left + px(CHECK_COLUMN) * progress, height.toFloat())
-        val cx = left + px(CHECK_COLUMN) / 2f
-        val cy = bubbleY + bubble.bubbleHeight / 2f
-        val radius = px(CHECK_SIZE) / 2f
+        val size = px(CHECK_SIZE)
+        val left = current.sideLeft + px(CHECK_LEFT) - px(CHECK_SHIFT) * (1f - progress)
+        val cx = left + size / 2f
+        val cy = bubbleY + bubble.bubbleHeight - px(CHECK_BOTTOM) - size / 2f
+        val radius = size / 2f
         val ring = px(CHECK_RING)
         fillPaint.shader = null
         fillPaint.color = blend(palette.surface, palette.primary, checkProgress)
@@ -274,10 +273,9 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         strokePaint.color = blend(palette.border, palette.primary, checkProgress)
         canvas.drawCircle(cx, cy, radius - ring / 2f, strokePaint)
         if (checkProgress > 0f) {
-            val size = px(CHECK_ICON)
-            QwillIcon.CHECK.draw(canvas, cx - size / 2f, cy - size / 2f, size, withAlpha(palette.textOnPrimary, checkProgress), iconPaint)
+            val icon = px(CHECK_ICON)
+            QwillIcon.CHECK.draw(canvas, cx - icon / 2f, cy - icon / 2f, icon, withAlpha(palette.textOnPrimary, checkProgress), iconPaint)
         }
-        canvas.restoreToCount(save)
     }
 
     private fun blend(from: Int, to: Int, share: Float): Int {
@@ -841,10 +839,12 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         private const val EDITED = "изм."
         private const val FLASH_HOLD = 0.55f
         private const val FLASH_RADIUS = 10f
-        private const val CHECK_COLUMN = 44f
-        private const val CHECK_SIZE = 24f
+        private const val CHECK_SHIFT = 35f
+        private const val CHECK_LEFT = 8f
+        private const val CHECK_BOTTOM = 8f
+        private const val CHECK_SIZE = 21f
         private const val CHECK_RING = 2f
-        private const val CHECK_ICON = 14f
+        private const val CHECK_ICON = 13f
         private const val TAP_MIN = 44f
         private const val BUMP_PEAK = 1.25f
         private const val BUMP_PEAK_AT = 0.6f

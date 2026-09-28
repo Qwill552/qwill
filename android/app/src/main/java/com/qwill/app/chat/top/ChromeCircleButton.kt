@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
 import com.qwill.app.ui.QwillIcon
+import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.theme.Motion
 import com.qwill.app.ui.theme.Theme
 import com.qwill.app.ui.theme.dp
@@ -14,6 +15,9 @@ import com.qwill.app.ui.theme.withAlpha
 
 class ChromeCircleButton(context: Context, private val icon: QwillIcon, label: String, private val danger: Boolean = false) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val clip = android.graphics.Path()
+
+    var blur: SharedBlur? = null
 
     init {
         isClickable = true
@@ -39,6 +43,14 @@ class ChromeCircleButton(context: Context, private val icon: QwillIcon, label: S
         val cx = width / 2f
         val cy = height / 2f
         val radius = context.dp(CIRCLE) / 2f
+        blur?.let {
+            clip.reset()
+            clip.addCircle(cx, cy, radius, android.graphics.Path.Direction.CW)
+            val save = canvas.save()
+            canvas.clipPath(clip)
+            it.draw(canvas, this)
+            canvas.restoreToCount(save)
+        }
         paint.style = Paint.Style.FILL
         paint.shader = null
         paint.color = withAlpha(palette.pulseGlass, FILL)

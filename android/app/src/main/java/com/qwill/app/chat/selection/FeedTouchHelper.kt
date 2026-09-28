@@ -14,6 +14,12 @@ import kotlin.math.hypot
 
 class FeedListView(context: Context) : RecyclerView(context) {
     var touchHelper: FeedTouchHelper? = null
+    var beforeDraw: (() -> Unit)? = null
+
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        beforeDraw?.invoke()
+        super.dispatchDraw(canvas)
+    }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         val helper = touchHelper ?: return super.dispatchTouchEvent(event)

@@ -26,6 +26,7 @@ import com.qwill.app.consent.CssGradient
 import com.qwill.app.emoji.Emoji
 import com.qwill.app.model.MessageDto
 import com.qwill.app.ui.QwillIcon
+import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.ripple
 import com.qwill.app.ui.theme.FontWeight
 import com.qwill.app.ui.theme.Fonts
@@ -51,6 +52,8 @@ class PinnedBannerView(context: Context, onJump: () -> Unit, onClose: () -> Unit
 
     var shownMessageId: Long? = null
         private set
+
+    var blur: SharedBlur? = null
 
     init {
         setWillNotDraw(false)
@@ -108,6 +111,12 @@ class PinnedBannerView(context: Context, onJump: () -> Unit, onClose: () -> Unit
             val line = CssGradient.linear(GRADIENT_ANGLE, width.toFloat(), height.toFloat())
             fillPaint.shader = LinearGradient(line.x0, line.y0, line.x1, line.y1, palette.pulseCapFrom, palette.pulseCapTo, Shader.TileMode.CLAMP)
             gradientDark = palette.isDark
+        }
+        blur?.let {
+            val save = canvas.save()
+            canvas.clipPath(shape)
+            it.draw(canvas, this)
+            canvas.restoreToCount(save)
         }
         canvas.drawPath(shape, fillPaint)
         val shader = fillPaint.shader

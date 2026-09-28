@@ -53,7 +53,7 @@ import com.qwill.app.search.SearchPillPainter
 import com.qwill.app.search.SearchReveal
 import com.qwill.app.search.SearchSession
 import com.qwill.app.search.SearchTriggerView
-import com.qwill.app.tabs.SearchCollapse
+import com.qwill.app.tabs.SearchShift
 import com.qwill.app.ui.ConnectionTitle
 import com.qwill.app.ui.QwillIcon
 import com.qwill.app.ui.QwillMenu
@@ -76,7 +76,6 @@ class ChatsScreen : Screen(), ChatCellHost {
     private lateinit var root: FrameLayout
     private lateinit var header: LinearLayout
     private lateinit var lupa: SearchIconButton
-    private lateinit var spacer: View
     private lateinit var searchRow: SearchTriggerView
     private lateinit var body: FrameLayout
     private lateinit var ownAvatar: HeaderAvatarView
@@ -100,8 +99,12 @@ class ChatsScreen : Screen(), ChatCellHost {
     private var safeArea = SafeArea.NONE
     private var timeReceiverRegistered = false
     private var searchCollapsed = false
-    private var collapseGeneration = 0
-    private val collapseAnimators = ArrayList<Animator>()
+    private var searchShift = 0
+    private var lupaShown = 0f
+    private var lupaTarget = false
+    private var lupaAnimator: ValueAnimator? = null
+    private val bodyClip = Rect()
+    private val searchClip = Rect()
     private var searchOpen = false
     private var searchRetreating = false
     private var searchFromIcon = false
@@ -158,9 +161,6 @@ class ChatsScreen : Screen(), ChatCellHost {
         })
         column.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dpInt(HEADER_H)))
 
-        spacer = View(context)
-        column.addView(spacer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dpInt(SEARCH_SLOT)))
-
         chips = ChipsRow(context) { pickFilter(it) }
         column.addView(chips, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
@@ -181,6 +181,7 @@ class ChatsScreen : Screen(), ChatCellHost {
                 onListScrolled()
             }
         })
+        list.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> onListScrolled() }
 
         skeleton = SkeletonView(context)
         body.addView(skeleton, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -200,8 +201,8 @@ class ChatsScreen : Screen(), ChatCellHost {
         Emoji.addListener(emojiListener)
         QwillApplication.recentSearches.addListener(recentsListener)
 
-        applySearchLayout(animated = false)
         applyInsets()
+        applySearchShift(animateLupa = false)
         applyTheme()
         onSessionChanged()
         refreshRows(animate = false)
@@ -227,7 +228,8 @@ class ChatsScreen : Screen(), ChatCellHost {
         menu = null
         deleteDialog = null
         themeReveal?.finishNow()
-        endCollapse()
+        lupaAnimator?.cancel()
+        lupaAnimator = null
         recentMenu?.dismissNow()
         recentMenu = null
         val closingSearch = reveal?.closing == true
@@ -331,7 +333,7 @@ class ChatsScreen : Screen(), ChatCellHost {
         chips.setPadding(sideLeft, 0, sideRight, 0)
         (chips.layoutParams as LinearLayout.LayoutParams).topMargin = context.dpInt(CHIPS_TOP)
         val listTop = context.dpInt(LIST_TOP)
-        list.setPadding(context.dpInt(LIST_PAD_X) + safeArea.left, 0, context.dpInt(LIST_PAD_X) + safeArea.right, context.dpInt(LIST_PAD_BOTTOM) + safeArea.bottom)
+        list.setPadding(context.dpInt(LIST_PAD_X) + safeArea.left, context.dpInt(SEARCH_SLOT), context.dpInt(LIST_PAD_X) + safeArea.right, context.dpInt(LIST_PAD_BOTTOM) + safeArea.bottom)
         (searchRow.layoutParams as FrameLayout.LayoutParams).apply {
             leftMargin = sideLeft
             rightMargin = sideRight
@@ -342,7 +344,9 @@ class ChatsScreen : Screen(), ChatCellHost {
             (body.layoutParams as LinearLayout.LayoutParams).topMargin = listTop
             body.requestLayout()
         }
-        skeleton.setPadding(context.dpInt(LIST_PAD_X) + safeArea.left, 0, context.dpInt(LIST_PAD_X) + safeArea.right, 0)
+        skeleton.setPadding(context.dpInt(LIST_PAD_X) + safeArea.left, context.dpInt(SEARCH_SLOT), context.dpInt(LIST_PAD_X) + safeArea.right, 0)
+        (empty.layoutParams as FrameLayout.LayoutParams).topMargin = context.dpInt(SEARCH_SLOT)
+        empty.requestLayout()
         header.requestLayout()
     }
 
@@ -583,115 +587,86 @@ class ChatsScreen : Screen(), ChatCellHost {
 
     private fun onListScrolled() {
         if (searchOpen || !::list.isInitialized) return
-        val offsetDp = list.computeVerticalScrollOffset() / root.resources.displayMetrics.density
-        val next = SearchCollapse.next(searchCollapsed, offsetDp)
-        if (next == searchCollapsed) return
-        searchCollapsed = next
-        applySearchLayout(animated = true)
+        applySearchShift(animateLupa = true)
     }
 
-    private fun endCollapse() {
-        collapseGeneration++
-        val running = ArrayList(collapseAnimators)
-        collapseAnimators.clear()
-        for (animator in running) animator.cancel()
-    }
-
-    private fun applySearchLayout(animated: Boolean) {
-        endCollapse()
-        val collapsed = searchCollapsed
-        spacer.visibility = if (collapsed) View.GONE else View.VISIBLE
-        if (!animated || !Motion.animationsEnabled) {
-            chips.translationY = 0f
-            body.translationY = 0f
+    private fun applySearchShift(animateLupa: Boolean) {
+        val slot = root.context.dpInt(SEARCH_SLOT)
+        val laidOut = adapter.itemCount == 0 || list.childCount > 0
+        val first = layoutManager.findViewByPosition(0)
+        val shift = if (laidOut) SearchShift.shift(first?.top, list.paddingTop, adapter.itemCount, slot) else searchShift
+        searchShift = shift
+        chips.translationY = (slot - shift).toFloat()
+        bodyClip.set(0, slot - shift, CLIP_FAR, CLIP_FAR)
+        body.clipBounds = bodyClip
+        searchRow.translationY = -shift.toFloat()
+        searchRow.alpha = SearchShift.alpha(shift, slot)
+        searchClip.set(0, (shift - root.context.dpInt(SEARCH_TOP)).coerceAtLeast(0), CLIP_FAR, CLIP_FAR)
+        searchRow.clipBounds = searchClip
+        val collapsed = SearchShift.collapsed(shift, slot)
+        if (collapsed != searchCollapsed) {
+            searchCollapsed = collapsed
             settleSearchRow(collapsed)
-            settleLupa(collapsed)
+        }
+        setLupaTarget(collapsed, animateLupa)
+    }
+
+    private fun setLupaTarget(shown: Boolean, animated: Boolean) {
+        if (shown == lupaTarget && (lupaAnimator != null || lupaShown == if (shown) 1f else 0f)) return
+        lupaTarget = shown
+        lupaAnimator?.cancel()
+        lupaAnimator = null
+        if (!animated || !Motion.animationsEnabled || searchOpen) {
+            settleLupa(shown)
             return
         }
-        val context = root.context
-        val shift = context.dp(SEARCH_SLOT) * if (collapsed) 1f else -1f
-        val generation = collapseGeneration
-        chips.translationY = shift
-        body.translationY = shift
-        collapseAnimators.add(run(COLLAPSE_MS, COLLAPSE_CURVE) { value ->
-            chips.translationY = shift * (1f - value)
-            body.translationY = shift * (1f - value)
-        })
-        val lift = -context.dp(SEARCH_ROW_LIFT)
-        if (collapsed) {
-            val fromLift = searchRow.translationY
-            val fromScale = searchRow.scaleX
-            val fromAlpha = if (searchRow.visibility == View.GONE) 0f else searchRow.alpha
-            searchRow.isClickable = false
-            collapseAnimators.add(run(COLLAPSE_MS, COLLAPSE_CURVE) { value ->
-                searchRow.translationY = fromLift + (lift - fromLift) * value
-                val scale = fromScale + (SEARCH_ROW_SCALE - fromScale) * value
-                searchRow.scaleX = scale
-                searchRow.scaleY = scale
-            })
-            collapseAnimators.add(run(FADE_MS, FADE_CURVE, onEnd = { if (generation == collapseGeneration) settleSearchRow(true) }) { value ->
-                searchRow.alpha = fromAlpha * (1f - value)
-            })
-            lupa.visibility = if (searchOpen) View.INVISIBLE else View.VISIBLE
-            lupa.scaleX = LUPA_START_SCALE
-            lupa.scaleY = LUPA_START_SCALE
-            lupa.alpha = 0f
-            collapseAnimators.add(run(LUPA_IN_MS, LUPA_CURVE, onEnd = { if (generation == collapseGeneration) settleLupa(true) }) { value ->
-                val scale = LUPA_START_SCALE + (1f - LUPA_START_SCALE) * value
-                lupa.scaleX = scale
-                lupa.scaleY = scale
-                lupa.alpha = value.coerceIn(0f, 1f)
-            })
-        } else {
-            if (searchRow.visibility == View.GONE) {
-                searchRow.translationY = lift
-                searchRow.scaleX = SEARCH_ROW_SCALE
-                searchRow.scaleY = SEARCH_ROW_SCALE
-                searchRow.alpha = 0f
+        lupa.visibility = View.VISIBLE
+        lupa.isClickable = shown
+        val from = lupaShown
+        val to = if (shown) 1f else 0f
+        val animator = ValueAnimator.ofFloat(from, to)
+        animator.duration = Motion.duration(LUPA_MS)
+        animator.interpolator = LUPA_CURVE
+        animator.addUpdateListener { setLupaShown(it.animatedValue as Float) }
+        animator.addListener(object : AnimatorListenerAdapter() {
+            private var cancelled = false
+
+            override fun onAnimationCancel(animation: Animator) {
+                cancelled = true
             }
-            searchRow.visibility = if (searchOpen) View.INVISIBLE else View.VISIBLE
-            searchRow.isClickable = true
-            val fromLift = searchRow.translationY
-            val fromScale = searchRow.scaleX
-            val fromAlpha = searchRow.alpha
-            collapseAnimators.add(run(COLLAPSE_MS, COLLAPSE_CURVE, onEnd = { if (generation == collapseGeneration) settleSearchRow(false) }) { value ->
-                searchRow.translationY = fromLift * (1f - value)
-                val scale = fromScale + (1f - fromScale) * value
-                searchRow.scaleX = scale
-                searchRow.scaleY = scale
-            })
-            collapseAnimators.add(run(FADE_MS, FADE_CURVE) { value ->
-                searchRow.alpha = fromAlpha + (1f - fromAlpha) * value
-            })
-            val fromLupa = lupa.alpha
-            val fromLupaScale = lupa.scaleX
-            lupa.isClickable = false
-            collapseAnimators.add(run(LUPA_OUT_MS, FADE_CURVE, onEnd = { if (generation == collapseGeneration) settleLupa(false) }) { value ->
-                val scale = fromLupaScale + (LUPA_START_SCALE - fromLupaScale) * value
-                lupa.scaleX = scale
-                lupa.scaleY = scale
-                lupa.alpha = fromLupa * (1f - value)
-            })
-        }
+
+            override fun onAnimationEnd(animation: Animator) {
+                if (cancelled) return
+                lupaAnimator = null
+                settleLupa(shown)
+            }
+        })
+        lupaAnimator = animator
+        animator.start()
+    }
+
+    private fun setLupaShown(value: Float) {
+        lupaShown = value
+        val scale = LUPA_START_SCALE + (1f - LUPA_START_SCALE) * value
+        lupa.scaleX = scale
+        lupa.scaleY = scale
+        lupa.alpha = value.coerceIn(0f, 1f)
     }
 
     private fun settleSearchRow(collapsed: Boolean) {
-        searchRow.translationY = 0f
-        searchRow.scaleX = 1f
-        searchRow.scaleY = 1f
-        searchRow.alpha = 1f
         searchRow.isClickable = !collapsed
         searchRow.visibility = when {
+            searchOpen -> if (collapsed) View.GONE else View.INVISIBLE
             collapsed -> View.GONE
-            searchOpen -> View.INVISIBLE
             else -> View.VISIBLE
         }
     }
 
     private fun settleLupa(collapsed: Boolean) {
-        lupa.scaleX = 1f
-        lupa.scaleY = 1f
-        lupa.alpha = 1f
+        lupaAnimator?.cancel()
+        lupaAnimator = null
+        lupaTarget = collapsed
+        setLupaShown(if (collapsed) 1f else 0f)
         lupa.isClickable = collapsed
         lupa.visibility = when {
             !collapsed -> View.GONE
@@ -699,22 +674,6 @@ class ChatsScreen : Screen(), ChatCellHost {
             else -> View.VISIBLE
         }
     }
-
-    private fun run(ms: Long, curve: android.view.animation.Interpolator, onEnd: (() -> Unit)? = null, apply: (Float) -> Unit): Animator =
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = Motion.duration(ms)
-            interpolator = curve
-            addUpdateListener { apply(it.animatedValue as Float) }
-            if (onEnd != null) {
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        collapseAnimators.remove(animation)
-                        onEnd()
-                    }
-                })
-            }
-            start()
-        }
 
     private fun searchSession(): SearchSession = session ?: SearchSession(
         guid = classGuid,
@@ -739,7 +698,6 @@ class ChatsScreen : Screen(), ChatCellHost {
     private fun openSearch(fromIcon: Boolean) {
         if (searchOpen || menu?.isShowing == true || deleteDialog != null) return
         if (fromIcon != searchCollapsed) return
-        endCollapse()
         settleSearchRow(searchCollapsed)
         settleLupa(searchCollapsed)
         QwillApplication.recentSearches.ensureLoaded()
@@ -774,6 +732,7 @@ class ChatsScreen : Screen(), ChatCellHost {
         val bounds = Rect(0, 0, source.width, source.height)
         root.offsetDescendantRectToMyCoords(source, bounds)
         val origin = RectF(bounds)
+        origin.offset(source.translationX, source.translationY)
         return if (searchFromIcon) {
             val inset = (source.width - context.dp(SearchIconButton.CIRCLE)) / 2f
             origin.inset(inset, inset)
@@ -824,6 +783,7 @@ class ChatsScreen : Screen(), ChatCellHost {
             session?.reset()
             settleSearchRow(searchCollapsed)
             settleLupa(searchCollapsed)
+            applySearchShift(animateLupa = false)
             backStateChanged()
         }
 
@@ -897,21 +857,15 @@ class ChatsScreen : Screen(), ChatCellHost {
         const val LIST_PAD_BOTTOM = 96f
         const val SEARCH_TOP = 9f
         const val SEARCH_SLOT = 56f
-        const val SEARCH_ROW_LIFT = 14f
-        const val SEARCH_ROW_SCALE = 0.97f
         const val SEARCH_DOCK_GAP = 16f
-        const val COLLAPSE_MS = 400L
-        const val FADE_MS = 300L
-        const val LUPA_IN_MS = 320L
-        const val LUPA_OUT_MS = 200L
         const val LUPA_START_SCALE = 0.6f
+        const val LUPA_MS = 350L
+        const val CLIP_FAR = 1_000_000
         const val HEADER_FADE_MS = 120L
         const val HEADER_RETURN_DELAY_MS = 140L
         const val SEARCH_PLACEHOLDER = "Поиск чатов и людей"
         const val FORGET_LABEL = "Убрать из недавних"
-        val COLLAPSE_CURVE = PathInterpolator(0.22f, 1f, 0.36f, 1f)
-        val FADE_CURVE = PathInterpolator(0.25f, 0.1f, 0.25f, 1f)
-        val LUPA_CURVE = PathInterpolator(0.34f, 1.56f, 0.64f, 1f)
+        val LUPA_CURVE = PathInterpolator(0.23f, 1f, 0.32f, 1f)
         val HEADER_CURVE = PathInterpolator(0f, 0f, 0.58f, 1f)
         const val SCROLLBAR_RADIUS = 2f
         const val SCROLLBAR_ALPHA = 0.32f

@@ -33,13 +33,15 @@ class TabRulesTest {
     }
 
     @Test
-    fun searchRowCollapsesPast26AndReturnsBelow8() {
-        assertFalse(SearchCollapse.next(false, 0f))
-        assertFalse(SearchCollapse.next(false, 26f))
-        assertTrue(SearchCollapse.next(false, 26.5f))
-        assertTrue(SearchCollapse.next(true, 20f))
-        assertTrue(SearchCollapse.next(true, 8f))
-        assertFalse(SearchCollapse.next(true, 7.9f))
-        assertFalse(SearchCollapse.next(false, 20f))
+    fun searchRowFollowsFirstRow() {
+        assertEquals(0, SearchShift.shift(firstTop = 147, paddingTop = 147, itemCount = 5, slot = 147))
+        assertEquals(40, SearchShift.shift(firstTop = 107, paddingTop = 147, itemCount = 5, slot = 147))
+        assertEquals(147, SearchShift.shift(firstTop = -300, paddingTop = 147, itemCount = 5, slot = 147))
+        assertEquals(147, SearchShift.shift(firstTop = null, paddingTop = 147, itemCount = 5, slot = 147))
+        assertEquals(0, SearchShift.shift(firstTop = null, paddingTop = 147, itemCount = 0, slot = 147))
+        assertEquals(0, SearchShift.shift(firstTop = 200, paddingTop = 147, itemCount = 5, slot = 147))
+        assertFalse(SearchShift.collapsed(145, 147))
+        assertTrue(SearchShift.collapsed(147, 147))
+        assertEquals(0.5f, SearchShift.alpha(50, 100), 0.0001f)
     }
 }

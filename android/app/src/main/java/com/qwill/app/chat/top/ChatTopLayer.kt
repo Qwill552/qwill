@@ -13,11 +13,12 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.animation.Interpolator
 import android.widget.FrameLayout
 import com.qwill.app.model.CallDto
 import com.qwill.app.model.MessageDto
-import com.qwill.app.ui.glass.GlassView
+import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.insets.SafeArea
 import com.qwill.app.ui.theme.Motion
 import com.qwill.app.ui.theme.Theme
@@ -27,13 +28,14 @@ import kotlin.math.roundToInt
 
 class ChatTopLayer(
     context: Context,
-    blurSource: View,
+    private val blurSource: View,
     private val onContentTopChanged: () -> Unit,
     onPinnedJump: () -> Unit,
     onPinnedClose: () -> Unit,
     onJoinCall: () -> Unit,
 ) : FrameLayout(context) {
-    private val backdrop = TopBackdrop(context, blurSource)
+    private val blur = SharedBlur(blurSource, BLUR, SATURATION)
+    private val backdrop = TopBackdrop(context, blur)
     val callBanner = GroupCallBannerView(context, onJoinCall)
     val pinnedBanner = PinnedBannerView(context, onPinnedJump, onPinnedClose)
     val header = ChatHeaderView(context)
@@ -55,6 +57,10 @@ class ChatTopLayer(
     private var callAnimator: ValueAnimator? = null
     private var pinnedAnimator: ValueAnimator? = null
     private var modeAnimator: ValueAnimator? = null
+    private val sourceWatcher = ViewTreeObserver.OnPreDrawListener {
+        if (blurSource.isDirty) invalidate()
+        true
+    }
 
     val contentTop: Int get() = context.dp(ChatTopLayout.contentTop(callShown, pinnedShown)).roundToInt()
 
@@ -73,6 +79,14 @@ class ChatTopLayer(
         addView(selection, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.TOP))
         header.clipChildren = false
         selection.clipChildren = false
+        setWillNotDraw(false)
+        for (view in listOf(backdrop, pinnedBanner, header.back, header.capsule, header.call, header.more, selection.close, selection.capsule, selection.copy, selection.delete)) {
+            blur.addConsumer(view)
+        }
+        pinnedBanner.blur = blur
+        header.capsule.blur = blur
+        selection.capsule.blur = blur
+        for (button in listOf(header.back, header.call, header.more, selection.close, selection.copy, selection.delete)) button.blur = blur
         applyTheme()
         applyLayout()
     }
@@ -263,8 +277,20 @@ class ChatTopLayer(
     private fun applyTransforms() {
         callBanner.translationY = callOffset
         callBanner.alpha = callAlpha
-        pinnedBanner.translationY = pinnedShift + pinnedOffset
+        val pinnedY = pinnedShift + pinnedOffset
+        if (pinnedBanner.translationY != pinnedY) pinnedBanner.invalidate()
+        pinnedBanner.translationY = pinnedY
         pinnedBanner.alpha = pinnedAlpha
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        blur.update(this, width, backdrop.height, canvas.isHardwareAccelerated)
+        super.dispatchDraw(canvas)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnPreDrawListener(sourceWatcher)
     }
 
     private fun tween(durationMs: Long, curve: Interpolator, update: (Float) -> Unit, end: () -> Unit): ValueAnimator {
@@ -288,26 +314,27 @@ class ChatTopLayer(
     }
 
     override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnPreDrawListener(sourceWatcher)
         super.onDetachedFromWindow()
         stopAnimations()
+        blur.release()
     }
 
-    private class TopBackdrop(context: Context, source: View) : FrameLayout(context) {
-        private val glass = GlassView(context, source, BLUR, SATURATION)
+    private class TopBackdrop(context: Context, private val blur: SharedBlur) : View(context) {
+        private val tintPaint = Paint()
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
         private var maskFor = -1
 
         init {
-            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-            glass.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(glass, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
         fun applyTheme() {
-            glass.tint = withAlpha(Theme.palette.pulseDock, TINT_ALPHA)
+            tintPaint.color = withAlpha(Theme.palette.pulseDock, TINT_ALPHA)
+            invalidate()
         }
 
-        override fun dispatchDraw(canvas: Canvas) {
+        override fun onDraw(canvas: Canvas) {
             if (width == 0 || height == 0) return
             if (maskFor != height) {
                 maskFor = height
@@ -322,20 +349,22 @@ class ChatTopLayer(
                 )
             }
             val save = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
-            super.dispatchDraw(canvas)
+            canvas.clipRect(0, 0, width, height)
+            blur.draw(canvas, this)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), tintPaint)
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
             canvas.restoreToCount(save)
         }
 
         private companion object {
-            const val BLUR = 6f
-            const val SATURATION = 1.5f
             const val TINT_ALPHA = 0.5f
             const val SOLID_SHARE = 0.2f
         }
     }
 
     private companion object {
+        const val BLUR = 12f
+        const val SATURATION = 1.8f
         const val RISE_SHARE = 1.2f
         const val PINNED_RISE = 6f
     }

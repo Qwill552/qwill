@@ -15,6 +15,7 @@ import android.text.TextPaint
 import android.view.MotionEvent
 import android.view.View
 import com.qwill.app.ui.QwillIcon
+import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.theme.FixedColors
 import com.qwill.app.ui.theme.FontWeight
 import com.qwill.app.ui.theme.Fonts
@@ -123,6 +124,8 @@ class SelectionCapsule(context: Context) : View(context) {
     private var shadowKey = ""
     private var animator: ValueAnimator? = null
 
+    var blur: SharedBlur? = null
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
@@ -185,6 +188,12 @@ class SelectionCapsule(context: Context) : View(context) {
             highlight.op(shape, lifted, Path.Op.DIFFERENCE)
         }
         drawShadow(canvas, palette.isDark)
+        blur?.let {
+            val save = canvas.save()
+            canvas.clipPath(shape)
+            it.draw(canvas, this)
+            canvas.restoreToCount(save)
+        }
         fillPaint.color = palette.chromeBg
         canvas.drawPath(shape, fillPaint)
         fillPaint.color = palette.chromeHighlight

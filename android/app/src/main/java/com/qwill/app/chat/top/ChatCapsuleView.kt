@@ -25,6 +25,7 @@ import com.qwill.app.ui.ConnectionDots
 import com.qwill.app.ui.OfficialMark
 import com.qwill.app.ui.QwillIcon
 import com.qwill.app.ui.ServiceLogo
+import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.theme.FontWeight
 import com.qwill.app.ui.theme.Fonts
 import com.qwill.app.ui.theme.Motion
@@ -67,6 +68,8 @@ class ChatCapsuleView(context: Context) : View(context) {
     private val image = ImageReceiver(this, QwillApplication.files.images)
     private var shapeFor = -1
     private var gradientDark: Boolean? = null
+
+    var blur: SharedBlur? = null
 
     private var model: CapsuleModel? = null
     private var current: Subtitle? = null
@@ -266,6 +269,12 @@ class ChatCapsuleView(context: Context) : View(context) {
             val line = CssGradient.linear(GRADIENT_ANGLE, width.toFloat(), height.toFloat())
             fillPaint.shader = LinearGradient(line.x0, line.y0, line.x1, line.y1, palette.pulseCapFrom, palette.pulseCapTo, Shader.TileMode.CLAMP)
             gradientDark = palette.isDark
+        }
+        blur?.let {
+            val save = canvas.save()
+            canvas.clipPath(shape)
+            it.draw(canvas, this)
+            canvas.restoreToCount(save)
         }
         canvas.drawPath(shape, fillPaint)
         iconPaint.style = Paint.Style.FILL

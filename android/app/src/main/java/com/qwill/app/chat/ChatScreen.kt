@@ -20,6 +20,8 @@ import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.view.animation.LinearInterpolator
+import android.view.animation.PathInterpolator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
@@ -269,13 +271,13 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
                 return false
             }
         }
-        list.addItemDecoration(object : RecyclerView.ItemDecoration() {
-            override fun onDrawOver(canvas: android.graphics.Canvas, parent: RecyclerView, state: RecyclerView.State) {
-                if (!layoutDirty) return
+        list.beforeDraw = {
+            if (layoutDirty) {
                 layoutDirty = false
-                parent.post { onListScrolled(0) }
+                updateFloatingDate(false)
+                list.post { onListScrolled(0) }
             }
-        })
+        }
         root.addView(list, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         status = TextView(context).apply {
@@ -438,7 +440,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private fun applyInsets() {
         top.setSafeArea(safe)
         val contentTop = top.contentTop + safe.top
-        list.setPadding(0, contentTop, 0, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
+        setListPadding(contentTop, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
         status.setPadding((px(STATUS_PAD_X) + safe.left).roundToInt(), list.paddingTop, (px(STATUS_PAD_X) + safe.right).roundToInt(), list.paddingBottom)
         (floating.layoutParams as FrameLayout.LayoutParams).topMargin =
             (contentTop + px(ChatTopLayout.FLOATING_DATE_GAP) - px(FLOATING_TAP_EXTRA)).roundToInt()
@@ -457,6 +459,24 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             appliedSides = sides
             rebindAll()
         }
+    }
+
+    private fun setListPadding(paddingTop: Int, paddingBottom: Int) {
+        val oldTop = list.paddingTop
+        if (oldTop == paddingTop && list.paddingBottom == paddingBottom) return
+        val dy = oldTop - paddingTop
+        if (dy != 0 && list.childCount > 0 && placement == null) {
+            val blocked = (dy < 0 && !list.canScrollVertically(1)) || (dy > 0 && !list.canScrollVertically(-1))
+            if (!blocked) {
+                list.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                    override fun onLayoutChange(v: View, l: Int, t: Int, r: Int, b: Int, ol: Int, ot: Int, or: Int, ob: Int) {
+                        list.removeOnLayoutChangeListener(this)
+                        list.scrollBy(0, dy)
+                    }
+                })
+            }
+        }
+        list.setPadding(0, paddingTop, 0, paddingBottom)
     }
 
     private fun updateThumbTrack() {
@@ -1181,8 +1201,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             if (floatingDay != -1L) {
                 floatingDay = -1L
                 floating.clear()
-                updateCovered()
             }
+            updateCovered()
             return
         }
         val changed = day != floatingDay
@@ -1205,7 +1225,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     }
 
     private fun isCoveredView(view: DayDividerView): Boolean =
-        floatingDay >= 0 && view.dayStartMs == floatingDay && view.top <= list.paddingTop
+        view.bottom <= list.paddingTop || (floatingDay >= 0 && view.dayStartMs == floatingDay && view.top <= list.paddingTop)
 
     override fun isCovered(dayStartMs: Long): Boolean = false
 
@@ -1598,10 +1618,12 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             setSelectionShown(target)
             return
         }
-        val animator = ValueAnimator.ofFloat(selectionShown, target)
-        animator.duration = Motion.duration(Motion.CHECK)
-        animator.interpolator = Motion.easeScreen
-        animator.addUpdateListener { setSelectionShown(it.animatedValue as Float) }
+        val from = selectionShown
+        val curve = if (target > from) SELECT_IN else SELECT_OUT
+        val animator = ValueAnimator.ofFloat(0f, 1f)
+        animator.duration = Motion.duration(SELECT_MS)
+        animator.interpolator = LinearInterpolator()
+        animator.addUpdateListener { setSelectionShown(from + (target - from) * curve.getInterpolation(it.animatedValue as Float)) }
         animator.addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator) {
                 if (selectionAnimator === animation) selectionAnimator = null
@@ -1681,6 +1703,9 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         const val DEFAULT_ROW = 56f
         const val AUTO_SCROLL_GUARD_MS = 700L
         const val MINUTE_MS = 60_000L
+        const val SELECT_MS = 200L
+        val SELECT_IN = PathInterpolator(0f, 0f, 0.58f, 1f)
+        val SELECT_OUT = PathInterpolator(0.42f, 0f, 1f, 1f)
         const val CIRCLE = 40f
         const val CLIP_LABEL = "Qwill"
     }

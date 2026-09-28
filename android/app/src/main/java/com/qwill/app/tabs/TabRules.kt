@@ -24,13 +24,16 @@ object TabRules {
         if (!pageHandled && selected != MainTab.CHATS) MainTab.CHATS else null
 }
 
-object SearchCollapse {
-    const val HIDE_AT_DP = 26f
-    const val SHOW_AT_DP = 8f
+object SearchShift {
+    const val HIDDEN_ALPHA = 0.01f
 
-    fun next(collapsed: Boolean, offsetDp: Float): Boolean = when {
-        offsetDp > HIDE_AT_DP -> true
-        offsetDp < SHOW_AT_DP -> false
-        else -> collapsed
+    fun shift(firstTop: Int?, paddingTop: Int, itemCount: Int, slot: Int): Int = when {
+        itemCount == 0 -> 0
+        firstTop == null -> slot
+        else -> (paddingTop - firstTop).coerceIn(0, slot)
     }
+
+    fun alpha(shift: Int, slot: Int): Float = if (slot <= 0) 1f else 1f - shift.toFloat() / slot
+
+    fun collapsed(shift: Int, slot: Int): Boolean = alpha(shift, slot) <= HIDDEN_ALPHA
 }
