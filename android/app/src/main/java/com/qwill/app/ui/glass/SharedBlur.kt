@@ -34,6 +34,12 @@ class SharedBlur(
     private var host: View? = null
     private var recorded = false
     private var pad = 0
+    private var phase = 0
+    private var recordedPhase = 0
+
+    fun onScrolled(dy: Int) {
+        phase = ((phase + dy) % DOWNSCALE + DOWNSCALE) % DOWNSCALE
+    }
 
     fun addConsumer(view: View) {
         if (view !in consumers) consumers.add(view)
@@ -51,8 +57,9 @@ class SharedBlur(
         source.getLocationInWindow(sourceLocation)
         val dx = (sourceLocation[0] - hostLocation[0]).toFloat()
         val dy = (sourceLocation[1] - hostLocation[1]).toFloat()
+        recordedPhase = phase
         val bw = ceil((width + pad * 2f) / DOWNSCALE).toInt().coerceAtLeast(1)
-        val bh = ceil((height + pad * 2f) / DOWNSCALE).toInt().coerceAtLeast(1)
+        val bh = ceil((height + pad * 2f + DOWNSCALE) / DOWNSCALE).toInt().coerceAtLeast(1)
         if (Build.VERSION.SDK_INT >= 31 && hardware) {
             recordNode(bw, bh, radius, dx, dy)
         } else {
@@ -81,7 +88,7 @@ class SharedBlur(
         if (Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated && renderNode != null) {
             canvas.drawRenderNode(renderNode)
         } else {
-            bitmap?.let { canvas.drawBitmap(it, 0f, 0f, bitmapPaint) }
+            bitmap?.let { canvas.drawBitmap(it, 0f, -recordedPhase.toFloat() / DOWNSCALE, bitmapPaint) }
         }
         canvas.restoreToCount(save)
     }
@@ -100,6 +107,7 @@ class SharedBlur(
         if (Build.VERSION.SDK_INT < 31) return
         val renderNode = node ?: RenderNode("sharedBlur").also { node = it }
         renderNode.setPosition(0, 0, bw, bh)
+        renderNode.translationY = -recordedPhase.toFloat() / DOWNSCALE
         val effectKey = radius.roundToInt()
         if (effectKey != nodeEffectKey) {
             val scaled = BlurMath.downscaleRadius(radius, DOWNSCALE.toFloat())
@@ -109,7 +117,7 @@ class SharedBlur(
         }
         val recording = renderNode.beginRecording()
         recording.scale(1f / DOWNSCALE, 1f / DOWNSCALE)
-        recording.translate(pad + dx, pad + dy)
+        recording.translate(pad + dx, pad + dy + recordedPhase)
         source.draw(recording)
         renderNode.endRecording()
     }
@@ -126,7 +134,7 @@ class SharedBlur(
         target.eraseColor(0)
         offscreen.save()
         offscreen.scale(1f / DOWNSCALE, 1f / DOWNSCALE)
-        offscreen.translate(pad + dx, pad + dy)
+        offscreen.translate(pad + dx, pad + dy + recordedPhase)
         source.draw(offscreen)
         offscreen.restore()
         val sigma = BlurMath.radiusToSigma(radius)

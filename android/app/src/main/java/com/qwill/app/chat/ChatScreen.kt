@@ -249,6 +249,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         list.itemAnimator = if (Motion.animationsEnabled) ChatItemAnimator(::shouldAppear, px(ChatItemAnimator.APPEAR_SHIFT_DP)) else null
         list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (::top.isInitialized) top.onSourceScrolled(dy)
                 onListScrolled(dy)
             }
 

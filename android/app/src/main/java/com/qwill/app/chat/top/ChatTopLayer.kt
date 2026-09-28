@@ -257,6 +257,10 @@ class ChatTopLayer(
         }
     }
 
+    fun onSourceScrolled(dy: Int) {
+        blur.onScrolled(dy)
+    }
+
     fun stopAnimations() {
         for (animator in listOf(callAnimator, pinnedAnimator, modeAnimator)) animator?.end()
     }
