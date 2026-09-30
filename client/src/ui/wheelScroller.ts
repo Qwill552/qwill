@@ -99,6 +99,12 @@ export function flingOf(velocity: number): Fling {
   return { durationMs, distance: velocity < 0 ? -distance : distance };
 }
 
+export function flingInCssPixels(velocity: number, pixelRatio: number): Fling {
+  const ratio = pixelRatio > 0 ? pixelRatio : 1;
+  const fling = flingOf(velocity * ratio);
+  return { durationMs: fling.durationMs, distance: fling.distance / ratio };
+}
+
 export function flingProgress(progress: number): number {
   if (progress <= 0) return 0;
   if (progress >= 1) return 1;

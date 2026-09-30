@@ -6,7 +6,7 @@ import {
   clampFlingVelocity,
   decelerate,
   edgeFalloff,
-  flingOf,
+  flingInCssPixels,
   flingProgress,
   MIN_FLING_VELOCITY,
   viscousFluid,
@@ -16,6 +16,8 @@ import styles from './WheelPicker.module.css';
 const ITEM_SIZE = 42;
 const TOUCH_SLOP = 8;
 const TAP_WINDOW_MS = 300;
+const REPEAT_DELAY_MS = 400;
+const REPEAT_INTERVAL_MS = 300;
 const VELOCITY_WINDOW_MS = 100;
 
 interface WheelPickerProps {
@@ -64,11 +66,13 @@ export function WheelPicker({ value, min, max, format, onChange, label, textOffs
   const gesture = useRef({
     pointerId: -1,
     dragging: false,
+    repeating: false,
     startY: 0,
     lastY: 0,
     startedAt: 0,
     samples: [] as { at: number; y: number }[],
   });
+  const repeatTimer = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     latest.current = { format, onChange, textOffset };
@@ -139,6 +143,8 @@ export function WheelPicker({ value, min, max, format, onChange, label, textOffs
     () => () => {
       if (motion.current) cancelAnimationFrame(motion.current.frame);
       motion.current = null;
+      if (repeatTimer.current !== null) window.clearTimeout(repeatTimer.current);
+      repeatTimer.current = null;
     },
     [],
   );
@@ -264,19 +270,43 @@ export function WheelPicker({ value, min, max, format, onChange, label, textOffs
     return ((newest.y - oldest.y) / (newest.at - oldest.at)) * 1000;
   }
 
+  function stopRepeat(): void {
+    if (repeatTimer.current !== null) window.clearTimeout(repeatTimer.current);
+    repeatTimer.current = null;
+  }
+
+  function scheduleRepeat(increment: boolean, delayMs: number): void {
+    repeatTimer.current = window.setTimeout(() => {
+      gesture.current.repeating = true;
+      stepByOne(increment);
+      scheduleRepeat(increment, REPEAT_INTERVAL_MS);
+    }, delayMs);
+  }
+
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    const wasMoving = motion.current !== null;
     stopMotion();
+    stopRepeat();
 
     gesture.current = {
       pointerId: event.pointerId,
       dragging: false,
+      repeating: false,
       startY: event.clientY,
       lastY: event.clientY,
       startedAt: event.timeStamp,
       samples: [{ at: event.timeStamp, y: event.clientY }],
     };
+
+    const { height, element } = geometry.current;
+    if (wasMoving || element === 0) return;
+    const localY = event.clientY - event.currentTarget.getBoundingClientRect().top;
+    const bandTop = (height - element) / 2;
+    const bandBottom = bandTop + element;
+    if (localY < bandTop) scheduleRepeat(false, REPEAT_DELAY_MS);
+    else if (localY > bandBottom) scheduleRepeat(true, REPEAT_DELAY_MS);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
@@ -291,6 +321,11 @@ export function WheelPicker({ value, min, max, format, onChange, label, textOffs
 
     if (!drag.dragging) {
       if (Math.abs(event.clientY - drag.startY) <= TOUCH_SLOP) return;
+      stopRepeat();
+      if (drag.repeating) {
+        drag.repeating = false;
+        stopMotion();
+      }
       drag.dragging = true;
       drag.lastY = event.clientY;
       return;
@@ -311,10 +346,15 @@ export function WheelPicker({ value, min, max, format, onChange, label, textOffs
 
     const wasDragging = drag.dragging;
     drag.dragging = false;
+    stopRepeat();
+    if (drag.repeating) {
+      drag.repeating = false;
+      return;
+    }
 
     const velocity = clampFlingVelocity(velocityOf());
     if (Math.abs(velocity) > MIN_FLING_VELOCITY && !prefersReducedMotion()) {
-      const fling = flingOf(velocity);
+      const fling = flingInCssPixels(velocity, window.devicePixelRatio);
       startMotion('fling', fling.distance, fling.durationMs, flingProgress);
       return;
     }

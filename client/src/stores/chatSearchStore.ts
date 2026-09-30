@@ -13,6 +13,7 @@ interface ChatSearchState {
   draft: string;
   query: string;
   fromUserId: string | null;
+  picking: boolean;
   mode: ChatSearchMode;
   results: MessageDto[];
   total: number;
@@ -25,6 +26,9 @@ interface ChatSearchState {
   setDraft: (value: string) => void;
   submit: (options?: { jump?: boolean }) => void;
   setFrom: (userId: string | null) => void;
+  startPicking: () => void;
+  pick: (userId: string) => void;
+  clearCaption: () => void;
   setMode: (mode: ChatSearchMode) => void;
   next: () => void;
   prev: () => void;
@@ -36,6 +40,7 @@ const IDLE = {
   draft: '',
   query: '',
   fromUserId: null,
+  picking: false,
   mode: 'chat' as ChatSearchMode,
   results: [] as MessageDto[],
   total: 0,
@@ -141,10 +146,11 @@ export const useChatSearchStore = create<ChatSearchState>((set, get) => {
     },
 
     setDraft(value) {
-      set({ draft: value });
+      set((state) => ({ draft: value, mode: state.mode === 'list' ? 'chat' : state.mode }));
     },
 
     submit(options) {
+      if (get().picking) return;
       void run(options?.jump !== false);
     },
 
@@ -153,7 +159,27 @@ export const useChatSearchStore = create<ChatSearchState>((set, get) => {
       void run(false);
     },
 
+    startPicking() {
+      set({ picking: true, draft: '', mode: 'chat' });
+    },
+
+    pick(userId) {
+      set({ fromUserId: userId, picking: false, draft: '' });
+      void run(true);
+    },
+
+    clearCaption() {
+      const { fromUserId, picking } = get();
+      if (fromUserId) {
+        set({ fromUserId: null, picking: true, draft: '' });
+        void run(false);
+        return;
+      }
+      if (picking) set({ picking: false });
+    },
+
     setMode(mode) {
+      if (mode === 'list' && get().total === 0) return;
       set({ mode });
     },
 

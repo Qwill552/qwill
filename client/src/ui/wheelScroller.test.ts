@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampFlingVelocity, decelerate, edgeFalloff, flingOf, flingProgress, viscousFluid } from './wheelScroller';
+import {
+  clampFlingVelocity,
+  decelerate,
+  edgeFalloff,
+  flingInCssPixels,
+  flingOf,
+  flingProgress,
+  viscousFluid,
+} from './wheelScroller';
 
 describe('wheelScroller: бросок барабана (R-33C, числа из Scroller.java)', () => {
   it('скорость 2000 px/с даёт ровно 1000 мс и 800 px', () => {
@@ -64,5 +72,22 @@ describe('wheelScroller: кривые', () => {
     expect(edgeFalloff(0.5)).toBeCloseTo(0.84, 2);
     expect(edgeFalloff(0.25)).toBeCloseTo(0.62, 2);
     expect(edgeFalloff(0.05)).toBeCloseTo(0.28, 2);
+  });
+});
+
+describe('wheelScroller: бросок в пикселях устройства (НАТ-12Б, «По пути»)', () => {
+  it('на плотности 3 потолок 1000 px/с летит ~505 px CSS за 1264 мс, как у Telegram', () => {
+    const fling = flingInCssPixels(1000, 3);
+
+    expect(Math.round(fling.durationMs)).toBe(1264);
+    expect(Math.round(fling.distance)).toBe(506);
+  });
+
+  it('на плотности 1 совпадает с прежним расчётом', () => {
+    expect(flingInCssPixels(1000, 1)).toEqual(flingOf(1000));
+  });
+
+  it('неизвестная плотность считается единицей, знак сохраняется', () => {
+    expect(flingInCssPixels(-2000, 0).distance).toBeCloseTo(-800, 6);
   });
 });

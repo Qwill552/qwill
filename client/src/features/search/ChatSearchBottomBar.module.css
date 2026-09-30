@@ -61,3 +61,29 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.toggle {
+  transition: opacity var(--dur-menu) var(--ease-screen);
+}
+
+.toggleStack {
+  display: grid;
+}
+
+.toggleLabel {
+  grid-area: 1 / 1;
+  text-align: center;
+  transition:
+    opacity var(--dur-toggle-swap) var(--ease-out-quint),
+    transform var(--dur-toggle-swap) var(--ease-out-quint);
+}
+
+.toggleHidden {
+  opacity: 0;
+  transform: scale(0.7);
+}

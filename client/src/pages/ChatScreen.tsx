@@ -24,6 +24,7 @@ import { ChatSearchBottomBar } from '../features/search/ChatSearchBottomBar';
 import { ChatSearchList } from '../features/search/ChatSearchList';
 import { useChatSearchStore } from '../stores/chatSearchStore';
 import { ChromeBar } from '../ui/chrome/ChromeBar';
+import { cssDurationMs } from '../ui/motion';
 import { GlassButton } from '../ui/chrome/GlassButton';
 import { GlassPill } from '../ui/chrome/GlassPill';
 import { Menu, type MenuItem } from '../ui/Menu';
@@ -163,6 +164,19 @@ export function ChatScreen() {
   const openSearch = useChatSearchStore((s) => s.openSearch);
   const closeSearch = useChatSearchStore((s) => s.close);
   const setSearchMode = useChatSearchStore((s) => s.setMode);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchLayerKept, setSearchLayerKept] = useState(searchOpen);
+  const searchLayerMounted = searchOpen || searchLayerKept;
+
+  useEffect(() => {
+    if (searchOpen) {
+      setSearchLayerKept(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setSearchLayerKept(false), cssDurationMs('--dur-search-swap'));
+    return () => window.clearTimeout(timer);
+  }, [searchOpen]);
 
   function stepBackFromSearch(): void {
     if (searchMode === 'list') setSearchMode('chat');
@@ -380,7 +394,10 @@ export function ChatScreen() {
   const subtitleTone = subtitle?.tone ?? 'default';
 
   const pinnedVisible =
-    pinnedMessage !== null && !selectionMode && !(chatId && isPinHidden(hiddenPins, chatId, pinnedMessage.id));
+    pinnedMessage !== null &&
+    !selectionMode &&
+    !(searchOpen && !isDesktop) &&
+    !(chatId && isPinHidden(hiddenPins, chatId, pinnedMessage.id));
 
   const canEditSelection =
     selectedMessages.length === 1 &&
@@ -503,6 +520,68 @@ export function ChatScreen() {
 
   if (!chatId) return null;
 
+  const chatHeader = (
+    <>
+      {/* На десктопе список чатов виден слева всегда — кнопке «назад» там не место
+          (ux-ui/14-desktop/03, «Ответы из макета»). */}
+      {!isDesktop && <GlassButton icon="back" label="Назад к чатам" onClick={() => navigate('/chats')} />}
+      <GlassPill
+        variant={isDesktop ? 'flat' : 'cap'}
+        title={
+          <span className={styles.titleRow}>
+            <span className={styles.titleText}>{activeChat?.title ?? '…'}</span>
+            {(isService || isSupportChat) && <OfficialMark size={16} />}
+            {muted && <Icon name="mute" size={14} className={styles.mutedIcon} />}
+          </span>
+        }
+        subtitle={subtitle && <ChatSubtitleText subtitle={subtitle} />}
+        subtitleTone={subtitleTone}
+        leading={
+          <Avatar
+            label={activeChat?.title ?? '?'}
+            avatarUrl={activeChat?.avatarUrl}
+            imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
+            size={40}
+            online={isDesktop ? subtitleTone === 'online' : undefined}
+            color={activeChat?.otherMember?.avatarColor}
+            colorKey={chatId}
+            className={isDesktop ? styles.headerAvatar : undefined}
+          />
+        }
+        onClick={
+          isService ? undefined : () => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))
+        }
+        onLeadingClick={
+          headerAvatarUrl ? () => openAvatarViewer(headerAvatarUrl, activeChat?.title ?? '') : undefined
+        }
+        leadingLabel="Открыть фото профиля"
+      />
+      {isDesktop && (
+        <GlassButton
+          variant="plain"
+          icon="search"
+          label="Поиск в чате"
+          onClick={() => openSearch(chatId)}
+        />
+      )}
+      {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
+      {!isService && (
+        <GlassButton
+          variant={isDesktop ? 'plain' : 'default'}
+          icon="phone"
+          label="Позвонить"
+          onClick={() => void startCall(chatId, 'AUDIO')}
+        />
+      )}
+      <GlassButton
+        variant={isDesktop ? 'plain' : 'default'}
+        icon="more"
+        label="Ещё"
+        onClick={(event) => setHeaderMenuAnchor(event.currentTarget.getBoundingClientRect())}
+      />
+    </>
+  );
+
   if (chatError) {
     return (
       <div className={styles.screen}>
@@ -560,7 +639,7 @@ export function ChatScreen() {
       <div className={styles.pinnedSlot} ref={setPinnedSlot} />
 
       {!isDesktop && searchOpen && (
-        <ChatSearchList chatId={chatId} isGroup={isGroup} visible={searchMode === 'list'} />
+        <ChatSearchList visible={searchMode === 'list'} />
       )}
 
       <ChromeBar variant={isDesktop ? 'solid' : 'chrome'} style={isDesktop ? DESKTOP_HEADER_STYLE : HEADER_STYLE}>
@@ -575,68 +654,19 @@ export function ChatScreen() {
             onForward={() => setForwardRequest([...selectedIds])}
             onDelete={handleSelectionDelete}
           />
-        ) : searchOpen && !isDesktop ? (
-          <ChatSearchBar onClose={closeSearch} />
+        ) : isDesktop ? (
+          chatHeader
         ) : (
-          <>
-            {/* На десктопе список чатов виден слева всегда — кнопке «назад» там не место
-                (ux-ui/14-desktop/03, «Ответы из макета»). */}
-            {!isDesktop && <GlassButton icon="back" label="Назад к чатам" onClick={() => navigate('/chats')} />}
-            <GlassPill
-              variant={isDesktop ? 'flat' : 'cap'}
-              title={
-                <span className={styles.titleRow}>
-                  <span className={styles.titleText}>{activeChat?.title ?? '…'}</span>
-                  {(isService || isSupportChat) && <OfficialMark size={16} />}
-                  {muted && <Icon name="mute" size={14} className={styles.mutedIcon} />}
-                </span>
-              }
-              subtitle={subtitle && <ChatSubtitleText subtitle={subtitle} />}
-              subtitleTone={subtitleTone}
-              leading={
-                <Avatar
-                  label={activeChat?.title ?? '?'}
-                  avatarUrl={activeChat?.avatarUrl}
-                  imageSrc={isService ? SERVICE_AVATAR_SRC : undefined}
-                  size={40}
-                  online={isDesktop ? subtitleTone === 'online' : undefined}
-                  color={activeChat?.otherMember?.avatarColor}
-                  colorKey={chatId}
-                  className={isDesktop ? styles.headerAvatar : undefined}
-                />
-              }
-              onClick={
-                isService ? undefined : () => (isGroup ? setGroupPanelOpen(true) : navigate(`/chats/${chatId}/info`))
-              }
-              onLeadingClick={
-                headerAvatarUrl ? () => openAvatarViewer(headerAvatarUrl, activeChat?.title ?? '') : undefined
-              }
-              leadingLabel="Открыть фото профиля"
-            />
-            {isDesktop && (
-              <GlassButton
-                variant="plain"
-                icon="search"
-                label="Поиск в чате"
-                onClick={() => openSearch(chatId)}
-              />
+          <div className={styles.headerSwap}>
+            <div className={`${styles.headerLayer} ${searchOpen ? styles.headerAway : ''}`} inert={searchOpen}>
+              {chatHeader}
+            </div>
+            {searchLayerMounted && (
+              <div className={`${styles.headerLayer} ${searchOpen ? styles.swapIn : styles.swapOut}`} inert={!searchOpen}>
+                <ChatSearchBar onClose={closeSearch} inputRef={searchInputRef} />
+              </div>
             )}
-            {/* Сервисному аккаунту не позвонишь: на той стороне никого нет. */}
-            {!isService && (
-              <GlassButton
-                variant={isDesktop ? 'plain' : 'default'}
-                icon="phone"
-                label="Позвонить"
-                onClick={() => void startCall(chatId, 'AUDIO')}
-              />
-            )}
-            <GlassButton
-              variant={isDesktop ? 'plain' : 'default'}
-              icon="more"
-              label="Ещё"
-              onClick={(event) => setHeaderMenuAnchor(event.currentTarget.getBoundingClientRect())}
-            />
-          </>
+          </div>
         )}
       </ChromeBar>
 
@@ -674,7 +704,11 @@ export function ChatScreen() {
               onForward={() => setForwardRequest([...selectedIds])}
             />
           ) : searchOpen && !isDesktop ? (
-            <ChatSearchBottomBar chatId={chatId} />
+            <ChatSearchBottomBar
+              chatId={chatId}
+              isGroup={isGroup}
+              onFocusField={() => searchInputRef.current?.focus()}
+            />
           ) : isService ? (
             <ServiceChatBar chatId={chatId} muted={muted} />
           ) : blocked ? (

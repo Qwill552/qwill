@@ -697,6 +697,10 @@
   --dur-select: 200ms;
   --dur-typing-dots: 800ms;
   --dur-ellipsis: 1500ms; /* цикл живого многоточия «Соединение…» */
+  --dur-search-swap: 320ms;
+  --dur-count-swap: 280ms;
+  --dur-toggle-swap: 420ms;
+  --dur-clear: 180ms;
   --ellipsis-state: running;
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
@@ -706,6 +710,7 @@
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-out: cubic-bezier(0, 0, 0.58, 1);
   --ease-in: cubic-bezier(0.42, 0, 1, 1);
+  --ease-decelerate: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
   --transition: var(--dur-menu) var(--ease-screen);
 }
@@ -745,6 +750,10 @@
     --dur-title-swap: 1ms;
     --dur-lupa: 1ms;
     --dur-select: 1ms;
+    --dur-search-swap: 1ms;
+    --dur-count-swap: 1ms;
+    --dur-toggle-swap: 1ms;
+    --dur-clear: 1ms;
     --ellipsis-state: paused;
     --transition: 1ms linear;
   }

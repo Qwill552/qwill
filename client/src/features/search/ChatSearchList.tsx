@@ -2,37 +2,28 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useChatSearchStore } from '../../stores/chatSearchStore';
-import { useChatStore } from '../../stores/chatStore';
-import { Chip } from '../../ui/Chip';
 import { cssDurationMs } from '../../ui/motion';
 import { scrollParentOf } from '../../ui/scrollParent';
 import { EmptyState } from '../chats/EmptyState';
-import { ChatSearchFromPicker } from './ChatSearchFromPicker';
 import { ChatSearchRow } from './ChatSearchRow';
 import styles from './ChatSearchList.module.css';
 
 const LOAD_AHEAD_PX = 600;
 
 interface ChatSearchListProps {
-  chatId: string;
-  isGroup: boolean;
   visible: boolean;
 }
 
-export function ChatSearchList({ chatId, isGroup, visible }: ChatSearchListProps) {
+export function ChatSearchList({ visible }: ChatSearchListProps) {
   const results = useChatSearchStore((s) => s.results);
   const query = useChatSearchStore((s) => s.query);
   const index = useChatSearchStore((s) => s.index);
   const loading = useChatSearchStore((s) => s.loading);
   const hasMore = useChatSearchStore((s) => s.hasMore);
-  const fromUserId = useChatSearchStore((s) => s.fromUserId);
   const loadMore = useChatSearchStore((s) => s.loadMore);
   const selectResult = useChatSearchStore((s) => s.selectResult);
-  const setFrom = useChatSearchStore((s) => s.setFrom);
-  const members = useChatStore((s) => s.membersByChat[chatId]);
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [mounted, setMounted] = useState(visible);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef(loadMore);
@@ -60,23 +51,11 @@ export function ChatSearchList({ chatId, isGroup, visible }: ChatSearchListProps
     return () => window.clearTimeout(timer);
   }, [visible]);
 
-  const fromMember = fromUserId ? members?.find((member) => member.userId === fromUserId) : undefined;
-
   if (!mounted) return null;
 
   return (
     <div className={`${styles.wrap} ${visible ? styles.opening : styles.closing}`}>
       <div className={`${styles.body} hide-native-scrollbar`}>
-        {isGroup && (
-          <div className={styles.chips}>
-            <Chip
-              label={fromMember ? `От: ${fromMember.displayName}` : 'От кого'}
-              active={Boolean(fromUserId)}
-              onClick={() => (fromUserId ? setFrom(null) : setPickerOpen(true))}
-            />
-          </div>
-        )}
-
         {results.length === 0 ? (
           <div className={styles.empty}>
             {loading ? (
@@ -102,10 +81,6 @@ export function ChatSearchList({ chatId, isGroup, visible }: ChatSearchListProps
           </>
         )}
       </div>
-
-      {pickerOpen && (
-        <ChatSearchFromPicker chatId={chatId} onPick={(userId) => setFrom(userId)} onClose={() => setPickerOpen(false)} />
-      )}
     </div>
   );
 }

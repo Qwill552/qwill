@@ -1,0 +1,65 @@
+.text {
+  white-space: pre;
+}
+
+.swap {
+  position: relative;
+  display: inline-block;
+  white-space: pre;
+}
+
+.gone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: var(--dur-count-swap) var(--ease-out-quint) both;
+}
+
+.come {
+  display: inline-block;
+  animation: var(--dur-count-swap) var(--ease-out-quint) both;
+}
+
+.up .gone {
+  animation-name: goneUp;
+}
+
+.up .come {
+  animation-name: comeUp;
+}
+
+.down .gone {
+  animation-name: goneDown;
+}
+
+.down .come {
+  animation-name: comeDown;
+}
+
+@keyframes goneUp {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes comeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes goneDown {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes comeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
