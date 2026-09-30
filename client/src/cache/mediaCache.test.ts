@@ -35,6 +35,7 @@ function chatStub(id: string, type: 'PRIVATE' | 'GROUP'): ChatListItemDto {
     lastMessage: null,
     updatedAt: new Date(0).toISOString(),
     unreadCount: 0,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

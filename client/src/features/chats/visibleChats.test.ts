@@ -13,6 +13,7 @@ function chat(overrides: Partial<ChatListItemDto> = {}): ChatListItemDto {
     lastMessage: null,
     updatedAt: '2026-08-25T10:00:00.000Z',
     unreadCount: 0,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

@@ -100,6 +100,7 @@ function listItem(unreadCount: number): ChatListItemDto {
     lastMessage: null,
     updatedAt: new Date().toISOString(),
     unreadCount,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

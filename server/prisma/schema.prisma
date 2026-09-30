@@ -130,6 +130,7 @@ model User {
   callParticipations CallParticipant[]
   blocksMade         Block[]            @relation("BlocksMade")
   blocksReceived     Block[]            @relation("BlocksGot")
+  mentions           MessageMention[]
 }
 
 model Session {
@@ -185,6 +186,7 @@ model Chat {
   members  ChatMember[]
   messages Message[]
   calls    Call[]
+  mentions MessageMention[]
 }
 
 model ChatMember {
@@ -259,6 +261,7 @@ model Message {
   attachments   Attachment[]
   reactions     Reaction[]
   pinnedInChats Chat[]       @relation("ChatPinnedMessage")
+  mentions      MessageMention[]
 
   @@index([chatId, id])
   @@index([senderId])
@@ -348,6 +351,23 @@ model LinkPreview {
   createdAt DateTime  @default(now())
 
   @@index([imageFileId])
+}
+
+model MessageMention {
+  messageId Int
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@id([messageId, userId])
+  @@index([userId, chatId, readAt])
 }
 
 model Reaction {

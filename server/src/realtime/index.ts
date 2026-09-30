@@ -8,13 +8,16 @@ import {
   messageEditSchema,
   messageForwardSchema,
   messageReactSchema,
+  mentionsReadSchema,
   messageSendSchema,
   SocketEvent,
   type CallInviteEvent,
   type CallLiveEvent,
+  type ChatMentionsEvent,
   type ChatPinnedEvent,
   type ChatReadEvent,
   type ChatReadPayload,
+  type MentionsReadAck,
   type MessageActionAck,
   type MessageBatchAck,
   type MessageDeletedBatchEvent,
@@ -46,6 +49,7 @@ import {
 } from '../services/message.js';
 import * as callService from '../services/call.js';
 import { isIpBanned } from '../services/ipBan.js';
+import { readMentions } from '../services/mention.js';
 import * as pushService from '../services/push.js';
 import { getUserById } from '../services/user.js';
 import { registerCallHandlers } from './call-handlers.js';
@@ -208,6 +212,32 @@ async function handleChatRead(userId: string, payload: ChatReadPayload): Promise
   io?.to(payload.chatId).emit(SocketEvent.ChatRead, event);
 
   if (advanced) await pushService.notifyChatRead(userId, payload.chatId);
+}
+
+async function handleMentionsRead(
+  userId: string,
+  payload: unknown,
+  ack?: (response: MentionsReadAck) => void,
+): Promise<void> {
+  const parsed = mentionsReadSchema.safeParse(payload);
+  if (!parsed.success) {
+    ack?.({ ok: false, error: { code: ErrorCode.VALIDATION_FAILED, message: 'Некорректный запрос' } });
+    return;
+  }
+
+  try {
+    const { chatId, messageIds } = parsed.data;
+    const unreadMentionsCount = await readMentions(chatId, userId, messageIds);
+    const event: ChatMentionsEvent = { chatId, unreadMentionsCount };
+    emitToUser(userId, SocketEvent.ChatMentions, event);
+    ack?.({ ok: true, unreadMentionsCount });
+  } catch (error) {
+    if (error instanceof AppError) {
+      ack?.({ ok: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    throw error;
+  }
 }
 
 async function handleTyping(socket: Socket, userId: string, payload: TypingPayload, isTyping: boolean): Promise<void> {
@@ -495,6 +525,12 @@ export function createSocketServer(httpServer: HttpServer | HttpsServer): Socket
     socket.on(SocketEvent.ChatRead, (payload: ChatReadPayload) => {
       handleChatRead(userId, payload).catch((error: unknown) => {
         logger.error({ err: error, userId }, 'Ошибка обработки chat:read');
+      });
+    });
+
+    socket.on(SocketEvent.MentionsRead, (payload, ack?: (response: MentionsReadAck) => void) => {
+      handleMentionsRead(userId, payload, ack).catch((error: unknown) => {
+        logger.error({ err: error, userId }, 'Ошибка обработки mentions:read');
       });
     });
 

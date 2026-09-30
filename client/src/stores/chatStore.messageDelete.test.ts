@@ -57,6 +57,7 @@ function listItem(overrides: Partial<ChatListItemDto> = {}): ChatListItemDto {
     lastMessage: null,
     updatedAt: new Date().toISOString(),
     unreadCount: 0,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

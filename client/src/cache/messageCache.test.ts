@@ -54,6 +54,7 @@ function chat(id: string): ChatListItemDto {
     lastMessage: null,
     updatedAt: new Date().toISOString(),
     unreadCount: 0,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

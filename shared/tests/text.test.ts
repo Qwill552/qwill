@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractLinks, splitTextWithLinks } from '../src/text.js';
+import { extractLinks, findMentions, splitTextWithLinks } from '../src/text.js';
 
 describe('splitTextWithLinks', () => {
   it('находит одну ссылку среди текста', () => {
@@ -104,5 +104,63 @@ describe('extractLinks', () => {
 
   it('возвращает пустой список без ссылок', () => {
     expect(extractLinks('просто текст')).toEqual([]);
+  });
+});
+
+describe('findMentions', () => {
+  const names = (content: string) => findMentions(content).map((mention) => mention.username);
+
+  it('находит упоминание в начале строки и отдаёт границы', () => {
+    expect(findMentions('@alice привет')).toEqual([{ start: 0, end: 6, username: 'alice' }]);
+  });
+
+  it('находит упоминание после пробела, перевода строки и скобки', () => {
+    expect(names('привет @bob')).toEqual(['bob']);
+    expect(names('строка\n@bob')).toEqual(['bob']);
+    expect(names('(@bob)')).toEqual(['bob']);
+    expect(names('«@bob»')).toEqual(['bob']);
+    expect(names('да,@bob')).toEqual(['bob']);
+  });
+
+  it('не считает почту упоминанием', () => {
+    expect(names('пиши на a@bob.com')).toEqual([]);
+  });
+
+  it('не считает двойную собаку упоминанием', () => {
+    expect(names('@@bob')).toEqual([]);
+  });
+
+  it('не ищет упоминания внутри ссылки', () => {
+    expect(names('https://example.com/@bob')).toEqual([]);
+    expect(names('https://example.com/ @bob')).toEqual(['bob']);
+  });
+
+  it('держит длину ника от 3 до 32 знаков', () => {
+    expect(names('@ab')).toEqual([]);
+    expect(names(`@${'a'.repeat(32)}`)).toEqual(['a'.repeat(32)]);
+    expect(names(`@${'a'.repeat(33)}`)).toEqual([]);
+  });
+
+  it('сводит регистр к нижнему', () => {
+    expect(names('@Alice_01')).toEqual(['alice_01']);
+  });
+
+  it('не считает кириллицу после собаки ником', () => {
+    expect(names('@алиса')).toEqual([]);
+    expect(names('@bobик')).toEqual(['bob']);
+  });
+
+  it('отпускает точку, запятую и вопрос после ника', () => {
+    expect(names('это @bob.')).toEqual(['bob']);
+    expect(names('@bob, привет')).toEqual(['bob']);
+    expect(names('ты где, @bob?')).toEqual(['bob']);
+  });
+
+  it('находит несколько упоминаний подряд', () => {
+    expect(names('@bob @carol')).toEqual(['bob', 'carol']);
+  });
+
+  it('пустой текст — пусто', () => {
+    expect(findMentions('')).toEqual([]);
   });
 });

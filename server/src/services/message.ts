@@ -21,7 +21,8 @@ import { logger } from '../lib/logger.js';
 import { computeBlurhash, imageDimensions } from '../lib/processImage.js';
 import { presenceStore } from '../realtime/presence.js';
 import { notifySupportMessage } from './adminNotify.js';
-import { assertChatWritable, assertMember } from './chat.js';
+import { assertChatWritable, assertMember, pairKeyFor } from './chat.js';
+import { recordMentions } from './mention.js';
 import { assertFileOwnershipProof, readStoredFile, toFileDto } from './file.js';
 import * as pushService from './push.js';
 import { assertSupportSendAllowed, incomingSupportMessageAdminId } from './support.js';
@@ -196,11 +197,13 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
   // Повтор отправки после обрыва сокета с тем же clientId — не создаёт дубль (секция 3).
   if (existing) return toMessageDto(existing);
 
+  let replyToSenderId: string | null = null;
   if (input.replyToId !== undefined) {
     const replyTarget = await prisma.message.findUnique({ where: { id: input.replyToId } });
     if (!replyTarget || replyTarget.chatId !== input.chatId) {
       throw badRequest(ErrorCode.MESSAGE_NOT_FOUND, 'Сообщение для ответа не найдено');
     }
+    replyToSenderId = replyTarget.senderId;
   }
 
   const attachmentCreate = input.attachment ? await buildAttachmentCreate(input.attachment) : null;
@@ -222,10 +225,21 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
 
   await prisma.chat.update({ where: { id: input.chatId }, data: { updatedAt: new Date() } });
 
+  const mentionedUserIds =
+    input.silent || input.announcementId
+      ? []
+      : await recordMentions({
+          id: message.id,
+          chatId: input.chatId,
+          senderId: input.senderId,
+          content: message.content,
+          replyToSenderId,
+        });
+
   const dto = toMessageDto(message);
   if (!input.silent) {
     // Не блокируем ack отправителю ожиданием push-провайдера — шлём в фоне (этап 9).
-    notifyOfflineMembers(input.chatId, input.senderId, dto).catch((error: unknown) => {
+    notifyOfflineMembers(input.chatId, input.senderId, dto, mentionedUserIds).catch((error: unknown) => {
       logger.error({ err: error, chatId: input.chatId }, 'Не удалось отправить push-уведомления о новом сообщении');
     });
   }
@@ -243,12 +257,36 @@ export async function sendMessage(input: SendMessageInput): Promise<MessageDto> 
 
 /** Пуш всем, у кого нет видимой вкладки чата, кроме отправителя — сокет мог остаться подключён
  *  в фоне (свёрнутое приложение), но push всё равно нужен, раз человек сейчас не смотрит (этап 9). */
-async function notifyOfflineMembers(chatId: string, senderId: string, message: MessageDto): Promise<void> {
-  const members = await prisma.chatMember.findMany({
-    where: { chatId, userId: { not: senderId }, mutedAt: null },
+async function mutedPrivateChatsWith(authorId: string, userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await prisma.chatMember.findMany({
+    where: {
+      userId: { in: userIds },
+      mutedAt: { not: null },
+      chat: { pairKey: { in: userIds.map((userId) => pairKeyFor(userId, authorId)) } },
+    },
     select: { userId: true },
   });
-  const offlineMemberIds = members.map((m) => m.userId).filter((userId) => !presenceStore.hasVisibleClient(userId));
+  return new Set(rows.map((row) => row.userId));
+}
+
+async function notifyOfflineMembers(
+  chatId: string,
+  senderId: string,
+  message: MessageDto,
+  mentionedUserIds: string[],
+): Promise<void> {
+  const members = await prisma.chatMember.findMany({
+    where: { chatId, userId: { not: senderId } },
+    select: { userId: true, mutedAt: true },
+  });
+  const mentioned = new Set(mentionedUserIds);
+  const mutedButMentioned = members.filter((m) => m.mutedAt && mentioned.has(m.userId)).map((m) => m.userId);
+  const authorMuted = await mutedPrivateChatsWith(senderId, mutedButMentioned);
+  const offlineMemberIds = members
+    .filter((m) => !m.mutedAt || (mentioned.has(m.userId) && !authorMuted.has(m.userId)))
+    .map((m) => m.userId)
+    .filter((userId) => !presenceStore.hasVisibleClient(userId));
   if (offlineMemberIds.length === 0) return;
 
   const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { type: true, title: true } });

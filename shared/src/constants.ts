@@ -25,6 +25,8 @@ export const PHONE_PATTERN = /^[0-9+()\-\s]+$/;
 export const CHAT_TITLE_MAX_LENGTH = 128;
 export const MESSAGE_MAX_LENGTH = 4096;
 
+export const MENTIONS_LIST_LIMIT = 100;
+
 /** Курсорная пагинация истории (секция 4: виртуализация не нужна при таком шаге). */
 export const MESSAGES_PAGE_SIZE = 50;
 

@@ -18,6 +18,7 @@ import {
   updateRoleSchema,
   type ChatDeletedEvent,
   type ChatMutedEvent,
+  type UnreadMentionsResponse,
 } from '@messenger/shared';
 import type { Request } from 'express';
 import { Router } from 'express';
@@ -36,6 +37,7 @@ import * as chatCalendarService from '../../services/chatCalendar.js';
 import * as chatMediaService from '../../services/chatMedia.js';
 import * as chatService from '../../services/chat.js';
 import * as groupService from '../../services/group.js';
+import * as mentionService from '../../services/mention.js';
 import * as messageService from '../../services/message.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
@@ -173,6 +175,13 @@ chatsRouter.get('/:id/sync', (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+chatsRouter.get('/:id/mentions', (req, res, next) => {
+  mentionService
+    .listUnreadMentionIds(paramId(req, 'id'), req.userId!)
+    .then((messageIds) => res.json({ messageIds } satisfies UnreadMentionsResponse))
+    .catch(next);
 });
 
 chatsRouter.get('/:id/attachments', (req, res, next) => {

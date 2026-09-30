@@ -88,6 +88,7 @@ function listItem(id: string, lastId: number | null): ChatListItemDto {
     lastMessage: lastId === null ? null : { ...message(lastId, 'x'), chatId: id },
     updatedAt: new Date().toISOString(),
     unreadCount: 0,
+    unreadMentionsCount: 0,
     muted: false,
     isSupportRequest: false,
     iBlocked: false,

@@ -5,6 +5,7 @@ import {
   CHAT_SEARCH_PAGE_SIZE,
   CHAT_TITLE_MAX_LENGTH,
   MESSAGE_BATCH_LIMIT,
+  MENTIONS_LIST_LIMIT,
   MESSAGE_MAX_LENGTH,
   MESSAGES_PAGE_SIZE,
 } from './constants.js';
@@ -282,6 +283,16 @@ export const chatMuteSchema = z.object({
 });
 export type ChatMuteInput = z.infer<typeof chatMuteSchema>;
 
+export const mentionsReadSchema = z.object({
+  chatId: z.string().min(1),
+  messageIds: z.array(z.number().int().positive()).min(1).max(MENTIONS_LIST_LIMIT).optional(),
+});
+export type MentionsReadInput = z.infer<typeof mentionsReadSchema>;
+
+export interface UnreadMentionsResponse {
+  messageIds: number[];
+}
+
 export const deleteChatQuerySchema = z.object({
   forEveryone: z
     .literal(['true', 'false'])
@@ -408,6 +419,7 @@ export interface ChatListItemDto {
   updatedAt: string;
   /** Сообщения чужих авторов с id больше собственного lastReadMessageId (секция 2). */
   unreadCount: number;
+  unreadMentionsCount: number;
   /** Уведомления по этому чату выключены лично мной — пуши о новых сообщениях не уходят.
    *  На звонки не влияет. */
   muted: boolean;

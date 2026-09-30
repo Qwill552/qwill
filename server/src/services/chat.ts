@@ -14,6 +14,7 @@ import { fileUrl } from '../lib/fileUrl.js';
 import { blockStateBetween, blockStatesFor, NO_BLOCK, type BlockState } from './block.js';
 import { findActiveCall } from './callDto.js';
 import { assertAvatarEligible } from './file.js';
+import { countUnreadMentions, countUnreadMentionsByChat } from './mention.js';
 import { messageInclude, toMessageDto, type MessageWithRelations } from './message.js';
 import { toMemberSummary } from './userSummary.js';
 import type { Chat, ChatMember, User } from '../generated/prisma/client.js';
@@ -27,6 +28,7 @@ function toChatListItem(
   chat: ChatWithRelations,
   userId: string,
   unreadCount: number,
+  unreadMentionsCount: number,
   block: BlockState,
 ): ChatListItemDto {
   const other = chat.type === 'PRIVATE' ? chat.members.find((m) => m.userId !== userId) : undefined;
@@ -43,6 +45,7 @@ function toChatListItem(
     lastMessage: lastMessageRow ? toMessageDto(lastMessageRow) : null,
     updatedAt: chat.updatedAt.toISOString(),
     unreadCount,
+    unreadMentionsCount,
     muted: own?.mutedAt != null,
     isSupportRequest: chat.isSupportRequest,
     iBlocked: chat.type === 'PRIVATE' && block.iBlocked,
@@ -221,7 +224,13 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
     return lastMessageId > (membership.clearedUpToMessageId ?? 0);
   });
 
-  const blockStates = await blockStatesFor(userId);
+  const [blockStates, mentionCounts] = await Promise.all([
+    blockStatesFor(userId),
+    countUnreadMentionsByChat(
+      userId,
+      new Map(visible.map((membership) => [membership.chatId, membership.clearedUpToMessageId])),
+    ),
+  ]);
 
   const items = await Promise.all(
     visible.map(async (membership) => {
@@ -233,7 +242,8 @@ export async function listChats(userId: string): Promise<ChatListItemDto[]> {
       );
       const otherId = membership.chat.members.find((m) => m.userId !== userId)?.userId;
       const block = (otherId ? blockStates.get(otherId) : undefined) ?? NO_BLOCK;
-      return toChatListItem(membership.chat, userId, unreadCount, block);
+      const unreadMentionsCount = mentionCounts.get(membership.chatId) ?? 0;
+      return toChatListItem(membership.chat, userId, unreadCount, unreadMentionsCount, block);
     }),
   );
 
@@ -255,6 +265,7 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
     own?.lastReadMessageId ?? null,
     own?.clearedUpToMessageId ?? null,
   );
+  const unreadMentionsCount = await countUnreadMentions(chatId, userId, own?.clearedUpToMessageId ?? null);
   const readCursors = Object.fromEntries(chat.members.map((m) => [m.userId, m.lastReadMessageId]));
 
   const [pinned, activeCall] = await Promise.all([
@@ -268,7 +279,7 @@ export async function getChatDetail(chatId: string, userId: string): Promise<Cha
   const block = chat.type === 'PRIVATE' && otherId ? await blockStateBetween(userId, otherId) : NO_BLOCK;
 
   return {
-    ...toChatListItem(chat, userId, unreadCount, block),
+    ...toChatListItem(chat, userId, unreadCount, unreadMentionsCount, block),
     members: chat.members.map((m) => toMemberSummary(m.user)),
     readCursors,
     pinnedMessage: pinned ? toMessageDto(pinned) : null,
