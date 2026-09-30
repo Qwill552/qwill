@@ -134,8 +134,9 @@
    по мере движения). Видимость и поворот — чистый CSS от того же --swipe-x. */
 .swipeIcon {
   position: absolute;
+  --swipe-share: 1;
   top: 50%;
-  right: 4px;
+  right: 0;
   display: grid;
   place-items: center;
   width: 28px;
@@ -144,8 +145,12 @@
   background: var(--primary-soft);
   color: var(--primary);
   opacity: var(--swipe-progress);
-  transform: translateY(-50%) rotate(calc(var(--swipe-progress) * -16deg));
+  transform: translate(calc(50% + var(--swipe-x) * var(--swipe-share)), -50%) rotate(calc(var(--swipe-progress) * -16deg));
   transition: background 140ms var(--ease-screen);
+}
+
+.own .swipeIcon {
+  --swipe-share: 0.5;
 }
 
 .row[data-swipe-armed] .swipeIcon {

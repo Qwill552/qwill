@@ -142,6 +142,21 @@
   color: rgba(var(--pulse-ink), 0.4);
 }
 
+.draftLabel {
+  color: var(--danger);
+}
+
+.mentionBadge {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--accent-from), var(--accent-to));
+  color: var(--text-on-primary);
+}
+
 .preview {
   overflow: hidden;
   flex: 1;

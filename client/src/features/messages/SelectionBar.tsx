@@ -13,10 +13,12 @@ interface SelectionBarProps {
 export function SelectionBar({ canReply, onReply, onForward }: SelectionBarProps) {
   return (
     <div className={styles.bar}>
-      <button type="button" className={styles.action} onClick={onReply} disabled={!canReply}>
-        <Icon name="reply" size={20} />
-        Ответить
-      </button>
+      {canReply && (
+        <button type="button" className={`${styles.action} ${styles.reply}`} onClick={onReply}>
+          <Icon name="reply" size={20} />
+          Ответить
+        </button>
+      )}
       <button type="button" className={styles.action} onClick={onForward}>
         <Icon name="forward" size={20} />
         Переслать

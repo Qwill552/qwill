@@ -114,6 +114,22 @@
   color: var(--link-out);
 }
 
+.mention {
+  color: var(--primary);
+  text-decoration: none;
+  -webkit-touch-callout: none;
+}
+
+.out .mention {
+  color: var(--link-out);
+}
+
+.mention:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 .pad {
   display: inline-block;
   height: 1px;

@@ -3,6 +3,12 @@
   min-height: 48px;
 }
 
+@media (max-width: 899px) {
+  .bar.bar {
+    box-shadow: var(--chrome-dock-shadow);
+  }
+}
+
 .icon {
   flex-shrink: 0;
   color: var(--text-secondary);

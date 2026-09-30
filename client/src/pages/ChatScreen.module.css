@@ -87,12 +87,27 @@
   bottom: 0;
   left: 0;
   z-index: 4;
-  height: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))));
-  background: rgba(var(--pulse-dock), 0.5);
-  backdrop-filter: blur(6px) saturate(150%);
-  mask-image: linear-gradient(to top, black 0%, black 20%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to top, black 0%, black 20%, transparent 100%);
+  overflow: hidden;
+  height: calc(
+    var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + var(--composer-fade-above)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 34%) 16px,
+    rgb(0 0 0 / 62%) 32px,
+    rgb(0 0 0 / 81%) 48px
+  );
   pointer-events: none;
+  --composer-fade-above: 7px;
+}
+
+.fadeWallpaper {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--chat-screen-h, 100dvh);
 }
 
 /* Едет вместе с композером: своя высота остаётся прежней, а освобождённую снизу полосу
@@ -102,12 +117,60 @@
   transform: translateY(calc(-1 * var(--bottom-lift-live)));
 }
 
+:global(html[data-bottom-lift]) .fadeWallpaper {
+  transform: translateY(var(--bottom-lift-live));
+}
+
 /* Обёртка, которую меряет ResizeObserver: её высота уходит в --composer-h и оттуда
    в нижний отступ ленты. */
 .composerSlot {
   display: flex;
   min-width: 0;
   flex: 1;
+}
+
+/* Низ экрана чата — одна ячейка: активное содержимое в потоке и задаёт высоту острова,
+   остальное прижато к низу и гаснет (Telegram ChatActivityBottomViewsVisibilityController). */
+.bottomStack {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.bottomLayer {
+  display: flex;
+  min-width: 0;
+  transition:
+    opacity var(--dur-bottom-swap) var(--ease-decelerate),
+    transform var(--dur-bottom-swap) var(--ease-decelerate);
+}
+
+.bottomAway {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottomPushed {
+  transform: translateY(54px);
+}
+
+.bottomEnter {
+  animation: bottomIn var(--dur-bottom-swap) var(--ease-decelerate) both;
+}
+
+.bottomEnter.bottomAway {
+  animation: none;
+}
+
+@keyframes bottomIn {
+  from {
+    opacity: 0;
+  }
 }
 
 /* На десктопе композер остаётся капсулой (в отличие от шапки), но внутренний ряд

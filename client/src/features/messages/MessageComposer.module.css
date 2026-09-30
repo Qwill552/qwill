@@ -3,6 +3,7 @@
    рецепт стекла (см. CLAUDE.md, «Не в этом заходе»). */
 
 .wrap {
+  position: relative;
   display: flex;
   min-width: 0;
   flex: 1;
@@ -32,7 +33,7 @@
   border-radius: 24px;
   background: rgba(var(--pulse-dock), 0.62);
   backdrop-filter: blur(14px) saturate(180%);
-  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
+  box-shadow: var(--chrome-dock-shadow), inset 0 1px 0 rgba(var(--pulse-glass), 0.14);
 }
 
 /* Десктоп: капсула на токенах хромы, а не на числах «Пульса» (ux-ui/14-desktop/03). */
@@ -261,8 +262,20 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  padding-left: var(--space-2);
+  align-items: stretch;
+  padding: 0 0 0 var(--space-2);
+  border: none;
   border-left: 3px solid var(--primary);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contextBar:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .contextLabel {
@@ -290,6 +303,18 @@
   background: transparent;
   color: rgba(var(--pulse-ink), 0.6);
   cursor: pointer;
+}
+
+.context,
+.error {
+  animation: islandIn var(--dur-island) var(--ease-island) both;
+}
+
+@keyframes islandIn {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(calc(100% + var(--space-1)));
+  }
 }
 
 .error {

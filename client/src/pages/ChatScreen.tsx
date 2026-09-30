@@ -46,6 +46,7 @@ import { SelectionBar } from '../features/messages/SelectionBar';
 import { SelectionHeader } from '../features/messages/SelectionHeader';
 import { useAuthStore } from '../stores/authStore';
 import { useCallStore } from '../stores/callStore';
+import { useDraftsStore } from '../stores/draftsStore';
 import { isPinHidden, useHiddenPinsStore } from '../stores/hiddenPinsStore';
 import { type LocalMessage, useChatStore } from '../stores/chatStore';
 import styles from './ChatScreen.module.css';
@@ -93,6 +94,34 @@ const DISMISS_TAP_SLOP_PX = 10;
 
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
  *  Буквальный перенос из «Пульс» (design-archive/reference), хрома — этап 2 CLAUDE.md. */
+type BottomMode = 'selection' | 'search' | 'service' | 'blocked' | 'composer';
+
+function bottomLayerClass(active: boolean, pushed: boolean, entering = false): string {
+  return [styles.bottomLayer, active ? '' : styles.bottomAway, pushed ? styles.bottomPushed : '', entering ? styles.bottomEnter : ''].join(' ');
+}
+
+function canReplyTo(message: LocalMessage, writable: boolean): boolean {
+  return writable && message.id > 0 && !message.deletedAt && message.type !== 'ANNOUNCEMENT';
+}
+
+function useKeptAfter(active: boolean, durationToken: string): boolean {
+  const [kept, setKept] = useState(active);
+  useEffect(() => {
+    if (active) {
+      setKept(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setKept(false), cssDurationMs(durationToken));
+    return () => window.clearTimeout(timer);
+  }, [active, durationToken]);
+  return active || kept;
+}
+
+function draftReplyContext(chatId: string | undefined): ComposerContext | null {
+  const reply = chatId ? (useDraftsStore.getState().drafts[chatId]?.replyTo ?? null) : null;
+  return reply ? { mode: 'reply', message: reply } : null;
+}
+
 export function ChatScreen() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
@@ -101,7 +130,12 @@ export function ChatScreen() {
    *  переход приносит просьбу открыть её вместе с навигацией. */
   const openPanelRequested = (useLocation().state as { openPanel?: boolean } | null)?.openPanel === true;
 
-  const [composerContext, setComposerContext] = useState<ComposerContext | null>(null);
+  const [composerContext, setComposerContext] = useState<ComposerContext | null>(() => draftReplyContext(chatId));
+  const [contextChatId, setContextChatId] = useState(chatId);
+  if (contextChatId !== chatId) {
+    setContextChatId(chatId);
+    setComposerContext(draftReplyContext(chatId));
+  }
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState<DOMRect | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -120,6 +154,7 @@ export function ChatScreen() {
   const composerApiRef = useRef<MessageComposerHandle>(null);
   const composerBarRef = useRef<HTMLDivElement>(null);
   const composerFadeRef = useRef<HTMLDivElement>(null);
+  const fadeWallpaperRef = useRef<HTMLDivElement>(null);
 
   const chats = useChatStore((s) => s.chats);
   const chatError = useChatStore((s) => s.chatError);
@@ -166,6 +201,7 @@ export function ChatScreen() {
   const setSearchMode = useChatSearchStore((s) => s.setMode);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const selectionBarKept = useKeptAfter(selectionMode, '--dur-bottom-swap');
   const [searchLayerKept, setSearchLayerKept] = useState(searchOpen);
   const searchLayerMounted = searchOpen || searchLayerKept;
 
@@ -184,17 +220,32 @@ export function ChatScreen() {
   }
 
   const handleReply = useCallback((message: LocalMessage) => setComposerContext({ mode: 'reply', message }), []);
-  const handleEdit = useCallback((message: LocalMessage) => setComposerContext({ mode: 'edit', message }), []);
+  const handleEdit = useCallback(
+    (message: LocalMessage) =>
+      setComposerContext((previous) => ({
+        mode: 'edit',
+        message,
+        stashedReply: previous?.mode === 'reply' ? previous.message : previous?.mode === 'edit' ? previous.stashedReply : null,
+      })),
+    [],
+  );
+  const handleClearContext = useCallback(
+    () =>
+      setComposerContext((previous) =>
+        previous?.mode === 'edit' && previous.stashedReply ? { mode: 'reply', message: previous.stashedReply } : null,
+      ),
+    [],
+  );
 
   const handleEditLast = useCallback(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index]!;
       if (message.sender?.id !== myId || message.id <= 0 || message.deletedAt) continue;
       if (!isEditableMessage(message)) continue;
-      setComposerContext({ mode: 'edit', message });
+      handleEdit(message);
       return;
     }
-  }, [messages, myId]);
+  }, [messages, myId, handleEdit]);
 
   // Кнопка/жест «назад» выходит из мультивыбора раньше, чем уходит из чата (ux-ui/06,
   // «Готово когда»). Контекстное меню регистрируется отдельно, внутри MessageContextMenu —
@@ -214,8 +265,6 @@ export function ChatScreen() {
   }, [chatId, openChat, closeChat]);
 
   useEffect(() => {
-    // Ответ/правка привязаны к открытому чату — при переходе в другой чат контекст неактуален.
-    setComposerContext(null);
     setGroupPanelOpen(openPanelRequested);
     setHeaderMenuAnchor(null);
     setReporting(false);
@@ -226,10 +275,11 @@ export function ChatScreen() {
   useEffect(() => {
     // Отвечали/редактировали сообщение, которое тем временем удалили (своё действие или
     // с другого устройства/собеседником) — контекст композера сбрасывается (R-15).
-    if (composerContext && !messages.some((m) => m.id === composerContext.message.id)) {
-      setComposerContext(null);
-    }
-  }, [messages, composerContext]);
+    if (!composerContext || messages.length === 0) return;
+    const gone = (id: number) => !messages.some((m) => m.id === id) && messages[0]!.id <= id;
+    if (!gone(composerContext.message.id)) return;
+    handleClearContext();
+  }, [messages, composerContext, handleClearContext]);
 
   useEffect(() => {
     // Меня удалили из группы (или я вышел) — если это открытый чат, уходим из него (секция 8).
@@ -242,7 +292,18 @@ export function ChatScreen() {
     const off = [composerBarRef.current, composerFadeRef.current]
       .filter((el): el is HTMLDivElement => el !== null)
       .map((el) => registerInsetMover(el, 'chrome'));
+    if (fadeWallpaperRef.current) off.push(registerInsetMover(fadeWallpaperRef.current, 'counter'));
     return () => off.forEach((stop) => stop());
+  }, [chatId]);
+
+  useLayoutEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) screen.style.setProperty('--chat-screen-h', `${entry.contentRect.height}px`);
+    });
+    observer.observe(screen);
+    return () => observer.disconnect();
   }, [chatId]);
 
   useEffect(() => {
@@ -399,6 +460,19 @@ export function ChatScreen() {
     !(searchOpen && !isDesktop) &&
     !(chatId && isPinHidden(hiddenPins, chatId, pinnedMessage.id));
 
+  const selectionReplyTarget =
+    selectedMessages.length === 1 && canReplyTo(selectedMessages[0]!, !isService && !blocked) ? selectedMessages[0]! : null;
+
+  const bottomMode: BottomMode = selectionMode
+    ? 'selection'
+    : searchOpen && !isDesktop
+      ? 'search'
+      : isService
+        ? 'service'
+        : blocked
+          ? 'blocked'
+          : 'composer';
+
   const canEditSelection =
     selectedMessages.length === 1 &&
     selectedMessages[0]!.sender?.id === myId &&
@@ -412,7 +486,7 @@ export function ChatScreen() {
   function handleSelectionEdit(): void {
     const message = selectedMessages[0];
     if (!message) return;
-    setComposerContext({ mode: 'edit', message });
+    handleEdit(message);
     exitSelection();
   }
 
@@ -434,7 +508,7 @@ export function ChatScreen() {
   }
 
   function handleSelectionReply(): void {
-    const message = selectedMessages[0];
+    const message = selectionReplyTarget;
     if (!message) return;
     setComposerContext({ mode: 'reply', message });
     exitSelection();
@@ -693,36 +767,58 @@ export function ChatScreen() {
         />
       )}
 
-      <div className={styles.composerFade} ref={composerFadeRef} />
+      <div className={styles.composerFade} ref={composerFadeRef}>
+        <div className={styles.fadeWallpaper} ref={fadeWallpaperRef}>
+          <ChatWallpaper />
+        </div>
+      </div>
 
       <ChromeBar side="bottom" ref={composerBarRef} style={isDesktop ? DESKTOP_COMPOSER_STYLE : COMPOSER_STYLE}>
         <div ref={composerRef} className={styles.composerSlot}>
-          {selectionMode ? (
-            <SelectionBar
-              canReply={selectedIds.size === 1}
-              onReply={handleSelectionReply}
-              onForward={() => setForwardRequest([...selectedIds])}
-            />
-          ) : searchOpen && !isDesktop ? (
-            <ChatSearchBottomBar
-              chatId={chatId}
-              isGroup={isGroup}
-              onFocusField={() => searchInputRef.current?.focus()}
-            />
-          ) : isService ? (
-            <ServiceChatBar chatId={chatId} muted={muted} />
-          ) : blocked ? (
-            <BlockedBar chatId={chatId} userId={otherMemberId} iBlocked={iBlocked} />
-          ) : (
-            <MessageComposer
-              ref={composerApiRef}
-              chatId={chatId}
-              context={composerContext}
-              onClearContext={() => setComposerContext(null)}
-              onEmojiPanelToggle={setEmojiPanelOpen}
-              onEditLast={isDesktop ? handleEditLast : undefined}
-            />
-          )}
+          <div className={styles.bottomStack}>
+            {(selectionMode || selectionBarKept) && (
+              <div className={bottomLayerClass(bottomMode === 'selection', false, true)} inert={bottomMode !== 'selection'}>
+                <SelectionBar
+                  canReply={selectionReplyTarget !== null}
+                  onReply={handleSelectionReply}
+                  onForward={() => setForwardRequest([...selectedIds])}
+                />
+              </div>
+            )}
+            {!isDesktop && searchLayerMounted && (
+              <div className={bottomLayerClass(bottomMode === 'search', bottomMode === 'selection', true)} inert={bottomMode !== 'search'}>
+                <ChatSearchBottomBar
+                  chatId={chatId}
+                  isGroup={isGroup}
+                  onFocusField={() => searchInputRef.current?.focus()}
+                />
+              </div>
+            )}
+            {isService && (
+              <div className={bottomLayerClass(bottomMode === 'service', !isDesktop && bottomMode === 'selection')} inert={bottomMode !== 'service'}>
+                <ServiceChatBar chatId={chatId} muted={muted} />
+              </div>
+            )}
+            {blocked && (
+              <div className={bottomLayerClass(bottomMode === 'blocked', !isDesktop && bottomMode === 'selection')} inert={bottomMode !== 'blocked'}>
+                <BlockedBar chatId={chatId} userId={otherMemberId} iBlocked={iBlocked} />
+              </div>
+            )}
+            {!isService && (
+              <div className={bottomLayerClass(bottomMode === 'composer', !isDesktop && bottomMode === 'selection')} inert={bottomMode !== 'composer'}>
+                <MessageComposer
+                  key={chatId}
+                  ref={composerApiRef}
+                  chatId={chatId}
+                  isGroup={isGroup}
+                  context={composerContext}
+                  onClearContext={handleClearContext}
+                  onEmojiPanelToggle={setEmojiPanelOpen}
+                  onEditLast={isDesktop ? handleEditLast : undefined}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </ChromeBar>
 

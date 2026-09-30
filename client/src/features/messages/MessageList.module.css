@@ -185,6 +185,15 @@
   pointer-events: none;
 }
 
+.mentionJump {
+  translate: 0 calc(-1 * var(--mention-lift, 0px));
+  transition:
+    opacity var(--transition),
+    transform var(--transition),
+    translate var(--dur-mention-stack) var(--ease-decelerate),
+    background 0.2s;
+}
+
 .jumpBadge {
   position: absolute;
   top: -5px;

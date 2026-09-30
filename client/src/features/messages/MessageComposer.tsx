@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_FILE_SIZE_BYTES, TYPING_REPEAT_MS } from '@messenger/shared';
+import { DEFAULT_MAX_FILE_SIZE_BYTES, MESSAGE_MAX_LENGTH, TYPING_REPEAT_MS, type GroupMemberDTO } from '@messenger/shared';
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type {
   ClipboardEvent,
@@ -11,8 +11,12 @@ import type {
 
 import { useEscapeKey, useHotkey } from '../../app/hotkeys';
 import { setPendingDraftProvider, takePendingDraft } from '../../app/pendingDraft';
+import { getSocket } from '../../realtime/socket';
 import { useAuthStore } from '../../stores/authStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useChatStore, type LocalMessage } from '../../stores/chatStore';
+import { useDraftsStore } from '../../stores/draftsStore';
+import { focusMessageInChat } from '../chat/showInChat';
+import { ChatSearchMembers } from '../search/ChatSearchMembers';
 import { Icon } from '../../ui/Icon';
 import { useEmojiIndex, type EmojiIndex } from '../emoji/emojiIndex';
 import { expectKeyboard } from '../../app/bottomInset';
@@ -32,6 +36,8 @@ import {
   setComposerCaretOffset,
   tokenizeComposerValue,
 } from './composerContent';
+import { splitLongText } from './longText';
+import { findMentionQuery, mentionInsertion, type MentionQueryMatch } from './mentions';
 import { MediaPickerSheet } from './MediaPickerSheet';
 import styles from './MessageComposer.module.css';
 
@@ -44,8 +50,17 @@ export interface MessageComposerHandle {
   closeEmojiPanel: () => void;
 }
 
+function draftMessage(message: LocalMessage | null): LocalMessage | null {
+  if (!message) return null;
+  const { localAttachment, status, ...rest } = message;
+  void localAttachment;
+  void status;
+  return rest;
+}
+
 interface MessageComposerProps {
   chatId: string;
+  isGroup?: boolean;
   context: ComposerContext | null;
   onClearContext: () => void;
   onEmojiPanelToggle?: (open: boolean) => void;
@@ -53,10 +68,11 @@ interface MessageComposerProps {
 }
 
 export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposerProps>(function MessageComposer(
-  { chatId, context, onClearContext, onEmojiPanelToggle, onEditLast },
+  { chatId, isGroup = false, context, onClearContext, onEmojiPanelToggle, onEditLast },
   ref,
 ) {
-  const [value, setValue] = useState(() => takePendingDraft(chatId) ?? '');
+  const [value, setValue] = useState(() => takePendingDraft(chatId) ?? useDraftsStore.getState().drafts[chatId]?.text ?? '');
+  const [mentionMatch, setMentionMatch] = useState<MentionQueryMatch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpenState] = useState(false);
   const [emojiPanelKept, setEmojiPanelKept] = useState(false);
@@ -79,6 +95,36 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
 
   const valueRef = useRef(value);
   valueRef.current = value;
+  const contextRef = useRef(context);
+  contextRef.current = context;
+  const stashedTextRef = useRef<string | null>(null);
+  const previousContextRef = useRef<ComposerContext | null>(context);
+
+  useEffect(() => {
+    function saveDraft(): void {
+      const chats = useChatStore.getState();
+      if (chats.chatsLoaded && !chats.chats.some((c) => c.id === chatId)) {
+        useDraftsStore.getState().remove(chatId);
+        return;
+      }
+      const current = contextRef.current;
+      const text = current?.mode === 'edit' ? (stashedTextRef.current ?? '') : valueRef.current;
+      const reply = current?.mode === 'reply' ? current.message : current?.mode === 'edit' ? current.stashedReply : null;
+      useDraftsStore.getState().save(chatId, text, draftMessage(reply));
+    }
+
+    function handleVisibility(): void {
+      if (document.visibilityState === 'hidden') saveDraft();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', saveDraft);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', saveDraft);
+      saveDraft();
+    };
+  }, [chatId]);
 
   useEffect(() => {
     setPendingDraftProvider(() => ({ chatId, text: valueRef.current }));
@@ -120,14 +166,45 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   }, [onEmojiPanelToggle]);
 
   useEffect(() => {
-    if (context?.mode === 'edit') {
+    const previous = previousContextRef.current;
+    previousContextRef.current = context;
+    if (context?.mode === 'edit' && !(previous?.mode === 'edit' && previous.message.id === context.message.id)) {
+      if (previous?.mode !== 'edit') stashedTextRef.current = valueRef.current;
       const content = context.message.content ?? '';
       pendingCaretRef.current = content.length;
       caretRangeRef.current = { start: content.length, end: content.length };
       setValue(content);
+    } else if (previous?.mode === 'edit' && context?.mode !== 'edit') {
+      const stashed = stashedTextRef.current ?? '';
+      stashedTextRef.current = null;
+      pendingCaretRef.current = stashed.length;
+      caretRangeRef.current = { start: stashed.length, end: stashed.length };
+      setValue(stashed);
     }
-    if (context) fieldRef.current?.focus();
+    if (context && context !== previous) fieldRef.current?.focus();
   }, [context]);
+
+  function updateMentionMatch(): void {
+    const el = fieldRef.current;
+    if (!isGroup || !el || document.activeElement !== el) {
+      setMentionMatch(null);
+      return;
+    }
+    const range = caretRangeRef.current;
+    setMentionMatch(findMentionQuery(valueRef.current, range.start, range.end));
+  }
+
+  useEffect(() => {
+    if (!isGroup) return;
+    function handleSelection(): void {
+      const el = fieldRef.current;
+      if (!el || document.activeElement !== el || isComposingRef.current) return;
+      caretRangeRef.current = getComposerCaretRange(el);
+      updateMentionMatch();
+    }
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  });
 
   useLayoutEffect(() => {
     const el = fieldRef.current;
@@ -173,6 +250,9 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
 
   function handleChange(next: string): void {
     setValue(next);
+    valueRef.current = next;
+    updateMentionMatch();
+    if (contextRef.current?.mode === 'edit') return;
 
     if (!next.trim()) {
       markStopped();
@@ -216,6 +296,19 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   function handleFieldBlur(): void {
     const el = fieldRef.current;
     if (el) caretRangeRef.current = getComposerCaretRange(el);
+    setMentionMatch(null);
+  }
+
+  function handleMentionPick(member: GroupMemberDTO): void {
+    const match = mentionMatch;
+    if (!match) return;
+    const insertion = mentionInsertion(member.username);
+    const current = valueRef.current;
+    const next = current.slice(0, match.start) + insertion + current.slice(match.end);
+    const caret = match.start + insertion.length;
+    pendingCaretRef.current = caret;
+    caretRangeRef.current = { start: caret, end: caret };
+    handleChange(next);
   }
 
   function insertPlainText(text: string): void {
@@ -250,9 +343,12 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   }
 
   function handleCancelContext(): void {
-    if (context?.mode === 'edit') setValue('');
     setError(null);
     onClearContext();
+  }
+
+  function handleContextJump(): void {
+    if (context) void focusMessageInChat(chatId, context.message.id);
   }
 
   const canEditLast = Boolean(onEditLast) && !context && !recording && value.length === 0;
@@ -260,32 +356,47 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   useEscapeKey(context !== null, handleCancelContext);
   useHotkey(canEditLast, { key: 'ArrowUp' }, () => onEditLast?.());
 
-  async function submit(): Promise<void> {
+  function submit(): void {
     const content = value.trim();
     if (!content || !user) return;
-    markStopped();
-    clearSendRejection(chatId);
 
     if (context?.mode === 'edit') {
-      try {
-        await editMessage(chatId, context.message.id, content);
-        setValue('');
+      if (content === (context.message.content ?? '').trim()) {
+        setError(null);
         onClearContext();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Не удалось изменить сообщение');
+        return;
       }
+      if (content.length > MESSAGE_MAX_LENGTH) {
+        setError(`Слишком длинное сообщение: ${content.length} из ${MESSAGE_MAX_LENGTH}`);
+        return;
+      }
+      if (!getSocket()?.connected) {
+        setError('Нет соединения');
+        return;
+      }
+      const target = context.message;
+      setError(null);
+      onClearContext();
+      editMessage(chatId, target.id, content).catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Не удалось изменить сообщение');
+      });
       return;
     }
 
+    markStopped();
+    clearSendRejection(chatId);
+    setError(null);
     const replyTo = context?.mode === 'reply' ? context.message : undefined;
-    sendMessage(chatId, content, user, undefined, replyTo);
+    for (const part of splitLongText(content)) sendMessage(chatId, part, user, undefined, replyTo);
     setValue('');
+    valueRef.current = '';
+    useDraftsStore.getState().remove(chatId);
     if (replyTo) onClearContext();
   }
 
   function handleSubmit(event: FormEvent): void {
     event.preventDefault();
-    void submit();
+    submit();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
@@ -294,9 +405,10 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       onEditLast?.();
       return;
     }
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    if (event.ctrlKey || event.metaKey || (desktop && !event.shiftKey)) {
       event.preventDefault();
-      void submit();
+      submit();
     }
   }
 
@@ -337,6 +449,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
 
   const editing = context?.mode === 'edit';
   const hasText = value.trim().length > 0;
+  const roundIcon = editing ? 'check' : hasText ? 'send' : 'mic';
 
   function handleRoundPointerDown(event: ReactPointerEvent<HTMLButtonElement>): void {
     if (hasText || editing || recording || !user) return;
@@ -376,7 +489,15 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
 
   return (
     <div className={styles.wrap}>
-      {context && <ComposerContextBar context={context} onCancel={handleCancelContext} />}
+      {isGroup && (
+        <ChatSearchMembers
+          chatId={chatId}
+          query={mentionMatch?.query ?? ''}
+          visible={mentionMatch !== null}
+          onPick={handleMentionPick}
+        />
+      )}
+      {context && <ComposerContextBar context={context} onCancel={handleCancelContext} onJump={handleContextJump} />}
       {(error ?? sendRejection) && <p className={styles.error}>{error ?? sendRejection}</p>}
 
       <form className={styles.composer} data-no-back-swipe onSubmit={handleSubmit}>
@@ -455,16 +576,18 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
           className={styles.send}
           type={hasText ? 'submit' : 'button'}
           disabled={editing ? !hasText : recordingLocked}
+          data-locked={editing && !hasText ? 'true' : undefined}
           data-recording={recording && !recordingLocked ? 'true' : undefined}
           onPointerDown={handleRoundPointerDown}
           onPointerMove={handleRoundPointerMove}
           onPointerUp={handleRoundPointerUp}
           onPointerCancel={handleRoundPointerCancel}
-          aria-label={hasText ? 'Отправить' : 'Записать голосовое'}
+          aria-label={editing ? 'Сохранить' : hasText ? 'Отправить' : 'Записать голосовое'}
         >
           <span className={styles.morph}>
-            <Icon name="mic" size={22} className={`${styles.morphIcon} ${hasText ? styles.morphHidden : ''}`} />
-            <Icon name="send" size={22} className={`${styles.morphIcon} ${hasText ? '' : styles.morphHidden}`} />
+            <Icon name="mic" size={22} className={`${styles.morphIcon} ${roundIcon === 'mic' ? '' : styles.morphHidden}`} />
+            <Icon name="send" size={22} className={`${styles.morphIcon} ${roundIcon === 'send' ? '' : styles.morphHidden}`} />
+            <Icon name="check" size={22} className={`${styles.morphIcon} ${roundIcon === 'check' ? '' : styles.morphHidden}`} />
           </span>
         </button>
       </form>

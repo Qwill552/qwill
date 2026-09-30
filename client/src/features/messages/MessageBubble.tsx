@@ -1,7 +1,9 @@
-import { splitTextWithLinks } from '@messenger/shared';
+import { findMentions, splitTextWithLinks, type MentionSpan } from '@messenger/shared';
 import { Fragment, type MouseEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useChatSearchStore } from '../../stores/chatSearchStore';
+import { useAuthStore } from '../../stores/authStore';
 import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Icon } from '../../ui/Icon';
 import { tintVar } from '../../ui/tint';
@@ -43,6 +45,19 @@ function renderHighlighted(text: string, from: number, length: number, hits: Ret
       <Fragment key={index}>{parseEmoji(piece.value)}</Fragment>
     ),
   );
+}
+
+function mentionPieces(from: number, to: number, mentions: MentionSpan[]): { start: number; end: number; username: string | null }[] {
+  const pieces: { start: number; end: number; username: string | null }[] = [];
+  let cursor = from;
+  for (const mention of mentions) {
+    if (mention.end <= from || mention.start >= to) continue;
+    if (mention.start > cursor) pieces.push({ start: cursor, end: mention.start, username: null });
+    pieces.push({ start: mention.start, end: mention.end, username: mention.username });
+    cursor = mention.end;
+  }
+  if (cursor < to) pieces.push({ start: cursor, end: to, username: null });
+  return pieces;
 }
 
 interface MessageBubbleProps {
@@ -89,6 +104,41 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
   const spans = message.content ? splitTextWithLinks(message.content) : null;
   const hits = message.content && searchQuery ? highlightRanges(message.content, searchQuery) : EMPTY_HITS;
   const spanOffsets = spanStarts(spans);
+  const mentions = message.content && !message.deletedAt ? findMentions(message.content) : [];
+  const navigate = useNavigate();
+  const myUsername = useAuthStore((s) => s.user?.username ?? null);
+
+  function handleMentionClick(event: MouseEvent<HTMLAnchorElement>, username: string): void {
+    event.preventDefault();
+    const store = useChatStore.getState();
+    if (store.selectionMode) {
+      store.toggleSelected(message.id);
+      return;
+    }
+    if (myUsername && myUsername.toLowerCase() === username) return;
+    const known = store.chats.find((c) => c.type === 'PRIVATE' && c.otherMember?.username.toLowerCase() === username);
+    navigate(known ? `/chats/${known.id}/info` : `/u/${username}`);
+  }
+
+  function renderText(from: number, length: number): ReactNode {
+    const content = message.content ?? '';
+    const pieces = mentionPieces(from, from + length, mentions);
+    if (pieces.length === 1 && pieces[0]!.username === null) return renderHighlighted(content, from, length, hits);
+    return pieces.map((piece) =>
+      piece.username === null ? (
+        <Fragment key={piece.start}>{renderHighlighted(content, piece.start, piece.end - piece.start, hits)}</Fragment>
+      ) : (
+        <a
+          key={piece.start}
+          href={`/u/${piece.username}`}
+          className={styles.mention}
+          onClick={(event) => handleMentionClick(event, piece.username!)}
+        >
+          {renderHighlighted(content, piece.start, piece.end - piece.start, hits)}
+        </a>
+      ),
+    );
+  }
   const firstLink = message.deletedAt ? null : (spans?.find((span) => span.kind === 'link')?.href ?? null);
   const metaUnderCard = useRenderableLinkPreview(firstLink) !== null;
 
@@ -253,9 +303,7 @@ export function MessageBubble({ message, own, read, showAuthor, album, children,
                           {span.value}
                         </a>
                       ) : (
-                        <Fragment key={i}>
-                          {renderHighlighted(message.content ?? '', spanOffsets[i]!, span.value.length, hits)}
-                        </Fragment>
+                        <Fragment key={i}>{renderText(spanOffsets[i]!, span.value.length)}</Fragment>
                       ),
                     )
                   : null}

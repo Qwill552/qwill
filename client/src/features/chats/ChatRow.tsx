@@ -10,6 +10,7 @@ import { formatChatRowWhen } from '../messages/dayLabel';
 import { isVoiceAttachment } from '../messages/Attachment';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { useChatStore } from '../../stores/chatStore';
+import { shownDraft, useDraftsStore } from '../../stores/draftsStore';
 import { Avatar } from '../../ui/Avatar';
 import { Badge } from '../../ui/Badge';
 import { useLongPress } from '../../ui/gestures/useLongPress';
@@ -74,6 +75,7 @@ export function ChatRow({ chat, online, typingNames, myUserId, index, today }: C
   const navigate = useNavigate();
   const layout = useLayoutMode();
   const setChatMuted = useChatStore((s) => s.setChatMuted);
+  const draft = shownDraft(chat, useDraftsStore((s) => s.drafts[chat.id]));
   const primeChatFromCache = useChatStore((s) => s.primeChatFromCache);
   const rowRef = useRef<HTMLAnchorElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
@@ -183,13 +185,22 @@ export function ChatRow({ chat, online, typingNames, myUserId, index, today }: C
             </span>
             {/* Пока сервер не отдаёт курсоры прочтения в списке чатов, честная отметка одна:
                 «отправлено». Двойная галочка появится вместе с этими данными. */}
-            {own && !typing && <Icon name="check" size={15} className={styles.sentMark} />}
-            {last && <span className={styles.time}>{formatChatRowWhen(last.createdAt, today)}</span>}
+            {own && !typing && !draft && <Icon name="check" size={15} className={styles.sentMark} />}
+            {draft ? (
+              <span className={styles.time}>{formatChatRowWhen(new Date(draft.date).toISOString(), today)}</span>
+            ) : (
+              last && <span className={styles.time}>{formatChatRowWhen(last.createdAt, today)}</span>
+            )}
           </div>
           <div className={styles.bottom}>
             {typing ? (
               <p className={styles.typing}>
                 {chat.type === 'GROUP' ? `${typingNames.join(', ')} печатает…` : 'печатает…'}
+              </p>
+            ) : draft ? (
+              <p className={styles.preview}>
+                <span className={styles.draftLabel}>{draft.text.trim() ? 'Черновик: ' : 'Черновик'}</span>
+                {parseEmoji(draft.text.replace(/\s+/g, ' ').trim())}
               </p>
             ) : (
               <p className={styles.preview}>
@@ -203,6 +214,11 @@ export function ChatRow({ chat, online, typingNames, myUserId, index, today }: C
                 {authorPrefix && <span className={styles.author}>{authorPrefix}</span>}
                 {parseEmoji(previewText(chat, own))}
               </p>
+            )}
+            {chat.unreadMentionsCount > 0 && (
+              <span className={styles.mentionBadge} aria-label="Есть упоминания">
+                <Icon name="at" size={15} />
+              </span>
             )}
             <Badge count={chat.unreadCount} muted={chat.muted} />
           </div>

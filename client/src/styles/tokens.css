@@ -300,6 +300,7 @@
   --chrome-bg: color-mix(in srgb, var(--surface) 62%, transparent);
   --chrome-border: color-mix(in srgb, var(--border) 85%, transparent);
   --chrome-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, var(--lift) 70%, transparent);
+  --chrome-dock-shadow: 0 0.33px 1px color-mix(in srgb, #000 12.5%, transparent);
 
   --card-bg: var(--surface);
   --card-border: var(--border);
@@ -324,6 +325,7 @@
   --chrome-bg: color-mix(in srgb, var(--surface-2) 56%, transparent);
   --chrome-border: color-mix(in srgb, var(--lift) 9%, transparent);
   --chrome-shadow: var(--shadow-lg), inset 0 1px 0 color-mix(in srgb, var(--lift) 14%, transparent);
+  --chrome-dock-shadow: 0 0 0 transparent;
 
   --card-bg: var(--surface);
   --card-border: color-mix(in srgb, var(--lift) 5%, transparent);
@@ -701,6 +703,11 @@
   --dur-count-swap: 280ms;
   --dur-toggle-swap: 420ms;
   --dur-clear: 180ms;
+  --dur-bottom-swap: 240ms; /* смена низа экрана чата: композер, выделение, поиск, плашки */
+  --dur-island: 250ms; /* выезд панели ответа и строки ошибки из-под поля */
+  --dur-reply-in: 320ms; /* «Ответить» в панели выделения */
+  --dur-swipe-return: 180ms; /* возврат строки после свайп-ответа */
+  --dur-mention-stack: 280ms; /* кнопка «@» съезжает на место спрятанной «вниз» */
   --ellipsis-state: running;
 
   --ease-screen: cubic-bezier(0.2, 0.9, 0.25, 1);
@@ -711,6 +718,7 @@
   --ease-out: cubic-bezier(0, 0, 0.58, 1);
   --ease-in: cubic-bezier(0.42, 0, 1, 1);
   --ease-decelerate: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-island: cubic-bezier(0.199, 0.011, 0.279, 0.91);
 
   --transition: var(--dur-menu) var(--ease-screen);
 }
@@ -754,6 +762,11 @@
     --dur-count-swap: 1ms;
     --dur-toggle-swap: 1ms;
     --dur-clear: 1ms;
+    --dur-bottom-swap: 1ms;
+    --dur-island: 1ms;
+    --dur-reply-in: 1ms;
+    --dur-swipe-return: 1ms;
+    --dur-mention-stack: 1ms;
     --ellipsis-state: paused;
     --transition: 1ms linear;
   }

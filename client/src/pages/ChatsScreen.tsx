@@ -14,6 +14,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useChatListPrefsStore } from '../stores/chatListPrefsStore';
 import { useChatSearchStore } from '../stores/chatSearchStore';
 import { useChatStore } from '../stores/chatStore';
+import { useDraftsStore } from '../stores/draftsStore';
 import { useUiStore } from '../stores/uiStore';
 import { Avatar } from '../ui/Avatar';
 import { Card } from '../ui/Card';
@@ -305,9 +306,10 @@ export function ChatsScreen() {
     },
   ];
 
+  const drafts = useDraftsStore((s) => s.drafts);
   const navigableChats = useMemo(
-    () => selectVisibleChats(chats, effectiveFilter, isAdmin),
-    [chats, effectiveFilter, isAdmin],
+    () => selectVisibleChats(chats, effectiveFilter, isAdmin, drafts),
+    [chats, effectiveFilter, isAdmin, drafts],
   );
 
   function stepChat(delta: number): void {

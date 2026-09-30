@@ -7,6 +7,7 @@ import type {
   CallTakenElsewhereEvent,
   ChatBlockEvent,
   ChatDeletedEvent,
+  ChatMentionsEvent,
   ChatMutedEvent,
   ChatDto,
   ChatListItemDto,
@@ -17,6 +18,7 @@ import type {
   ChatUpdatedEvent,
   GroupMemberDTO,
   MemberChangedEvent,
+  MentionsReadAck,
   MessageActionAck,
   MessageAttachmentInput,
   MessageBatchAck,
@@ -54,6 +56,7 @@ import {
   getMessagesAfterRequest,
   getMessagesAroundRequest,
   getMessagesRequest,
+  getUnreadMentionsRequest,
   leaveGroupRequest,
   listChatsRequest,
   removeMemberRequest,
@@ -130,7 +133,9 @@ import { closeDesktopChatNotifications } from '../native/desktop';
 import { trackUpdating } from '../realtime/connectionStatus';
 import { emitWhenReady, getSocket } from '../realtime/socket';
 import { notifyDesktopOfMessage } from '../app/desktopNotify';
+import { mentionsMe } from '../features/messages/mentions';
 import { useAuthStore } from './authStore';
+import { useDraftsStore } from './draftsStore';
 import { useCallStore } from './callStore';
 
 export type LocalAttachmentKind = 'image' | 'video' | 'voice' | 'file';
@@ -223,6 +228,7 @@ interface ChatState {
   /** Причина, по которой сервер отказал в отправке по существу (лимит обращений, заглушение):
    *  чтобы человек увидел текст, а не только красный пузырь. Живёт до следующей отправки. */
   sendRejectionByChat: Record<string, string>;
+  mentionIdsByChat: Record<string, number[]>;
   myUserId: string | null;
   /** Чат, открытый в текущей вкладке — новые сообщения в нём читаются сразу же (секция 8). */
   activeChatId: string | null;
@@ -295,6 +301,10 @@ interface ChatState {
   retryMessage: (chatId: string, clientId: string) => void;
   /** Правка и удаление резолвятся/реджектятся по ack — компонент показывает ошибку сам (секция 6). */
   editMessage: (chatId: string, messageId: number, content: string) => Promise<void>;
+  loadUnreadMentions: (chatId: string) => Promise<number[]>;
+  readMentions: (chatId: string, messageIds: number[]) => void;
+  readAllMentions: (chatId: string) => void;
+  applyChatMentions: (event: ChatMentionsEvent) => void;
   deleteMessage: (chatId: string, messageId: number) => Promise<void>;
   deleteMessagesBatch: (chatId: string, messageIds: number[]) => Promise<void>;
   /** toChatId=null снимает закреп (то же, что messageId=null на сервере). */
@@ -833,6 +843,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chatsLoaded: false,
   chatError: null,
   sendRejectionByChat: {},
+  mentionIdsByChat: {},
   myUserId: null,
   activeChatId: null,
   membersByChat: {},
@@ -2069,7 +2080,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   editMessage(chatId, messageId, content) {
     const socket = getSocket();
-    if (!socket) return Promise.resolve();
+    if (!socket?.connected) return Promise.reject(new Error('Нет соединения'));
+    const original = get().messagesByChat[chatId]?.find((m) => m.id === messageId);
+    if (original) get().applyMessageUpdate({ ...original, content, editedAt: new Date().toISOString() });
 
     return new Promise((resolve, reject) => {
       socket.emit(SocketEvent.MessageEdit, { chatId, messageId, content }, (ack: MessageActionAck) => {
@@ -2078,8 +2091,60 @@ export const useChatStore = create<ChatState>((set, get) => ({
           resolve();
           return;
         }
+        if (original) get().applyMessageUpdate(original);
         reject(new Error(ack.error?.message ?? 'Не удалось изменить сообщение'));
       });
+    });
+  },
+
+  async loadUnreadMentions(chatId) {
+    const { messageIds } = await getUnreadMentionsRequest(chatId);
+    set((state) => ({
+      mentionIdsByChat: { ...state.mentionIdsByChat, [chatId]: messageIds },
+      chats:
+        messageIds.length === 0
+          ? state.chats.map((c) => (c.id === chatId && c.unreadMentionsCount !== 0 ? { ...c, unreadMentionsCount: 0 } : c))
+          : state.chats,
+    }));
+    return messageIds;
+  },
+
+  readMentions(chatId, messageIds) {
+    if (messageIds.length === 0) return;
+    const wanted = new Set(messageIds);
+    set((state) => {
+      const known = state.mentionIdsByChat[chatId] ?? [];
+      const rest = known.filter((id) => !wanted.has(id));
+      const removed = known.length - rest.length;
+      return {
+        mentionIdsByChat: { ...state.mentionIdsByChat, [chatId]: rest },
+        chats: state.chats.map((c) =>
+          c.id === chatId ? { ...c, unreadMentionsCount: Math.max(0, c.unreadMentionsCount - removed) } : c,
+        ),
+      };
+    });
+    getSocket()?.emit(SocketEvent.MentionsRead, { chatId, messageIds }, (ack: MentionsReadAck) => {
+      if (ack.ok && ack.unreadMentionsCount !== undefined) {
+        get().applyChatMentions({ chatId, unreadMentionsCount: ack.unreadMentionsCount });
+      }
+    });
+  },
+
+  readAllMentions(chatId) {
+    get().applyChatMentions({ chatId, unreadMentionsCount: 0 });
+    getSocket()?.emit(SocketEvent.MentionsRead, { chatId }, (ack: MentionsReadAck) => {
+      if (ack.ok && ack.unreadMentionsCount !== undefined) {
+        get().applyChatMentions({ chatId, unreadMentionsCount: ack.unreadMentionsCount });
+      }
+    });
+  },
+
+  applyChatMentions(event) {
+    set((state) => {
+      const count = Math.max(0, event.unreadMentionsCount);
+      const chats = state.chats.map((c) => (c.id === event.chatId && c.unreadMentionsCount !== count ? { ...c, unreadMentionsCount: count } : c));
+      if (count > 0) return { chats };
+      return { chats, mentionIdsByChat: { ...state.mentionIdsByChat, [event.chatId]: [] } };
     });
   },
 
@@ -2249,6 +2314,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     socket.off(SocketEvent.ChatDeleted).on(SocketEvent.ChatDeleted, (event: ChatDeletedEvent) => {
       get().applyChatDeleted(event.chatId);
+    });
+
+    socket.off(SocketEvent.ChatMentions).on(SocketEvent.ChatMentions, (event: ChatMentionsEvent) => {
+      get().applyChatMentions(event);
     });
 
     socket.off(SocketEvent.ChatMuted).on(SocketEvent.ChatMuted, (event: ChatMutedEvent) => {
@@ -2426,6 +2495,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       kickedChatId: null,
       pinnedByChat: {},
   activeCallByChat: {},
+      mentionIdsByChat: {},
       selectionMode: false,
       selectedIds: new Set(),
     });
@@ -2460,14 +2530,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const isMine = message.sender?.id === state.myUserId;
       const unreadCount = isMine ? chat.unreadCount : chat.unreadCount + 1;
+      const knownMentions = state.mentionIdsByChat[message.chatId] ?? [];
+      const repliedSenderId =
+        message.replyToId !== null
+          ? (state.messagesByChat[message.chatId]?.find((m) => m.id === message.replyToId)?.sender?.id ?? null)
+          : null;
+      const mentioned =
+        !knownMentions.includes(message.id) &&
+        mentionsMe(message, chat.type, state.myUserId, useAuthStore.getState().user?.username ?? null, repliedSenderId);
 
       const updatedChat: ChatListItemDto = {
         ...chat,
         lastMessage: message,
         updatedAt: message.createdAt,
         unreadCount,
+        unreadMentionsCount: mentioned ? chat.unreadMentionsCount + 1 : chat.unreadMentionsCount,
       };
-      return { ...state, chats: upsertChat(state.chats, updatedChat) };
+      return {
+        ...state,
+        chats: upsertChat(state.chats, updatedChat),
+        mentionIdsByChat: mentioned
+          ? { ...state.mentionIdsByChat, [message.chatId]: [...knownMentions, message.id].sort((x, y) => x - y) }
+          : state.mentionIdsByChat,
+      };
     });
 
     void writeCachedMessages([message]);
@@ -2572,6 +2657,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   applyChatDeleted(chatId: string) {
+    useDraftsStore.getState().remove(chatId);
     const fileIds = (get().messagesByChat[chatId] ?? []).flatMap((message) => {
       if (!message.attachment) return [];
       const ids = [message.attachment.file.id];

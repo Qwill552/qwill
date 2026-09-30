@@ -3,6 +3,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { isTypingTarget } from '../../app/hotkeys';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useDraftsStore } from '../../stores/draftsStore';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { Skeleton } from '../../ui/Skeleton';
 import { ChatRow } from './ChatRow';
@@ -67,7 +68,8 @@ export const ChatList = forwardRef<ChatListHandle, ChatListProps>(function ChatL
     },
   }));
 
-  const visible = useMemo(() => selectVisibleChats(chats, filter, isAdmin), [chats, filter, isAdmin]);
+  const drafts = useDraftsStore((s) => s.drafts);
+  const visible = useMemo(() => selectVisibleChats(chats, filter, isAdmin, drafts), [chats, filter, isAdmin, drafts]);
 
   const loading = !chatsLoaded && chats.length === 0;
 

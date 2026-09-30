@@ -12,7 +12,9 @@ import { type LocalMessage, useChatStore } from '../../stores/chatStore';
 import { Badge } from '../../ui/Badge';
 import { startDissolve } from '../../ui/dissolve';
 import { bumpScrollEpoch } from '../../ui/gestures/gestureReducer';
+import { useLongPress } from '../../ui/gestures/useLongPress';
 import { Icon } from '../../ui/Icon';
+import { Menu } from '../../ui/Menu';
 import { cssDurationMs } from '../../ui/motion';
 import { ScrollIndicator } from '../../ui/ScrollIndicator';
 import { dayKeyOfIso } from '../calendar/calendarDates';
@@ -227,6 +229,8 @@ function isReadByOthers(
   return others.every(([, cursor]) => cursor !== null && cursor !== undefined && cursor >= messageId);
 }
 
+const MENTION_READ_INTERVAL_MS = 500;
+
 export function MessageList({
   chatId,
   isGroup,
@@ -291,7 +295,22 @@ export function MessageList({
   const hidePin = useHiddenPinsStore((s) => s.hide);
   const [unpinConfirm, setUnpinConfirm] = useState(false);
   const unreadCount = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.unreadCount ?? 0);
+  const mentionCount = useChatStore((s) => s.chats.find((c) => c.id === chatId)?.unreadMentionsCount ?? 0);
+  const mentionIds = useChatStore((s) => s.mentionIdsByChat[chatId]);
+  const loadUnreadMentions = useChatStore((s) => s.loadUnreadMentions);
+  const readMentions = useChatStore((s) => s.readMentions);
+  const readAllMentions = useChatStore((s) => s.readAllMentions);
+  const pendingMentionReads = useRef(new Set<number>());
+  const mentionReadTimer = useRef(0);
+  const mentionsRequested = useRef<string | null>(null);
+  const mentionLongFired = useRef(false);
+  const [mentionMenu, setMentionMenu] = useState<DOMRect | null>(null);
+  const mentionJumpRef = useRef<HTMLButtonElement>(null);
   const isService = useChatStore((s) => isServiceChat(s.chats.find((c) => c.id === chatId)));
+  const chatBlocked = useChatStore((s) => {
+    const chat = s.chats.find((c) => c.id === chatId);
+    return chat?.iBlocked === true || chat?.blockedMe === true;
+  });
   const myId = useAuthStore((s) => s.user?.id) ?? null;
 
   // Права на «Удалить чужое»/«Закрепить» в группе завязаны на роль участника (membersByChat) —
@@ -430,13 +449,13 @@ export function MessageList({
         canEdit: own && canAct && isEditableMessage(row.message),
         canDelete: isDeletableMessage(row.message, myId, isGroupAdmin),
         canPin: canPinBase && canAct,
-        canReply: !isService,
+        canReply: !isService && !chatBlocked && row.message.type !== 'ANNOUNCEMENT',
         canReact: !isService,
         isPinned: pinnedMessage !== null && row.groupIds.includes(pinnedMessage.id),
         showUnread: unreadAnchor !== null && row.groupIds.includes(unreadAnchor.messageId),
       };
     });
-  }, [rows, myId, readCursors, isGroupAdmin, canPinBase, isService, pinnedMessage, unreadAnchor]);
+  }, [rows, myId, readCursors, isGroupAdmin, canPinBase, isService, chatBlocked, pinnedMessage, unreadAnchor]);
 
   // Удалённое сообщение уходит из стора мгновенно, но не из ленты: строка задерживается
   // здесь замороженной, пока не доиграет распад. Диффим прямо в рендере, а не в эффекте, —
@@ -1183,8 +1202,39 @@ export function MessageList({
 
   const readFrame = useRef(0);
   const updateReadingRef = useRef<() => void>(() => undefined);
+  function flushMentionReads(): void {
+    window.clearTimeout(mentionReadTimer.current);
+    mentionReadTimer.current = 0;
+    const ids = [...pendingMentionReads.current];
+    pendingMentionReads.current.clear();
+    if (ids.length > 0) readMentions(chatId, ids);
+  }
+
+  function collectMentionReads(el: HTMLElement): void {
+    if (!mentionIds || mentionIds.length === 0) return;
+    const wanted = new Set(mentionIds);
+    const listTop = el.getBoundingClientRect().top;
+    const edges = visibleEdges(el);
+    const top = listTop + edges.top;
+    const bottom = listTop + edges.bottom;
+    let flashed = 0;
+    for (const node of el.querySelectorAll<HTMLElement>('.message-wrap')) {
+      const id = Number(node.dataset.messageId);
+      if (!wanted.has(id) || pendingMentionReads.current.has(id)) continue;
+      const rect = node.getBoundingClientRect();
+      if (rect.bottom <= top || rect.top >= bottom) continue;
+      pendingMentionReads.current.add(id);
+      flashed = id;
+    }
+    if (flashed !== 0) flashMessageRef.current(flashed);
+    if (pendingMentionReads.current.size > 0 && mentionReadTimer.current === 0) {
+      mentionReadTimer.current = window.setTimeout(flushMentionReads, MENTION_READ_INTERVAL_MS);
+    }
+  }
+
   updateReadingRef.current = () => {
     const el = listRef.current;
+    if (el && documentVisible && !(focus && focus.seq !== placedFocus.current)) collectMentionReads(el);
     if (!el || !documentVisible || !unreadDecided) return;
     if (unreadCount > 0 && myCursor === undefined) return;
     if (focus && focus.seq !== placedFocus.current && entryIndexByMessage.has(focus.messageId)) return;
@@ -1223,6 +1273,43 @@ export function MessageList({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!isGroup || mentionCount <= 0 || mentionsRequested.current === chatId) return;
+    mentionsRequested.current = chatId;
+    loadUnreadMentions(chatId).catch(() => {
+      mentionsRequested.current = null;
+    });
+  }, [isGroup, mentionCount, chatId, loadUnreadMentions]);
+
+  const flushMentionReadsRef = useRef(flushMentionReads);
+  flushMentionReadsRef.current = flushMentionReads;
+  useEffect(() => () => flushMentionReadsRef.current(), [chatId]);
+
+  const mentionPress = useLongPress({
+    onLongPress: () => {
+      mentionLongFired.current = true;
+      const rect = mentionJumpRef.current?.getBoundingClientRect();
+      if (rect) setMentionMenu(rect);
+    },
+  });
+
+  function handleMentionJump(): void {
+    if (mentionLongFired.current) {
+      mentionLongFired.current = false;
+      return;
+    }
+    const first = (useChatStore.getState().mentionIdsByChat[chatId] ?? []).find((id) => !pendingMentionReads.current.has(id));
+    if (first !== undefined) {
+      void focusMessageInChat(chatId, first);
+      return;
+    }
+    loadUnreadMentions(chatId)
+      .then((ids) => {
+        if (ids[0] !== undefined) void focusMessageInChat(chatId, ids[0]);
+      })
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     scheduleReading();
@@ -1527,6 +1614,48 @@ export function MessageList({
         <Icon name="chevron-down" size={22} />
         <Badge count={unreadCount} small className={styles.jumpBadge} />
       </button>
+
+      <button
+        type="button"
+        ref={mentionJumpRef}
+        className={`${styles.jump} ${styles.mentionJump} ${mentionCount > 0 && !searchArrowsShown ? '' : styles.jumpHidden}`}
+        style={{
+          ['--mention-lift' as string]:
+            (showJump || !isViewportNewest) && !searchArrowsShown ? `${unreadCount > 0 ? 64 : 54}px` : '0px',
+        }}
+        aria-label={`К непрочитанным упоминаниям: ${mentionCount}`}
+        tabIndex={mentionCount > 0 && !searchArrowsShown ? 0 : -1}
+        onClick={handleMentionJump}
+        onPointerDown={mentionPress.onPointerDown}
+        onPointerMove={mentionPress.onPointerMove}
+        onPointerUp={mentionPress.onPointerUp}
+        onPointerCancel={mentionPress.onPointerCancel}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMentionMenu(event.currentTarget.getBoundingClientRect());
+        }}
+      >
+        <Icon name="at" size={22} />
+        <Badge count={mentionCount} small className={styles.jumpBadge} />
+      </button>
+
+      {mentionMenu && (
+        <Menu
+          anchor={mentionMenu}
+          onClose={() => setMentionMenu(null)}
+          items={[
+            {
+              id: 'read-all-mentions',
+              label: 'Отметить все прочитанными',
+              icon: 'check-double',
+              onSelect: () => {
+                pendingMentionReads.current.clear();
+                readAllMentions(chatId);
+              },
+            },
+          ]}
+        />
+      )}
       </SelectionDragContext.Provider>
     </MediaFeedContext.Provider>
   );

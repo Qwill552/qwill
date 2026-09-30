@@ -1,5 +1,7 @@
 import type { ChatListItemDto } from '@messenger/shared';
 
+import { chatSortTime, type Drafts } from '../../stores/draftsStore';
+
 import type { ChatFilter } from './ChatFilters';
 
 export function isEmptyPrivateChat(chat: ChatListItemDto): boolean {
@@ -10,6 +12,7 @@ export function selectVisibleChats(
   chats: ChatListItemDto[],
   filter: ChatFilter,
   isAdmin = false,
+  drafts: Drafts = {},
 ): ChatListItemDto[] {
   const started = chats.filter((c) => !isEmptyPrivateChat(c));
   const filtered =
@@ -24,5 +27,5 @@ export function selectVisibleChats(
             : isAdmin
               ? started.filter((c) => !c.isSupportRequest)
               : started;
-  return [...filtered].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+  return [...filtered].sort((a, b) => chatSortTime(b, drafts[b.id]) - chatSortTime(a, drafts[a.id]));
 }

@@ -20,7 +20,7 @@ export interface BottomInsetState {
 
 /** `chrome` едет вверх вместе с клавиатурой, `feed` — отстаёт от уже пересчитанной
  *  раскладки ровно на то, что клавиатуре осталось пройти. */
-export type InsetMoverMode = 'chrome' | 'feed' | 'panel';
+export type InsetMoverMode = 'chrome' | 'feed' | 'panel' | 'counter';
 
 interface KeyboardInsetsPlugin {
   addListener(
@@ -202,6 +202,7 @@ function rememberPanelLift(value: number): void {
 
 function offsetOf(mode: InsetMoverMode, atLift: number): number {
   if (mode === 'chrome') return -atLift;
+  if (mode === 'counter') return atLift;
   if (mode === 'feed') return layoutLift - atLift;
   return panelLift - atLift;
 }

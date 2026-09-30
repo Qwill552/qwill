@@ -264,10 +264,7 @@ export function MessageRow({
   });
 
   const swipe = useSwipeAction<HTMLDivElement>({
-    onTrigger: () => {
-      haptic();
-      onReply(message);
-    },
+    onTrigger: () => onReply(message),
     disabled: () => selectionMode || !canAct || !canReply,
   });
 

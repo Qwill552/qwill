@@ -10,6 +10,7 @@ import type {
   ChatMessageAtDateResponse,
   ChatSearchResponse,
   ChatUpdatedEvent,
+  UnreadMentionsResponse,
   CreateGroupInput,
   CreatePrivateChatInput,
   GroupMemberDTO,
@@ -28,6 +29,10 @@ export function listChatsRequest(): Promise<ChatListResponse> {
 
 export function getChatRequest(chatId: string): Promise<ChatDto> {
   return apiRequest<ChatDto>(`/api/chats/${chatId}`);
+}
+
+export function getUnreadMentionsRequest(chatId: string): Promise<UnreadMentionsResponse> {
+  return apiRequest<UnreadMentionsResponse>(`/api/chats/${chatId}/mentions`);
 }
 
 export function createPrivateChatRequest(input: CreatePrivateChatInput): Promise<ChatDto> {
