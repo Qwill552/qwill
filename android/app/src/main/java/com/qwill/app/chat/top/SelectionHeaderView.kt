@@ -14,6 +14,7 @@ import android.graphics.RectF
 import android.text.TextPaint
 import android.view.MotionEvent
 import android.view.View
+import com.qwill.app.ui.CharDiffText
 import com.qwill.app.ui.QwillIcon
 import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.theme.FixedColors
@@ -52,64 +53,6 @@ class SelectionHeaderView(context: Context) : ChromeRowLayout(context, ACTION_GA
     }
 }
 
-class CountText(private val prefix: String) {
-    private var shown = ""
-    private var previous = ""
-    private var growing = true
-    var progress = 1f
-
-    val text: String get() = prefix + shown
-
-    fun set(value: Int): Boolean {
-        val next = value.toString()
-        if (next == shown) return false
-        growing = shown.isEmpty() || value > (shown.toIntOrNull() ?: 0)
-        previous = shown
-        shown = next
-        return true
-    }
-
-    fun durationMs(): Long = if (growing) GROW_MS else SHRINK_MS
-
-    fun draw(canvas: Canvas, x: Float, baseline: Float, shift: Float, paint: TextPaint) {
-        val baseAlpha = paint.alpha
-        canvas.drawText(prefix, x, baseline, paint)
-        var left = x + paint.measureText(prefix)
-        val direction = if (growing) 1f else -1f
-        val oldLeft = left
-        for (index in shown.indices) {
-            val char = shown.substring(index, index + 1)
-            val same = progress < 1f && index < previous.length && previous[index] == shown[index] && previous.length == shown.length
-            if (progress >= 1f || same) {
-                paint.alpha = baseAlpha
-                canvas.drawText(char, left, baseline, paint)
-            } else {
-                paint.alpha = (baseAlpha * progress).toInt()
-                canvas.drawText(char, left, baseline + direction * shift * (1f - progress), paint)
-            }
-            left += paint.measureText(char)
-        }
-        if (progress < 1f) {
-            var gone = oldLeft
-            for (index in previous.indices) {
-                val char = previous.substring(index, index + 1)
-                val same = index < shown.length && previous[index] == shown[index] && previous.length == shown.length
-                if (!same) {
-                    paint.alpha = (baseAlpha * (1f - progress)).toInt()
-                    canvas.drawText(char, gone, baseline - direction * shift * progress, paint)
-                }
-                gone += paint.measureText(char)
-            }
-        }
-        paint.alpha = baseAlpha
-    }
-
-    private companion object {
-        const val GROW_MS = 180L
-        const val SHRINK_MS = 150L
-    }
-}
-
 class SelectionCapsule(context: Context) : View(context) {
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Fonts.display(FontWeight.SEMIBOLD) }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -118,7 +61,8 @@ class SelectionCapsule(context: Context) : View(context) {
     private val shape = Path()
     private val highlight = Path()
     private val rect = RectF()
-    private val count = CountText(PREFIX)
+    private val count = CharDiffText()
+    private var countValue = -1
     private var shapeFor = -1
     private var shadow: Bitmap? = null
     private var shadowKey = ""
@@ -132,7 +76,9 @@ class SelectionCapsule(context: Context) : View(context) {
     }
 
     fun setCount(value: Int, animated: Boolean) {
-        if (!count.set(value)) return
+        val growing = countValue < 0 || value > countValue
+        if (!count.set(PREFIX + value, growing)) return
+        countValue = value
         contentDescription = count.text
         animator?.cancel()
         if (!animated || !Motion.animationsEnabled || !isShown) {
@@ -142,7 +88,7 @@ class SelectionCapsule(context: Context) : View(context) {
         }
         count.progress = 0f
         val next = ValueAnimator.ofFloat(0f, 1f)
-        next.duration = Motion.duration(count.durationMs())
+        next.duration = Motion.duration(if (growing) GROW_MS else SHRINK_MS)
         next.interpolator = Motion.easeScreen
         next.addUpdateListener {
             count.progress = it.animatedValue as Float
@@ -241,6 +187,8 @@ class SelectionCapsule(context: Context) : View(context) {
 
     private companion object {
         const val PREFIX = "Выбрано "
+        const val GROW_MS = 180L
+        const val SHRINK_MS = 150L
         const val RADIUS = 26f
         const val BORDER = 1f
         const val PAD_X = 12f

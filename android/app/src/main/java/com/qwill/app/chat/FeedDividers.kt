@@ -88,8 +88,9 @@ class DayPill(private val context: Context) {
     }
 }
 
-class DayDividerView(context: Context) : View(context) {
+class DayDividerView(context: Context, private val onTap: (Long) -> Unit) : View(context) {
     private val pill = DayPill(context)
+    private var tracking = false
     var dayStartMs = 0L
         private set
     var covered = false
@@ -101,6 +102,41 @@ class DayDividerView(context: Context) : View(context) {
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val half = pill.width / 2f + px(TAP_EXTRA_X)
+                val top = px(DayPill.TOP - TAP_EXTRA_Y)
+                val bottom = px(DayPill.TOP + TAP_EXTRA_Y) + pill.height
+                tracking = !covered && event.x >= width / 2f - half && event.x <= width / 2f + half && event.y >= top && event.y <= bottom
+                return tracking
+            }
+            MotionEvent.ACTION_UP -> {
+                if (!tracking) return false
+                tracking = false
+                performClick()
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> tracking = false
+        }
+        return tracking
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        if (!covered) {
+            playSoundEffect(android.view.SoundEffectConstants.CLICK)
+            onTap(dayStartMs)
+        }
+        return true
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        info.className = "android.widget.Button"
+        info.addAction(AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, "Открыть календарь"))
     }
 
     fun bind(dayStart: Long, isCovered: Boolean) {
@@ -127,6 +163,11 @@ class DayDividerView(context: Context) : View(context) {
     }
 
     private fun px(dp: Float): Float = dp * resources.displayMetrics.density
+
+    private companion object {
+        const val TAP_EXTRA_X = 8f
+        const val TAP_EXTRA_Y = 10f
+    }
 }
 
 class UnreadDividerView(context: Context) : View(context) {

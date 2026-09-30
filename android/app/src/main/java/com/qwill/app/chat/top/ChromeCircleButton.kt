@@ -19,6 +19,13 @@ class ChromeCircleButton(context: Context, private val icon: QwillIcon, label: S
 
     var blur: SharedBlur? = null
 
+    var iconAlpha = 1f
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     init {
         isClickable = true
         isFocusable = true
@@ -65,7 +72,8 @@ class ChromeCircleButton(context: Context, private val icon: QwillIcon, label: S
             canvas.drawCircle(cx, cy, radius + context.dp(FOCUS), paint)
         }
         val size = context.dp(ICON)
-        icon.draw(canvas, cx - size / 2f, cy - size / 2f, size, if (danger) palette.danger else palette.pulseInk, paint)
+        val ink = if (danger) palette.danger else palette.pulseInk
+        icon.draw(canvas, cx - size / 2f, cy - size / 2f, size, if (iconAlpha < 1f) withAlpha(ink, iconAlpha) else ink, paint)
     }
 
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {

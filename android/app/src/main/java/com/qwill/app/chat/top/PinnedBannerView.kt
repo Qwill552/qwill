@@ -19,7 +19,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import com.qwill.app.chats.ChatPreview
 import com.qwill.app.consent.CssGradient
@@ -164,7 +163,7 @@ class PinnedBannerView(context: Context, onJump: () -> Unit, onClose: () -> Unit
             progress = 0f
             val swap = ValueAnimator.ofFloat(0f, 1f)
             swap.duration = Motion.duration(SWAP_MS)
-            swap.interpolator = EASE_OUT_QUINT
+            swap.interpolator = Motion.easeOutQuint
             swap.addUpdateListener {
                 progress = it.animatedValue as Float
                 invalidate()
@@ -314,7 +313,6 @@ class PinnedBannerView(context: Context, onJump: () -> Unit, onClose: () -> Unit
         private const val SWAP_MS = 360L
         private const val SWAP_SHIFT = 12f
         private const val RIPPLE_ALPHA = 0.12f
-        private val EASE_OUT_QUINT = PathInterpolator(0.23f, 1f, 0.32f, 1f)
 
         fun previewText(message: MessageDto): String {
             val content = message.content

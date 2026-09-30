@@ -11,8 +11,25 @@ object DayLabel {
         "января", "февраля", "марта", "апреля", "мая", "июня",
         "июля", "августа", "сентября", "октября", "ноября", "декабря",
     )
+    private val SHORT_MONTHS = arrayOf(
+        "янв.", "февр.", "мар.", "апр.", "мая", "июн.",
+        "июл.", "авг.", "сент.", "окт.", "нояб.", "дек.",
+    )
     private const val DAY_MS = 86_400_000.0
     private const val WEEK_DAYS = 7L
+
+    fun attachmentDateTime(atMs: Long, nowMs: Long = System.currentTimeMillis(), zone: TimeZone = TimeZone.getDefault()): String {
+        val moment = Calendar.getInstance(zone).apply { timeInMillis = atMs }
+        val now = Calendar.getInstance(zone).apply { timeInMillis = nowMs }
+        val time = hourMinute(atMs, zone)
+        val diff = ((startOfDay(now) - startOfDay(moment)) / DAY_MS).roundToLong()
+        if (diff == 0L) return "сегодня в $time"
+        val day = "${moment.get(Calendar.DAY_OF_MONTH)} ${SHORT_MONTHS[moment.get(Calendar.MONTH)]}"
+        val dated = if (moment.get(Calendar.YEAR) == now.get(Calendar.YEAR)) day else "$day ${moment.get(Calendar.YEAR)} г."
+        return "$dated в $time"
+    }
+
+    fun longDate(year: Int, monthIndex: Int, day: Int): String = "$day ${MONTHS[monthIndex]} $year г."
 
     fun format(atMs: Long, nowMs: Long = System.currentTimeMillis(), zone: TimeZone = TimeZone.getDefault()): String {
         val moment = Calendar.getInstance(zone).apply { timeInMillis = atMs }

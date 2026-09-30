@@ -27,6 +27,7 @@ class GlassView(
     private val source: View,
     private val blurDp: Float = Glass.CHROME_BLUR,
     saturation: Float = Glass.CHROME_SATURATION,
+    private val tracksSource: Boolean = true,
 ) : View(context) {
 
     var cornerRadius: Float = 0f
@@ -82,13 +83,16 @@ class GlassView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (!tracksSource) return
         viewTreeObserver.addOnScrollChangedListener(scrollListener)
         viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
     }
 
     override fun onDetachedFromWindow() {
-        viewTreeObserver.removeOnScrollChangedListener(scrollListener)
-        viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
+        if (tracksSource) {
+            viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+            viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
+        }
         releaseBuffers()
         super.onDetachedFromWindow()
     }

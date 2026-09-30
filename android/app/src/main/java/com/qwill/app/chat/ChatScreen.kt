@@ -29,8 +29,20 @@ import com.qwill.app.BuildConfig
 import com.qwill.app.QwillApplication
 import com.qwill.app.auth.SessionState
 import com.qwill.app.calls.ActiveCallsListener
+import com.qwill.app.chat.bottom.ChatBottomLayer
+import com.qwill.app.chat.calendar.CalendarFilter
+import com.qwill.app.chat.calendar.ChatCalendarSheet
+import com.qwill.app.chat.calendar.DatePickerSheet
 import com.qwill.app.chat.dialogs.ChatDialogs
 import com.qwill.app.chat.dialogs.ConfirmDialog
+import com.qwill.app.chat.search.ChatSearch
+import com.qwill.app.chat.search.ChatSearchListView
+import com.qwill.app.chat.search.ChatSearchMode
+import com.qwill.app.chat.search.ChatSearchText
+import com.qwill.app.chat.search.ChatSearchTransport
+import com.qwill.app.chat.search.MemberSuggest
+import com.qwill.app.chat.search.SearchArrowsView
+import com.qwill.app.chat.search.SearchCancel
 import com.qwill.app.chat.selection.FeedListView
 import com.qwill.app.chat.selection.FeedTouchHelper
 import com.qwill.app.chat.selection.MessageSelection
@@ -60,6 +72,7 @@ import com.qwill.app.messenger.HistorySource
 import com.qwill.app.messenger.MembersListener
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListItemDto
+import com.qwill.app.model.ChatSearchResponse
 import com.qwill.app.model.ChatType
 import com.qwill.app.model.MessageDto
 import com.qwill.app.net.ApiException
@@ -69,6 +82,7 @@ import com.qwill.app.net.NoResponseError
 import com.qwill.app.realtime.ConnectionStateListener
 import com.qwill.app.realtime.PresenceListener
 import com.qwill.app.realtime.TypingListener
+import com.qwill.app.search.Highlight
 import com.qwill.app.ui.AppForeground
 import com.qwill.app.ui.ConnectionTitleRule
 import com.qwill.app.ui.ForegroundListener
@@ -77,6 +91,7 @@ import com.qwill.app.ui.QwillMenu
 import com.qwill.app.ui.QwillMenuItem
 import com.qwill.app.ui.TitleKind
 import com.qwill.app.ui.insets.SafeArea
+import com.qwill.app.ui.stack.BackGestureOverlay
 import com.qwill.app.ui.stack.Screen
 import com.qwill.app.ui.theme.Dimens
 import com.qwill.app.ui.theme.FontWeight
@@ -89,6 +104,8 @@ import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+
+enum class JumpOutcome { OK, FAILED, SUPERSEDED }
 
 class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     Screen(), MessageCellHost, ChatAdapterHost, FeedScrollThumb.Host, FeedTouchHelper.Host {
@@ -109,6 +126,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private lateinit var wallpaper: ChatWallpaperView
     private lateinit var list: FeedListView
     private lateinit var top: ChatTopLayer
+    private lateinit var bottom: ChatBottomLayer
+    private lateinit var searchPanel: ChatSearchListView
     private lateinit var touchHelper: FeedTouchHelper
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var adapter: ChatAdapter
@@ -163,6 +182,14 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private var dialog: ConfirmDialog? = null
     private var deleteChatDialog: DeleteChatDialog? = null
     private var membersRequested = false
+    private val search = ChatSearch(SearchTransport()) { onSearchChanged() }
+    private var calendarSheet: ChatCalendarSheet? = null
+    private var dateSheet: DatePickerSheet? = null
+    private var jumpOutcome: ((JumpOutcome) -> Unit)? = null
+    private var panelSource = false
+    private var appliedHighlight: String? = null
+    private var counterIndex = 0
+    private var searchSelectionHidden = false
     private var connectionKind = TitleKind.BRAND
     private var targetKind = TitleKind.BRAND
     private val kindTask = Runnable {
@@ -200,6 +227,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         if (changed != chatId) return@MembersListener
         updatePinned(animated = true)
         updateSelectionHeader(animated = false)
+        if (search.open) renderSearch(animated = true)
     }
     private val emojiListener = EmojiListener { indexChanged ->
         if (indexChanged) {
@@ -221,7 +249,11 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     }
 
     override val interceptsBack: Boolean
-        get() = menu?.isShowing == true || dialog != null || deleteChatDialog != null || selection.active
+        get() = menu?.isShowing == true || dialog != null || deleteChatDialog != null || calendarSheet != null || dateSheet != null ||
+            selection.active || search.open
+
+    override val backOverlay: BackGestureOverlay?
+        get() = calendarSheet?.sheet ?: dateSheet?.sheet
 
     override val selectionActive: Boolean get() = selection.active
 
@@ -249,7 +281,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         list.itemAnimator = if (Motion.animationsEnabled) ChatItemAnimator(::shouldAppear, px(ChatItemAnimator.APPEAR_SHIFT_DP)) else null
         list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (::top.isInitialized) top.onSourceScrolled(dy)
+                if (!panelSource) feedBlur(dy)
                 onListScrolled(dy)
             }
 
@@ -299,6 +331,28 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         thumb = FeedScrollThumb(context, this)
         root.addView(thumb, FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
 
+        searchPanel = ChatSearchListView(context)
+        searchPanel.onSelect = { index -> search.select(index) }
+        searchPanel.onLoadMore = { search.loadMore() }
+        searchPanel.onReveal = { progress -> onPanelReveal(progress) }
+        searchPanel.onScrolledBy = { dy -> if (panelSource) feedBlur(dy) }
+        root.addView(searchPanel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        bottom = ChatBottomLayer(context, list, wallpaper)
+        root.addView(bottom, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        bottom.bar.calendar.setOnClickListener { openDatePicker() }
+        bottom.bar.from.setOnClickListener {
+            search.startPicking()
+            top.search.focusInput()
+        }
+        bottom.bar.toggle.setOnClickListener {
+            search.setMode(if (search.mode == ChatSearchMode.LIST) ChatSearchMode.CHAT else ChatSearchMode.LIST)
+            if (search.mode == ChatSearchMode.LIST) top.search.dropKeyboard()
+        }
+        bottom.arrows.older.setOnClickListener { search.next() }
+        bottom.arrows.newer.setOnClickListener { search.prev() }
+        bottom.members.onPick = { member -> search.pick(member) }
+
         top = ChatTopLayer(
             context,
             list,
@@ -312,6 +366,14 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         top.header.back.setOnClickListener { stack?.pop() }
         top.header.call.setOnClickListener {}
         top.header.more.setOnClickListener { openMenu() }
+        top.search.back.setOnClickListener { closeSearch() }
+        top.search.clear.setOnClickListener { onSearchClear() }
+        top.search.field.onText = { text -> search.setDraft(text) }
+        top.search.field.onSubmit = {
+            top.search.dropKeyboard()
+            search.submit()
+        }
+        top.search.field.input.onDeleteEmpty = { if (search.from != null || search.picking) search.clearCaption() }
         top.selection.close.setOnClickListener { exitSelection(animated = true) }
         top.selection.copy.setOnClickListener { copySelection() }
         top.selection.delete.setOnClickListener { confirmDeleteSelection() }
@@ -330,6 +392,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             top.setSelectionMode(true, animated = false)
             updateSelectionHeader(animated = false)
         }
+        if (search.open) renderSearch(animated = false)
         if (!opened) {
             open()
         } else {
@@ -355,6 +418,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         shown = false
         MainQueue.cancel(minuteTask)
         touchHelper.cancel()
+        top.search.dropKeyboard()
         menu?.dismissNow()
         if (selection.active) exitSelection(animated = false)
         rememberPosition()
@@ -375,8 +439,20 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             it.requestClose()
             return true
         }
+        calendarSheet?.let {
+            it.requestClose()
+            return true
+        }
+        dateSheet?.let {
+            it.requestClose()
+            return true
+        }
         if (selection.active) {
             exitSelection(animated = true)
+            return true
+        }
+        if (search.open) {
+            if (search.mode == ChatSearchMode.LIST) search.setMode(ChatSearchMode.CHAT) else closeSearch()
             return true
         }
         return false
@@ -393,6 +469,11 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         dialog?.dismissNow()
         dialog = null
         deleteChatDialog = null
+        calendarSheet?.dismissNow()
+        calendarSheet = null
+        dateSheet?.dismissNow()
+        dateSheet = null
+        panelSource = false
     }
 
     override fun onDestroyed() {
@@ -422,6 +503,10 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         if (!::list.isInitialized) return
         applyTheme()
         top.applyTheme()
+        bottom.applyTheme()
+        searchPanel.applyTheme()
+        calendarSheet?.applyTheme()
+        dateSheet?.applyTheme()
         menu?.applyTheme()
         dialog?.applyTheme()
         deleteChatDialog?.applyTheme()
@@ -443,8 +528,12 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     private fun applyInsets() {
         top.setSafeArea(safe)
+        bottom.setSafeArea(safe)
+        calendarSheet?.setSafeArea(safe)
+        dateSheet?.setSafeArea(safe)
         val contentTop = top.contentTop + safe.top
         setListPadding(contentTop, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
+        searchPanel.setInsets(contentTop, (px(PANEL_BOTTOM) + safe.bottom).roundToInt())
         status.setPadding((px(STATUS_PAD_X) + safe.left).roundToInt(), list.paddingTop, (px(STATUS_PAD_X) + safe.right).roundToInt(), list.paddingBottom)
         (floating.layoutParams as FrameLayout.LayoutParams).topMargin =
             (contentTop + px(ChatTopLayout.FLOATING_DATE_GAP) - px(FLOATING_TAP_EXTRA)).roundToInt()
@@ -789,7 +878,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
         status.text = text.orEmpty()
         status.visibility = if (text == null) View.GONE else View.VISIBLE
-        list.visibility = if (failure != null) View.INVISIBLE else View.VISIBLE
+        applyFeedVisibility()
         applyTheme()
     }
 
@@ -919,8 +1008,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             showJump = false
         }
         val visible = feed.loaded && (showJump || feed.hasMoreAfter)
-        if (!visible && jump.shown) feed.returnToId = null
-        jump.setShown(visible)
+        if (!visible && jump.shown && !search.open) feed.returnToId = null
+        jump.setShown(visible && !search.open)
     }
 
     private fun updateJumpCount() {
@@ -948,7 +1037,16 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         messages.openChat(chatId, classGuid, historyCallback)
     }
 
-    private fun jumpTo(messageId: Long, from: Long? = null) {
+    private fun settleJump(outcome: JumpOutcome) {
+        val callback = jumpOutcome ?: return
+        jumpOutcome = null
+        callback(outcome)
+    }
+
+    private fun jumpTo(messageId: Long, from: Long? = null, onOutcome: ((JumpOutcome) -> Unit)? = null) {
+        settleJump(JumpOutcome.SUPERSEDED)
+        jumpOutcome = onOutcome
+        jumpSeq++
         list.stopScroll()
         if (from != null) feed.returnToId = from
         pendingJumpId = messageId
@@ -958,6 +1056,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             loadWindow(messageId, flash = true, offset = null)
             return
         }
+        settleJump(JumpOutcome.OK)
         val key = keyOfMessage(messageId)
         val view = layoutManager.findViewByPosition(position)
         val distance = if (view != null) {
@@ -986,8 +1085,10 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
                     if (seq != jumpSeq) return
                     if (page.messages.none { it.id == messageId }) {
                         pendingJumpId = null
+                        settleJump(JumpOutcome.FAILED)
                         return
                     }
+                    settleJump(JumpOutcome.OK)
                     feed.locals.putAll(page.pendingLocal)
                     replaceFeed(page.messages, page.pending, page.hasMoreBefore, page.hasMoreAfter)
                     submitRows(diff = false)
@@ -997,7 +1098,9 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
                 }
 
                 override fun onHistoryFailed(error: ApiException) {
-                    if (seq == jumpSeq) pendingJumpId = null
+                    if (seq != jumpSeq) return
+                    pendingJumpId = null
+                    settleJump(JumpOutcome.FAILED)
                 }
             },
         )
@@ -1133,6 +1236,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     private fun updateReading() {
         if (!::list.isInitialized || !shown || !AppForeground.active || !feed.loaded) return
+        if (searchPanel.revealed >= 1f) return
         if (feed.unreadAtEntry > 0 && (!cursorKnown || !unreadDecided || awaitingUnread)) return
         if (placement != null) return
         val top = list.paddingTop.toFloat()
@@ -1253,6 +1357,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
         val service = chat?.otherMember?.isService == true
         val (left, right) = sideInsets()
+        val query = appliedHighlight
+        val highlight = if (query != null && !message.content.isNullOrEmpty() && Highlight.ranges(message.content, query).isNotEmpty()) query else null
         return MessageCellModel(
             row = row,
             showAuthor = group && !row.own && !row.sameAuthorAsPrev,
@@ -1265,6 +1371,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             myId = myId(),
             sideLeft = left,
             sideRight = right,
+            highlight = highlight,
         )
     }
 
@@ -1401,6 +1508,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         updatePinned(animated)
         updateCall(animated)
         if (!available && selection.active) exitSelection(animated = false)
+        if (!available && search.open) closeSearch()
     }
 
     private fun updateSubtitle(animated: Boolean) {
@@ -1445,7 +1553,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private fun updatePinned(animated: Boolean) {
         if (!::top.isInitialized) return
         val pinned = details?.pinnedMessage
-        val visible = pinned != null && failure == null && !selection.active && !QwillApplication.hiddenPins.isHidden(chatId, pinned.id)
+        val visible = pinned != null && failure == null && !selection.active && !search.open && !QwillApplication.hiddenPins.isHidden(chatId, pinned.id)
         top.setPinned(if (visible) pinned else null, canUnpin(), animated && shown)
     }
 
@@ -1487,13 +1595,14 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     }
 
     private fun menuItems(chat: ChatListItemDto): List<QwillMenuItem> {
+        val searchItem = QwillMenuItem(label = "Поиск", icon = QwillIcon.SEARCH) { openSearch() }
         val muteItem = QwillMenuItem(
             label = if (chat.muted) "Включить уведомления" else "Отключить уведомления",
             icon = if (chat.muted) QwillIcon.MUTE else QwillIcon.BELL,
             muted = chat.muted,
         ) { messages.setChatMuted(chatId, !chat.muted) }
-        if (isService() || chat.type == ChatType.GROUP) return listOf(muteItem)
-        val items = arrayListOf(muteItem)
+        if (isService() || chat.type == ChatType.GROUP) return listOf(searchItem, muteItem)
+        val items = arrayListOf(searchItem, muteItem)
         val other = chat.otherMember
         if (other != null) {
             items.add(
@@ -1592,6 +1701,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         updateSelectionHeader(animated = true)
         syncCells()
         updatePinned(animated = true)
+        if (search.open) renderSearch(animated = true)
         backStateChanged()
     }
 
@@ -1615,6 +1725,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
         syncCells()
         updatePinned(animated)
+        if (search.open) renderSearch(animated)
         backStateChanged()
     }
 
@@ -1679,6 +1790,136 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     private fun myId(): String? = (QwillApplication.session.state as? SessionState.Authenticated)?.user?.id
 
+    override fun onDayTap(dayStartMs: Long) {
+        openCalendar(dayStartMs)
+    }
+
+    private fun feedBlur(dy: Int) {
+        if (::top.isInitialized) top.onSourceScrolled(dy)
+        if (::bottom.isInitialized) bottom.onSourceScrolled(dy)
+    }
+
+    private fun applyFeedVisibility() {
+        val covered = ::searchPanel.isInitialized && searchPanel.revealed >= 1f
+        list.visibility = if (failure != null || covered) View.INVISIBLE else View.VISIBLE
+        wallpaper.visibility = if (covered) View.INVISIBLE else View.VISIBLE
+    }
+
+    private fun onPanelReveal(progress: Float) {
+        val usePanel = progress > 0f
+        if (usePanel != panelSource) {
+            panelSource = usePanel
+            val source: View = if (usePanel) searchPanel else list
+            top.setBlurSource(source, wallpaper)
+            bottom.setBlurSource(source, wallpaper)
+        }
+        val wasCovered = list.visibility == View.INVISIBLE && failure == null
+        applyFeedVisibility()
+        if (wasCovered && progress < 1f) list.post { updateReading() }
+    }
+
+    private fun openSearch() {
+        if (failure != null || search.open) return
+        search.open()
+        top.search.focusInput()
+    }
+
+    private fun closeSearch() {
+        if (!search.open) return
+        top.search.dropKeyboard()
+        search.close()
+    }
+
+    private fun onSearchClear() {
+        if (search.draft.isNotEmpty()) search.setDraft("") else search.clearCaption()
+    }
+
+    private fun onSearchChanged() {
+        if (view == null || !::top.isInitialized) return
+        renderSearch(animated = true)
+    }
+
+    private fun renderSearch(animated: Boolean) {
+        val open = search.open
+        val animate = animated && shown
+        top.setSearchMode(open, animate)
+        val field = top.search.field
+        field.setText(search.draft)
+        field.setCaption(search.picking, search.from?.let { MemberSuggest.firstName(it) })
+        top.search.setClearShown(open && (search.draft.isNotEmpty() || search.picking || search.from != null), animate)
+        val bar = bottom.bar
+        bar.setButtons(calendarShown = !search.picking, fromShown = isGroup() && !search.picking)
+        val up = search.index >= counterIndex
+        counterIndex = search.index
+        bar.counter.set(ChatSearchText.counter(search), up, animate)
+        bar.toggle.setState(search.mode == ChatSearchMode.LIST, search.total > 0, animate)
+        bottom.arrows.setEnabledArrows(search.canOlder, search.canNewer, animate)
+        val visible = open && !selection.active
+        val selectionChanged = open && searchSelectionHidden != selection.active
+        searchSelectionHidden = selection.active
+        val duration = if (selectionChanged) SearchArrowsView.SELECTION_MS else SEARCH_BAR_MS
+        bottom.setBarShown(visible, duration, animate)
+        bottom.arrows.setListMode(search.mode == ChatSearchMode.LIST, animate)
+        bottom.arrows.setShown(visible, if (selectionChanged) SearchArrowsView.SELECTION_MS else SearchArrowsView.OPEN_MS, animate) {
+            bottom.settleVisibility()
+        }
+        val suggestions = if (open && search.picking) {
+            val recent = feed.messages.asReversed().mapNotNull { it.sender?.id }.distinct()
+            MemberSuggest.filter(messages.membersOf(chatId), search.draft, recent, myId())
+        } else {
+            emptyList()
+        }
+        bottom.members.setMembers(suggestions, search.draft, open && search.picking, animate)
+        searchPanel.setData(search.results, search.query, search.index, search.loading, search.loadingMore, myId())
+        searchPanel.setOpen(open && search.mode == ChatSearchMode.LIST, animate)
+        val highlight = if (open) search.query.trim().ifEmpty { null } else null
+        if (highlight != appliedHighlight) {
+            appliedHighlight = highlight
+            rebindVisible()
+        }
+        updateJumpVisibility()
+        updatePinned(animate)
+        backStateChanged()
+    }
+
+    private fun openCalendar(dayStartMs: Long) {
+        if (calendarSheet != null || dateSheet != null || failure != null) return
+        menu?.dismissNow()
+        val day = DayLabel.dayKey(dayStartMs)
+        val next = ChatCalendarSheet(context, root, chatId, CalendarFilter.ALL, day, day, classGuid, { picked -> jumpTo(picked.firstMessageId) }) {
+            calendarSheet = null
+            backStateChanged()
+        }
+        calendarSheet = next
+        next.setSafeArea(safe)
+        next.show()
+        backStateChanged()
+    }
+
+    private fun openDatePicker() {
+        if (calendarSheet != null || dateSheet != null) return
+        top.search.dropKeyboard()
+        val next = DatePickerSheet(context, root, chatId, classGuid, { id, done -> jumpTo(id, null, done) }) {
+            dateSheet = null
+            backStateChanged()
+        }
+        dateSheet = next
+        next.setSafeArea(safe)
+        next.show()
+        backStateChanged()
+    }
+
+    private inner class SearchTransport : ChatSearchTransport {
+        override fun search(q: String, before: Long?, fromUserId: String?, done: (ApiResult<ChatSearchResponse>) -> Unit): SearchCancel {
+            val handle = QwillApplication.api.send(ChatRequests.search(chatId, q, before, fromUserId), classGuid) { done(it) }
+            return SearchCancel { QwillApplication.api.cancel(handle) }
+        }
+
+        override fun jump(messageId: Long, done: (JumpOutcome) -> Unit) {
+            jumpTo(messageId, null, done)
+        }
+    }
+
     private fun px(dp: Float): Float = dp * context.resources.displayMetrics.density
 
     private inner class CenterScroller(context: Context, private val key: String) : LinearSmoothScroller(context) {
@@ -1715,5 +1956,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         val SELECT_OUT = PathInterpolator(0.42f, 0f, 1f, 1f)
         const val CIRCLE = 40f
         const val CLIP_LABEL = "Qwill"
+        const val PANEL_BOTTOM = 100f
+        const val SEARCH_BAR_MS = 240L
     }
 }

@@ -25,6 +25,8 @@ import com.qwill.app.files.MediaTypes
 import com.qwill.app.model.LocalAttachment
 import com.qwill.app.model.MessageDto
 import com.qwill.app.model.MessageType
+import com.qwill.app.search.Highlight
+import com.qwill.app.search.HighlightRange
 import com.qwill.app.ui.QwillIcon
 import com.qwill.app.ui.theme.FontWeight
 import com.qwill.app.ui.theme.Fonts
@@ -46,12 +48,20 @@ class BubbleInput(
     val rowWidth: Int,
     val versionCode: Int,
     val local: LocalAttachment? = null,
+    val highlight: String? = null,
 )
 
 class LinkColorSpan(private val own: Boolean) : CharacterStyle(), UpdateAppearance {
     override fun updateDrawState(paint: TextPaint) {
         val palette = Theme.palette
         paint.color = if (own) palette.linkOut else palette.primary
+    }
+}
+
+class SearchHitSpan(private val own: Boolean) : CharacterStyle(), UpdateAppearance {
+    override fun updateDrawState(paint: TextPaint) {
+        val palette = Theme.palette
+        paint.color = if (own) palette.searchHitInkOut else palette.searchHitInk
     }
 }
 
@@ -145,6 +155,7 @@ class BubbleLayout(
     val metaInline: Boolean,
     val call: CallLayout?,
     val announcement: AnnouncementLayout?,
+    val hits: List<HighlightRange> = emptyList(),
 ) {
     val hasBubble: Boolean get() = kind != BubbleKind.EMOJI
 }
@@ -374,9 +385,11 @@ object BubbleLayouts {
         var textWidth = 0f
         var lastLineWidth = 0f
         val links = if (hasText) TextLinks.ranges(content) else emptyList()
+        val query = input.highlight
+        val hits = if (hasText && !query.isNullOrBlank()) Highlight.ranges(content, query) else emptyList()
         if (hasText || stubInfo == null) {
             val layoutWidth = max(1, maxContent.toInt())
-            val layout = textLayoutOf(content, links, input.own, paints, layoutWidth)
+            val layout = textLayoutOf(content, links, hits, input.own, paints, layoutWidth)
             textLayout = layout
             val lines = layout.lineCount
             textHeight = layout.height.toFloat()
@@ -512,6 +525,7 @@ object BubbleLayouts {
             metaInline = metaInReactions,
             call = null,
             announcement = null,
+            hits = hits,
         )
     }
 
@@ -723,11 +737,22 @@ object BubbleLayouts {
         }
     }
 
-    private fun textLayoutOf(content: String, links: List<LinkRange>, own: Boolean, paints: BubblePaints, width: Int): StaticLayout {
+    private fun textLayoutOf(
+        content: String,
+        links: List<LinkRange>,
+        hits: List<HighlightRange>,
+        own: Boolean,
+        paints: BubblePaints,
+        width: Int,
+    ): StaticLayout {
         val scale = paints.scale
         val replaced = Emoji.replace(content, paints.px(scale.emojiInline))
         val spannable = SpannableString(replaced)
         for (link in links) spannable.setSpan(LinkColorSpan(own), link.start, link.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        for (hit in hits) {
+            val end = minOf(hit.end, spannable.length)
+            if (hit.start < end) spannable.setSpan(SearchHitSpan(own), hit.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
         spannable.setSpan(ExactLineHeight(ceil(paints.px(scale.line)).toInt()), 0, spannable.length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
         return build(spannable, paints.text, width)
     }

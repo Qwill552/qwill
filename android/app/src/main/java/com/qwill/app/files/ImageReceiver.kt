@@ -34,6 +34,10 @@ class ImageReceiver(private val view: View, private val loader: ImageLoader) {
 
     val hasPlaceholder: Boolean get() = blur != null
 
+    var fadeWithoutPlaceholder = false
+
+    val imageAlpha: Float get() = if (image == null) 0f else fadeAlpha() / 255f
+
     var lastSource: FileSource? = null
         private set
 
@@ -96,7 +100,8 @@ class ImageReceiver(private val view: View, private val loader: ImageLoader) {
                 if (request?.fileId != target.fileId) return@load
                 image = bitmap
                 lastSource = source
-                fadeStartedAt = if (blur != null && Motion.duration(Motion.MEDIA_FADE) > 0) SystemClock.uptimeMillis() else 0L
+                val fades = blur != null || (fadeWithoutPlaceholder && source != FileSource.MEMORY)
+                fadeStartedAt = if (fades && Motion.duration(Motion.MEDIA_FADE) > 0) SystemClock.uptimeMillis() else 0L
                 view.invalidate()
             }
         }

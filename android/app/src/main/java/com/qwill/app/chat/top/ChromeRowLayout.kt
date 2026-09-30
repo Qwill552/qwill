@@ -8,7 +8,11 @@ import com.qwill.app.ui.theme.dp
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-open class ChromeRowLayout(context: Context, private val trailingGapDp: Float) : ViewGroup(context) {
+open class ChromeRowLayout(
+    context: Context,
+    private val trailingGapDp: Float,
+    private val middleGapDp: Float = GAP,
+) : ViewGroup(context) {
     private var leading: View? = null
     private var middle: View? = null
     private val trailing = ArrayList<View>()
@@ -68,7 +72,7 @@ open class ChromeRowLayout(context: Context, private val trailingGapDp: Float) :
 
     private fun middleBounds(width: Int): Pair<Int, Int> {
         val circle = context.dp(ChromeCircleButton.CIRCLE)
-        val gap = context.dp(GAP)
+        val gap = context.dp(middleGapDp)
         val left = safe.left + context.dp(SIDE) + circle + gap
         val shown = trailing.count { it.visibility != GONE }
         var right = width - safe.right - context.dp(SIDE)

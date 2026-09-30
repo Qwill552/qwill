@@ -626,7 +626,7 @@ class ChatsScreen : Screen(), ChatCellHost {
         val to = if (shown) 1f else 0f
         val animator = ValueAnimator.ofFloat(from, to)
         animator.duration = Motion.duration(LUPA_MS)
-        animator.interpolator = LUPA_CURVE
+        animator.interpolator = Motion.easeOutQuint
         animator.addUpdateListener { setLupaShown(it.animatedValue as Float) }
         animator.addListener(object : AnimatorListenerAdapter() {
             private var cancelled = false
@@ -865,7 +865,6 @@ class ChatsScreen : Screen(), ChatCellHost {
         const val HEADER_RETURN_DELAY_MS = 140L
         const val SEARCH_PLACEHOLDER = "Поиск чатов и людей"
         const val FORGET_LABEL = "Убрать из недавних"
-        val LUPA_CURVE = PathInterpolator(0.23f, 1f, 0.32f, 1f)
         val HEADER_CURVE = PathInterpolator(0f, 0f, 0.58f, 1f)
         const val SCROLLBAR_RADIUS = 2f
         const val SCROLLBAR_ALPHA = 0.32f

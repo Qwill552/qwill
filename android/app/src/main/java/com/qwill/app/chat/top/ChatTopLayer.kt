@@ -16,6 +16,8 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.view.animation.Interpolator
 import android.widget.FrameLayout
+import com.qwill.app.chat.ChatGlass
+import com.qwill.app.chat.search.ChatSearchHeaderView
 import com.qwill.app.model.CallDto
 import com.qwill.app.model.MessageDto
 import com.qwill.app.ui.glass.SharedBlur
@@ -28,20 +30,21 @@ import kotlin.math.roundToInt
 
 class ChatTopLayer(
     context: Context,
-    private val blurSource: View,
-    private val underlay: View,
+    blurSource: View,
+    underlay: View,
     private val onContentTopChanged: () -> Unit,
     onPinnedJump: () -> Unit,
     onPinnedClose: () -> Unit,
     onJoinCall: () -> Unit,
 ) : FrameLayout(context) {
-    private val blur = SharedBlur(blurSource, underlay, BLUR_RADIUS, SATURATION)
+    private val blur = SharedBlur(blurSource, underlay, ChatGlass.BLUR_RADIUS, ChatGlass.SATURATION)
     private val consumers = ArrayList<View>()
     private val backdrop = TopBackdrop(context, blur)
     val callBanner = GroupCallBannerView(context, onJoinCall)
     val pinnedBanner = PinnedBannerView(context, onPinnedJump, onPinnedClose)
     val header = ChatHeaderView(context)
     val selection = SelectionHeaderView(context)
+    val search = ChatSearchHeaderView(context)
 
     private var safe = SafeArea.NONE
     private var callShown = false
@@ -49,6 +52,7 @@ class ChatTopLayer(
     private var pinnedShown = false
     private var pinnedLeaving = false
     private var selectionShown = false
+    private var searchShown = false
 
     private var callOffset = 0f
     private var callAlpha = 1f
@@ -60,8 +64,8 @@ class ChatTopLayer(
     private var pinnedAnimator: ValueAnimator? = null
     private var modeAnimator: ValueAnimator? = null
     private val sourceWatcher = ViewTreeObserver.OnPreDrawListener {
-        if (blurSource.isDirty) invalidate()
-        if (underlay.isDirty) for (view in consumers) view.invalidate()
+        if (blur.source.isDirty) invalidate()
+        if (blur.underlay?.isDirty == true) for (view in consumers) view.invalidate()
         true
     }
 
@@ -80,17 +84,26 @@ class ChatTopLayer(
         selection.visibility = View.INVISIBLE
         selection.alpha = 0f
         addView(selection, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        search.visibility = View.INVISIBLE
+        search.alpha = 0f
+        addView(search, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.TOP))
         header.clipChildren = false
         selection.clipChildren = false
+        search.clipChildren = false
         setWillNotDraw(false)
-        for (view in listOf(backdrop, pinnedBanner, header.back, header.capsule, header.call, header.more, selection.close, selection.capsule, selection.copy, selection.delete)) {
+        val glass = listOf(
+            backdrop, pinnedBanner, header.back, header.capsule, header.call, header.more,
+            selection.close, selection.capsule, selection.copy, selection.delete, search.back, search.field, search.clear,
+        )
+        for (view in glass) {
             blur.addConsumer(view)
             consumers.add(view)
         }
         pinnedBanner.blur = blur
         header.capsule.blur = blur
         selection.capsule.blur = blur
-        for (button in listOf(header.back, header.call, header.more, selection.close, selection.copy, selection.delete)) button.blur = blur
+        search.field.blur = blur
+        for (button in listOf(header.back, header.call, header.more, selection.close, selection.copy, selection.delete, search.back, search.clear)) button.blur = blur
         applyTheme()
         applyLayout()
     }
@@ -100,6 +113,7 @@ class ChatTopLayer(
         safe = area
         header.setSafeArea(area)
         selection.setSafeArea(area)
+        search.setSafeArea(area)
         applyLayout()
     }
 
@@ -109,6 +123,7 @@ class ChatTopLayer(
         callBanner.invalidate()
         header.refresh()
         selection.refresh()
+        search.refresh()
     }
 
     fun setCall(call: CallDto?, animated: Boolean) {
@@ -236,25 +251,67 @@ class ChatTopLayer(
     fun setSelectionMode(active: Boolean, animated: Boolean) {
         if (active == selectionShown) return
         selectionShown = active
+        switchMode(animated, Motion.MENU, Motion.easeScreen, scaled = false)
+    }
+
+    fun setSearchMode(active: Boolean, animated: Boolean) {
+        if (active == searchShown) return
+        searchShown = active
+        switchMode(animated, SEARCH_MS, Motion.easeOutQuint, scaled = true)
+    }
+
+    private fun activeHeader(): View = when {
+        selectionShown -> selection
+        searchShown -> search
+        else -> header
+    }
+
+    private fun switchMode(animated: Boolean, durationMs: Long, curve: Interpolator, scaled: Boolean) {
         modeAnimator?.cancel()
-        val incoming = if (active) selection else header
-        val outgoing = if (active) header else selection
-        incoming.visibility = View.VISIBLE
+        modeAnimator = null
+        val target = activeHeader()
+        val rows = listOf(header, selection, search)
+        target.visibility = View.VISIBLE
         if (!animated || !Motion.animationsEnabled || !isShown) {
-            incoming.alpha = 1f
-            outgoing.alpha = 0f
-            outgoing.visibility = View.INVISIBLE
+            for (row in rows) {
+                val active = row === target
+                row.alpha = if (active) 1f else 0f
+                row.scaleX = 1f
+                row.scaleY = 1f
+                if (!active) row.visibility = View.INVISIBLE
+            }
             return
         }
-        val fromIn = incoming.alpha
-        val fromOut = outgoing.alpha
-        modeAnimator = tween(Motion.MENU, Motion.easeScreen, { p ->
-            incoming.alpha = fromIn + (1f - fromIn) * p
-            outgoing.alpha = fromOut * (1f - p)
+        if (scaled && target.alpha <= 0f) {
+            target.scaleX = HIDDEN_SCALE
+            target.scaleY = HIDDEN_SCALE
+        }
+        val fromAlpha = rows.map { it.alpha }
+        val fromScale = rows.map { it.scaleX }
+        val toScale = rows.map { if (it === target) 1f else if (scaled) HIDDEN_SCALE else it.scaleX }
+        modeAnimator = tween(durationMs, curve, { p ->
+            for ((index, row) in rows.withIndex()) {
+                val to = if (row === target) 1f else 0f
+                row.alpha = fromAlpha[index] + (to - fromAlpha[index]) * p
+                val scale = fromScale[index] + (toScale[index] - fromScale[index]) * p
+                row.scaleX = scale
+                row.scaleY = scale
+            }
         }) {
             modeAnimator = null
-            outgoing.visibility = View.INVISIBLE
+            for (row in rows) {
+                if (row === target) continue
+                row.visibility = View.INVISIBLE
+                row.scaleX = 1f
+                row.scaleY = 1f
+            }
         }
+    }
+
+    fun setBlurSource(view: View, back: View?) {
+        blur.setSource(view, back)
+        invalidate()
+        for (consumer in consumers) consumer.invalidate()
     }
 
     fun onSourceScrolled(dy: Int) {
@@ -294,6 +351,15 @@ class ChatTopLayer(
     override fun dispatchDraw(canvas: Canvas) {
         blur.update(this, width, backdrop.height, canvas.isHardwareAccelerated)
         super.dispatchDraw(canvas)
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        val pivotY = safe.top + context.dp(ChromeRowLayout.TOP_PAD + ChatCapsuleView.HEIGHT / 2f)
+        for (row in listOf(header, selection, search)) {
+            row.pivotX = row.width / 2f
+            row.pivotY = pivotY
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -371,8 +437,8 @@ class ChatTopLayer(
     }
 
     private companion object {
-        const val BLUR_RADIUS = 40f
-        const val SATURATION = 1.8f
+        const val SEARCH_MS = 320L
+        const val HIDDEN_SCALE = 0.95f
         const val RISE_SHARE = 1.2f
         const val PINNED_RISE = 6f
     }

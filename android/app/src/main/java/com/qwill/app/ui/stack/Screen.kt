@@ -6,6 +6,16 @@ import com.qwill.app.QwillApplication
 import com.qwill.app.net.RequestGuid
 import com.qwill.app.ui.insets.SafeArea
 
+interface BackGestureOverlay {
+    fun begin()
+
+    fun progress(value: Float)
+
+    fun cancel()
+
+    fun commit()
+}
+
 abstract class Screen {
     val classGuid: Int = RequestGuid.next()
 
@@ -24,6 +34,8 @@ abstract class Screen {
     open val paintsOwnBackground: Boolean get() = false
 
     open val interceptsBack: Boolean get() = false
+
+    open val backOverlay: BackGestureOverlay? get() = null
 
     protected abstract fun createView(context: Context): View
 

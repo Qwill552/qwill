@@ -27,6 +27,7 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     private var movingUnder: View? = null
     private var openness = 1f
     private var backGestureActive = false
+    private var overlayGesture: BackGestureOverlay? = null
 
     var onBackStateChanged: (() -> Unit)? = null
 
@@ -124,6 +125,12 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     }
 
     fun beginBackGesture(): Boolean {
+        val overlay = top?.backOverlay
+        if (overlay != null) {
+            overlayGesture = overlay
+            overlay.begin()
+            return true
+        }
         if (top?.interceptsBack == true || screens.size < 2) return false
         finishTransition()
         val topView = screens.last().view ?: return false
@@ -136,6 +143,10 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     }
 
     fun updateBackGesture(progress: Float) {
+        overlayGesture?.let {
+            it.progress(progress)
+            return
+        }
         if (!backGestureActive || width == 0) return
         val pulled = (progress - Motion.SYSTEM_BACK_LAZY_START) / (1f - Motion.SYSTEM_BACK_LAZY_START)
         if (pulled <= 0f) {
@@ -148,6 +159,11 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     }
 
     fun cancelBackGesture() {
+        overlayGesture?.let {
+            overlayGesture = null
+            it.cancel()
+            return
+        }
         if (!backGestureActive) return
         backGestureActive = false
         val topView = movingTop ?: return
@@ -156,6 +172,11 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     }
 
     fun commitBackGesture() {
+        overlayGesture?.let {
+            overlayGesture = null
+            it.commit()
+            return
+        }
         if (!backGestureActive) {
             handleBack()
             return
@@ -176,6 +197,7 @@ class ScreenStack(context: Context) : FrameLayout(context) {
     }
 
     fun destroyAll() {
+        overlayGesture = null
         finishTransition()
         for (screen in screens.asReversed()) {
             screen.view?.let { removeView(it) }

@@ -2,6 +2,7 @@ package com.qwill.app.ui.theme
 
 import android.content.Context
 import android.provider.Settings
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.Interpolator
 import android.view.animation.PathInterpolator
 
@@ -28,6 +29,8 @@ object Motion {
     val easeScreen: Interpolator = PathInterpolator(0.2f, 0.9f, 0.25f, 1f)
     val easeClose: Interpolator = PathInterpolator(0.42f, 0f, 1f, 1f)
     val easeSpring: Interpolator = PathInterpolator(0.2f, 1.5f, 0.4f, 1f)
+    val easeOutQuint: Interpolator = PathInterpolator(0.23f, 1f, 0.32f, 1f)
+    val decelerate: Interpolator = DecelerateInterpolator()
 
     const val SYSTEM_BACK_NUDGE_DP = 56f
     const val SYSTEM_BACK_LAZY_START = 0.015f

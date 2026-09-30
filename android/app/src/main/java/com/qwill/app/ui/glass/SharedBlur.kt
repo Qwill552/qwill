@@ -19,15 +19,22 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 class SharedBlur(
-    private val source: View,
-    private val underlay: View?,
+    source: View,
+    underlay: View?,
     private val radiusDp: Float,
     saturation: Float,
 ) {
+    var source: View = source
+        private set
+    var underlay: View? = underlay
+        private set
     private val saturationFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = saturationFilter }
     private val edgePaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+    private val bottomEdgePaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
     private var edgeFor = -1
+    private var bottomEdgeFor = -1
+    private var bottomEdgeHeight = -1f
     private val hostLocation = IntArray(2)
     private val sourceLocation = IntArray(2)
     private val viewLocation = IntArray(2)
@@ -45,6 +52,14 @@ class SharedBlur(
 
     fun onScrolled(dy: Int) {
         phase = ((phase + dy) % scale + scale) % scale
+    }
+
+    fun setSource(view: View, back: View?) {
+        if (view === source && back === underlay) return
+        source = view
+        underlay = back
+        phase = 0
+        recorded = false
     }
 
     fun addConsumer(view: View) {
@@ -162,9 +177,15 @@ class SharedBlur(
         }
         val width = source.width.toFloat()
         val height = source.height.toFloat()
+        if (bottomEdgeFor != fade || bottomEdgeHeight != height) {
+            bottomEdgeFor = fade
+            bottomEdgeHeight = height
+            bottomEdgePaint.shader = LinearGradient(0f, height - fade, 0f, height, -0x1000000, 0, Shader.TileMode.CLAMP)
+        }
         val save = canvas.saveLayer(0f, 0f, width, height, null)
         source.draw(canvas)
         canvas.drawRect(0f, 0f, width, fade.toFloat(), edgePaint)
+        canvas.drawRect(0f, height - fade, width, height, bottomEdgePaint)
         canvas.restoreToCount(save)
     }
 

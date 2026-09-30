@@ -48,6 +48,7 @@ class MessageCellModel(
     val myId: String?,
     val sideLeft: Int,
     val sideRight: Int,
+    val highlight: String? = null,
 ) {
     val key: String get() = row.key
 }
@@ -80,6 +81,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
     private val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val linkPressPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val hitPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
     private val bubbleRect = RectF()
     private val bubblePath = Path()
@@ -407,6 +409,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
             host.paints.text.color = ink
             val save = canvas.save()
             canvas.translate(bubble.contentLeft, bubble.textTop)
+            drawSearchHits(canvas, text, bubble, own, palette)
             pressedLink?.let { drawLinkPress(canvas, text, it, own, palette) }
             text.draw(canvas)
             drawUnderlines(canvas, text, bubble.links, own, palette)
@@ -450,6 +453,17 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         paints.quoteText.color = if (own) withAlpha(palette.textOnOut, FORWARD_OUT_ALPHA) else palette.textSecondary
         canvas.drawText(quote.text, 0, quote.text.length, textLeft, quote.textBaseline, paints.quoteText)
         if (flashing && !pressedQuote) postInvalidateDelayed(QUOTE_FLASH_MS)
+    }
+
+    private fun drawSearchHits(canvas: Canvas, text: android.text.StaticLayout, bubble: BubbleLayout, own: Boolean, palette: Palette) {
+        if (bubble.hits.isEmpty()) return
+        hitPaint.color = if (own) palette.searchHitBgOut else palette.searchHitBg
+        if (hitPaint.pathEffect == null) hitPaint.pathEffect = CornerPathEffect(px(HIT_RADIUS))
+        for (hit in bubble.hits) {
+            scratchPath.reset()
+            text.getSelectionPath(hit.start, minOf(hit.end, text.text.length), scratchPath)
+            canvas.drawPath(scratchPath, hitPaint)
+        }
     }
 
     private fun drawLinkPress(canvas: Canvas, text: android.text.StaticLayout, link: LinkRange, own: Boolean, palette: Palette) {
@@ -820,6 +834,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         private const val QUOTE_FLASH_MS = 120L
         private const val LINK_PRESS_ALPHA = 0.2f
         private const val LINK_PRESS_RADIUS = 4f
+        private const val HIT_RADIUS = 4f
         private const val UNDERLINE = 1f
         private const val UNDERLINE_OFFSET = 2f
         private const val CALL_SYMBOL = 15f

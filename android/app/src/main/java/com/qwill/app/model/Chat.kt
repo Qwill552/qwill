@@ -292,6 +292,28 @@ data class MessageReactPayload(
 data class MessageAtDateResponse(val messageId: Long? = null)
 
 @Serializable
+data class ChatSearchResponse(
+    val messages: List<MessageDto> = emptyList(),
+    val total: Int = 0,
+    val hasMore: Boolean = false,
+)
+
+@Serializable
+data class ChatCalendarDay(
+    val date: String,
+    val count: Int = 0,
+    val firstMessageId: Long = 0,
+    val preview: FileDto? = null,
+)
+
+@Serializable
+data class ChatCalendarResponse(
+    val days: List<ChatCalendarDay> = emptyList(),
+    val minDate: String? = null,
+    val maxDate: String? = null,
+)
+
+@Serializable
 data class ChatUpdatedEvent(
     val chatId: String,
     val title: String = "",

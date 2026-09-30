@@ -28,6 +28,8 @@ interface ChatAdapterHost {
     fun sideInsets(): Pair<Int, Int>
 
     fun idOf(row: FeedRow): Long
+
+    fun onDayTap(dayStartMs: Long)
 }
 
 class ChatLayoutCache(private val paints: BubblePaints, private val versionCode: Int) {
@@ -40,11 +42,13 @@ class ChatLayoutCache(private val paints: BubblePaints, private val versionCode:
         val rowWidth: Int,
         val fontSize: Float,
         val emojiReady: Boolean,
+        val highlight: String?,
     ) {
         override fun equals(other: Any?): Boolean {
             if (other !is Key) return false
             return message === other.message && own == other.own && showAuthor == other.showAuthor && status == other.status &&
-                local === other.local && rowWidth == other.rowWidth && fontSize == other.fontSize && emojiReady == other.emojiReady
+                local === other.local && rowWidth == other.rowWidth && fontSize == other.fontSize && emojiReady == other.emojiReady &&
+                highlight == other.highlight
         }
 
         override fun hashCode(): Int {
@@ -56,6 +60,7 @@ class ChatLayoutCache(private val paints: BubblePaints, private val versionCode:
             result = result * 31 + rowWidth
             result = result * 31 + fontSize.hashCode()
             result = result * 31 + emojiReady.hashCode()
+            result = result * 31 + (highlight?.hashCode() ?: 0)
             return result
         }
     }
@@ -64,10 +69,10 @@ class ChatLayoutCache(private val paints: BubblePaints, private val versionCode:
 
     fun layoutFor(model: MessageCellModel, rowWidth: Int, emojiReady: Boolean): BubbleLayout {
         val message = model.row.message
-        val key = Key(message, model.row.own, model.showAuthor, model.status.ordinal, model.local, rowWidth, Theme.fontSize.base, emojiReady)
+        val key = Key(message, model.row.own, model.showAuthor, model.status.ordinal, model.local, rowWidth, Theme.fontSize.base, emojiReady, model.highlight)
         cache.get(key)?.let { return it }
         val built = BubbleLayouts.build(
-            BubbleInput(message, model.row.own, model.showAuthor, model.status, model.myId, rowWidth, versionCode, model.local),
+            BubbleInput(message, model.row.own, model.showAuthor, model.status, model.myId, rowWidth, versionCode, model.local, model.highlight),
             paints,
         )
         cache.put(key, built)
@@ -131,7 +136,7 @@ class ChatAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val view = when (viewType) {
-            TYPE_DAY -> DayDividerView(context)
+            TYPE_DAY -> DayDividerView(context) { day -> host.onDayTap(day) }
             TYPE_UNREAD -> UnreadDividerView(context)
             else -> MessageCell(context, cellHost)
         }
