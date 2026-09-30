@@ -145,6 +145,16 @@ class SharedBlur(
         canvas.restoreToCount(save)
     }
 
+    fun drawUnderlay(canvas: Canvas, consumer: View) {
+        val back = underlay ?: return
+        consumer.getLocationInWindow(viewLocation)
+        back.getLocationInWindow(sourceLocation)
+        val save = canvas.save()
+        canvas.translate((sourceLocation[0] - viewLocation[0]).toFloat(), (sourceLocation[1] - viewLocation[1]).toFloat())
+        back.draw(canvas)
+        canvas.restoreToCount(save)
+    }
+
     fun release() {
         drawnOffsets.clear()
         bitmap?.recycle()

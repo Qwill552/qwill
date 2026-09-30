@@ -32,9 +32,7 @@ import com.qwill.app.chat.top.ChromeCircleButton
 import com.qwill.app.ui.glass.SharedBlur
 import com.qwill.app.ui.insets.SafeArea
 import com.qwill.app.ui.theme.Motion
-import com.qwill.app.ui.theme.Theme
 import com.qwill.app.ui.theme.dp
-import com.qwill.app.ui.theme.withAlpha
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -80,7 +78,7 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
     private var islandReady = false
     private val clip = Rect()
     private val consumers = listOf(backdrop, contextBar, errorLine, composer.capsule, blocked, service, selectionBar, bar, mentions, members, arrows.older, arrows.newer)
-    private val parts = listOf(backdrop, contextBar, errorLine, composer, blocked, service, selectionBar, bar, mentions, members, arrows)
+    private val parts = listOf(contextBar, errorLine, composer, blocked, service, selectionBar, bar, mentions, members, arrows)
     private val sourceWatcher = ViewTreeObserver.OnPreDrawListener {
         var draw = true
         if (visibility == View.VISIBLE) {
@@ -419,7 +417,7 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         service.translationY = push
         bar.translationY = push
         mentions.baseShift = push - island.current
-        backdrop.band = bottomInset + island.current
+        backdrop.band = bottomInset + island.current + context.dp(FADE_ABOVE)
         backdrop.invalidate()
         invalidate()
     }
@@ -507,8 +505,7 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         var top = height.toFloat()
         for (view in parts) {
             if (view.visibility != View.VISIBLE || view.alpha <= 0f) continue
-            val viewTop = if (view === backdrop) height - backdrop.band else view.y
-            if (viewTop < top) top = viewTop
+            if (view.y < top) top = view.y
         }
         return top.coerceIn(0f, height.toFloat()).toInt()
     }
@@ -534,10 +531,9 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
     }
 
     private class BottomBackdrop(context: Context, private val blur: SharedBlur) : View(context) {
-        private val tintPaint = Paint()
         private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
         private val maskMatrix = Matrix()
-        private val mask = LinearGradient(0f, 1f, 0f, 0f, intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT), floatArrayOf(0f, SOLID_SHARE, 1f), Shader.TileMode.CLAMP)
+        private val mask = LinearGradient(0f, 0f, 0f, 1f, FADE_STOPS, null, Shader.TileMode.CLAMP)
         var band = 0f
 
         init {
@@ -546,7 +542,6 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         }
 
         fun applyTheme() {
-            tintPaint.color = withAlpha(Theme.palette.pulseDock, TINT_ALPHA)
             invalidate()
         }
 
@@ -558,20 +553,24 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         override fun onDraw(canvas: Canvas) {
             if (width == 0 || height == 0 || band <= 0f) return
             val top = height - band
-            maskMatrix.setScale(1f, band)
+            maskMatrix.setScale(1f, context.dp(FADE_HEIGHT))
             maskMatrix.postTranslate(0f, top)
             mask.setLocalMatrix(maskMatrix)
             val save = canvas.saveLayer(0f, top, width.toFloat(), height.toFloat(), null)
             canvas.clipRect(0f, top, width.toFloat(), height.toFloat())
-            blur.draw(canvas, this)
-            canvas.drawRect(0f, top, width.toFloat(), height.toFloat(), tintPaint)
+            blur.drawUnderlay(canvas, this)
             canvas.drawRect(0f, top, width.toFloat(), height.toFloat(), maskPaint)
             canvas.restoreToCount(save)
         }
 
         private companion object {
-            const val TINT_ALPHA = 0.5f
-            const val SOLID_SHARE = 0.2f
+            const val FADE_HEIGHT = 48f
+            val FADE_STOPS = intArrayOf(
+                0,
+                Color.argb(0x60 * 255 / 285, 0, 0, 0),
+                Color.argb(0xB0 * 255 / 285, 0, 0, 0),
+                Color.argb(0xE8 * 255 / 285, 0, 0, 0),
+            )
         }
     }
 
@@ -582,6 +581,7 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         const val MEMBERS_GAP = 8f
         const val ARROWS_GAP = 12f
         const val SELECTION_PUSH = 54f
+        const val FADE_ABOVE = 7f
         const val MODE_MS = 240L
         const val REPLY_MS = 320L
     }
