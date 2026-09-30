@@ -154,7 +154,7 @@
   position: absolute;
   z-index: 5;
   right: calc(var(--safe-right) + 14px);
-  bottom: calc(var(--composer-h, 48px) + var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
+  bottom: calc(var(--composer-inset-bottom, calc(20px + var(--safe-bottom))) + 12px);
   display: grid;
   place-items: center;
   width: 44px;
@@ -165,7 +165,8 @@
   backdrop-filter: blur(10px);
   color: rgb(var(--pulse-ink));
   cursor: pointer;
-  transition: opacity var(--transition), transform var(--transition), background 0.2s, bottom var(--dur-menu) var(--ease-screen);
+  translate: 0 calc(-1 * var(--composer-h, 48px));
+  transition: opacity var(--transition), transform var(--transition), background 0.2s, translate var(--dur-menu) var(--ease-screen);
 }
 
 :global(html[data-bottom-lift]) .jump:not(.jumpHidden) {
@@ -186,7 +187,7 @@
 }
 
 .mentionJump {
-  translate: 0 calc(-1 * var(--mention-lift, 0px));
+  translate: 0 calc(-1 * (var(--composer-h, 48px) + var(--mention-lift, 0px)));
   transition:
     opacity var(--transition),
     transform var(--transition),

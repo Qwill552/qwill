@@ -1024,9 +1024,11 @@ export function MessageList({
   useEffect(() => {
     const list = listRef.current;
     const jump = jumpRef.current;
+    const mentionJump = mentionJumpRef.current;
     const off = [
       list ? registerInsetMover(list, 'feed') : null,
       jump ? registerInsetMover(jump, 'chrome') : null,
+      mentionJump ? registerInsetMover(mentionJump, 'chrome') : null,
     ];
     return () => off.forEach((stop) => stop?.());
   }, [chatId]);
