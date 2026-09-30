@@ -40,6 +40,7 @@ class SharedBlur(
     private val viewLocation = IntArray(2)
     private val consumers = ArrayList<View>()
     private val drawnOffsets = HashMap<View, Long>()
+    private val underLocation = IntArray(2)
     private var node: RenderNode? = null
     private var nodeEffectKey = -1
     private var bitmap: Bitmap? = null
@@ -104,9 +105,8 @@ class SharedBlur(
     }
 
     fun invalidateMoved() {
-        val owner = host ?: return
-        if (drawnOffsets.isEmpty() || !recorded) return
-        owner.getLocationInWindow(hostLocation)
+        if (drawnOffsets.isEmpty()) return
+        refreshAnchors()
         for (view in consumers) {
             val drawn = drawnOffsets[view] ?: continue
             view.getLocationInWindow(viewLocation)
@@ -114,25 +114,35 @@ class SharedBlur(
         }
     }
 
+    private fun refreshAnchors() {
+        val owner = host
+        if (owner != null) owner.getLocationInWindow(hostLocation) else hostLocation.fill(0)
+        val back = underlay
+        if (back != null) back.getLocationInWindow(underLocation) else underLocation.fill(0)
+    }
+
     private fun offsetKey(view: IntArray): Long {
-        val x = hostLocation[0] - view[0]
-        val y = hostLocation[1] + regionTop - view[1]
-        return (x.toLong() shl 32) or (y.toLong() and 0xFFFFFFFFL)
+        var key = (hostLocation[0] - view[0]).toLong()
+        key = key * OFFSET_PRIME + (hostLocation[1] + regionTop - view[1])
+        key = key * OFFSET_PRIME + (underLocation[0] - view[0])
+        key = key * OFFSET_PRIME + (underLocation[1] - view[1])
+        return key
+    }
+
+    private fun drawBack(canvas: Canvas, back: View) {
+        val save = canvas.save()
+        canvas.translate((underLocation[0] - viewLocation[0]).toFloat(), (underLocation[1] - viewLocation[1]).toFloat())
+        back.draw(canvas)
+        canvas.restoreToCount(save)
     }
 
     fun draw(canvas: Canvas, consumer: View) {
-        val owner = host ?: return
+        if (host == null) return
         consumer.getLocationInWindow(viewLocation)
-        underlay?.let { back ->
-            back.getLocationInWindow(sourceLocation)
-            val save = canvas.save()
-            canvas.translate((sourceLocation[0] - viewLocation[0]).toFloat(), (sourceLocation[1] - viewLocation[1]).toFloat())
-            back.draw(canvas)
-            canvas.restoreToCount(save)
-        }
-        if (!recorded) return
-        owner.getLocationInWindow(hostLocation)
+        refreshAnchors()
         drawnOffsets[consumer] = offsetKey(viewLocation)
+        underlay?.let { drawBack(canvas, it) }
+        if (!recorded) return
         val save = canvas.save()
         canvas.translate((hostLocation[0] - viewLocation[0] - pad).toFloat(), (hostLocation[1] + regionTop - viewLocation[1] - pad).toFloat())
         canvas.scale(scale.toFloat(), scale.toFloat())
@@ -148,11 +158,9 @@ class SharedBlur(
     fun drawUnderlay(canvas: Canvas, consumer: View) {
         val back = underlay ?: return
         consumer.getLocationInWindow(viewLocation)
-        back.getLocationInWindow(sourceLocation)
-        val save = canvas.save()
-        canvas.translate((sourceLocation[0] - viewLocation[0]).toFloat(), (sourceLocation[1] - viewLocation[1]).toFloat())
-        back.draw(canvas)
-        canvas.restoreToCount(save)
+        refreshAnchors()
+        drawnOffsets[consumer] = offsetKey(viewLocation)
+        drawBack(canvas, back)
     }
 
     fun release() {
@@ -230,6 +238,7 @@ class SharedBlur(
         const val MAX_LOW_SIGMA = 3f
         const val PAD_SIGMAS = 2f
         const val STACK_SIGMA_RATIO = 2.45f
+        const val OFFSET_PRIME = 1_000_003L
     }
 }
 
