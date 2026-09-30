@@ -60,7 +60,7 @@ class DockCapsule(
             highlight.reset()
             highlight.op(shape, lifted, Path.Op.DIFFERENCE)
         }
-        if (withShadow) {
+        if (withShadow && !palette.isDark) {
             if (stretchShadow) drawStretchedShadow(canvas, width, drawnTop, height.toFloat()) else drawShadow(canvas, width, height, radius)
         }
         blur?.let {
@@ -87,7 +87,7 @@ class DockCapsule(
         val context = view.context
         val reach = context.dp(SHADOW_BLUR)
         val bitmap = shadowBitmap(width, height.toFloat(), radius)
-        shadowPaint.color = withAlpha(Color.BLACK, SHADOW_ALPHA)
+        shadowPaint.color = SHADOW_COLOR
         val y = context.dp(SHADOW_Y)
         rect.set(-reach, -reach + y, width + reach, height + reach + y)
         canvas.drawBitmap(bitmap, null, rect, shadowPaint)
@@ -98,7 +98,7 @@ class DockCapsule(
         val reach = context.dp(SHADOW_BLUR)
         val base = context.dp(radiusDp) * 2f
         val bitmap = shadowBitmap(width, base, base / 2f)
-        shadowPaint.color = withAlpha(Color.BLACK, SHADOW_ALPHA)
+        shadowPaint.color = SHADOW_COLOR
         val y = context.dp(SHADOW_Y)
         val half = (base + reach * 2) / 2f
         val mid = bitmap.height / 2
@@ -148,10 +148,10 @@ class DockCapsule(
         const val FILL_ALPHA = 0.62f
         const val HIGHLIGHT_ALPHA = 0.14f
         const val BORDER_ALPHA = 0.12f
-        const val SHADOW_Y = 18f
-        const val SHADOW_BLUR = 40f
-        const val SHADOW_SPREAD = 16f
-        const val SHADOW_ALPHA = 0.5f
-        const val SHADOW_SCALE = 0.25f
+        const val SHADOW_Y = 1f / 3f
+        const val SHADOW_BLUR = 2f
+        const val SHADOW_SPREAD = 0f
+        val SHADOW_COLOR = withAlpha(Color.BLACK, 0x20 / 255f)
+        const val SHADOW_SCALE = 0.5f
     }
 }

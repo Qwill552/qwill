@@ -61,7 +61,7 @@ class GlassPill(private val view: View) {
             highlight.reset()
             highlight.op(shape, lifted, Path.Op.DIFFERENCE)
         }
-        drawShadow(canvas, width, height, radius, palette.isDark)
+        if (!palette.isDark) drawShadow(canvas, width, height, radius)
         blur?.let {
             val save = canvas.save()
             canvas.clipPath(shape)
@@ -82,11 +82,11 @@ class GlassPill(private val view: View) {
         shadowKey = ""
     }
 
-    private fun drawShadow(canvas: Canvas, width: Int, height: Int, radius: Float, dark: Boolean) {
+    private fun drawShadow(canvas: Canvas, width: Int, height: Int, radius: Float) {
         val context = view.context
-        val y = context.dp(if (dark) DARK_Y else LIGHT_Y)
-        val reach = context.dp(if (dark) DARK_BLUR else LIGHT_BLUR)
-        val key = "$width:$height:$dark"
+        val y = context.dp(SHADOW_Y)
+        val reach = context.dp(SHADOW_BLUR)
+        val key = "$width:$height"
         var bitmap = shadow
         if (bitmap == null || key != shadowKey) {
             bitmap?.recycle()
@@ -104,7 +104,7 @@ class GlassPill(private val view: View) {
             shadow = bitmap
             shadowKey = key
         }
-        shadowPaint.color = if (dark) withAlpha(Color.BLACK, DARK_ALPHA) else withAlpha(LIGHT_SHADOW, LIGHT_ALPHA)
+        shadowPaint.color = SHADOW_COLOR
         rect.set(-reach, -reach + y, width + reach, height + reach + y)
         canvas.drawBitmap(bitmap, null, rect, shadowPaint)
     }
@@ -112,14 +112,10 @@ class GlassPill(private val view: View) {
     private companion object {
         const val RADIUS = 26f
         const val BORDER = 1f
-        const val LIGHT_Y = 4f
-        const val LIGHT_BLUR = 16f
-        const val LIGHT_ALPHA = 0.08f
-        const val DARK_Y = 10f
-        const val DARK_BLUR = 34f
-        const val DARK_ALPHA = 0.46f
-        const val SHADOW_SCALE = 0.25f
-        val LIGHT_SHADOW = Color.rgb(20, 24, 35)
+        const val SHADOW_Y = 1f / 3f
+        const val SHADOW_BLUR = 2f
+        val SHADOW_COLOR = withAlpha(Color.BLACK, 0x20 / 255f)
+        const val SHADOW_SCALE = 0.5f
     }
 }
 
