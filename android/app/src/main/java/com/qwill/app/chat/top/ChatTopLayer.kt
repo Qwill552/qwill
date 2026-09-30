@@ -64,6 +64,7 @@ class ChatTopLayer(
     private var pinnedAnimator: ValueAnimator? = null
     private var modeAnimator: ValueAnimator? = null
     private val sourceWatcher = ViewTreeObserver.OnPreDrawListener {
+        blur.invalidateMoved()
         if (blur.source.isDirty) invalidate()
         if (blur.underlay?.isDirty == true) for (view in consumers) view.invalidate()
         true

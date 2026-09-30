@@ -39,6 +39,7 @@ class SharedBlur(
     private val sourceLocation = IntArray(2)
     private val viewLocation = IntArray(2)
     private val consumers = ArrayList<View>()
+    private val drawnOffsets = HashMap<View, Long>()
     private var node: RenderNode? = null
     private var nodeEffectKey = -1
     private var bitmap: Bitmap? = null
@@ -99,6 +100,24 @@ class SharedBlur(
             for (view in consumers) view.invalidate()
         }
         recorded = true
+        invalidateMoved()
+    }
+
+    fun invalidateMoved() {
+        val owner = host ?: return
+        if (drawnOffsets.isEmpty() || !recorded) return
+        owner.getLocationInWindow(hostLocation)
+        for (view in consumers) {
+            val drawn = drawnOffsets[view] ?: continue
+            view.getLocationInWindow(viewLocation)
+            if (offsetKey(viewLocation) != drawn) view.invalidate()
+        }
+    }
+
+    private fun offsetKey(view: IntArray): Long {
+        val x = hostLocation[0] - view[0]
+        val y = hostLocation[1] + regionTop - view[1]
+        return (x.toLong() shl 32) or (y.toLong() and 0xFFFFFFFFL)
     }
 
     fun draw(canvas: Canvas, consumer: View) {
@@ -113,6 +132,7 @@ class SharedBlur(
         }
         if (!recorded) return
         owner.getLocationInWindow(hostLocation)
+        drawnOffsets[consumer] = offsetKey(viewLocation)
         val save = canvas.save()
         canvas.translate((hostLocation[0] - viewLocation[0] - pad).toFloat(), (hostLocation[1] + regionTop - viewLocation[1] - pad).toFloat())
         canvas.scale(scale.toFloat(), scale.toFloat())
@@ -126,6 +146,7 @@ class SharedBlur(
     }
 
     fun release() {
+        drawnOffsets.clear()
         bitmap?.recycle()
         bitmap = null
         bitmapCanvas = null

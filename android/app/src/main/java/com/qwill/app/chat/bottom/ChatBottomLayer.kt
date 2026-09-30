@@ -85,6 +85,7 @@ class ChatBottomLayer(context: Context, blurSource: View, underlay: View) : Fram
         var draw = true
         if (visibility == View.VISIBLE) {
             if (syncIsland()) draw = false
+            blur.invalidateMoved()
             if (blur.source.isDirty) invalidate()
             if (blur.underlay?.isDirty == true) for (view in consumers) view.invalidate()
         }

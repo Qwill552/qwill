@@ -530,8 +530,13 @@ class ComposerCapsule(context: Context) : ViewGroup(context) {
         emoji.layout(inset, buttonBottom - emoji.measuredHeight, inset + emoji.measuredWidth, buttonBottom)
         attach.layout(width - inset - attach.measuredWidth, buttonBottom - attach.measuredHeight, width - inset, buttonBottom)
         val side = context.dp(BUTTON_INSET + ComposerIconButton.SIZE + FIELD_GAP).roundToInt()
-        val inputBottom = height - context.dp(FIELD_BOTTOM).roundToInt()
-        input.layout(side, inputBottom - input.measuredHeight, side + input.measuredWidth, inputBottom)
+        val inputTop = if (input.lineCount <= 1 && height <= context.dp(MIN_HEIGHT).roundToInt()) {
+            val metrics = input.paint.fontMetrics
+            (height / 2f - input.paddingTop - (metrics.descent - metrics.ascent) / 2f).roundToInt()
+        } else {
+            height - context.dp(FIELD_BOTTOM).roundToInt() - input.measuredHeight
+        }
+        input.layout(side, inputTop, side + input.measuredWidth, inputTop + input.measuredHeight)
     }
 
     override fun dispatchDraw(canvas: Canvas) {

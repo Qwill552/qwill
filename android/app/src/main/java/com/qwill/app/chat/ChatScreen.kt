@@ -2076,6 +2076,11 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     override fun onMentionClick(username: String) {
         val me = (QwillApplication.session.state as? SessionState.Authenticated)?.user
         if (me != null && me.username.equals(username, ignoreCase = true)) return
+        val known = messages.chats.firstOrNull { it.type == ChatType.PRIVATE && it.otherMember?.username.equals(username, ignoreCase = true) }
+        if (known != null) {
+            if (known.id != chatId && stack?.top === this) stack?.push(ChatScreen(known.id))
+            return
+        }
         messages.startPrivateChat(username, classGuid) { result ->
             when (result) {
                 is ApiResult.Success -> if (result.value.id != chatId && stack?.top === this) stack?.push(ChatScreen(result.value.id))
