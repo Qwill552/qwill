@@ -62,6 +62,8 @@ interface MessageCellHost {
 
     fun onLinkClick(url: String)
 
+    fun onMentionClick(username: String) {}
+
     fun onQuoteClick(model: MessageCellModel)
 
     fun onReactionClick(model: MessageCellModel, emoji: String)
@@ -119,6 +121,13 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
 
     val key: String? get() = model?.key
 
+    var slideOffset = 0f
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     val boundModel: MessageCellModel? get() = model
 
     init {
@@ -128,6 +137,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
     fun bind(next: MessageCellModel) {
         val previous = model
         model = next
+        if (previous?.key != next.key) slideOffset = 0f
         trackReactionBumps(previous, next)
         val sender = next.row.message.sender
         if (next.showAvatar && sender != null) {
@@ -231,7 +241,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         drawSelectionHighlight(canvas, palette)
         drawFlash(canvas, current, palette)
         if (selection > 0f && SelectionRules.selectable(current.row.message)) drawCheckbox(canvas, current, bubble, selection, palette)
-        val shift = shiftX(current)
+        val shift = shiftX(current) + slideOffset
         if (shift != 0f) {
             canvas.save()
             canvas.translate(shift, 0f)
@@ -481,6 +491,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         val thickness = px(UNDERLINE)
         val offset = px(UNDERLINE_OFFSET)
         for (link in links) {
+            if (link.mention) continue
             val first = text.getLineForOffset(link.start)
             val last = text.getLineForOffset(max(link.start, link.end - 1))
             for (line in first..last) {
@@ -687,7 +698,7 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
                 when {
                     link != null -> {
                         playSoundEffect(android.view.SoundEffectConstants.CLICK)
-                        host.onLinkClick(link.href)
+                        if (link.mention) host.onMentionClick(link.href) else host.onLinkClick(link.href)
                     }
                     quote -> {
                         quoteFlashUntil = SystemClock.uptimeMillis() + QUOTE_FLASH_MS
@@ -790,7 +801,8 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
         val quote = bubble.quote
         if (quote != null && !quote.deleted) info.addAction(AccessibilityNodeInfo.AccessibilityAction(ACTION_QUOTE, "Перейти к цитате"))
         bubble.links.forEachIndexed { index, link ->
-            info.addAction(AccessibilityNodeInfo.AccessibilityAction(ACTION_LINK_BASE + index, "Открыть ссылку ${link.href}"))
+            val label = if (link.mention) "Открыть @${link.href}" else "Открыть ссылку ${link.href}"
+            info.addAction(AccessibilityNodeInfo.AccessibilityAction(ACTION_LINK_BASE + index, label))
         }
     }
 
@@ -804,7 +816,8 @@ class MessageCell(context: Context, private val host: MessageCellHost) : View(co
             }
             val index = action - ACTION_LINK_BASE
             if (index >= 0 && index < bubble.links.size) {
-                host.onLinkClick(bubble.links[index].href)
+                val link = bubble.links[index]
+                if (link.mention) host.onMentionClick(link.href) else host.onLinkClick(link.href)
                 return true
             }
         }

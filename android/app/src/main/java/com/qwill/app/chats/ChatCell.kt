@@ -24,6 +24,7 @@ import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.animation.PathInterpolator
 import com.qwill.app.QwillApplication
+import com.qwill.app.chat.composer.ChatDraft
 import com.qwill.app.consent.CssGradient
 import com.qwill.app.emoji.Emoji
 import com.qwill.app.files.ImageReceiver
@@ -50,6 +51,7 @@ data class ChatRowModel(
     val myUserId: String?,
     val online: Boolean,
     val typists: List<String>,
+    val draft: ChatDraft? = null,
 ) {
     val id: String get() = chat.id
 }
@@ -103,6 +105,9 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
     private var badgeText = ""
     private var badgeWidth = 0f
     private var badgeShaderWidth = -1f
+    private var mentionBadge = false
+    private var mentionShaderWidth = -1f
+    private val mentionGradientPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var service = false
     private var ownSent = false
 
@@ -151,7 +156,11 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
         } else {
             image.setImage(QwillApplication.files.avatarRequest(chat.avatarUrl), null, avatarSize, small = true)
         }
-        val time = chat.lastMessage?.let { ChatRowTime.format(it.createdAt, nowMs) }.orEmpty()
+        val draft = ChatPreview.shownDraft(chat, next.draft)
+        val time = when {
+            draft != null -> ChatRowTime.formatMs(draft.date, nowMs, java.util.TimeZone.getDefault())
+            else -> chat.lastMessage?.let { ChatRowTime.format(it.createdAt, nowMs) }.orEmpty()
+        }
         val timeChanged = time != timeText
         timeText = time
         val needsText = next != laidOutFor || timeChanged || laidOutPalette !== Theme.palette || laidOutEmoji != (Emoji.matcher != null)
@@ -210,7 +219,7 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
         timeWidth = if (timeText.isEmpty()) 0f else timePaint.measureText(timeText)
         val typing = current.typists.isNotEmpty()
         val last = chat.lastMessage
-        val nextPreview = ChatPreview.of(chat, current.myUserId)
+        val nextPreview = ChatPreview.of(chat, current.myUserId, current.draft)
         preview = nextPreview
         ownSent = nextPreview.own && !typing
         var nameRoom = bodyWidth
@@ -225,8 +234,10 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
             else -> unread.toString()
         }
         badgeWidth = if (badgeText.isEmpty()) 0f else max(px(BADGE_H), badgePaint.measureText(badgeText) + px(BADGE_PAD) * 2)
+        mentionBadge = chat.unreadMentionsCount > 0
         var previewRoom = bodyWidth
         if (badgeWidth > 0f) previewRoom -= badgeWidth + px(GAP)
+        if (mentionBadge) previewRoom -= px(BADGE_H) + px(GAP)
         if (typing) {
             val label = if (chat.type == ChatType.GROUP) "${current.typists.joinToString(", ")} печатает…" else "печатает…"
             typingText = TextUtils.ellipsize(label, previewPaint, max(0f, previewRoom), TextUtils.TruncateAt.END)
@@ -236,14 +247,15 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
             if (nextPreview.icon != null) previewRoom -= px(PREVIEW_ICON) + px(PREVIEW_ICON_GAP)
             previewLayout = buildPreview(nextPreview, max(0f, previewRoom), palette)
         }
-        if (last == null) timeWidth = 0f
+        if (last == null && !nextPreview.draft) timeWidth = 0f
     }
 
     private fun buildPreview(content: ChatPreviewText, room: Float, palette: Palette): StaticLayout {
         val builder = SpannableStringBuilder()
         if (content.author.isNotEmpty()) {
             builder.append(content.author)
-            builder.setSpan(ForegroundColorSpan(withAlpha(palette.pulseInk, AUTHOR_ALPHA)), 0, content.author.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            val authorColor = if (content.draft) palette.danger else withAlpha(palette.pulseInk, AUTHOR_ALPHA)
+            builder.setSpan(ForegroundColorSpan(authorColor), 0, content.author.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         builder.append(Emoji.replace(content.text, px(PREVIEW_EMOJI)))
         previewPaint.color = withAlpha(palette.pulseInk, PREVIEW_ALPHA)
@@ -316,7 +328,7 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
         val timeLine = timeMetrics.descent - timeMetrics.ascent
         val previewLine = previewMetrics.descent - previewMetrics.ascent
         val topRow = maxOf(nameLine, timeLine, if (ownSent) px(CHECK_SIZE) else 0f)
-        val bottomRow = max(previewLine, if (badgeWidth > 0f) px(BADGE_H) else 0f)
+        val bottomRow = max(previewLine, if (badgeWidth > 0f || mentionBadge) px(BADGE_H) else 0f)
         val bodyTop = (height - topRow - px(ROW_GAP) - bottomRow) / 2f
         val topCenter = bodyTop + topRow / 2f
         val bottomCenter = bodyTop + topRow + px(ROW_GAP) + bottomRow / 2f
@@ -363,6 +375,25 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
             }
         }
         if (badgeWidth > 0f) drawBadge(canvas, right - badgeWidth, bottomCenter, current.chat.muted, palette)
+        if (mentionBadge) {
+            val mentionRight = if (badgeWidth > 0f) right - badgeWidth - px(GAP) else right
+            drawMentionBadge(canvas, mentionRight - px(BADGE_H), bottomCenter)
+        }
+    }
+
+    private fun drawMentionBadge(canvas: Canvas, left: Float, centerY: Float) {
+        val size = px(BADGE_H)
+        if (mentionShaderWidth != size) {
+            val line = CssGradient.linear(BADGE_ANGLE, size, size)
+            mentionGradientPaint.shader = LinearGradient(line.x0, line.y0, line.x1, line.y1, FixedColors.badgeFrom, FixedColors.badgeTo, Shader.TileMode.CLAMP)
+            mentionShaderWidth = size
+        }
+        val save = canvas.save()
+        canvas.translate(left, centerY - size / 2f)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, mentionGradientPaint)
+        canvas.restoreToCount(save)
+        val icon = px(MENTION_ICON)
+        QwillIcon.AT.draw(canvas, left + (size - icon) / 2f, centerY - icon / 2f, icon, FixedColors.lift, iconPaint)
     }
 
     private fun drawOfficialMark(canvas: Canvas, left: Float, centerY: Float, palette: Palette) {
@@ -536,11 +567,12 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
         if (current.typists.isNotEmpty()) {
             parts.add(if (chat.type == ChatType.GROUP) "${current.typists.joinToString(", ")} печатает" else "печатает")
         } else {
-            val content = ChatPreview.of(chat, current.myUserId)
+            val content = ChatPreview.of(chat, current.myUserId, current.draft)
             parts.add(content.author + content.text)
         }
         if (timeText.isNotEmpty()) parts.add(timeText)
         if (chat.unreadCount > 0) parts.add("непрочитанных: ${chat.unreadCount}")
+        if (chat.unreadMentionsCount > 0) parts.add("есть упоминания")
         if (chat.muted) parts.add("уведомления выключены")
         contentDescription = parts.joinToString(", ")
     }
@@ -598,6 +630,7 @@ class ChatCell(context: Context, private val host: ChatCellHost) : View(context)
         private const val PREVIEW_ICON_GAP = 2f
         private const val BADGE_TEXT = 12f
         private const val BADGE_H = 22f
+        private const val MENTION_ICON = 15f
         private const val BADGE_PAD = 7f
         private const val BADGE_RADIUS = 11f
         private const val BADGE_ANGLE = 140f

@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import com.qwill.app.QwillApplication
+import com.qwill.app.chat.composer.DraftsListener
 import com.qwill.app.R
 import com.qwill.app.auth.SessionState
 import com.qwill.app.auth.SessionStateListener
@@ -117,6 +118,7 @@ class ChatsScreen : Screen(), ChatCellHost {
     val searchActive: Boolean get() = searchOpen && !searchRetreating
 
     private val chatsListener = ChatsListener { refreshRows(animate = true) }
+    private val draftsListener = DraftsListener { refreshRows(animate = true) }
     private val presenceListener = PresenceListener {
         refreshRows(animate = true)
         refreshSearch()
@@ -194,6 +196,7 @@ class ChatsScreen : Screen(), ChatCellHost {
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reveal?.setGeometry(revealGeometry()) }
 
         QwillApplication.messages.addChatsListener(chatsListener)
+        QwillApplication.drafts.addListener(draftsListener)
         QwillApplication.presence.addListener(presenceListener)
         QwillApplication.typing.addListener(typingListener)
         QwillApplication.socket.addStateListener(connectionListener)
@@ -218,6 +221,7 @@ class ChatsScreen : Screen(), ChatCellHost {
     override fun onViewDestroyed() {
         savedListState = layoutManager.onSaveInstanceState()
         QwillApplication.messages.removeChatsListener(chatsListener)
+        QwillApplication.drafts.removeListener(draftsListener)
         QwillApplication.presence.removeListener(presenceListener)
         QwillApplication.typing.removeListener(typingListener)
         QwillApplication.socket.removeStateListener(connectionListener)
@@ -412,9 +416,10 @@ class ChatsScreen : Screen(), ChatCellHost {
         val myId = currentUser()?.id
         val presence = QwillApplication.presence
         val typing = QwillApplication.typing
-        val models = VisibleChats.select(controller.chats, active, admin).map { chat ->
+        val drafts = QwillApplication.drafts.all()
+        val models = VisibleChats.select(controller.chats, active, admin, drafts).map { chat ->
             val online = chat.type == ChatType.PRIVATE && chat.otherMember?.let { presence[it.id]?.online } == true
-            ChatRowModel(chat, myId, online, typing.typists(chat.id).map { it.displayName })
+            ChatRowModel(chat, myId, online, typing.typists(chat.id).map { it.displayName }, drafts[chat.id])
         }
         updatePlaceholders(controller.chatsReady, controller.chats.isEmpty(), models.isEmpty())
         if (jumpTop) {

@@ -3,6 +3,7 @@ package com.qwill.app.chat.selection
 import com.qwill.app.model.GroupMemberDTO
 import com.qwill.app.model.GroupRole
 import com.qwill.app.model.MessageDto
+import com.qwill.app.model.MessageType
 
 object SelectionRules {
     const val LIMIT = 50
@@ -95,4 +96,24 @@ class MessageSelection {
         active = false
         ids = emptyList()
     }
+}
+
+object EditRules {
+    fun canEdit(message: MessageDto, myId: String?): Boolean =
+        myId != null &&
+            message.sender?.id == myId &&
+            message.id > 0 &&
+            message.deletedAt == null &&
+            message.type == MessageType.TEXT &&
+            message.attachment == null &&
+            message.forwardedFrom == null
+}
+
+object ReplyRules {
+    fun canReply(message: MessageDto, chatWritable: Boolean): Boolean =
+        chatWritable &&
+            message.id > 0 &&
+            message.deletedAt == null &&
+            message.type != MessageType.ANNOUNCEMENT &&
+            message.announcement == null
 }

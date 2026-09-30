@@ -1,6 +1,7 @@
 package com.qwill.app.messenger
 
 import com.qwill.app.auth.SessionState
+import com.qwill.app.chat.composer.MentionRules
 import com.qwill.app.core.TaskQueue
 import com.qwill.app.database.MessagesStorage
 import com.qwill.app.database.PageSide
@@ -12,6 +13,7 @@ import com.qwill.app.model.ChatBlockEvent
 import com.qwill.app.model.ChatDeletedEvent
 import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListItemDto
+import com.qwill.app.model.ChatMentionsEvent
 import com.qwill.app.model.ChatMemberSummary
 import com.qwill.app.model.ChatMutedEvent
 import com.qwill.app.model.ChatPinnedEvent
@@ -32,6 +34,7 @@ import com.qwill.app.net.NoResponseError
 import com.qwill.app.net.RequestGuid
 import com.qwill.app.realtime.SocketConnection
 import com.qwill.app.realtime.SocketEvent
+import java.util.TreeSet
 import java.util.concurrent.Executor
 
 class MessagesController(
@@ -64,6 +67,7 @@ class MessagesController(
     private val membersListeners = ArrayList<MembersListener>()
     private val membersByChat = HashMap<String, List<GroupMemberDTO>>()
     private val membersWanted = HashSet<String>()
+    private val mentionIds = HashMap<String, TreeSet<Long>>()
     private val cancelledGuids = HashSet<Int>()
     private val syncWaiters = HashMap<String, MutableList<(SyncOutcome) -> Unit>>()
     private val preloadQueue = ArrayDeque<String>()
@@ -144,6 +148,7 @@ class MessagesController(
         socket.subscribe(SocketEvent.CHAT_DELETED, ChatDeletedEvent.serializer(), none) { applyChatDeleted(it.chatId) }
         socket.subscribe(SocketEvent.MEMBER_CHANGED, MemberChangedEvent.serializer(), none) { applyMemberChanged(it) }
         socket.subscribe(SocketEvent.CHAT_MUTED, ChatMutedEvent.serializer(), none) { applyChatMuted(it) }
+        socket.subscribe(SocketEvent.CHAT_MENTIONS, ChatMentionsEvent.serializer(), none) { applyChatMentions(it) }
         socket.addConnectedListener { onSocketConnected() }
     }
 
@@ -217,6 +222,74 @@ class MessagesController(
                 is ApiResult.Failure -> callback(result.error)
             }
         }
+    }
+
+    fun editMessage(original: MessageDto, text: String, callback: (ApiException?) -> Unit) {
+        val current = epoch
+        applyMessageUpdate(original.copy(content = text, editedAt = sender.isoTime(clock())))
+        transport.editMessage(original.chatId, original.id, text, guid) edit@{ result ->
+            if (current != epoch) return@edit
+            when (result) {
+                is ApiResult.Success -> {
+                    result.value?.let { applyMessageUpdate(it) }
+                    callback(null)
+                }
+                is ApiResult.Failure -> {
+                    applyMessageUpdate(original)
+                    callback(result.error)
+                }
+            }
+        }
+    }
+
+    fun unreadMentionIds(chatId: String): List<Long> = mentionIds[chatId]?.toList() ?: emptyList()
+
+    fun loadUnreadMentions(chatId: String, requestGuid: Int, callback: (ApiResult<List<Long>>) -> Unit) {
+        val current = epoch
+        transport.unreadMentions(chatId, requestGuid) { result ->
+            if (!alive(current, requestGuid)) return@unreadMentions
+            when (result) {
+                is ApiResult.Success -> {
+                    val ids = result.value.messageIds
+                    mentionIds[chatId] = TreeSet(ids)
+                    if (ids.isEmpty()) setMentionCount(chatId, 0)
+                    callback(ApiResult.Success(ids))
+                }
+                is ApiResult.Failure -> callback(result)
+            }
+        }
+    }
+
+    fun readMentions(chatId: String, ids: List<Long>) {
+        if (ids.isEmpty()) return
+        val known = mentionIds[chatId]
+        val removed = ids.count { known?.remove(it) == true }
+        val count = chats.firstOrNull { it.id == chatId }?.unreadMentionsCount ?: 0
+        setMentionCount(chatId, count - removed)
+        val current = epoch
+        transport.readMentions(chatId, ids, guid) { result ->
+            if (current == epoch && result is ApiResult.Success) setMentionCount(chatId, result.value)
+        }
+    }
+
+    fun readAllMentions(chatId: String) {
+        mentionIds.remove(chatId)
+        setMentionCount(chatId, 0)
+        val current = epoch
+        transport.readMentions(chatId, null, guid) { result ->
+            if (current == epoch && result is ApiResult.Success) setMentionCount(chatId, result.value)
+        }
+    }
+
+    fun applyChatMentions(event: ChatMentionsEvent) {
+        if (event.unreadMentionsCount <= 0) mentionIds.remove(event.chatId)
+        setMentionCount(event.chatId, event.unreadMentionsCount)
+    }
+
+    private fun setMentionCount(chatId: String, count: Int) {
+        val next = count.coerceAtLeast(0)
+        updateChat(chatId) { it.copy(unreadMentionsCount = next) }
+        updateDetails(chatId) { if (it.unreadMentionsCount == next) it else it.copy(unreadMentionsCount = next) }
     }
 
     fun applyChatMuted(event: ChatMutedEvent) {
@@ -489,10 +562,11 @@ class MessagesController(
         storageQueue.post {
             val confirmed = clientId != null && storage.confirmUnsent(clientId, message)
             if (!confirmed) storage.putMessages(listOf(message))
+            val repliedSenderId = if (confirmed) null else message.replyToId?.let { storage.readMessage(message.chatId, it)?.sender?.id }
             main.post {
                 if (current != epoch) return@post
                 if (confirmed) notify(FeedUpdate.Sent(message.chatId, clientId!!, message)) else notify(FeedUpdate.Added(message.chatId, listOf(message)))
-                touchChat(message)
+                touchChat(message, repliedSenderId)
             }
         }
     }
@@ -708,6 +782,7 @@ class MessagesController(
         syncWaiters.clear()
         membersByChat.clear()
         membersWanted.clear()
+        mentionIds.clear()
         preloadQueue.clear()
         preloadStarted = false
         preloadWaiting = false
@@ -1007,15 +1082,20 @@ class MessagesController(
         storageQueue.post { storage.prune(opened, timings.totalLimit, timings.pageSize) }
     }
 
-    private fun touchChat(message: MessageDto) {
+    private fun touchChat(message: MessageDto, repliedSenderId: String? = null) {
         val chat = chats.firstOrNull { it.id == message.chatId }
         if (chat == null) {
             reloadChat(message.chatId)
             return
         }
-        val mine = message.sender?.id == me()?.id
+        val user = me()
+        val mine = message.sender?.id == user?.id
         val unread = if (mine) chat.unreadCount else chat.unreadCount + 1
-        upsertChat(chat.copy(lastMessage = message, updatedAt = message.createdAt, unreadCount = unread))
+        val mentioned = MentionRules.mentionsMe(message, chat.type, user?.id, user?.username, repliedSenderId) &&
+            mentionIds.getOrPut(chat.id) { TreeSet() }.add(message.id)
+        val mentions = if (mentioned) chat.unreadMentionsCount + 1 else chat.unreadMentionsCount
+        upsertChat(chat.copy(lastMessage = message, updatedAt = message.createdAt, unreadCount = unread, unreadMentionsCount = mentions))
+        if (mentioned) updateDetails(chat.id) { it.copy(unreadMentionsCount = mentions) }
     }
 
     private fun updateChat(chatId: String, transform: (ChatListItemDto) -> ChatListItemDto) {

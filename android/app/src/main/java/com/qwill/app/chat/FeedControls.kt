@@ -26,7 +26,13 @@ import kotlin.math.ceil
 import kotlin.math.hypot
 import kotlin.math.max
 
-class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(context) {
+class JumpDownButton(
+    context: Context,
+    private val icon: QwillIcon = QwillIcon.CHEVRON_DOWN,
+    private val label: String = LABEL,
+    private val countLabel: String = COUNT_LABEL,
+    private val onJump: () -> Unit,
+) : View(context) {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -45,15 +51,53 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
     private var visibleTarget = false
     private var animator: ValueAnimator? = null
     private var pressed = false
+    private var stackOffset = 0f
+    private var stackAnimator: ValueAnimator? = null
+    private var longFired = false
+    private val longPress = Runnable {
+        val action = onLongPress
+        if (pressed && action != null) {
+            longFired = true
+            pressed = false
+            invalidate()
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            action()
+        }
+    }
+
+    var onLongPress: (() -> Unit)? = null
 
     val pad: Float get() = px(PAD)
 
     val shown: Boolean get() = visibleTarget
 
+    val hasCount: Boolean get() = badgeText.isNotEmpty()
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
-        contentDescription = "К последним сообщениям"
+        contentDescription = label
         alpha = 0f
+    }
+
+    fun setStackOffset(target: Float, animated: Boolean) {
+        if (target == stackOffset && stackAnimator == null) return
+        stackAnimator?.cancel()
+        stackAnimator = null
+        val duration = Motion.duration(STACK_MS)
+        if (!animated || duration <= 0L || !isAttachedToWindow || progress <= 0f) {
+            stackOffset = target
+            apply(progress)
+            return
+        }
+        stackAnimator = ValueAnimator.ofFloat(stackOffset, target).apply {
+            this.duration = duration
+            interpolator = Motion.decelerate
+            addUpdateListener {
+                stackOffset = it.animatedValue as Float
+                apply(progress)
+            }
+            start()
+        }
     }
 
     fun setCount(count: Int) {
@@ -64,7 +108,7 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
         }
         if (text == badgeText) return
         badgeText = text
-        contentDescription = if (count > 0) "К последним сообщениям, непрочитанных: $count" else "К последним сообщениям"
+        contentDescription = if (count > 0) "$label, $countLabel: $count" else label
         invalidate()
     }
 
@@ -93,7 +137,7 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
         val scale = HIDDEN_SCALE + (1f - HIDDEN_SCALE) * value
         scaleX = scale
         scaleY = scale
-        translationY = px(HIDDEN_SHIFT) * (1f - value)
+        translationY = px(HIDDEN_SHIFT) * (1f - value) + stackOffset
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -126,7 +170,7 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
         strokePaint.color = withAlpha(palette.pulseGlass, BORDER_ALPHA)
         canvas.drawCircle(cx, cy, size / 2f - px(BORDER) / 2f, strokePaint)
         val icon = px(ICON)
-        QwillIcon.CHEVRON_DOWN.draw(canvas, cx - icon / 2f, cy - icon / 2f, icon, palette.pulseInk, iconPaint)
+        this.icon.draw(canvas, cx - icon / 2f, cy - icon / 2f, icon, palette.pulseInk, iconPaint)
         if (badgeText.isNotEmpty()) drawBadge(canvas, left + size + px(BADGE_OUT), top - px(BADGE_OUT), palette.pulseDock)
     }
 
@@ -178,24 +222,29 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
             MotionEvent.ACTION_DOWN -> {
                 if (!inside) return false
                 pressed = true
+                longFired = false
+                if (onLongPress != null) postDelayed(longPress, LONG_PRESS_MS)
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (pressed && !inside) {
                     pressed = false
+                    removeCallbacks(longPress)
                     invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                val fire = pressed && inside
+                removeCallbacks(longPress)
+                val fire = pressed && inside && !longFired
                 pressed = false
                 invalidate()
                 if (fire) performClick()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(longPress)
                 pressed = false
                 invalidate()
                 return true
@@ -243,6 +292,10 @@ class JumpDownButton(context: Context, private val onJump: () -> Unit) : View(co
         const val BADGE_OUT = 5f
         const val BADGE_ANGLE = 140f
         const val MAX_BADGE = 99
+        const val STACK_MS = 280L
+        const val LONG_PRESS_MS = 500L
+        const val LABEL = "К последним сообщениям"
+        const val COUNT_LABEL = "непрочитанных"
     }
 }
 

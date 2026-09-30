@@ -15,7 +15,10 @@ import com.qwill.app.database.time
 import com.qwill.app.model.ChatBlockEvent
 import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatListResponse
+import com.qwill.app.model.ChatMentionsEvent
 import com.qwill.app.model.ChatMutedEvent
+import com.qwill.app.model.ChatType
+import com.qwill.app.model.UnreadMentionsResponse
 import com.qwill.app.model.GroupMemberDTO
 import com.qwill.app.model.GroupRole
 import com.qwill.app.model.MembersResponse
@@ -933,5 +936,121 @@ class MessagesControllerTest {
         controller.closeChat("g1")
         controller.onSocketConnected()
         assertEquals(2, transport.callsStartingWith("members:g1").size)
+    }
+
+    @Test
+    fun editChangesFeedAtOnceAndRevertsOnFailure() {
+        start()
+        serveChats(chat("c1"))
+        controller.onSocketConnected()
+        val original = message(5, "c1", content = "было", sender = ME)
+        storage.putMessages(listOf(original))
+        updates.clear()
+        val errors = ArrayList<ApiException?>()
+
+        controller.editMessage(original, "стало") { errors.add(it) }
+
+        val edited = updatesOf<FeedUpdate.Changed>().single().messages.single()
+        assertEquals("стало", edited.content)
+        assertTrue(edited.editedAt != null)
+        assertEquals("стало", storage.readMessage("c1", 5)?.content)
+        assertEquals(listOf("edit:c1:5:стало"), transport.callsStartingWith("edit:"))
+
+        transport.heldEdits.single().reply(ApiResult.Failure(ApiError(0, ErrorCode.FORBIDDEN, "нельзя")))
+
+        val reverted = updatesOf<FeedUpdate.Changed>().last().messages.single()
+        assertEquals("было", reverted.content)
+        assertNull(reverted.editedAt)
+        assertEquals("нельзя", errors.single()?.message)
+    }
+
+    @Test
+    fun editAcceptedTakesServerVersion() {
+        start()
+        serveChats(chat("c1"))
+        controller.onSocketConnected()
+        val original = message(6, "c1", content = "было", sender = ME)
+        storage.putMessages(listOf(original))
+        val errors = ArrayList<ApiException?>()
+        transport.edit = { _, _, text -> ApiResult.Success(original.copy(content = text, editedAt = time(99))) }
+
+        controller.editMessage(original, "стало") { errors.add(it) }
+
+        assertEquals(listOf<ApiException?>(null), errors)
+        assertEquals(time(99), storage.readMessage("c1", 6)?.editedAt)
+    }
+
+    @Test
+    fun chatMentionsEventSetsCount() {
+        start()
+        serveChats(chat("g1").copy(type = ChatType.GROUP, unreadMentionsCount = 3))
+        controller.onSocketConnected()
+
+        controller.applyChatMentions(ChatMentionsEvent("g1", 1))
+
+        assertEquals(1, controller.chats.single().unreadMentionsCount)
+    }
+
+    @Test
+    fun liveReplyToMineCountsAsMentionOnce() {
+        start()
+        serveChats(chat("g1").copy(type = ChatType.GROUP))
+        controller.onSocketConnected()
+        storage.putMessages(listOf(message(1, "g1", sender = ME)))
+        val reply = message(2, "g1").copy(replyToId = 1)
+
+        controller.applyIncomingMessage(reply)
+        controller.applyIncomingMessage(reply)
+        assertEquals(1, controller.chats.single().unreadMentionsCount)
+        assertEquals(listOf(2L), controller.unreadMentionIds("g1"))
+
+        controller.applyIncomingMessage(message(3, "g1", sender = ME).copy(replyToId = 1))
+        controller.applyIncomingMessage(message(4, "g1"))
+        assertEquals(1, controller.chats.single().unreadMentionsCount)
+    }
+
+    @Test
+    fun replyInPrivateChatIsNotMention() {
+        start()
+        serveChats(chat("c1"))
+        controller.onSocketConnected()
+        storage.putMessages(listOf(message(1, "c1", sender = ME)))
+
+        controller.applyIncomingMessage(message(2, "c1").copy(replyToId = 1))
+
+        assertEquals(0, controller.chats.single().unreadMentionsCount)
+    }
+
+    @Test
+    fun readMentionsDropsCountAtOnceAndTakesServerCount() {
+        start()
+        serveChats(chat("g1").copy(type = ChatType.GROUP, unreadMentionsCount = 3))
+        controller.onSocketConnected()
+        transport.mentionList = { ApiResult.Success(UnreadMentionsResponse(listOf(5L, 6L, 7L))) }
+        val loaded = ArrayList<List<Long>>()
+        controller.loadUnreadMentions("g1", RequestGuid.next()) { if (it is ApiResult.Success) loaded.add(it.value) }
+        assertEquals(listOf(listOf(5L, 6L, 7L)), loaded)
+
+        controller.readMentions("g1", listOf(5L))
+        assertEquals(2, controller.chats.single().unreadMentionsCount)
+        assertEquals(listOf(6L, 7L), controller.unreadMentionIds("g1"))
+
+        transport.mentionsRead = { _, _ -> ApiResult.Success(0) }
+        controller.readAllMentions("g1")
+        assertEquals(0, controller.chats.single().unreadMentionsCount)
+        assertTrue(controller.unreadMentionIds("g1").isEmpty())
+        assertEquals(listOf("mentionsRead:g1:5", "mentionsRead:g1:all"), transport.callsStartingWith("mentionsRead"))
+    }
+
+    @Test
+    fun emptyMentionListResetsCount() {
+        start()
+        serveChats(chat("g1").copy(type = ChatType.GROUP, unreadMentionsCount = 2))
+        controller.onSocketConnected()
+        transport.mentionList = { ApiResult.Success(UnreadMentionsResponse(emptyList())) }
+
+        controller.loadUnreadMentions("g1", RequestGuid.next()) {}
+
+        assertEquals(0, controller.chats.single().unreadMentionsCount)
     }
 }

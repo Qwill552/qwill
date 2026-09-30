@@ -12,6 +12,7 @@ import com.qwill.app.model.MessageSendPayload
 import com.qwill.app.model.MessagesAround
 import com.qwill.app.model.MessagesPage
 import com.qwill.app.model.MessagesSyncResponse
+import com.qwill.app.model.UnreadMentionsResponse
 import com.qwill.app.net.ApiCallback
 import com.qwill.app.net.ApiResult
 import com.qwill.app.net.NetworkError
@@ -89,6 +90,10 @@ class FakeTransport : MessagesTransport {
     var membersOf: (String) -> ApiResult<MembersResponse>? = { ApiResult.Failure(NetworkError()) }
     var block: (String, Boolean) -> ApiResult<BlockStateDto>? = { _, blocked -> ApiResult.Success(BlockStateDto(iBlocked = blocked)) }
     var batchDelete: (String, List<Long>) -> ApiResult<List<MessageDto>>? = { _, _ -> ApiResult.Failure(NetworkError()) }
+    var edit: (String, Long, String) -> ApiResult<MessageDto?>? = { _, _, _ -> null }
+    val heldEdits = ArrayList<Held<MessageDto?>>()
+    var mentionList: (String) -> ApiResult<UnreadMentionsResponse>? = { ApiResult.Failure(NetworkError()) }
+    var mentionsRead: (String, List<Long>?) -> ApiResult<Int>? = { _, _ -> null }
 
     override fun listChats(guid: Int, callback: ApiCallback<ChatListResponse>) {
         calls.add("chats")
@@ -163,6 +168,22 @@ class FakeTransport : MessagesTransport {
     override fun deleteBatch(chatId: String, messageIds: List<Long>, guid: Int, callback: ApiCallback<List<MessageDto>>) {
         calls.add("deleteBatch:$chatId:${messageIds.joinToString(",")}")
         batchDelete(chatId, messageIds)?.let { callback.onResult(it) }
+    }
+
+    override fun editMessage(chatId: String, messageId: Long, content: String, guid: Int, callback: ApiCallback<MessageDto?>) {
+        calls.add("edit:$chatId:$messageId:$content")
+        val result = edit(chatId, messageId, content)
+        if (result == null) heldEdits.add(Held("edit:$messageId", callback)) else callback.onResult(result)
+    }
+
+    override fun unreadMentions(chatId: String, guid: Int, callback: ApiCallback<UnreadMentionsResponse>) {
+        calls.add("mentions:$chatId")
+        mentionList(chatId)?.let { callback.onResult(it) }
+    }
+
+    override fun readMentions(chatId: String, messageIds: List<Long>?, guid: Int, callback: ApiCallback<Int>) {
+        calls.add("mentionsRead:$chatId:${messageIds?.joinToString(",") ?: "all"}")
+        mentionsRead(chatId, messageIds)?.let { callback.onResult(it) }
     }
 
     override fun cancelRequestsForGuid(guid: Int) {

@@ -1,17 +1,77 @@
 package com.qwill.app.chat
 
-enum class SpanKind { TEXT, LINK }
+enum class SpanKind { TEXT, LINK, MENTION }
 
 data class TextSpan(val kind: SpanKind, val value: String, val href: String?)
 
-data class LinkRange(val start: Int, val end: Int, val href: String)
+data class LinkRange(val start: Int, val end: Int, val href: String, val mention: Boolean = false)
+
+data class MentionRange(val start: Int, val end: Int, val username: String)
 
 object TextLinks {
     private val SCHEMES = arrayOf("https://", "http://")
     private val TRAILING = setOf('.', ',', '!', '?', ';', '»')
 
+    const val USERNAME_MIN = 3
+    const val USERNAME_MAX = 32
+    private val LEADING = setOf('(', '[', '«', '"', '\'', ',', ';', ':', '!', '?')
+
     fun split(content: String?): List<TextSpan> {
         if (content.isNullOrEmpty()) return listOf(TextSpan(SpanKind.TEXT, content.orEmpty(), null))
+        val result = ArrayList<TextSpan>()
+        var offset = 0
+        for (span in linkSpans(content)) {
+            if (span.kind == SpanKind.TEXT) splitMentions(content, offset, span.value, result) else result.add(span)
+            offset += span.value.length
+        }
+        return result
+    }
+
+    fun mentions(content: String?): List<MentionRange> {
+        val result = ArrayList<MentionRange>()
+        var offset = 0
+        for (span in split(content)) {
+            if (span.kind == SpanKind.MENTION) result.add(MentionRange(offset, offset + span.value.length, span.href.orEmpty()))
+            offset += span.value.length
+        }
+        return result
+    }
+
+    private fun splitMentions(content: String, offset: Int, value: String, out: MutableList<TextSpan>) {
+        var cursor = 0
+        var index = value.indexOf('@')
+        while (index >= 0) {
+            val end = mentionEnd(content, offset + index, offset + value.length)
+            if (end > 0) {
+                if (index > cursor) out.add(TextSpan(SpanKind.TEXT, value.substring(cursor, index), null))
+                val local = end - offset
+                val raw = value.substring(index, local)
+                out.add(TextSpan(SpanKind.MENTION, raw, raw.substring(1).lowercase()))
+                cursor = local
+                index = value.indexOf('@', cursor)
+            } else {
+                index = value.indexOf('@', index + 1)
+            }
+        }
+        if (cursor < value.length || out.isEmpty()) out.add(TextSpan(SpanKind.TEXT, value.substring(cursor), null))
+    }
+
+    private fun mentionEnd(content: String, at: Int, limit: Int): Int {
+        if (at > 0) {
+            val before = content[at - 1]
+            if (!isJsWhitespace(before) && before !in LEADING) return -1
+        }
+        var end = at + 1
+        while (end < limit && isUsernameChar(content[end])) end++
+        val length = end - at - 1
+        if (length < USERNAME_MIN || length > USERNAME_MAX) return -1
+        if (end < content.length && isUsernameChar(content[end])) return -1
+        return end
+    }
+
+    private fun isUsernameChar(char: Char): Boolean = char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9' || char == '_'
+
+    private fun linkSpans(content: String): List<TextSpan> {
         val spans = ArrayList<TextSpan>()
         var cursor = 0
         var from = 0
@@ -36,7 +96,11 @@ object TextLinks {
         val result = ArrayList<LinkRange>()
         var offset = 0
         for (span in split(content)) {
-            if (span.kind == SpanKind.LINK) result.add(LinkRange(offset, offset + span.value.length, span.href.orEmpty()))
+            when (span.kind) {
+                SpanKind.LINK -> result.add(LinkRange(offset, offset + span.value.length, span.href.orEmpty()))
+                SpanKind.MENTION -> result.add(LinkRange(offset, offset + span.value.length, span.href.orEmpty(), mention = true))
+                SpanKind.TEXT -> Unit
+            }
             offset += span.value.length
         }
         return result

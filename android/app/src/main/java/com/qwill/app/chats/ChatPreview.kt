@@ -1,6 +1,8 @@
 package com.qwill.app.chats
 
 import com.qwill.app.calls.CallText
+import com.qwill.app.chat.composer.ChatDraft
+import com.qwill.app.core.IsoTime
 import com.qwill.app.files.MediaTypes
 import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatType
@@ -13,15 +15,42 @@ data class ChatPreviewText(
     val text: String,
     val failedCall: Boolean,
     val own: Boolean,
+    val draft: Boolean = false,
 )
 
 object ChatPreview {
     const val ANNOUNCEMENT_PREVIEW_TEXT = "Что нового в Qwill"
     const val NO_MESSAGES = "Нет сообщений"
+    const val DRAFT = "Черновик"
 
     private val WHITESPACE = Regex("[ \\t\\n\\r\\u000C]+")
 
-    fun of(chat: ChatListItemDto, myUserId: String?): ChatPreviewText {
+    fun shownDraft(chat: ChatListItemDto, draft: ChatDraft?): ChatDraft? {
+        if (draft == null || draft.isEmpty) return null
+        val lastAt = IsoTime.parse(chat.lastMessage?.createdAt) ?: 0L
+        if (lastAt > draft.date && chat.unreadCount > 0) return null
+        return draft
+    }
+
+    fun sortTime(chat: ChatListItemDto, draft: ChatDraft?): Long {
+        val updated = IsoTime.parse(chat.updatedAt) ?: 0L
+        val drafted = draft?.takeIf { !it.isEmpty }?.date ?: 0L
+        return maxOf(updated, drafted)
+    }
+
+    fun of(chat: ChatListItemDto, myUserId: String?, draft: ChatDraft? = null): ChatPreviewText {
+        val shown = shownDraft(chat, draft)
+        if (shown != null) {
+            val text = collapse(shown.text)
+            return ChatPreviewText(
+                icon = null,
+                author = if (text.isEmpty()) DRAFT else "$DRAFT: ",
+                text = text,
+                failedCall = false,
+                own = false,
+                draft = true,
+            )
+        }
         val last = chat.lastMessage
         val own = last?.sender != null && myUserId != null && last.sender.id == myUserId
         val call = last?.call?.takeIf { last.deletedAt == null }

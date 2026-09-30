@@ -135,6 +135,7 @@ data class ChatListItemDto(
     val lastMessage: MessageDto? = null,
     val updatedAt: String = "",
     val unreadCount: Int = 0,
+    val unreadMentionsCount: Int = 0,
     val muted: Boolean = false,
     val isSupportRequest: Boolean = false,
     val iBlocked: Boolean = false,
@@ -151,6 +152,7 @@ data class ChatDto(
     val lastMessage: MessageDto? = null,
     val updatedAt: String = "",
     val unreadCount: Int = 0,
+    val unreadMentionsCount: Int = 0,
     val muted: Boolean = false,
     val isSupportRequest: Boolean = false,
     val iBlocked: Boolean = false,
@@ -168,6 +170,7 @@ data class ChatDto(
         lastMessage = lastMessage,
         updatedAt = updatedAt,
         unreadCount = unreadCount,
+        unreadMentionsCount = unreadMentionsCount,
         muted = muted,
         isSupportRequest = isSupportRequest,
         iBlocked = iBlocked,
@@ -250,6 +253,32 @@ data class ChatDeletedEvent(val chatId: String)
 
 @Serializable
 data class ChatMutedEvent(val chatId: String, val muted: Boolean = false)
+
+@Serializable
+data class ChatMentionsEvent(val chatId: String, val unreadMentionsCount: Int = 0)
+
+@Serializable
+data class MentionsReadPayload(val chatId: String, val messageIds: List<Long>? = null)
+
+@Serializable
+data class MentionsReadAck(
+    val ok: Boolean = false,
+    val unreadMentionsCount: Int = 0,
+    val error: SocketAckError? = null,
+)
+
+@Serializable
+data class UnreadMentionsResponse(val messageIds: List<Long> = emptyList())
+
+@Serializable
+data class MessageEditPayload(val chatId: String, val messageId: Long, val content: String)
+
+@Serializable
+data class MessageActionAck(
+    val ok: Boolean = false,
+    val message: MessageDto? = null,
+    val error: SocketAckError? = null,
+)
 
 data class ChatPinPayload(val chatId: String, val messageId: Long?) {
     fun toJson(): JsonObject = buildJsonObject {

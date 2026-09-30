@@ -15,6 +15,8 @@ object SocketEvent {
     const val CHAT_CREATED = "chat:created"
     const val CHAT_DELETED = "chat:deleted"
     const val CHAT_MUTED = "chat:muted"
+    const val CHAT_MENTIONS = "chat:mentions"
+    const val MENTIONS_READ = "mentions:read"
     const val CHAT_READ = "chat:read"
     const val CHAT_PIN = "chat:pin"
     const val CHAT_PINNED = "chat:pinned"

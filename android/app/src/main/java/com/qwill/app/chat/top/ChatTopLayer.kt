@@ -93,7 +93,7 @@ class ChatTopLayer(
         setWillNotDraw(false)
         val glass = listOf(
             backdrop, pinnedBanner, header.back, header.capsule, header.call, header.more,
-            selection.close, selection.capsule, selection.copy, selection.delete, search.back, search.field, search.clear,
+            selection.close, selection.capsule, selection.edit, selection.copy, selection.delete, search.back, search.field, search.clear,
         )
         for (view in glass) {
             blur.addConsumer(view)
@@ -103,7 +103,7 @@ class ChatTopLayer(
         header.capsule.blur = blur
         selection.capsule.blur = blur
         search.field.blur = blur
-        for (button in listOf(header.back, header.call, header.more, selection.close, selection.copy, selection.delete, search.back, search.clear)) button.blur = blur
+        for (button in listOf(header.back, header.call, header.more, selection.close, selection.edit, selection.copy, selection.delete, search.back, search.clear)) button.blur = blur
         applyTheme()
         applyLayout()
     }

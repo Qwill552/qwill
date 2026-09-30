@@ -1,6 +1,7 @@
 package com.qwill.app.chats
 
 import com.qwill.app.calls.CallText
+import com.qwill.app.chat.composer.ChatDraft
 import com.qwill.app.model.AttachmentDto
 import com.qwill.app.model.CallKind
 import com.qwill.app.model.CallStatus
@@ -133,5 +134,56 @@ class ChatPreviewTest {
         val preview = ChatPreview.of(chat(last), "me")
         assertEquals(text, preview.text)
         assertEquals(icon, preview.icon)
+    }
+
+    private fun iso(ms: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.ROOT)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(ms))
+
+    private fun timed(ms: Long, unread: Int = 0) = ChatListItemDto(
+        id = "c",
+        title = "Чат",
+        lastMessage = message(content = "последнее").copy(createdAt = iso(ms)),
+        updatedAt = iso(ms),
+        unreadCount = unread,
+    )
+
+    @Test
+    fun draftReplacesLastMessage() {
+        val preview = ChatPreview.of(timed(1_000_000L), "me", ChatDraft("  недописано\nещё ", null, 2_000_000L))
+        assertTrue(preview.draft)
+        assertEquals("Черновик: ", preview.author)
+        assertEquals("недописано ещё", preview.text)
+        assertNull(preview.icon)
+    }
+
+    @Test
+    fun emptyDraftWithoutReplyIsHidden() {
+        val preview = ChatPreview.of(timed(1_000_000L), "me", ChatDraft("   ", null, 2_000_000L))
+        assertFalse(preview.draft)
+        assertEquals("последнее", preview.text)
+    }
+
+    @Test
+    fun newerUnreadMessageHidesDraft() {
+        val draft = ChatDraft("текст", null, 1_000_000L)
+        assertFalse(ChatPreview.of(timed(2_000_000L, unread = 1), "me", draft).draft)
+        assertTrue(ChatPreview.of(timed(2_000_000L, unread = 0), "me", draft).draft)
+    }
+
+    @Test
+    fun replyOnlyDraftHasNoColon() {
+        val preview = ChatPreview.of(timed(1_000_000L), "me", ChatDraft("", message(content = "вопрос"), 2_000_000L))
+        assertEquals("Черновик", preview.author)
+        assertEquals("", preview.text)
+    }
+
+    @Test
+    fun draftDateLiftsChatInList() {
+        val older = timed(1_000_000L).copy(id = "older")
+        val newer = timed(3_000_000L).copy(id = "newer")
+        val drafts = mapOf("older" to ChatDraft("текст", null, 5_000_000L))
+        assertEquals(listOf("newer", "older"), VisibleChats.select(listOf(newer, older), ChatFilter.ALL, false).map { it.id })
+        assertEquals(listOf("older", "newer"), VisibleChats.select(listOf(newer, older), ChatFilter.ALL, false, drafts).map { it.id })
     }
 }

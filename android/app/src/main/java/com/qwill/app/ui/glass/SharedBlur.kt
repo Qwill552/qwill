@@ -49,6 +49,7 @@ class SharedBlur(
     private var phase = 0
     private var recordedPhase = 0
     private var scale = MIN_SCALE
+    private var regionTop = 0
 
     fun onScrolled(dy: Int) {
         phase = ((phase + dy) % scale + scale) % scale
@@ -66,7 +67,7 @@ class SharedBlur(
         if (view !in consumers) consumers.add(view)
     }
 
-    fun update(host: View, width: Int, height: Int, hardware: Boolean) {
+    fun update(host: View, width: Int, height: Int, hardware: Boolean, top: Int = 0) {
         this.host = host
         if (width <= 0 || height <= 0) {
             recorded = false
@@ -81,13 +82,16 @@ class SharedBlur(
             nodeEffectKey = -1
         }
         pad = ceil(sigma * PAD_SIGMAS / scale).toInt() * scale
+        val extra = ((top % scale) + scale) % scale
+        regionTop = top - extra
+        val regionHeight = height + extra
         host.getLocationInWindow(hostLocation)
         source.getLocationInWindow(sourceLocation)
         val dx = (sourceLocation[0] - hostLocation[0]).toFloat()
-        val dy = (sourceLocation[1] - hostLocation[1]).toFloat()
+        val dy = (sourceLocation[1] - hostLocation[1] - regionTop).toFloat()
         recordedPhase = phase
         val bw = ceil((width + pad * 2f) / scale).toInt().coerceAtLeast(1)
-        val bh = ceil((height + pad * 2f + scale) / scale).toInt().coerceAtLeast(1)
+        val bh = ceil((regionHeight + pad * 2f + scale) / scale).toInt().coerceAtLeast(1)
         if (Build.VERSION.SDK_INT >= 31 && hardware) {
             recordNode(bw, bh, radius, dx, dy)
         } else {
@@ -110,7 +114,7 @@ class SharedBlur(
         if (!recorded) return
         owner.getLocationInWindow(hostLocation)
         val save = canvas.save()
-        canvas.translate((hostLocation[0] - viewLocation[0] - pad).toFloat(), (hostLocation[1] - viewLocation[1] - pad).toFloat())
+        canvas.translate((hostLocation[0] - viewLocation[0] - pad).toFloat(), (hostLocation[1] + regionTop - viewLocation[1] - pad).toFloat())
         canvas.scale(scale.toFloat(), scale.toFloat())
         val renderNode = node
         if (Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated && renderNode != null) {

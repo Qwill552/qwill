@@ -25,12 +25,14 @@ object Motion {
     const val WHEEL_SETTLE = 800L
     const val WHEEL_STEP = 300L
     const val CLOUD_POP = 190L
+    const val ISLAND = 250L
 
     val easeScreen: Interpolator = PathInterpolator(0.2f, 0.9f, 0.25f, 1f)
     val easeClose: Interpolator = PathInterpolator(0.42f, 0f, 1f, 1f)
     val easeSpring: Interpolator = PathInterpolator(0.2f, 1.5f, 0.4f, 1f)
     val easeOutQuint: Interpolator = PathInterpolator(0.23f, 1f, 0.32f, 1f)
     val decelerate: Interpolator = DecelerateInterpolator()
+    val island: Interpolator = PathInterpolator(0.199f, 0.011f, 0.279f, 0.910f)
 
     const val SYSTEM_BACK_NUDGE_DP = 56f
     const val SYSTEM_BACK_LAZY_START = 0.015f

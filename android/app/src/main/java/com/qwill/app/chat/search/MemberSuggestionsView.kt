@@ -38,6 +38,12 @@ import kotlin.math.roundToInt
 class MemberSuggestionsView(context: Context) : FrameLayout(context) {
     var onPick: ((GroupMemberDTO) -> Unit)? = null
     var screenHeight = 0
+    var baseShift = 0f
+        set(value) {
+            if (field == value) return
+            field = value
+            translationY = value + context.dp(RISE) * (1f - shown)
+        }
 
     private val capsule = DockCapsule(this, RADIUS)
     private val list = RecyclerView(context)
@@ -111,7 +117,7 @@ class MemberSuggestionsView(context: Context) : FrameLayout(context) {
     private fun apply(value: Float) {
         shown = value
         alpha = value
-        translationY = context.dp(RISE) * (1f - value)
+        translationY = baseShift + context.dp(RISE) * (1f - value)
         if (value <= 0f && !target) visibility = View.GONE
     }
 

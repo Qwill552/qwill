@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -29,7 +30,10 @@ import com.qwill.app.BuildConfig
 import com.qwill.app.QwillApplication
 import com.qwill.app.auth.SessionState
 import com.qwill.app.calls.ActiveCallsListener
+import com.qwill.app.chat.bottom.BottomMode
 import com.qwill.app.chat.bottom.ChatBottomLayer
+import com.qwill.app.chat.bottom.IslandFrame
+import com.qwill.app.chat.composer.ComposerController
 import com.qwill.app.chat.calendar.CalendarFilter
 import com.qwill.app.chat.calendar.ChatCalendarSheet
 import com.qwill.app.chat.calendar.DatePickerSheet
@@ -46,6 +50,8 @@ import com.qwill.app.chat.search.SearchCancel
 import com.qwill.app.chat.selection.FeedListView
 import com.qwill.app.chat.selection.FeedTouchHelper
 import com.qwill.app.chat.selection.MessageSelection
+import com.qwill.app.chat.selection.EditRules
+import com.qwill.app.chat.selection.ReplyRules
 import com.qwill.app.chat.selection.SelectionRules
 import com.qwill.app.chat.top.CapsuleModel
 import com.qwill.app.chat.top.ChatSubtitle
@@ -74,11 +80,13 @@ import com.qwill.app.model.ChatDto
 import com.qwill.app.model.ChatListItemDto
 import com.qwill.app.model.ChatSearchResponse
 import com.qwill.app.model.ChatType
+import com.qwill.app.model.GroupMemberDTO
 import com.qwill.app.model.MessageDto
 import com.qwill.app.net.ApiException
 import com.qwill.app.net.ApiResult
 import com.qwill.app.net.NetworkError
 import com.qwill.app.net.NoResponseError
+import com.qwill.app.realtime.ConnectionState
 import com.qwill.app.realtime.ConnectionStateListener
 import com.qwill.app.realtime.PresenceListener
 import com.qwill.app.realtime.TypingListener
@@ -133,6 +141,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private lateinit var adapter: ChatAdapter
     private lateinit var floating: FloatingDateView
     private lateinit var jump: JumpDownButton
+    private lateinit var mentionJump: JumpDownButton
+    private lateinit var sideStack: FrameLayout
     private lateinit var thumb: FeedScrollThumb
     private lateinit var status: TextView
     private lateinit var layoutCache: ChatLayoutCache
@@ -160,8 +170,33 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private var showJump = false
     private var pendingJumpId: Long? = null
     private var placement: Placement? = null
-    private var flashKey: String? = null
-    private var flashStarted = 0L
+    private val flashes = HashMap<String, Long>()
+    private var islandCurrent = 0f
+    private var islandApplied = 0f
+    private var islandShift = 0f
+    private var keyboardShift = 0f
+    private var blockPending = false
+    private var mentionsRequested = false
+    private val pendingMentionReads = LinkedHashSet<Long>()
+    private var mentionReadScheduled = false
+    private val mentionReadTask = Runnable { flushMentionReads() }
+    private val composerHost = object : ComposerController.Host {
+        override val myId: String? get() = this@ChatScreen.myId()
+
+        override val groupChat: Boolean get() = isGroup()
+
+        override fun members(): List<GroupMemberDTO>? = messages.membersOf(chatId)
+
+        override fun recentAuthorIds(): List<String> = feed.messages.asReversed().mapNotNull { it.sender?.id }.distinct()
+
+        override fun jumpTo(messageId: Long) = this@ChatScreen.jumpTo(messageId)
+
+        override fun socketReady(): Boolean {
+            val state = QwillApplication.socket.state
+            return state == ConnectionState.Connected || state == ConnectionState.Updating
+        }
+    }
+    private val composer = ComposerController(chatId, composerHost)
     private var liveKeys = HashSet<String>()
     private var floatingDay = -1L
     private var jumpSeq = 0
@@ -218,6 +253,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private val chatsListener = ChatsListener {
         updateJumpCount()
         updateHeader(animated = true)
+        updateMentionJump(animated = true)
     }
     private val presenceListener = PresenceListener { updateSubtitle(animated = true) }
     private val typingListener = TypingListener { changed -> if (changed == null || changed == chatId) updateSubtitle(animated = true) }
@@ -228,12 +264,15 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         updatePinned(animated = true)
         updateSelectionHeader(animated = false)
         if (search.open) renderSearch(animated = true)
+        composer.refreshMentions()
     }
     private val emojiListener = EmojiListener { indexChanged ->
         if (indexChanged) {
             layoutCache.clear()
             rebindAll()
             top.pinnedBanner.applyTheme()
+            bottom.composer.input.refreshEmoji()
+            bottom.contextBar.refresh()
         } else {
             for (index in 0 until list.childCount) list.getChildAt(index).invalidate()
             top.pinnedBanner.invalidate()
@@ -245,6 +284,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             top.header.capsule.invalidate()
         } else {
             readTracker.flush()
+            flushMentionReads()
+            composer.saveDraft()
         }
     }
 
@@ -325,8 +366,15 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         floating = FloatingDateView(context) { day -> jumpToDay(day) }
         root.addView(floating, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
+        sideStack = FrameLayout(context)
+        sideStack.clipChildren = false
+        sideStack.clipToPadding = false
         jump = JumpDownButton(context) { onJumpPressed() }
-        root.addView(jump, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.BOTTOM))
+        mentionJump = JumpDownButton(context, QwillIcon.AT, MENTIONS_LABEL, MENTIONS_COUNT_LABEL) { onMentionJumpPressed() }
+        mentionJump.onLongPress = { openMentionMenu() }
+        sideStack.addView(jump, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        sideStack.addView(mentionJump, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        root.addView(sideStack, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.BOTTOM))
 
         thumb = FeedScrollThumb(context, this)
         root.addView(thumb, FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END))
@@ -339,7 +387,16 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         root.addView(searchPanel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         bottom = ChatBottomLayer(context, list, wallpaper)
-        root.addView(bottom, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        root.addView(bottom, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        bottom.onIsland = { frame -> applyIsland(frame) }
+        bottom.onKeyboardShift = { shift ->
+            keyboardShift = shift
+            applyListTranslation()
+        }
+        bottom.selectionBar.reply.setOnClickListener { replyToSelection() }
+        bottom.blocked.unblock.setOnClickListener { unblockFromBar() }
+        bottom.service.onMutedChange = { muted -> messages.setChatMuted(chatId, muted) }
+        composer.attach(bottom)
         bottom.bar.calendar.setOnClickListener { openDatePicker() }
         bottom.bar.from.setOnClickListener {
             search.startPicking()
@@ -375,6 +432,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         }
         top.search.field.input.onDeleteEmpty = { if (search.from != null || search.picking) search.clearCaption() }
         top.selection.close.setOnClickListener { exitSelection(animated = true) }
+        top.selection.edit.setOnClickListener { editSelection() }
         top.selection.copy.setOnClickListener { copySelection() }
         top.selection.delete.setOnClickListener { confirmDeleteSelection() }
         touchHelper = FeedTouchHelper(list, this)
@@ -393,6 +451,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             updateSelectionHeader(animated = false)
         }
         if (search.open) renderSearch(animated = false)
+        updateBottomMode(animated = false)
         if (!opened) {
             open()
         } else {
@@ -419,6 +478,10 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         MainQueue.cancel(minuteTask)
         touchHelper.cancel()
         top.search.dropKeyboard()
+        composer.saveDraft()
+        composer.onLeave()
+        composer.dropKeyboard()
+        flushMentionReads()
         menu?.dismissNow()
         if (selection.active) exitSelection(animated = false)
         rememberPosition()
@@ -460,6 +523,9 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     override fun onViewDestroyed() {
         restoreAnchor = topAnchor()
+        composer.detach()
+        MainQueue.cancel(mentionReadTask)
+        mentionReadScheduled = false
         MainQueue.cancel(trimTask)
         MainQueue.cancel(kindTask)
         selectionAnimator?.cancel()
@@ -478,6 +544,8 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     override fun onDestroyed() {
         readTracker.stop()
+        composer.onLeave()
+        MainQueue.cancel(mentionReadTask)
         MainQueue.cancel(minuteTask)
         MainQueue.cancel(kindTask)
         messages.removeFeedListener(feedListener)
@@ -532,16 +600,18 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         calendarSheet?.setSafeArea(safe)
         dateSheet?.setSafeArea(safe)
         val contentTop = top.contentTop + safe.top
-        setListPadding(contentTop, (px(ChatInsets.LIST_BOTTOM) + safe.bottom).roundToInt())
+        setListPadding(contentTop, listBottomPadding())
         searchPanel.setInsets(contentTop, (px(PANEL_BOTTOM) + safe.bottom).roundToInt())
         status.setPadding((px(STATUS_PAD_X) + safe.left).roundToInt(), list.paddingTop, (px(STATUS_PAD_X) + safe.right).roundToInt(), list.paddingBottom)
         (floating.layoutParams as FrameLayout.LayoutParams).topMargin =
             (contentTop + px(ChatTopLayout.FLOATING_DATE_GAP) - px(FLOATING_TAP_EXTRA)).roundToInt()
         floating.requestLayout()
-        val jumpParams = jump.layoutParams as FrameLayout.LayoutParams
-        jumpParams.rightMargin = (px(ChatInsets.JUMP_RIGHT) + safe.right - jump.pad).roundToInt()
-        jumpParams.bottomMargin = (px(ChatInsets.JUMP_BOTTOM) + safe.bottom - jump.pad).roundToInt()
-        jump.requestLayout()
+        val stackParams = sideStack.layoutParams as FrameLayout.LayoutParams
+        stackParams.rightMargin = (px(ChatInsets.JUMP_RIGHT) + safe.right - jump.pad).roundToInt()
+        stackParams.bottomMargin = (bottomInset() + px(STACK_GAP) - jump.pad).roundToInt()
+        stackParams.height = (px(Dimens.TAP_MIN) + jump.pad * 2 + px(STACK_ROOM)).roundToInt()
+        sideStack.requestLayout()
+        applyStackTranslation()
         val thumbParams = thumb.layoutParams as FrameLayout.LayoutParams
         thumbParams.width = (px(THUMB_STRIP) + safe.right).roundToInt()
         thumb.layoutParams = thumbParams
@@ -598,6 +668,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         connectionKind = currentKind()
         targetKind = connectionKind
         requestMembersIfGroup()
+        composer.restoreDraft()
         messages.openChat(chatId, classGuid, historyCallback)
     }
 
@@ -662,6 +733,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         details = chat
         requestMembersIfGroup()
         updateHeader(animated = true)
+        updateMentionJump(animated = true)
         if (selection.active) updateSelectionHeader(animated = false)
         val me = myId()
         if (me != null && chat.readCursors.containsKey(me)) {
@@ -779,6 +851,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             }
             is FeedUpdate.Failed -> {
                 if (feed.discard(update.clientId)) submitRows(diff = true)
+                update.reason?.let { composer.showError(it) }
             }
             is FeedUpdate.Discarded -> {
                 if (feed.discard(update.clientId)) submitRows(diff = true)
@@ -790,11 +863,13 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             is FeedUpdate.UploadProgress -> Unit
             is FeedUpdate.Changed -> {
                 if (feed.change(update.messages)) submitRows(diff = true)
+                for (message in update.messages) composer.onMessageChanged(message)
                 for (message in update.messages) if (message.id in selectedCache) selectedCache[message.id] = message
                 if (selection.active) updateSelectionHeader(animated = false)
             }
             is FeedUpdate.Removed -> {
                 if (feed.remove(update.ids)) submitRows(diff = true)
+                composer.onMessagesRemoved(update.ids)
                 if (selection.active && selection.removeAll(update.ids)) onSelectionChanged()
             }
             is FeedUpdate.ReactionsChanged -> if (feed.reactions(update.messageId, update.reactions)) submitRows(diff = true)
@@ -806,6 +881,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             }
             is FeedUpdate.DetailsChanged -> onChatDetails(update.details)
             is FeedUpdate.ChatGone -> {
+                composer.onChatGone()
                 if (selection.active) exitSelection(animated = false)
                 if (stack?.top === this) stack?.pop()
             }
@@ -959,7 +1035,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
 
     override fun visibleTop(): Float = list.paddingTop.toFloat()
 
-    override fun visibleBottom(): Float = list.height - (px(ChatInsets.COMPOSER_TOP) + safe.bottom)
+    override fun visibleBottom(): Float = list.height - list.paddingBottom + px(LIST_EXTRA)
 
     private fun visibleCenter(): Float = (list.paddingTop + visibleBottom()) / 2f
 
@@ -1010,10 +1086,12 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         val visible = feed.loaded && (showJump || feed.hasMoreAfter)
         if (!visible && jump.shown && !search.open) feed.returnToId = null
         jump.setShown(visible && !search.open)
+        updateStack(animated = true)
     }
 
     private fun updateJumpCount() {
         jump.setCount(messages.chats.firstOrNull { it.id == chatId }?.unreadCount ?: 0)
+        updateStack(animated = true)
     }
 
     private fun onJumpPressed() {
@@ -1119,13 +1197,14 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     }
 
     private fun startFlash(key: String) {
-        flashKey = key
-        flashStarted = SystemClock.uptimeMillis()
+        val now = SystemClock.uptimeMillis()
+        flashes.entries.removeAll { now - it.value > Motion.FLASH }
+        flashes[key] = now
         val position = adapter.positionOfKey(key)
         if (position >= 0) layoutManager.findViewByPosition(position)?.invalidate()
     }
 
-    override fun flashStartedAt(key: String): Long = if (key == flashKey) flashStarted else 0L
+    override fun flashStartedAt(key: String): Long = flashes[key] ?: 0L
 
     private fun keyOfMessage(messageId: Long): String {
         val message = feed.messages.firstOrNull { it.id == messageId }
@@ -1237,6 +1316,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     private fun updateReading() {
         if (!::list.isInitialized || !shown || !AppForeground.active || !feed.loaded) return
         if (searchPanel.revealed >= 1f) return
+        if (placement == null) collectMentionReads(list.paddingTop.toFloat(), visibleBottom())
         if (feed.unreadAtEntry > 0 && (!cursorKnown || !unreadDecided || awaitingUnread)) return
         if (placement != null) return
         val top = list.paddingTop.toFloat()
@@ -1509,6 +1589,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         updateCall(animated)
         if (!available && selection.active) exitSelection(animated = false)
         if (!available && search.open) closeSearch()
+        updateBottomMode(animated)
     }
 
     private fun updateSubtitle(animated: Boolean) {
@@ -1702,12 +1783,16 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         syncCells()
         updatePinned(animated = true)
         if (search.open) renderSearch(animated = true)
+        updateBottomMode(animated = true)
         backStateChanged()
     }
 
     private fun updateSelectionHeader(animated: Boolean) {
         if (!::top.isInitialized || !selection.active) return
-        top.selection.setState(selection.count, SelectionRules.canDelete(selectedMessages(), myId(), isGroupAdmin()), animated)
+        val selected = selectedMessages()
+        val canEdit = selected.size == 1 && EditRules.canEdit(selected[0], myId())
+        top.selection.setState(selection.count, SelectionRules.canDelete(selected, myId(), isGroupAdmin()), canEdit, animated)
+        if (::bottom.isInitialized) bottom.setSelectionReply(selectionReplyTarget() != null, animated && shown)
     }
 
     private fun selectedMessages(): List<MessageDto> =
@@ -1726,6 +1811,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         syncCells()
         updatePinned(animated)
         if (search.open) renderSearch(animated)
+        updateBottomMode(animated)
         backStateChanged()
     }
 
@@ -1789,6 +1875,214 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
     }
 
     private fun myId(): String? = (QwillApplication.session.state as? SessionState.Authenticated)?.user?.id
+
+    private fun bottomInset(): Float = px(ChatBottomLayer.BOTTOM) + safe.bottom
+
+    private fun listBottomPadding(): Int = (islandApplied + bottomInset() + px(LIST_EXTRA)).roundToInt()
+
+    private fun applyIsland(frame: IslandFrame): Boolean {
+        islandCurrent = frame.current
+        islandApplied = frame.applied
+        islandShift = frame.listShift
+        if (!::list.isInitialized) return false
+        val padding = listBottomPadding()
+        val changed = padding != list.paddingBottom
+        if (changed) {
+            list.setPadding(list.paddingLeft, list.paddingTop, list.paddingRight, padding)
+            status.setPadding(status.paddingLeft, status.paddingTop, status.paddingRight, padding)
+            updateThumbTrack()
+        }
+        applyListTranslation()
+        return changed
+    }
+
+    private fun applyListTranslation() {
+        if (!::list.isInitialized) return
+        val next = islandShift - keyboardShift
+        if (list.translationY != next) {
+            list.translationY = next
+            if (::top.isInitialized) top.invalidate()
+            if (::bottom.isInitialized) bottom.invalidateBlur()
+        }
+        applyStackTranslation()
+    }
+
+    private fun applyStackTranslation() {
+        if (!::sideStack.isInitialized) return
+        sideStack.translationY = -(islandCurrent + keyboardShift)
+    }
+
+    private fun chatWritable(): Boolean {
+        val chat = listItem()
+        return failure == null && !isService() && chat?.iBlocked != true && chat?.blockedMe != true
+    }
+
+    private fun bottomModeNow(): BottomMode {
+        val chat = listItem()
+        return when {
+            failure != null -> BottomMode.NONE
+            selection.active -> BottomMode.SELECTION
+            search.open -> BottomMode.SEARCH
+            isService() -> BottomMode.SERVICE
+            chat != null && (chat.iBlocked || chat.blockedMe) -> BottomMode.BLOCKED
+            else -> BottomMode.COMPOSER
+        }
+    }
+
+    private fun updateBottomMode(animated: Boolean) {
+        if (!::bottom.isInitialized) return
+        val chat = listItem()
+        if (chat != null) {
+            bottom.blocked.setState(chat.iBlocked, blockPending)
+            bottom.service.setMuted(chat.muted, animated && shown)
+        }
+        val mode = bottomModeNow()
+        val changed = mode != bottom.currentMode
+        bottom.setMode(mode, animated && shown)
+        bottom.setSelectionReply(selectionReplyTarget() != null, animated && shown)
+        if (changed) composer.onModeChanged()
+    }
+
+    private fun selectionReplyTarget(): MessageDto? {
+        if (!selection.active || selection.count != 1) return null
+        val message = selectedMessages().singleOrNull() ?: return null
+        return if (ReplyRules.canReply(message, chatWritable())) message else null
+    }
+
+    private fun replyToSelection() {
+        val message = selectionReplyTarget() ?: return
+        exitSelection(animated = true)
+        composer.reply(message)
+    }
+
+    private fun editSelection() {
+        val message = selectedMessages().singleOrNull() ?: return
+        if (!EditRules.canEdit(message, myId())) return
+        exitSelection(animated = true)
+        composer.edit(message)
+    }
+
+    private fun unblockFromBar() {
+        val other = listItem()?.otherMember ?: return
+        if (blockPending) return
+        blockPending = true
+        updateBottomMode(animated = true)
+        messages.setUserBlocked(chatId, other.id, false) {
+            blockPending = false
+            updateBottomMode(animated = true)
+        }
+    }
+
+    private fun mentionCount(): Int = listItem()?.unreadMentionsCount ?: 0
+
+    private fun requestMentionsIfNeeded() {
+        if (mentionsRequested || !isGroup() || mentionCount() <= 0) return
+        mentionsRequested = true
+        messages.loadUnreadMentions(chatId, classGuid) { result ->
+            if (result is ApiResult.Success && ::list.isInitialized) list.post { updateReading() }
+        }
+    }
+
+    private fun updateMentionJump(animated: Boolean) {
+        if (!::mentionJump.isInitialized) return
+        val count = mentionCount()
+        mentionJump.setCount(count)
+        mentionJump.setShown(count > 0 && feed.loaded && failure == null && !search.open, animated && shown)
+        updateStack(animated)
+        if (count > 0) requestMentionsIfNeeded()
+    }
+
+    private fun updateStack(animated: Boolean) {
+        if (!::mentionJump.isInitialized) return
+        val gap = px(STACK_BUTTONS_GAP)
+        val offset = if (jump.shown) -(px(Dimens.TAP_MIN) + gap + if (jump.hasCount) gap else 0f) else 0f
+        mentionJump.setStackOffset(offset, animated && shown)
+    }
+
+    private fun onMentionJumpPressed() {
+        list.stopScroll()
+        val first = messages.unreadMentionIds(chatId).firstOrNull { it !in pendingMentionReads }
+        if (first != null) {
+            jumpTo(first)
+            return
+        }
+        messages.loadUnreadMentions(chatId, classGuid) { result ->
+            if (result is ApiResult.Success) result.value.firstOrNull()?.let { jumpTo(it) }
+        }
+    }
+
+    private fun openMentionMenu() {
+        if (menu?.isShowing == true || dialog != null || deleteChatDialog != null) return
+        val target = menu ?: QwillMenu(root).also { menu = it }
+        target.onClosed = { backStateChanged() }
+        val items = listOf(QwillMenuItem(label = MENTIONS_READ_ALL, icon = QwillIcon.CHECK_DOUBLE) { readAllMentions() })
+        target.show(anchorOf(mentionJump), items, safe)
+        backStateChanged()
+    }
+
+    private fun readAllMentions() {
+        pendingMentionReads.clear()
+        MainQueue.cancel(mentionReadTask)
+        mentionReadScheduled = false
+        messages.readAllMentions(chatId)
+    }
+
+    private fun collectMentionReads(topEdge: Float, bottomEdge: Float) {
+        val unread = messages.unreadMentionIds(chatId)
+        if (unread.isEmpty()) return
+        val wanted = unread.toHashSet()
+        for (index in 0 until list.childCount) {
+            val child = list.getChildAt(index)
+            val cell = child as? MessageCell ?: continue
+            if (child.bottom <= topEdge || child.top >= bottomEdge) continue
+            val message = cell.boundModel?.row?.message ?: continue
+            if (message.id !in wanted || !pendingMentionReads.add(message.id)) continue
+            cell.key?.let { startFlash(it) }
+        }
+        if (pendingMentionReads.isNotEmpty() && !mentionReadScheduled) {
+            mentionReadScheduled = true
+            MainQueue.postDelayed(mentionReadTask, ReadTracker.MIN_INTERVAL_MS)
+        }
+    }
+
+    private fun flushMentionReads() {
+        MainQueue.cancel(mentionReadTask)
+        mentionReadScheduled = false
+        if (pendingMentionReads.isEmpty()) return
+        val ids = pendingMentionReads.toList()
+        pendingMentionReads.clear()
+        messages.readMentions(chatId, ids)
+    }
+
+    private fun hideKeyboard() {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(root.windowToken, 0)
+        composer.dropKeyboard()
+    }
+
+    override val keyboardShown: Boolean get() = keyboardShift > 0f || safe.keyboard > 0
+
+    override fun dismissKeyboard() {
+        hideKeyboard()
+    }
+
+    override fun canSwipeReply(message: MessageDto): Boolean =
+        ::bottom.isInitialized && bottom.currentMode == BottomMode.COMPOSER && ReplyRules.canReply(message, chatWritable())
+
+    override fun onSwipeReply(message: MessageDto) {
+        composer.reply(message)
+    }
+
+    override fun onMentionClick(username: String) {
+        val me = (QwillApplication.session.state as? SessionState.Authenticated)?.user
+        if (me != null && me.username.equals(username, ignoreCase = true)) return
+        messages.startPrivateChat(username, classGuid) { result ->
+            when (result) {
+                is ApiResult.Success -> if (result.value.id != chatId && stack?.top === this) stack?.push(ChatScreen(result.value.id))
+                is ApiResult.Failure -> Toast.makeText(context, result.error.message ?: MENTION_NOT_FOUND, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     override fun onDayTap(dayStartMs: Long) {
         openCalendar(dayStartMs)
@@ -1857,8 +2151,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         val visible = open && !selection.active
         val selectionChanged = open && searchSelectionHidden != selection.active
         searchSelectionHidden = selection.active
-        val duration = if (selectionChanged) SearchArrowsView.SELECTION_MS else SEARCH_BAR_MS
-        bottom.setBarShown(visible, duration, animate)
+        updateBottomMode(animate)
         bottom.arrows.setListMode(search.mode == ChatSearchMode.LIST, animate)
         bottom.arrows.setShown(visible, if (selectionChanged) SearchArrowsView.SELECTION_MS else SearchArrowsView.OPEN_MS, animate) {
             bottom.settleVisibility()
@@ -1878,6 +2171,7 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
             rebindVisible()
         }
         updateJumpVisibility()
+        updateMentionJump(animate)
         updatePinned(animate)
         backStateChanged()
     }
@@ -1957,6 +2251,13 @@ class ChatScreen(val chatId: String, private val initialJumpId: Long? = null) :
         const val CIRCLE = 40f
         const val CLIP_LABEL = "Qwill"
         const val PANEL_BOTTOM = 100f
-        const val SEARCH_BAR_MS = 240L
+        const val LIST_EXTRA = 40f
+        const val STACK_GAP = 12f
+        const val STACK_BUTTONS_GAP = 10f
+        const val STACK_ROOM = 64f
+        const val MENTIONS_LABEL = "К непрочитанным упоминаниям"
+        const val MENTIONS_COUNT_LABEL = "упоминаний"
+        const val MENTIONS_READ_ALL = "Отметить все прочитанными"
+        const val MENTION_NOT_FOUND = "Пользователь не найден"
     }
 }

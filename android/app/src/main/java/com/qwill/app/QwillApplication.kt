@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.util.Log
 import com.qwill.app.auth.FileSessionStore
 import com.qwill.app.calls.ActiveCalls
+import com.qwill.app.chat.composer.Drafts
+import com.qwill.app.chat.composer.PreferencesDraftsStorage
 import com.qwill.app.chat.top.HiddenPins
 import com.qwill.app.chat.top.PreferencesHiddenPinsStorage
 import com.qwill.app.auth.Session
@@ -66,6 +68,7 @@ class QwillApplication : Application() {
         typing = TypingStore(MainQueue, { (session.state as? SessionState.Authenticated)?.user?.id }).also { it.attach(socket) }
         calls = ActiveCalls().also { it.attach(socket) }
         hiddenPins = HiddenPins(PreferencesHiddenPinsStorage(this)) { (session.state as? SessionState.Authenticated)?.user?.id }
+        drafts = Drafts(PreferencesDraftsStorage(this)) { (session.state as? SessionState.Authenticated)?.user?.id }
         val storage = MessagesStorage(File(filesDir, MessagesStorage.FILE_NAME), NativeSqlDatabase.OPENER) { Log.w(STORAGE_TAG, it) }
         val storageQueue = DispatchQueue("storageQueue")
         val mediaTaskQueue = DispatchQueue("mediaTaskQueue").apply { priority = Thread.MIN_PRIORITY }
@@ -109,6 +112,7 @@ class QwillApplication : Application() {
                 UploadService.update(this, count, uploadPercent)
             },
         ).also { it.attach(socket) }
+        messages.addFeedListener { update -> if (update is FeedUpdate.ChatGone) drafts.remove(update.chatId) }
         messages.addFeedListener { update ->
             if (update !is FeedUpdate.UploadProgress) return@addFeedListener
             val percent = (update.share * 100).toInt()
@@ -134,6 +138,7 @@ class QwillApplication : Application() {
             typing.clear()
             calls.clear()
             hiddenPins.clear()
+            drafts.clear()
             messages.onSessionCleared()
             recentSearches.clear()
             ChatPositions.clear()
@@ -242,6 +247,9 @@ class QwillApplication : Application() {
             private set
 
         lateinit var hiddenPins: HiddenPins
+            private set
+
+        lateinit var drafts: Drafts
             private set
     }
 }

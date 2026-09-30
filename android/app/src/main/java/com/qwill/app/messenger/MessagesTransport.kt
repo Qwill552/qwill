@@ -10,15 +10,20 @@ import com.qwill.app.model.ChatListResponse
 import com.qwill.app.model.ChatReadPayload
 import com.qwill.app.model.CreatePrivateChatInput
 import com.qwill.app.model.MembersResponse
+import com.qwill.app.model.MentionsReadAck
+import com.qwill.app.model.MentionsReadPayload
+import com.qwill.app.model.MessageActionAck
 import com.qwill.app.model.MessageBatchAck
 import com.qwill.app.model.MessageDeleteBatchPayload
 import com.qwill.app.model.MessageReactPayload
 import com.qwill.app.model.MessageDto
+import com.qwill.app.model.MessageEditPayload
 import com.qwill.app.model.MessageSendAck
 import com.qwill.app.model.MessageSendPayload
 import com.qwill.app.model.MessagesAround
 import com.qwill.app.model.MessagesPage
 import com.qwill.app.model.MessagesSyncResponse
+import com.qwill.app.model.UnreadMentionsResponse
 import com.qwill.app.net.ApiCallback
 import com.qwill.app.net.ApiClient
 import com.qwill.app.net.ApiJson
@@ -57,6 +62,12 @@ interface MessagesTransport {
     fun pinMessage(chatId: String, messageId: Long?)
 
     fun deleteBatch(chatId: String, messageIds: List<Long>, guid: Int, callback: ApiCallback<List<MessageDto>>)
+
+    fun editMessage(chatId: String, messageId: Long, content: String, guid: Int, callback: ApiCallback<MessageDto?>)
+
+    fun unreadMentions(chatId: String, guid: Int, callback: ApiCallback<UnreadMentionsResponse>)
+
+    fun readMentions(chatId: String, messageIds: List<Long>?, guid: Int, callback: ApiCallback<Int>)
 
     fun cancelRequestsForGuid(guid: Int)
 }
@@ -154,6 +165,30 @@ class ApiMessagesTransport(
             SocketEvent.MESSAGE_DELETE_BATCH,
             ApiJson.encodeToJsonElement(MessageDeleteBatchPayload.serializer(), MessageDeleteBatchPayload(chatId, messageIds)),
             { body -> ApiJson.decodeFromJsonElement(MessageBatchAck.serializer(), body).messages.orEmpty() },
+            guid,
+            callback,
+        )
+    }
+
+    override fun editMessage(chatId: String, messageId: Long, content: String, guid: Int, callback: ApiCallback<MessageDto?>) {
+        socket.request(
+            SocketEvent.MESSAGE_EDIT,
+            ApiJson.encodeToJsonElement(MessageEditPayload.serializer(), MessageEditPayload(chatId, messageId, content)),
+            { body -> ApiJson.decodeFromJsonElement(MessageActionAck.serializer(), body).message },
+            guid,
+            callback,
+        )
+    }
+
+    override fun unreadMentions(chatId: String, guid: Int, callback: ApiCallback<UnreadMentionsResponse>) {
+        api.send(ApiRequest.get("/api/chats/${encode(chatId)}/mentions", UnreadMentionsResponse.serializer()), guid, callback)
+    }
+
+    override fun readMentions(chatId: String, messageIds: List<Long>?, guid: Int, callback: ApiCallback<Int>) {
+        socket.request(
+            SocketEvent.MENTIONS_READ,
+            ApiJson.encodeToJsonElement(MentionsReadPayload.serializer(), MentionsReadPayload(chatId, messageIds)),
+            { body -> ApiJson.decodeFromJsonElement(MentionsReadAck.serializer(), body).unreadMentionsCount },
             guid,
             callback,
         )

@@ -31,21 +31,24 @@ import kotlin.math.max
 class SelectionHeaderView(context: Context) : ChromeRowLayout(context, ACTION_GAP) {
     val close = ChromeCircleButton(context, QwillIcon.CLOSE, "Выйти из выделения")
     val capsule = SelectionCapsule(context)
+    val edit = ChromeCircleButton(context, QwillIcon.EDIT, "Изменить")
     val copy = ChromeCircleButton(context, QwillIcon.COPY, "Копировать")
     val delete = ChromeCircleButton(context, QwillIcon.TRASH, "Удалить", danger = true)
 
     init {
-        setParts(close, capsule, listOf(copy, delete))
+        setParts(close, capsule, listOf(edit, copy, delete))
+        edit.visibility = View.GONE
     }
 
-    fun setState(count: Int, canDelete: Boolean, animated: Boolean) {
+    fun setState(count: Int, canDelete: Boolean, canEdit: Boolean, animated: Boolean) {
         capsule.setCount(count, animated)
         delete.visibility = if (canDelete) View.VISIBLE else View.GONE
+        edit.visibility = if (canEdit) View.VISIBLE else View.GONE
     }
 
     fun refresh() {
         capsule.refresh()
-        for (view in listOf(close, copy, delete)) view.invalidate()
+        for (view in listOf(close, edit, copy, delete)) view.invalidate()
     }
 
     private companion object {

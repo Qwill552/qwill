@@ -392,6 +392,71 @@ class TextLinksTest {
         assertEquals(listOf(LinkRange(7, 7 + url.length, url)), TextLinks.ranges("ссылка $url тут"))
         assertEquals(listOf(l("https://a.com"), t(" b")), spans("https://a.com b"))
     }
+
+    private fun names(text: String): List<String> = TextLinks.mentions(text).map { it.username }
+
+    @Test
+    fun mentionAtStartHasBounds() {
+        assertEquals(listOf(MentionRange(0, 6, "alice")), TextLinks.mentions("@alice привет"))
+        assertEquals(listOf(Triple(SpanKind.MENTION, "@alice", "alice"), t(" привет")), spans("@alice привет"))
+    }
+
+    @Test
+    fun mentionAfterSpaceBreakAndBrackets() {
+        assertEquals(listOf("bob"), names("привет @bob"))
+        assertEquals(listOf("bob"), names("строка\n@bob"))
+        assertEquals(listOf("bob"), names("(@bob)"))
+        assertEquals(listOf("bob"), names("«@bob»"))
+        assertEquals(listOf("bob"), names("да,@bob"))
+    }
+
+    @Test
+    fun mailAndDoubleAtAreNotMentions() {
+        assertEquals(emptyList<String>(), names("пиши на a@bob.com"))
+        assertEquals(emptyList<String>(), names("@@bob"))
+    }
+
+    @Test
+    fun noMentionsInsideLinks() {
+        assertEquals(emptyList<String>(), names("https://example.com/@bob"))
+        assertEquals(listOf("bob"), names("https://example.com/ @bob"))
+        assertEquals(emptyList<String>(), names("@bobhttps://example.com"))
+    }
+
+    @Test
+    fun mentionLengthIsThreeToThirtyTwo() {
+        assertEquals(emptyList<String>(), names("@ab"))
+        assertEquals(listOf("a".repeat(32)), names("@" + "a".repeat(32)))
+        assertEquals(emptyList<String>(), names("@" + "a".repeat(33)))
+    }
+
+    @Test
+    fun mentionIsLowercased() {
+        assertEquals(listOf("alice_01"), names("@Alice_01"))
+    }
+
+    @Test
+    fun cyrillicAfterAtIsNotNick() {
+        assertEquals(emptyList<String>(), names("@алиса"))
+        assertEquals(listOf("bob"), names("@bobик"))
+    }
+
+    @Test
+    fun punctuationAfterNick() {
+        assertEquals(listOf("bob"), names("это @bob."))
+        assertEquals(listOf("bob"), names("@bob, привет"))
+        assertEquals(listOf("bob"), names("ты где, @bob?"))
+        assertEquals(listOf("bob", "carol"), names("@bob @carol"))
+    }
+
+    @Test
+    fun mentionNextToLinkKeepsBothRanges() {
+        val url = "https://a.com"
+        assertEquals(
+            listOf(LinkRange(0, 4, "bob", mention = true), LinkRange(5, 5 + url.length, url)),
+            TextLinks.ranges("@bob $url"),
+        )
+    }
 }
 
 class AuthorTintTest {
