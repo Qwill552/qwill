@@ -412,23 +412,6 @@ function browserKeyboardShown(): boolean {
   return viewport !== null && viewport.height * viewport.scale < viewportHeight() - 1;
 }
 
-function watchPageHeight(): void {
-  if (hasNativeInsets) return;
-  const root = document.documentElement;
-  const touch = window.matchMedia('(pointer: coarse)').matches;
-  let last = 0;
-  const apply = (): void => {
-    const height = window.innerHeight;
-    if (height === last) return;
-    const keyboardClosed = touch && last > 0 && height - last > 1;
-    last = height;
-    root.style.setProperty('--page-h', `${height}px`);
-    if (keyboardClosed && document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  };
-  window.addEventListener('resize', apply);
-  apply();
-}
-
 function watchSafeBottom(): void {
   window.visualViewport?.addEventListener('resize', scheduleSafeBottomHold);
   window.addEventListener('resize', scheduleSafeBottomHold);
@@ -504,7 +487,6 @@ export function initBottomInset(): void {
   panelProbe = probe(panelProbe, 'var(--emoji-panel-h)');
   rememberPanelLift(stored > 0 ? stored : measure(panelProbe));
 
-  watchPageHeight();
   watchSafeBottom();
   watchPanelGesture();
   void watchNativeInsets();
