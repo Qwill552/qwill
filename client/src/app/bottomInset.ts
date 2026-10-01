@@ -2,15 +2,6 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 import { onBackGesture } from './backGesture';
 
-interface VirtualKeyboard extends EventTarget {
-  overlaysContent: boolean;
-  boundingRect: DOMRectReadOnly;
-}
-
-type NavigatorWithVirtualKeyboard = Navigator & {
-  virtualKeyboard?: VirtualKeyboard;
-};
-
 export type BottomInsetPhase = 'measure' | 'start' | 'end';
 
 export interface BottomInsetState {
@@ -34,10 +25,6 @@ interface KeyboardInsetsPlugin {
       at?: number;
     }) => void,
   ): Promise<{ remove: () => Promise<void> }>;
-}
-
-function virtualKeyboard(): VirtualKeyboard | undefined {
-  return (navigator as NavigatorWithVirtualKeyboard).virtualKeyboard;
 }
 
 const RESTING_LIFT = 0;
@@ -137,7 +124,7 @@ function readSafeBottom(): number {
 function scheduleSafeBottomHold(): void {
   window.clearTimeout(safeTimer);
   safeTimer = window.setTimeout(() => {
-    if (keyboardHeight > 0 || panelOpen || keyboardExpected || running.size > 0) {
+    if (keyboardHeight > 0 || browserKeyboardShown() || panelOpen || keyboardExpected || running.size > 0) {
       scheduleSafeBottomHold();
       return;
     }
@@ -168,7 +155,7 @@ export function isKeyboardExpected(): boolean {
 }
 
 export function expectKeyboard(): void {
-  if (panelLift <= 0) return;
+  if (!hasNativeInsets || panelLift <= 0) return;
   window.clearTimeout(expectTimer);
   keyboardExpected = true;
   expectTimer = window.setTimeout(() => {
@@ -416,33 +403,14 @@ function revealFocused(height: number): void {
   window.scrollTo(0, 0);
 }
 
-/** Оболочка и браузер сообщают о клавиатуре по-разному, и ровно одним способом каждый.
- *  В WebView сжимается визуальный вьюпорт, а `boundingRect` пуст; в Chrome вьюпорт не
- *  шевелится вовсе. Берём наибольшее из двух. */
-function webKeyboardHeight(): number {
+function browserKeyboardShown(): boolean {
   const viewport = window.visualViewport;
-  const fromViewport = viewport ? viewportHeight() - viewport.height * viewport.scale : 0;
-  return Math.max(0, fromViewport, apiKeyboardHeight());
+  return viewport !== null && viewport.height * viewport.scale < viewportHeight() - 1;
 }
 
-function apiKeyboardHeight(): number {
-  const aboveNavigationBar = virtualKeyboard()?.boundingRect.height ?? 0;
-  return aboveNavigationBar > 0 ? aboveNavigationBar + Math.max(heldSafeBottom, 0) : 0;
-}
-
-function watchWebSources(): void {
-  const onChange = (): void => {
-    scheduleSafeBottomHold();
-    if (hasNativeInsets) return;
-    const height = Math.round(webKeyboardHeight());
-    if (height === keyboardHeight) return;
-    applySettledHeight(height);
-  };
-
-  window.visualViewport?.addEventListener('resize', onChange);
-  window.visualViewport?.addEventListener('scroll', onChange);
-  virtualKeyboard()?.addEventListener('geometrychange', onChange);
-  onChange();
+function watchSafeBottom(): void {
+  window.visualViewport?.addEventListener('resize', scheduleSafeBottomHold);
+  window.addEventListener('resize', scheduleSafeBottomHold);
 }
 
 async function watchNativeInsets(): Promise<void> {
@@ -507,9 +475,6 @@ function watchPanelGesture(): void {
 }
 
 export function initBottomInset(): void {
-  const keyboard = virtualKeyboard();
-  if (keyboard) keyboard.overlaysContent = true;
-
   heldSafeBottom = readSafeBottom();
   document.documentElement.style.setProperty('--safe-bottom-hold', `${heldSafeBottom}px`);
 
@@ -518,7 +483,7 @@ export function initBottomInset(): void {
   panelProbe = probe(panelProbe, 'var(--emoji-panel-h)');
   rememberPanelLift(stored > 0 ? stored : measure(panelProbe));
 
-  watchWebSources();
+  watchSafeBottom();
   watchPanelGesture();
   void watchNativeInsets();
 }
