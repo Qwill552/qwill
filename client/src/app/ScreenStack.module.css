@@ -4,7 +4,7 @@
 
 .stack {
   position: absolute;
-  overflow: hidden;
+  overflow: clip;
   inset: 0;
 }
 
