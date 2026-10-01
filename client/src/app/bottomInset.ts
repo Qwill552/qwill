@@ -418,12 +418,16 @@ function revealFocused(height: number): void {
 
 /** Оболочка и браузер сообщают о клавиатуре по-разному, и ровно одним способом каждый.
  *  В WebView сжимается визуальный вьюпорт, а `boundingRect` пуст; в Chrome вьюпорт не
- *  шевелится вовсе, зато честен `boundingRect`. Берём наибольшее из двух. */
+ *  шевелится вовсе. Берём наибольшее из двух. */
 function webKeyboardHeight(): number {
   const viewport = window.visualViewport;
   const fromViewport = viewport ? viewportHeight() - viewport.height * viewport.scale : 0;
-  const fromApi = virtualKeyboard()?.boundingRect.height ?? 0;
-  return Math.max(0, fromViewport, fromApi);
+  return Math.max(0, fromViewport, apiKeyboardHeight());
+}
+
+function apiKeyboardHeight(): number {
+  const aboveNavigationBar = virtualKeyboard()?.boundingRect.height ?? 0;
+  return aboveNavigationBar > 0 ? aboveNavigationBar + Math.max(heldSafeBottom, 0) : 0;
 }
 
 function watchWebSources(): void {
