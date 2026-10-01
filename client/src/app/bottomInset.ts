@@ -150,6 +150,10 @@ function forgetExpectedKeyboard(): void {
   keyboardExpected = false;
 }
 
+export function followsNativeKeyboard(): boolean {
+  return hasNativeInsets;
+}
+
 export function isKeyboardExpected(): boolean {
   return keyboardExpected;
 }

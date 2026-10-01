@@ -19,7 +19,7 @@ import { focusMessageInChat } from '../chat/showInChat';
 import { ChatSearchMembers } from '../search/ChatSearchMembers';
 import { Icon } from '../../ui/Icon';
 import { useEmojiIndex, type EmojiIndex } from '../emoji/emojiIndex';
-import { expectKeyboard } from '../../app/bottomInset';
+import { expectKeyboard, followsNativeKeyboard } from '../../app/bottomInset';
 import { useLayoutMode } from '../../app/useLayoutMode';
 import { EmojiPanel } from '../emoji/EmojiPanel';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice/VoiceRecorder';
@@ -150,6 +150,10 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   }
 
   function returnToKeyboard(): void {
+    if (!followsNativeKeyboard()) {
+      setEmojiPanelOpen(false);
+      return;
+    }
     expectKeyboard();
     setEmojiPanelOpen(false);
     fieldRef.current?.focus();
@@ -522,6 +526,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
                   return;
                 }
                 setEmojiAnchor(event.currentTarget.getBoundingClientRect());
+                if (!followsNativeKeyboard()) fieldRef.current?.blur();
                 setEmojiPanelOpen(true);
               }}
               aria-label={emojiPanelOpen ? 'Клавиатура' : 'Эмодзи'}
@@ -552,6 +557,11 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
                   expectKeyboard();
                   setEmojiPanelOpen(false);
                 }
+              }}
+              onTouchEnd={(event) => {
+                if (!emojiPanelOpen || followsNativeKeyboard()) return;
+                event.preventDefault();
+                setEmojiPanelOpen(false);
               }}
               onBlur={handleFieldBlur}
               onPaste={handleFieldPaste}
