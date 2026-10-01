@@ -308,6 +308,31 @@ export function ChatScreen() {
   }, [chatId]);
 
   useEffect(() => {
+    if (followsNativeKeyboard()) return;
+    let touchPointer = false;
+
+    function trackPointer(event: PointerEvent): void {
+      touchPointer = event.pointerType === 'touch';
+    }
+
+    function keepKeyboard(event: MouseEvent): void {
+      if (!touchPointer) return;
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLElement) || !focused.isContentEditable || !screenRef.current?.contains(focused)) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest(KEYBOARD_TARGETS)) return;
+      event.preventDefault();
+    }
+
+    document.addEventListener('pointerdown', trackPointer, true);
+    document.addEventListener('mousedown', keepKeyboard, true);
+    return () => {
+      document.removeEventListener('pointerdown', trackPointer, true);
+      document.removeEventListener('mousedown', keepKeyboard, true);
+    };
+  }, [chatId]);
+
+  useEffect(() => {
     setEmojiPanelLift(emojiPanelOpen && !isDesktop);
   }, [emojiPanelOpen, isDesktop]);
 
@@ -323,7 +348,6 @@ export function ChatScreen() {
     let startY = 0;
     let dragged = false;
     let panAllowed = false;
-    let touchPointer = false;
 
     function inFeed(event: Event): boolean {
       const target = event.target;
@@ -331,7 +355,6 @@ export function ChatScreen() {
     }
 
     function handleDown(event: PointerEvent): void {
-      touchPointer = event.pointerType === 'touch';
       dismissingPointer = null;
       if (bottomLift() <= 0 || !inFeed(event)) return;
       dismissingPointer = event.pointerId;
@@ -364,15 +387,6 @@ export function ChatScreen() {
       event.stopPropagation();
     }
 
-    function keepKeyboard(event: MouseEvent): void {
-      if (!touchPointer || followsNativeKeyboard()) return;
-      const focused = document.activeElement;
-      if (!(focused instanceof HTMLElement) || !focused.isContentEditable || !screen?.contains(focused)) return;
-      const target = event.target;
-      if (target instanceof Element && target.closest(KEYBOARD_TARGETS)) return;
-      event.preventDefault();
-    }
-
     function startsInScroller(target: EventTarget | null): boolean {
       if (!(target instanceof Element)) return false;
       for (let el: Element | null = target; el && el !== screen; el = el.parentElement) {
@@ -397,7 +411,6 @@ export function ChatScreen() {
     screen.addEventListener('pointerup', handleUp, true);
     screen.addEventListener('pointercancel', handleUp, true);
     screen.addEventListener('click', handleClick, true);
-    screen.addEventListener('mousedown', keepKeyboard, true);
     screen.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
     screen.addEventListener('touchmove', handleTouchMove, { capture: true, passive: false });
     return () => {
@@ -406,7 +419,6 @@ export function ChatScreen() {
       screen.removeEventListener('pointerup', handleUp, true);
       screen.removeEventListener('pointercancel', handleUp, true);
       screen.removeEventListener('click', handleClick, true);
-      screen.removeEventListener('mousedown', keepKeyboard, true);
       screen.removeEventListener('touchstart', handleTouchStart, true);
       screen.removeEventListener('touchmove', handleTouchMove, true);
     };
