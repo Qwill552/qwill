@@ -795,7 +795,7 @@
 html,
 body,
 #root {
-  height: 100dvh;
+  height: var(--page-h, 100dvh);
 }
 
 #root {
