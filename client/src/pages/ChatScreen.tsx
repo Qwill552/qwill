@@ -5,7 +5,7 @@ import type { ChatDto } from '@messenger/shared';
 import { createReportRequest } from '../api/admin';
 import { useEscapeKey, useHotkey } from '../app/hotkeys';
 import { useBackHandler } from '../app/useBackHandler';
-import { bottomLift, registerInsetMover, setEmojiPanelLift } from '../app/bottomInset';
+import { bottomLift, followsNativeKeyboard, registerInsetMover, setEmojiPanelLift } from '../app/bottomInset';
 import { useLayoutMode } from '../app/useLayoutMode';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
@@ -91,6 +91,7 @@ const CALL_BANNER_H = 52;
 
 const DISMISS_CLICK_WINDOW_MS = 700;
 const DISMISS_TAP_SLOP_PX = 10;
+const KEYBOARD_TARGETS = 'input, textarea, select, [contenteditable="true"], [contenteditable=""]';
 
 /** Экран одного чата: обои, лента во всю высоту, плавающая хрома и композер поверх неё.
  *  Буквальный перенос из «Пульс» (design-archive/reference), хрома — этап 2 CLAUDE.md. */
@@ -322,6 +323,7 @@ export function ChatScreen() {
     let startY = 0;
     let dragged = false;
     let panAllowed = false;
+    let touchPointer = false;
 
     function inFeed(event: Event): boolean {
       const target = event.target;
@@ -329,6 +331,7 @@ export function ChatScreen() {
     }
 
     function handleDown(event: PointerEvent): void {
+      touchPointer = event.pointerType === 'touch';
       dismissingPointer = null;
       if (bottomLift() <= 0 || !inFeed(event)) return;
       dismissingPointer = event.pointerId;
@@ -361,6 +364,15 @@ export function ChatScreen() {
       event.stopPropagation();
     }
 
+    function keepKeyboard(event: MouseEvent): void {
+      if (!touchPointer || followsNativeKeyboard()) return;
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLElement) || !focused.isContentEditable || !screen?.contains(focused)) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest(KEYBOARD_TARGETS)) return;
+      event.preventDefault();
+    }
+
     function startsInScroller(target: EventTarget | null): boolean {
       if (!(target instanceof Element)) return false;
       for (let el: Element | null = target; el && el !== screen; el = el.parentElement) {
@@ -385,6 +397,7 @@ export function ChatScreen() {
     screen.addEventListener('pointerup', handleUp, true);
     screen.addEventListener('pointercancel', handleUp, true);
     screen.addEventListener('click', handleClick, true);
+    screen.addEventListener('mousedown', keepKeyboard, true);
     screen.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
     screen.addEventListener('touchmove', handleTouchMove, { capture: true, passive: false });
     return () => {
@@ -393,6 +406,7 @@ export function ChatScreen() {
       screen.removeEventListener('pointerup', handleUp, true);
       screen.removeEventListener('pointercancel', handleUp, true);
       screen.removeEventListener('click', handleClick, true);
+      screen.removeEventListener('mousedown', keepKeyboard, true);
       screen.removeEventListener('touchstart', handleTouchStart, true);
       screen.removeEventListener('touchmove', handleTouchMove, true);
     };
